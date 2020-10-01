@@ -1,0 +1,23 @@
+Copyright (C) 2018-2020 Dunyu Liu, dunyuliu@tamu.edu
+
+If you copy, download, install or use EQquasi if you agree to be bound
+by the terms and conditions of the following agreement. 
+
+EQquasi Software Licence Agreement
+
+'Software' shall mean the EQquasi in the binary excutable 
+format, together with a user guide, exemplary source code files included 
+in the package. The author grants to the licensee a non-exclusive, non-
+transferable license to download, install and use the Software free of 
+charge for non-commercial, academic research, including industry-sponsored 
+research, and education purposes, except for the part of MUMPS, a parallel 
+iterative solver, which is distributed under CeCILL-C license (please see
+https://cecill.info/licences/Licence_CeCILL-C_V1-en.html) abd the part of
+AZTEC, a parallel iterative solver, which is distributed under the Aztec 
+License Agreesment that can be referred to at http://www.cs.sandia.gov/CRF/Aztec_download.html.
+
+Disclaimer and Limitation of Warranty and Liability. The licensee acknowledge 
+that the Software is a research tool, provided with potential faults and bugs,
+wihtout any maintenance, debugging, improvement and other support. 
+
+

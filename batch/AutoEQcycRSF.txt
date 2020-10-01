@@ -1,0 +1,77 @@
+#BSUB -J M8AutoSharp-NormCap-NewSwitch
+#BSUB -L /bin/bash
+#BSUB -W 20:00
+#BSUB -n 100              # 100: total number of cores/jobslots to allocate for the job
+#BSUB -R "span[ptile=20]"
+#BSUB -R "rusage[mem=2700]" 
+#BSUB -M 2700
+#BSUB -o job.%J       # directs the job's standard output to stdout1.jobid
+##BSUB -P project_ID      # This is the project number against which the used service units (SUs) are charged.
+#BSUB -P 082792054919
+#BSUB -u dunyuliu@tamu.edu  # sends email to the specified address (e.g., netid@tamu.edu,
+#                         # myname@gmail.com) with information about main job events (next line).
+##BSUB -B -N              # send emails on job begin (-B) and end (-N)
+#
+export OMP_NUM_THREADS=1
+#load intel toolchain
+ml intel/2018a
+#
+for i in `seq 16 17`;
+do
+  echo "Cycle #:" $i
+  echo "The" $i "cycle started at" >> cycles.log
+  date >> cycles.log
+  # Quasi-static-interseismic deformation
+  echo "Post-Inter-Pre-seismic deformations #:" $((i-1)) >> cycles.log
+  if [ $i == 1 ]; then
+	cp ./exacutable/eqquasi3drunQ0 ./
+ 	#mpirun -np 100 ./eqquasi3drunQ0
+	mkdir "./Q$((i-1))"
+	mv ./cplot_EQquasi.txt "./Q$((i-1))"
+	mv ./dispprofile* "./Q$((i-1))"
+	mv ./fault* "./Q$((i-1))"
+	mv ./Slave-* "./Q$((i-1))" 
+	mv ./slip.txt "./Q$((i-1))"
+	mv ./time* "./Q$((i-1))"
+	rm -r eqquasi3drunQ0
+	cp -r "./Q$((i-1))"/cplot_EQquasi.txt ./
+  else
+    cp ./exacutable/eqquasi3drunQi ./
+    	mpirun -np 100 ./eqquasi3drunQi
+	mkdir "./Q$((i-1))"
+	mv ./cplot_EQquasi.txt "./Q$((i-1))"
+	mv ./dispprofile* "./Q$((i-1))"
+	mv ./fault* "./Q$((i-1))"
+	mv ./Slave-* "./Q$((i-1))" 
+	mv ./slip.txt "./Q$((i-1))"
+	mv ./time* "./Q$((i-1))"
+	rm -r eqquasi3drunQi
+	rm -r cplot_EQdyna.txt
+	cp -r "./Q$((i-1))"/cplot_EQquasi.txt ./  
+  fi
+  
+  # Dynamic ruptures
+	echo "Dynamic rupture #:" $i >> cycles.log
+	cp ./exacutable/eqdyna-hyb ./
+    	mpirun -np 100 ./eqdyna-hyb
+	mkdir "./D$((i))"
+	cp ./exacutable/gencplot ./
+	./gencplot
+	mv ./body* "./D$((i))"
+	mv ./fault* "./D$((i))"	
+	rm -r event*
+	rm -r fmaxsur*
+	mv frt* "./D$((i))"
+	mv pma_max_slipr.txt "./D$((i))"
+	rm -r cplot_EQquasi.txt
+	mv cplot_EQdyna.txt "./D$((i))"	
+	mv fslip* "./D$((i))"
+	rm -r gencplot
+	rm -r eqdyna-hyb
+	cp -r "./D$((i))"/cplot_EQdyna.txt ./  	
+
+  echo "The" $i "cycle ended at" >> cycles.log
+  date >> cycles.log
+  echo "=====================================" >> cycles.log
+done
+##

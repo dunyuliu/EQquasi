@@ -1,7 +1,8 @@
 SUBROUTINE faulting(ift,nftnd,numnp,neq,constrainm,right,constrain,constrainv,constraina,constrainf,id,&
 					n4onf,fltsta,&
 					nsmp,fnft,fltslp,un,us,ud,fric,arn,r4nuc,slp4fri,anonfs,nonmx,it,x,&
-					kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp)
+					kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp, &
+                                        maxsliprate,totmomrate,totruptarea,tottaoruptarea,totslipruptarea)
 use globalvar
 implicit none
 !
@@ -37,7 +38,7 @@ real (kind=8) :: rr,R0,T,F,G,dtao0,dtao,mr!RSF
 real (kind=8) :: statetmp, T_coeff!RSF
 integer (kind=4) :: iv,ivmax=1000,signal(2)  !RSF
 real (kind=8) :: tstk0, tdip0,ttao0, tstk1, tdip1, ttao1, taoc_old, taoc_new !RSF
-real (kind=8) :: dxmudv, rsfeq, drsfeqdv, vtmp,caph,caphprime !RSF
+real (kind=8) :: dxmudv, rsfeq, drsfeqdv, vtmp,caph,caphprime,newtonstep !RSF
 
 real (kind=8) :: frica,fricb,fricl,fricf0,fricv0,fricfw,fricvw,&
 	vup,vdo,v_trial,v_trial_new,sliprs_trial,sliprd_trial, &
@@ -54,8 +55,9 @@ real (kind=8) :: frica,fricb,fricl,fricf0,fricv0,fricfw,fricvw,&
 	slipaccn,slipaccs,slipaccd,a_trial,time0
 	
 integer(kind=4)::maxa,ia(neq+1),itag,status1
-real(kind=8)::kstiff(maxa),acct(neq),phi
-real(kind = 8) :: ma_bar_ku_arr(nftnd), sliprate_arr(nftnd)! calculate abs(ma/ku) for all fault nodes.
+real(kind=8)::kstiff(maxa),acct(neq),phi,signres
+real(kind = 8) :: ma_bar_ku_arr(nftnd), sliprate_arr(nftnd),momrate_arr(nftnd),maxsliprate,totmomrate,ruptarea_arr(nftnd),totruptarea,taoruptarea_arr(nftnd), &
+                tottaoruptarea,slipruptarea_arr(nftnd),totslipruptarea! calculate abs(ma/ku) for all fault nodes.
 !Parameters for Newmark Integration   
 	delt=0.5d0  
 	alfa=0.25d0*(0.5d0+delt)**2
@@ -84,6 +86,9 @@ real(kind = 8) :: ma_bar_ku_arr(nftnd), sliprate_arr(nftnd)! calculate abs(ma/ku
 !...the above definition of private is very important. xmu was not defined as private
 !	ealier and resulted in problems: it can be imaged that it should if different
 !	OpenMP threads mess up xmu! B.D. 10/31/09
+ruptarea_arr = 0.0d0
+taoruptarea_arr = 0.0d0 
+slipruptarea_arr = 0.0d0
 do i=1,nftnd	!just fault nodes
     fnfault = fric(7,i) !initial forces on the fault node
     fsfault = fric(8,i) !norm, strike, dip components directly
@@ -342,7 +347,7 @@ elseif (friclaw==3.or.friclaw==4)then
     ! endif
 	!fsfault = fric(8,i)+dtao
 !---3.2: DECLARE THE TIME FOR RUPTURING.	
-	if(fnft(i)>600.d0) then	!fnft should be initialized by >10000
+	if(fnft(i)<0.0d0) then	!fnft should be initialized by >10000
 		if(sliprate >= 0.001d0) then	!first time to reach 1mm/s
 			fnft(i) = time	!rupture time for the node
 		endif
@@ -353,117 +358,16 @@ elseif (friclaw==3.or.friclaw==4)then
 	sliprd_trial=sliprated
 	statetmp=fric(20,i)
 !---3.4: FRICTIONAL/NON FRIVTIONAL REGION	
-!	if 	(x(3,isn) >= -18.0d3) then 
+	if 	(abs(x(3,isn)--60.0d3) <= 40.0d3) then 
 !---3.4.1: FRICTIONAL REGION CONTROLLED BY RSF. 
-		if (status1 == 1) then
-!---3.4.1.1: DYNAMIC PROCESS, [STATUS1]==1		
-			T_coeff=arn(i)*aa7*(mmast+mslav)/mmast/mslav
-			tstk0 = (mslav*mmast/aa7*(sliprs_trial+(fvd(5,2,4)-fvd(5,1,4))*aa6)+mslav*fvd(5,2,1)-mmast*fvd(5,1,1))/mtotl+fsfault
-			tdip0 = (mslav*mmast/aa7*(sliprd_trial+(fvd(6,2,4)-fvd(6,1,4))*aa6)+mslav*fvd(6,2,1)-mmast*fvd(6,1,1))/mtotl+fdfault
-			tnrm = (mslav*fvd(4,2,1)-mmast*fvd(4,1,1))/mtotl+fnfault
-			ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)
-			!if (x(1,isn)==-9.15d3.and.x(3,isn)==-11.70d3)then
-			!	write(*,*) 'STATION AAA,mslav,mmast',mslav,mmast,mtotl,arn(i)
-			!	write(*,*) 'tstk,tdip,tnrm',tstk0/1e6,tdip0/1e6,tnrm/1e6
-			!	write(*,*) 'fvd',fvd(5,2,1),fvd(5,1,1),fvd(6,2,1),fvd(6,1,1)
-			!	write(*,*) 'fsfault,fdfault,fnfault',fsfault,fdfault,fnfault
-			!	write(*,*) 'slipn,slips,slipd',fvd(4,2,3),fvd(4,1,3),fvd(5,2,3),fvd(5,1,3),fvd(6,2,3),fvd(6,1,3)
-			!	write(*,*) 'sliprn,sliprs,sliprd',fvd(4,2,2),fvd(4,1,2),fvd(5,2,2),fvd(5,1,2),fvd(6,2,2),fvd(6,1,2)				
-			!endif		 
-			if((tnrm+fric(6,i))>-10.0d6) then
-				tnrm0 = -10.0d6
-			else
-				tnrm0 = tnrm+fric(6,i)
-			endif	
-
-
-			do iv = 1,ivmax	
-				psi = fric(11,i)/v_trial + (statetmp - fric(11,i)/v_trial) * dexp(-v_trial*dt/fric(11,i))				
-				if(friclaw == 3) then
-					call rate_state_ageing_law(v_trial,psi,fric(1,i),xmu,dxmudv,dtev1) !RSF
-				elseif(friclaw == 4) then
-					call rate_state_slip_law(v_trial,psi,fric(1,i),xmu,dxmudv) !RSF
-				endif 	
-				tau_fric_trial = fric(4,i) - xmu * tnrm0
-				
-				rsfeq=v_trial + T_coeff *(tau_fric_trial-ttao0)
-				drsfeqdv=1.0d0+T_coeff * (-dxmudv * tnrm0)
-				
-				if(abs(rsfeq/drsfeqdv) < 1.d-14 * abs(v_trial).and. abs(rsfeq) < 1.d-6 * abs(v_trial)) exit 
-				vtmp = v_trial - rsfeq / drsfeqdv
-				if(vtmp <= 0.0d0) then
-				  v_trial = v_trial/2.0d0
-				else
-				  v_trial = vtmp
-				endif
-			        !if (x(1,isn)==-10.05d3.and.x(3,isn)==-6.3d3)then
-				!	write(*,*) 'FAULTING=DYNAMIC=AAA=ITAG=',itag
-				!	write(*,*) 'iv,vtrial,phi*',iv,v_trial,psi
-				!	write(*,*) 'fvd,mast,slav',fvd(5,2,1),fvd(5,1,1)
-				!	write(*,*) 'tau_fric_trial,ttao0',tau_fric_trial/1.0d6,ttao0/1.0e6
-				!	write(*,*) 'tstk0,tdip0',tstk0/1.0d6,tdip0/1.0e6
-				!endif				
-			enddo !iv	
-			if(v_trial < fric(19,i)) then
-				v_trial = fric(19,i)
-				tau_fric_trial = ttao0
-			endif	
-			tstk=tau_fric_trial*tstk0/ttao0
-			tdip=tau_fric_trial*tdip0/ttao0
-			ttao=sqrt(tstk**2+tdip**2)
-			fric(26,i)=v_trial
-			fric(28,i)=tstk
-			fric(29,i)=tdip
-			fric(30,i)=tnrm0
-			slipratemast=(v_trial)*mslav/(mmast+mslav)
-			sliprateslav=-(v_trial)*mslav/(mmast+mslav)
-
-			v_s_new_mast=slipratemast*tstk/ttao
-			v_d_new_mast=slipratemast*tdip/ttao
-			v_s_new_slav=sliprateslav*tstk/ttao
-			v_d_new_slav=sliprateslav*tdip/ttao
-			vxm=v_s_new_mast*us(1,i)+v_d_new_mast*ud(1,i)
-			vym=v_s_new_mast*us(2,i)+v_d_new_mast*ud(2,i)
-			vzm=v_s_new_mast*us(3,i)+v_d_new_mast*ud(3,i)
-			vxs=v_s_new_slav*us(1,i)+v_d_new_slav*ud(1,i)
-			vys=v_s_new_slav*us(2,i)+v_d_new_slav*ud(2,i)
-			vzs=v_s_new_slav*us(3,i)+v_d_new_slav*ud(3,i)
-		
-			axm=(vxm-fvd(1,2,2)-aa6*fvd(1,2,4))/aa7 
-			aym=(vym-fvd(2,2,2)-aa6*fvd(2,2,4))/aa7 
-			azm=(vzm-fvd(3,2,2)-aa6*fvd(3,2,4))/aa7
-			axs=(vxs-fvd(1,1,2)-aa6*fvd(1,1,4))/aa7
-			ays=(vys-fvd(2,1,2)-aa6*fvd(2,1,4))/aa7
-			azs=(vzs-fvd(3,1,2)-aa6*fvd(3,1,4))/aa7		
-			
-			constrain(1,imn)=(axm+aa3*fvd(1,2,4)+aa2*fvd(1,2,2))/aa0+fvd(1,2,3)
-			constrain(2,imn)=(aym+aa3*fvd(2,2,4)+aa2*fvd(2,2,2))/aa0+fvd(2,2,3)
-			constrain(3,imn)=(azm+aa3*fvd(3,2,4)+aa2*fvd(3,2,2))/aa0+fvd(3,2,3)
-			constrain(1,isn)=(axs+aa3*fvd(1,1,4)+aa2*fvd(1,1,2))/aa0+fvd(1,1,3)
-			constrain(2,isn)=(ays+aa3*fvd(2,1,4)+aa2*fvd(2,1,2))/aa0+fvd(2,1,3)
-			constrain(3,isn)=(azs+aa3*fvd(3,1,4)+aa2*fvd(3,1,2))/aa0+fvd(3,1,3)	
-				
-			constrainv(1,imn)=vxm
-			constrainv(2,imn)=vym 
-			constrainv(3,imn)=vzm 
-			constrainv(1,isn)=vxs
-			constrainv(2,isn)=vys 
-			constrainv(3,isn)=vzs 
-			constraina(1,imn)=axm
-			constraina(2,imn)=aym 
-			constraina(3,imn)=azm 
-			constraina(1,isn)=axs
-			constraina(2,isn)=ays 
-			constraina(3,isn)=azs	
-			fric(20,i)=psi
-		elseif (status1 == 0) then 
-!---3.4.1.2: NON-DYNAMIC PROCESS: [STATUS1]==0		
+		if (status1 == 0.or.status1 == 1) then 
+!---3.4.1.2: Dynamic + NON-DYNAMIC PROCESS: [STATUS1]==0		
 			tstk0 = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
 			tdip0 = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
 			tnrm = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
-                        ! fric(41,i) is abs(KU)
+            ! fric(41,i) is abs(KU)
 			fric(41,i) = sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
-                        ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		
+            ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		
 			if((tnrm + fric(6,i))>-10.0d6) then
 				tnrm0 = -10.0d6
 			else
@@ -477,8 +381,8 @@ elseif (friclaw==3.or.friclaw==4)then
 !----------: THETA**(t+1) [FRIC(22,:)] FOR ITAG==1, , USING [V_TRIAL]={[CONSTRAINV]+[CONSTRAINVTMP]}*0.5	
 			if (itag == 0) then 
 				v_trial = sliprate
-                                fric(42,i) = sliprate !Only record the final sliprate in fric(42,i) in the last time step.
-                                phi = dlog(fric(12,i) * fric(20,i) / fric(11,i))
+                fric(42,i) = sliprate !Only record the final sliprate in fric(42,i) in the last time step.
+                phi = dlog(fric(12,i) * fric(20,i) / fric(11,i))
 				if (v_trial * dtev1 / fric(11,i) <= 1.0d-6) then 
 					fric(22,i) = dlog(dexp(phi)*(1-v_trial*dtev1/fric(11,i)) + fric(12,i)*dtev1/fric(11,i))
 					fric(22,i) = fric(11,i)/fric(12,i)*dexp(fric(22,i))
@@ -511,13 +415,17 @@ elseif (friclaw==3.or.friclaw==4)then
 				endif		
 			endif
 !---3.4.1.4: NEWTON METHOD TO GET NEW V_TRIAL BASED ON TRACTION=ELASTIC FORCE.			
-			        !if (x(1,isn)==-12.0d3.and.x(3,isn)==-9.0d3) then 
-                                !        write(*,*) 'Before Newton, ITAG',itag,'V_trial',v_trial
-                                !        write(*,*) 'tstk0,tdip0,tnrm0',tstk0/1d6,tdip0/1d6,tnrm0/1d6
-                                !        write(*,*) 'fvd511,521',fvd(5,1,1),fvd(5,2,1)
-                                !        write(*,*) 'mmast,mslav',mmast,mslav
-                                !endif 
-                        do iv = 1,ivmax	
+			if (x(1,isn)==-20.0d3.and.x(3,isn)==-70.0d3) then 
+				write(*,*) 'Before Newton, ITAG',itag,'V_trial',v_trial
+                                write(*,*) 'State Variable',fric(22,i)
+				write(*,*) 'tstk0,tdip0,tnrm0',tstk0/1d6,tdip0/1d6,tnrm0/1d6
+				write(*,*) 'fvd511,521',fvd(5,1,1),fvd(5,2,1)
+				write(*,*) 'mmast,mslav',mmast,mslav
+			endif 
+			!Modify ttao0 for quasi-dynamic. 11252019.
+			!ttao0 = ttao0 - v_trial*2670.0d0*3464.0d0/2.0d0
+                        !newtonstep = 1.0d0
+			do iv = 1,ivmax	
 				if(friclaw == 3) then
 					call rate_state_ageing_law(v_trial,fric(22,i),fric(1,i),xmu,dxmudv,dtev1) !RSF
 				elseif(friclaw == 4) then
@@ -525,24 +433,29 @@ elseif (friclaw==3.or.friclaw==4)then
 				endif 	
 				tau_fric_trial = fric(4,i) - xmu * tnrm0
 				
-				rsfeq = (tau_fric_trial-ttao0)
-				drsfeqdv = (-dxmudv * tnrm0)
-				
-				!if(abs(rsfeq/drsfeqdv) < 1.d-14 * abs(v_trial).and. abs(rsfeq) < 1.d-6 * abs(v_trial)) exit 
+				rsfeq = (tau_fric_trial-ttao0 + 3464.d0*2670.d0/2.0d0*v_trial)
+				drsfeqdv = (-dxmudv * tnrm0 +  3464.d0*2670.d0/2.0d0)
+                                
+			!if(abs(rsfeq/drsfeqdv) < 1.d-14 * abs(v_trial).and. abs(rsfeq) < 1.d-6 * abs(v_trial)) exit 
 				if (abs(rsfeq) < 1.0d-7 * ttao0) exit
-				vtmp = v_trial - rsfeq / drsfeqdv
+				vtmp = v_trial -  rsfeq / drsfeqdv
 				if(vtmp <= 0.0d0) then
-				  v_trial = v_trial/2.0d0
-				else
+				  v_trial = v_trial/1.1d0
+                                  !newtonstep = newtonstep/2.0d0
+			        else
 				  v_trial = vtmp
+                                  !newtonstep = 1.0d0
 				endif
-				!if (x(1,isn)==-12d3.and.x(3,isn)==-6d3)then
-				!	write(*,*) 'FAULTING=======AAA======ITAG=',itag
-				!	write(*,*) 'iv,vtrial,phi*',iv,v_trial,fric(22,i)
-				!	write(*,*) 'fvd,mast,slav',fvd(5,2,1),fvd(5,1,1)
-				!	write(*,*) 'tau_fric_trial,ttao0',tau_fric_trial/1.0d6,ttao0/1.0e6
-				!	write(*,*) 'tstk0,tdip0',tstk0/1.0d6,tdip0/1.0e6
-				!endif	
+                                signres = rsfeq
+                                
+				if (x(1,isn)==-20d3.and.x(3,isn)==-70d3)then
+					write(*,*) 'FAULTING=======AAA======ITAG=',itag
+					write(*,*) 'iv,vtrial,phi*',iv,v_trial,fric(22,i)
+                                        write(*,*) 'rsfeq',rsfeq,'drs',drsfeqdv
+					write(*,*) 'fvd,mast,slav',fvd(5,2,1),fvd(5,1,1)
+					write(*,*) 'tau_fric_trial,ttao0',tau_fric_trial/1.0d6,ttao0/1.0e6
+					write(*,*) 'tstk0,tdip0',tstk0/1.0d6,tdip0/1.0e6
+				endif	
 				!if (x(1,isn)==-12d3.and.x(3,isn)==-21d3)then
 				!	write(*,*) 'FAULTING=======BBB======ITAG=',itag
 				!	write(*,*) 'iv,vtrial,phi*',iv,v_trial,fric(22,i)
@@ -587,7 +500,20 @@ elseif (friclaw==3.or.friclaw==4)then
 			elseif (itag == 1) then 
 				fric(20,i) = fric(22,i)
                                 ma_bar_ku_arr(i) = (v_trial - fric(42,i)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i)
-                                ma_bar_ku_arr(i) = abs(ma_bar_ku_arr(i)) 
+                                ma_bar_ku_arr(i) = abs(ma_bar_ku_arr(i))
+                                momrate_arr(i) =0.0d0 
+                                if ((abs(x(1,isn))<=30.0d3+6.0d3).and.(abs(x(3,isn)--60.0d3)<=15.0d3+6.0d3)) then
+                                        momrate_arr(i) = 3464.0d0**2*2670.0d0*v_trial*dx*dx
+                                endif
+                                ruptarea_arr(i) = 0.0d0
+                                taoruptarea_arr(i) = 0.0d0
+                                slipruptarea_arr(i) = 0.0d0
+                                if (v_trial>=1.0d-3) then
+                                        ruptarea_arr(i) = dx*dx
+                                        taoruptarea_arr(i) = ttao*dx*dx
+                                        slipruptarea_arr(i) = slip*dx*dx
+                                endif
+                                
 				constrainv(1,imn)=vxm
 				constrainv(2,imn)=vym 
 				constrainv(3,imn)=vzm 
@@ -622,48 +548,48 @@ elseif (friclaw==3.or.friclaw==4)then
 			write(*,*) 'x,z',x(1,isn)/1.0d3,x(3,isn)/1.0d3
 			stop '"psi" is a NaN'
 		endif		
-	! elseif (x(3,isn)<-18.0d3) then
+	 elseif (abs(x(3,isn)--60.0d3)>40.0d3) then
 ! !---3.4.2: LOADING BOTTOM AT A FIXED SLIDING RATE	
-		! tstk0=30.0d6
-		! tdip0=0.0d6
-		! tnrm=-50.0d6	 
-		! if((tnrm+fric(6,i))>0) then
-			! tnrm0 = 0.0d0
-		! else
-			! tnrm0 = tnrm+fric(6,i)
-		! endif
-		! fric(28,i)=tstk0
-		! fric(29,i)=tdip0
-		! v_trial = 1.0d-9
-		! slipratemast=(v_trial)*mslav/(mmast+mslav)
-		! sliprateslav=-(v_trial)*mslav/(mmast+mslav)
-		! v_s_new_mast=slipratemast
-		! v_d_new_mast=slipratemast
-		! v_s_new_slav=sliprateslav
-		! v_d_new_slav=sliprateslav
-		! vxm=v_s_new_mast*us(1,i)+v_d_new_mast*ud(1,i)
-		! vym=v_s_new_mast*us(2,i)+v_d_new_mast*ud(2,i)
-		! vzm=v_s_new_mast*us(3,i)+v_d_new_mast*ud(3,i)
-		! vxs=v_s_new_slav*us(1,i)+v_d_new_slav*ud(1,i)
-		! vys=v_s_new_slav*us(2,i)+v_d_new_slav*ud(2,i)
-		! vzs=v_s_new_slav*us(3,i)+v_d_new_slav*ud(3,i)
+		 tstk0=2.585534683723515d7
+		 tdip0=0.0d6
+		 tnrm=-50.0d6	 
+		 if((tnrm+fric(6,i))>0) then
+			 tnrm0 = 0.0d0
+		 else
+			 tnrm0 = tnrm+fric(6,i)
+		 endif
+		 fric(28,i)=tstk0
+		 fric(29,i)=tdip0
+		 v_trial = 1.0d-9
+		 slipratemast=(v_trial)*mslav/(mmast+mslav)
+		 sliprateslav=-(v_trial)*mslav/(mmast+mslav)
+		 v_s_new_mast=slipratemast
+		 v_d_new_mast=0.0d0
+		 v_s_new_slav=sliprateslav
+		 v_d_new_slav=0.0d0
+		 vxm=v_s_new_mast*us(1,i)+v_d_new_mast*ud(1,i)
+		 vym=v_s_new_mast*us(2,i)+v_d_new_mast*ud(2,i)
+		 vzm=v_s_new_mast*us(3,i)+v_d_new_mast*ud(3,i)
+		 vxs=v_s_new_slav*us(1,i)+v_d_new_slav*ud(1,i)
+		 vys=v_s_new_slav*us(2,i)+v_d_new_slav*ud(2,i)
+		 vzs=v_s_new_slav*us(3,i)+v_d_new_slav*ud(3,i)
 		 
-		! constrainvtmp(1,imn)=vxm
-		! constrainvtmp(2,imn)=vym 
-		! constrainvtmp(3,imn)=vzm 
-		! constrainvtmp(1,isn)=vxs
-		! constrainvtmp(2,isn)=vys 
-		! constrainvtmp(3,isn)=vzs 
-			
-		! constrainv(1,imn)=vxm
-		! constrainv(2,imn)=vym 
-		! constrainv(3,imn)=vzm 
-		! constrainv(1,isn)=vxs
-		! constrainv(2,isn)=vys 
-		! constrainv(3,isn)=vzs 	
+		 constrainvtmp(1,imn)=vxm
+		 constrainvtmp(2,imn)=vym 
+		 constrainvtmp(3,imn)=vzm 
+		 constrainvtmp(1,isn)=vxs
+		 constrainvtmp(2,isn)=vys 
+		 constrainvtmp(3,isn)=vzs 
 		
-		! v_trial = 1.0d-13! reset v_trial to deactivate its effect in variable time step.
-	! endif	
+		 constrainv(1,imn)=vxm
+		 constrainv(2,imn)=vym 
+		 constrainv(3,imn)=vzm 
+		 constrainv(1,isn)=vxs
+		 constrainv(2,isn)=vys 
+		 constrainv(3,isn)=vzs 	
+	
+	     !v_trial = 1.0d-20! reset v_trial to deactivate its effect in variable time step.
+	 endif	
 	!v(t+1)=v(t)+a6*a(t)+a7*a(t+1)====>>a(t+1)=(v(t+1)-v(t)-a6*a(t))/a7 
 	!a(t+1)=a0*(u(t+1)-u(t))-a2*v(t)-a3*a(t)====>>u(t+1)=(a(t+1)+a3*a(t)+a2*v(t))/a0+u(t)	
 
@@ -724,7 +650,7 @@ endif
 	!   and can be written out here. B.D. 2/28/08
 	!...Store only, no write out. B.D. 10/25/09
 	if ((status1==0.and.itag==1).or.(status1==1)) then
-		if(n4onf>0) then	
+		if(n4onf>0) then
 			do j=1,n4onf
 				if(anonfs(1,j)==i.and.anonfs(3,j)==ift) then !only selected stations. B.D. 10/25/09    
 					fltsta(1,it,j) = time
@@ -741,7 +667,7 @@ endif
 			enddo 
 		endif   
 	endif
-	if (x(1,isn)==xsource.and.x(3,isn)==zsource)then
+	!if (x(1,isn)==xsource.and.x(3,isn)==zsource)then
 		!write(*,*) '************Sliprates',sliprates,sliprate
 		!write(*,*) '&&&&&&&&&&&&Traction',tnrm,tstk
 		!write(*,*) 'Force',taox,ftix,xmu
@@ -750,17 +676,25 @@ endif
 		!write(*,*) 'Acc',axs,ays,azs
 		!write(*,*) 'U',d(id(1,isn)),d(id(2,isn)),d(id(3,isn))
 		!write(*,*) 'neq',id(1,isn),id(2,isn),id(3,isn)
-	endif
+	!endif
 enddo	!ending i
-	if (((status1==0.and.itag==1).and.(mod(it,10)==1)).or.((status1==1).and.(mod(it,1)==0))) then 
-	        open(9002,file='slip.txt',form='formatted',status='unknown',position='append')
-		        write(9002,'(1x,6e32.21e4)') (fltslp(1,i),fltslr(1,i),fric(26,i),fric(20,i),fric(28,i),fric(30,i),i=1,nftnd)
-        endif
-	if ((status1==0.and.itag==1).or.(status1==1)) then
+	if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
+	        !open(9002,file='slip.txt',form='formatted',status='unknown',position='append')
+		     !   write(9002,'(1x,6e32.21e4)') (fltslp(1,i),fltslr(1,i),fric(26,i),fric(20,i),fric(28,i),fric(30,i),i=1,nftnd)
+		open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
+			write(9002,'(1x,5e32.21e4)') (time, fltslp(1,p1nodearr(i)), fltslp(2,p1nodearr(i)), fric(28,p1nodearr(i)),fric(29,p1nodearr(i)),i=1,p1nnode)	
+		open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
+			write(9003,'(1x,5e32.21e4)') (time, fltslp(1,p2nodearr(i)), fltslp(2,p2nodearr(i)), fric(28,p2nodearr(i)),fric(29,p2nodearr(i)),i=1,p2nnode)			
+    endif
+	if (itag==1) then
                 pma = maxval(ma_bar_ku_arr)
-                sliprmax = maxval(sliprate_arr) 
-	        open(9003,file='timehis.txt',form='formatted',status='unknown',position='append')
-		        write(9003,'(1x,i10,3e32.21e4)') it,time, pma, sliprmax	
+                maxsliprate = maxval(sliprate_arr) 
+                totmomrate = sum(momrate_arr)
+                totruptarea = sum(ruptarea_arr)
+                tottaoruptarea = sum(taoruptarea_arr)
+                totslipruptarea = sum(slipruptarea_arr)
+	        !open(9003,file='timehis.txt',form='formatted',status='unknown',position='append')
+		!        write(9003,'(1x,i10,3e32.21e4)') it,time, pma, sliprmax	
 	endif 		
 	dtev=minval(dtev1D)
 !-------------------------------------------------------------------!	

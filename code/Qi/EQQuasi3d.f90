@@ -16,8 +16,8 @@ integer(kind=4),allocatable,dimension(:,:,:) :: nsmp
 real(kind=8),allocatable,dimension(:,:) :: fnft,arn,r4nuc,arn4m,slp4fri
 real(kind=8),allocatable,dimension(:,:,:) :: fric,un,us,ud,fltslp
 integer(kind=4)::nftmx,nonmx,n4onf
-integer(kind=4),dimension(1)::nonfs=(/9/)
-real(kind=8),dimension(2,9,1)::xonfs
+integer(kind=4),dimension(1)::nonfs=(/18/)
+real(kind=8),dimension(2,18,1)::xonfs
 
 !integer istatus(MPI_STATUS_SIZE)
 
@@ -25,11 +25,11 @@ CALL MPI_INIT(IERR)
 call mpi_comm_rank(MPI_COMM_WORLD,me,IERR)
 call mpi_comm_size(MPI_COMM_WORLD,nprocs,IERR)
 
-fltxyz(1,1,1)=-30.0d3
-fltxyz(2,1,1)=30.0d3
+fltxyz(1,1,1)=-60.0d3
+fltxyz(2,1,1)=60.0d3
 fltxyz(1,2,1)=0.0d0
 fltxyz(2,2,1)=0.0d0
-fltxyz(1,3,1)=-30.0d3
+fltxyz(1,3,1)=-120.0d3
 fltxyz(2,3,1)=0.0d0
 fltxyz(1,4,1)=270.0d0/180.0d0*pi
 fltxyz(2,4,1)=90.0d0/180.0d0*pi
@@ -81,8 +81,8 @@ call CRSelem(numel,numnp,neq,x,mat,ien,id,&
 			anonfs,fnft,slp4fri,et,me)
 if (me==0) write(*,*) 'AFTER CRSELEM AND THE END OF THE SIMULATION'
 
+!CALL MPI_FINALIZE ( IERR )
+STOP
 !======================3=========================!
 !=================OUTPUT PHASE===================!
-!CALL MPI_FINALIZE(IERR)
-STOP
 end 

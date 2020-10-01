@@ -1,3 +1,19 @@
+# Version 1.1.0
+*modified:   REAME.md
+*modified:   code/Q0/EQQuasi3d.f90
+*modified:   code/Q0/Quasi-CRSelem.f90
+*modified:   code/Q0/Quasi-faulting.f90
+*modified:   code/Q0/Quasi-globalvar.f90
+*modified:   code/Q0/Quasi-meshgen.f90
+*modified:   code/Q0/makefile
+*modified:   code/Qi/EQQuasi3d.f90
+*modified:   code/Qi/Quasi-CRSelem.f90
+*modified:   code/Qi/Quasi-faulting.f90
+*modified:   code/Qi/Quasi-globalvar.f90
+*modified:   code/Qi/Quasi-mesh4num.f90
+*modified:   code/Qi/Quasi-meshgen.f90
+*modified:   code/Qi/makefile
+
 # Version 1.0.0
 *new file:   Changelog.md
 *new file:   LICENSE

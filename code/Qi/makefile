@@ -39,4 +39,5 @@ Quasi-faulting.o: Quasi-faulting.f90 fric.o Quasi-globalvar.o
 	$(F90) $(OPT) Quasi-faulting.f90		
 fric.o: fric.f90 Quasi-globalvar.o
 	$(F90) $(OPT) fric.f90		
-clean:
+clear: eqquasi3drun
+	rm *.o

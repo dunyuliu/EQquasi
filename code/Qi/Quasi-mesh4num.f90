@@ -129,7 +129,7 @@ do ix=1,nxt
 			ycoor=ylinet(iy)
 			zcoor=zlinet(iz)
 			nnode=nnode + 1	
-			if(ycoor==0.0d0 .or. iy==1 .or. iy==nyt) then! .or. ix == 1 .or. ix ==nxt) then 
+			if(ycoor==0.0d0.or.iy==1.or.iy==nyt) then 
 			!if (ycoor==0.0d0) then 
 			else
 				do i1=1,ndof

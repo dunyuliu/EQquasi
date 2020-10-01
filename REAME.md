@@ -10,6 +10,15 @@ handle the heavy computing loads. Rate- and state- friction law with various for
 mented. 
 
 ### Author:  Dunyu Liu
+### Date:    11/25/2019-01/06/2020
+### Contact: dunyuliu@tamu.edu
+## Version 1.1.0; Git tag v1.1.0; Parent 1.0.0.
+# Major changes:
+* Change fault geometry, frictional parameters for SEAS BP4. 
+* Change output formats in accordance to BP4.
+
+
+### Author:  Dunyu Liu
 ### Date:    03/20/2019
 ### Contact: dunyuliu@tamu.edu
 ## Version 1.0.0; Git tag v1.0.0; Root

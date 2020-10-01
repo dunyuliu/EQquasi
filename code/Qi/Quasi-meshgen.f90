@@ -33,7 +33,7 @@ real (kind=8),dimension(50,nftmx,ntotft) :: fric
 !...output on-fault stations. B.D. 10/25/09
 integer (kind=4) :: n4onf
 integer,dimension(ntotft)::nonfs
-real (kind=8),dimension(2,9,ntotft) :: xonfs
+real (kind=8),dimension(2,18,ntotft) :: xonfs
 !...output node coors. 6 Off-fault stations in this example. B.D. 10/25/11
 integer (kind=4)::n4nds=6,n4out
 integer (kind=4),dimension(6)::n4yn=0
@@ -46,31 +46,35 @@ real (kind=8),dimension(2,6)::x4nds=reshape((/0.0,-3.0,&!8.0,6.0
 												12.0,-3.0,&
 												12.0,3.0/),(/2,6/))
 real(kind=8)::center(3),ycoort,strtmp,kinkx	
-integer(kind=4)::kkk,nfx,nfz			
-real(kind=8)::initialinput(13,20301)
-!-------------------------------------------------------------------!
-!------------Early Oct.2015/ D.Liu----------------------------------!
-!------------Input of initial stress for TSN------------------------!
-open(3001,file='cplot_EQdyna.txt',form='formatted',status='old')
-	do i=1,20301
-	read(3001,*) (initialinput(j,i),j=1,13)
-	enddo
-close(3001)		
-
+integer(kind=4)::kkk,nfx,nfz	
+real(kind=8)::initial(16,14641)
 										
 !on-fault station coordinates are given here 
 !(along strike, z).
-xonfs=reshape((/-18.0,-9.0,&
-				-15.0,-9.0,&
-				-12.0,-9.0,&
-				-9.0,-9.0,&
-				-6.0,-9.0,&
-				6.0,-9.0,&
-				12.0,-9.0,&
-				18.0,-9.0,&
-				0.0,-9.0/),(/2,9,1/))
+xonfs=reshape((/-36.0,-60.0,&
+				-22.0,-67.0,&
+				-16.0,-72.0,&
+				-16.0,-60.0,&
+				-16.0,-48.0,&
+				0.0,-81.0,&
+				0.0,-72.0,&
+				0.0,-60.0,&
+				0.0,-48.0,&
+                                0.0,-39.0,&
+                                16.0,-72.0,&
+                                16.0,-60.0,&
+                                16.0,-48.0,&
+                                36.0,-60.0,&
+								-58.0,-60.0,&
+								58.0,-60.0,&
+								0.0,-2.0,&
+								0.0,-118.0/),(/2,18,1/))
 xonfs = xonfs * 1000.0d0  !convert from km to m
-
+open(111,file = 'cplot_EQquasi.txt', form = 'formatted', status ='old')
+  do i = 1,14641
+    read(111,*) (initial(j,i),j=1,16)
+  enddo
+close(111)
 dy=dx
 dz=dx
 tol=dx/100.d0
@@ -195,26 +199,28 @@ do ix = 1, nxt
 			x(3,nnode) = zcoor			
 			ycoort=ycoor
 			strtmp=270.0d0/180.0d0*pi
-			if (xcoor>0.0d0) then 
-
-				tmp1 = (xcoor--0.0d3)*dtand(ttheta)
-			        tmp2=ttheta
-				strtmp=(270.0d0-tmp2)/180.0d0*pi		
-				if (ycoor>=0.0d3) then 	
-					ycoort=(ylinet(nyt)-tmp1)*ycoor/ylinet(nyt) + tmp1
-				elseif (ycoor<0.0d0) then 
-					ycoort=ylinet(1)+(ycoor-ylinet(1))/(-ylinet(1))*(tmp1-ylinet(1))
-				endif
-				x(2,nnode)=ycoort							
-			endif
+                        !The normal vector at x = 0 belongs to the left segment.
+			!if (xcoor>0.0d0) then 
+!
+!				tmp1 = (xcoor--0.0d3)*dtand(ttheta)
+!				tmp2=ttheta
+!				strtmp=(270.0d0-tmp2)/180.0d0*pi		
+!				if (ycoor>=0.0d3) then 	
+!					ycoort=(ylinet(nyt)-tmp1)*ycoor/ylinet(nyt) + tmp1
+!				elseif (ycoor<0.0d0) then 
+!					ycoort=ylinet(1)+(ycoor-ylinet(1))/(-ylinet(1))*(tmp1-ylinet(1))
+!				endif
+!				x(2,nnode)=ycoort							
+!			endif
+                        x(2,nnode) = ycoort
 			plane2(iy,iz) = nnode
-			if(iy==1.or.iy==nyt.or.ycoor==0.0d0 ) then! .or. ix == 1 .or. ix == nxt) then 
+			if(iy==1.or.iy==nyt.or.ycoor==0.0d0) then 
 			!if(ycoor==0.0d0)then
-				if ( iy == nyt ) then! .or. (ycoor > 0.0d0 .and. (ix == 1 .or. ix == nxt))) then 
+				if (ycoor>0.0d0) then 
 					id(1,nnode)=-3!+x movement
 					id(2,nnode)=-1!fixed
 					id(3,nnode)=-1!fixed
-				elseif ( iy == 1 ) then! .or. (ycoor < 0.0d0 .and. (ix == 1 .or. ix == nxt))) then 
+				elseif (ycoor<0.0d0) then 
 					id(1,nnode)=-2!-x movement
 					id(2,nnode)=-1!fixed
 					id(3,nnode)=-1!fixed
@@ -312,22 +318,28 @@ do ix = 1, nxt
 					! if (abs(xcoor)<=1500.and.abs(zcoor--12e3)<=1500.)then
 						! fric(8,nftnd(ift),ift) =1.0e6+1.005*0.760*abs(7378.0*zcoor)
 					! endif		
+					!tmp2 = 270.0d0*pi/180.0d0 - strtmp
 					
-					nfx=(xcoor--30.0d3)/dx+1
-					nfz=(zcoor--30.0d3)/dx+1
-					fric(8,nftnd(ift),ift) = initialinput(5,(nfx-1)*101+nfz)!TSTK
-					fric(7,nftnd(ift),ift) = initialinput(7,(nfx-1)*101+nfz)!TNRM
-					fric(43,nftnd(ift),ift) = initialinput(6, (nfx-1)*101 + nfz)!TDIP from EQdyna
-					fric(44,nftnd(ift),ift) = fric(8,nftnd(ift),ift)!tstk0 for later EQdyna	to compute Pma				  
-					fric(45,nftnd(ift),ift) = fric(43,nftnd(ift),ift)!tdip0
-					fric(20,nftnd(ift),ift) = initialinput(3,(nfx-1)*101+nfz)!STATE VARIABLE
-					fric(25,nftnd(ift),ift) = initialinput(4,(nfx-1)*101+nfz)!SLIPRATE 
-					fric(31,nftnd(ift),ift) = initialinput(8,(nfx-1)*101+nfz)!vmx
-					fric(32,nftnd(ift),ift) = initialinput(9,(nfx-1)*101+nfz)!vmy
-					fric(33,nftnd(ift),ift) = initialinput(10,(nfx-1)*101+nfz)!vmz
-					fric(34,nftnd(ift),ift) = initialinput(11,(nfx-1)*101+nfz)!vsx
-					fric(35,nftnd(ift),ift) = initialinput(12,(nfx-1)*101+nfz)!vsx
-					fric(36,nftnd(ift),ift) = initialinput(13,(nfx-1)*101+nfz)!vsx
+					!fric(7,nftnd(ift),ift) = -50.0d6 - 30.0d6 * dcos(2.0d0*(45.0d0*pi/180.0d0 - tmp2))
+					!fric(8,nftnd(ift),ift) = 30.0d6 * dsin(2.0d0*(45.0d0*pi/180.0d0 - tmp2))
+                                        nfx = (xcoor - -60.0d3)/dx+1
+                                        nfz = (zcoor - -120.0d3)/dx+1
+                                        fric(7,nftnd(ift),ift) = initial(7,(nfx-1)*121+nfz)!tnrm0
+                                        fric(8,nftnd(ift),ift) = initial(5,(nfx-1)*121+nfz)!tstk
+                                        fric(46,nftnd(ift),ift) = initial(6,(nfx-1)*121+nfz)!tdip
+                                        fric(31,nftnd(ift),ift) = initial(8,(nfx-1)*121+nfz)
+                                        fric(32,nftnd(ift),ift) = initial(9,(nfx-1)*121+nfz)
+                                        fric(33,nftnd(ift),ift) = initial(10,(nfx-1)*121+nfz)
+                                        fric(34,nftnd(ift),ift) = initial(11,(nfx-1)*121+nfz)
+                                        fric(35,nftnd(ift),ift) = initial(12,(nfx-1)*121+nfz)
+                                        fric(36,nftnd(ift),ift) = initial(13,(nfx-1)*121+nfz)
+                                        fric(47,nftnd(ift),ift) = initial(3,(nfx-1)*121+nfz)! Peak sliprate
+                                        fric(44, nftnd(ift), ift) = fric(8, nftnd(ift), ift) !tstk0
+                                        fric(45, nftnd(ift), ift) = 0.0d0
+					!if (xcoor<-30.0d3+1.5d3+12.0d3.and.xcoor>-30.0d3+1.5d3.and.zcoor<-75.0d3+1.5d3+12.0d3 &
+                                        !        .and.zcoor>-75.0d3+1.5d3) then
+					!	fric(8,nftnd(ift),ift)=fric(8,nftnd(ift),ift)*1.1d0
+					!endif
 !TPV104 2016.10.05 D.Liu
 					if (friclaw==3.or.friclaw==4)then
 						! if (abs(xcoor)<=12.d3) then 
@@ -354,43 +366,59 @@ do ix = 1, nxt
 						! fric(11,nftnd(ift),ift)=0.008d0!RSF critical distance.
 						
 						!a Lapusta&Liu(2009)
-						if (abs(zcoor)<=4.0d3) then 
-							fric(9,nftnd(ift),ift) = 0.007d0 + 0.004d0*(4.0d3-abs(zcoor))/4.0d3
-						elseif (abs(zcoor)>4.0d3.and.abs(zcoor)<=17.5d3) then 
-							fric(9,nftnd(ift),ift) = 0.007d0
-						elseif (abs(zcoor)>17.5d3.and.abs(zcoor)<=24.0d3) then
-							fric(9,nftnd(ift),ift) = 0.007d0 + 0.009d0*(abs(zcoor)-17.5d3)/6.5d3 
-						elseif (abs(zcoor)>24.0d3) then
-							fric(9,nftnd(ift),ift) = 0.016d0
-						endif
-						if (abs(zcoor)<=4.0d3) then 
-							tmp1 = -0.004d0 + 0.008d0*(4.0d3-abs(zcoor))/4.0d3
-							fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
-						elseif (abs(zcoor)>4.0d3.and.abs(zcoor)<=13.5d3) then 
-							tmp1 = -0.004d0 
-							fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1 
-						elseif (abs(zcoor)>13.5d3.and.abs(zcoor)<=17.5d3) then
-							tmp1 = -0.004d0 + 0.011d0*(abs(zcoor)-13.5d3)/4.0d3
-							fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1  
-						elseif (abs(zcoor)>17.5d3.and.abs(zcoor)<=24.0d3) then
-							tmp1 = 0.007d0 + 0.009d0*(abs(zcoor)-17.5d3)/6.5d3 
-							fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
-						elseif (abs(zcoor)>24.0d3) then
-							tmp1 = 0.007d0 + 0.009d0
-							fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
-						endif
-						if (abs(xcoor)>23.0d3.and.abs(xcoor)<28.0d3) then 
+						!if (abs(zcoor)<=4.0d3) then 
+						!	fric(9,nftnd(ift),ift) = 0.007d0 + 0.004d0*(4.0d3-abs(zcoor))/4.0d3
+						!elseif (abs(zcoor)>4.0d3.and.abs(zcoor)<=17.5d3) then 
+					!		fric(9,nftnd(ift),ift) = 0.007d0
+					!	elseif (abs(zcoor)>17.5d3.and.abs(zcoor)<=24.0d3) then
+					!		fric(9,nftnd(ift),ift) = 0.007d0 + 0.009d0*(abs(zcoor)-17.5d3)/6.5d3 
+					!	elseif (abs(zcoor)>24.0d3) then
+					!		fric(9,nftnd(ift),ift) = 0.016d0
+					!	endif
+					!	if (abs(zcoor)<=4.0d3) then 
+					!		tmp1 = -0.004d0 + 0.008d0*(4.0d3-abs(zcoor))/4.0d3
+					!		fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
+					!	elseif (abs(zcoor)>4.0d3.and.abs(zcoor)<=13.5d3) then 
+					!		tmp1 = -0.004d0 
+					!		fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1 
+					!	elseif (abs(zcoor)>13.5d3.and.abs(zcoor)<=17.5d3) then
+					!		tmp1 = -0.004d0 + 0.011d0*(abs(zcoor)-13.5d3)/4.0d3
+					!		fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1  
+					!	elseif (abs(zcoor)>17.5d3.and.abs(zcoor)<=24.0d3) then
+					!		tmp1 = 0.007d0 + 0.009d0*(abs(zcoor)-17.5d3)/6.5d3 
+					!		fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
+					!	elseif (abs(zcoor)>24.0d3) then
+					!		tmp1 = 0.007d0 + 0.009d0
+					!		fric(10,nftnd(ift),ift) = fric(9,nftnd(ift),ift) - tmp1
+					!	endif
+					!	if (abs(xcoor)>23.0d3.and.abs(xcoor)<28.0d3) then 
 							!fric(9,nftnd(ift),ift) = fric(9,nftnd(ift),ift)+0.009d0*( abs(xcoor)-15.d3)/5.0d3
-							fric(10,nftnd(ift),ift) = fric(10,nftnd(ift),ift)*(28.0d3 - abs(xcoor))/5.0d3
-						elseif (abs(xcoor)>=28.0d3) then 
+					!		fric(10,nftnd(ift),ift) = fric(10,nftnd(ift),ift)*(28.0d3 - abs(xcoor))/5.0d3
+					!	elseif (abs(xcoor)>=28.0d3) then 
 							!fric(9,nftnd(ift),ift) = fric(9,nftnd(ift),ift)+0.009d0*( abs(xcoor)-15.d3)/5.0d3
-							fric(10,nftnd(ift),ift) = 0.000d0
-						endif 
+					!		fric(10,nftnd(ift),ift) = 0.000d0
+					!	endif 
 						!if (fric(10,nftnd(ift),ift)<0.001d0)then 
 						!	fric(10,nftnd(ift),ift) = 0.001d0
-						!endif 
-						
-						fric(11,nftnd(ift),ift)=0.011d0 + 0.016d0*max(0.0d0, (4.0d3-abs(zcoor))/4.0d3)!RSF critical distance.
+						!endi
+if(abs(zcoor--60.0d3)<80.0d3.and.abs(zcoor--60.0d3)>=18.0d3) then
+ tmp1 = 1.0d0
+elseif (abs(zcoor--60.0d3)<18.0d3.and.abs(zcoor--60.0d3)>15.0d3) then
+ tmp1 = (abs(zcoor--60.0d3) - 15.0d3)/3.0d3
+elseif (abs(zcoor - -60.0d3)<=15.0d3) then
+ tmp1 = 0.0d0
+endif
+if(abs(xcoor)<=30.0d3)then
+ tmp2 = 0.0d0
+elseif (abs(xcoor)>30.0d3.and.abs(xcoor)<33.0d3) then
+ tmp2 = (abs(xcoor)-30.0d3)/3.0d3
+elseif (abs(xcoor)>=33.0d3) then
+ tmp2 = 1.0d0
+endif
+					        fric(9,nftnd(ift),ift) = 0.0065d0 + max(tmp1,tmp2)*(0.025d0-0.0065d0)
+                                	        fric(10,nftnd(ift),ift) = 0.013d0
+                                                
+						fric(11,nftnd(ift),ift)=0.04d0 !+ 0.016d0*max(0.0d0, (4.0d3-abs(zcoor))/4.0d3)!RSF critical distance.
 						fric(12,nftnd(ift),ift)=1.0d-6!RSF:V0
 						fric(13,nftnd(ift),ift)=0.6d0!RSF:miu0
 						if(friclaw==4) then 
@@ -403,9 +431,9 @@ do ix = 1, nxt
 						! fric(19,nftnd(ift),ift)=1.0d-9!RSF:mag	
 						!if (zcoor>=-12.0d3.and.abs(xcoor)<=12.0d3) then
 							fric(16,nftnd(ift),ift)=0.0d0 !RSF: initial normal slip rate 
-							fric(17,nftnd(ift),ift)=1.0d-12!RSF:s 
+							fric(17,nftnd(ift),ift)=1.0d-20!RSF:s 
 							fric(18,nftnd(ift),ift)=0.0d0!RSF:d
-							fric(19,nftnd(ift),ift)=1.0d-12!RSF:mag	
+							fric(19,nftnd(ift),ift)=1.0d-20!RSF:mag	
 						!	if( fric(9,nftnd(ift),ift) - fric(10,nftnd(ift),ift) > 0.0001d0 ) then
 						!		fric(16,nftnd(ift),ift)=0.0d0 !RSF: initial normal slip rate 
 						!		fric(17,nftnd(ift),ift)=1.0d-9!RSF:s 
@@ -426,8 +454,12 @@ do ix = 1, nxt
 						 ! if (xcoor==-18.0d3.and.zcoor==-21.0d3) then 
 							! write(*,*) 'state variable',fric(20,nftnd(ift),ift)
 						 ! endif 
-						! fric(20,nftnd(ift),ift)=fric(11,nftnd(ift),ift)/1.0d-9!fric(19,nftnd(ift),ift)
-						! fric(8,nftnd(ift),ift) = - fric(7,nftnd(ift),ift) * (fric(13,nftnd(ift),ift) + (fric(9,nftnd(ift),ift) - fric(10,nftnd(ift),ift))*dlog(1.0d-9/fric(12,nftnd(ift),ift)))
+                                                fric(20,nftnd(ift),ift) = initial(4,(nfx-1)*121+nfz)
+						!fric(20,nftnd(ift),ift)=fric(11,nftnd(ift),ift)/fric(12,nftnd(ift),ift)* &
+                                                !        dexp(fric(9,nftnd(ift),ift)/fric(10,nftnd(ift),ift)*dlog(2.0d0* &
+                             !fric(12,nftnd(ift),ift)/1d-9*dsinh((25.855d6-2670.0d0*3464.0d0/2.0d0* &
+                      !  1d-9)/fric(9,nftnd(ift),ift)/abs(fric(7,nftnd(ift),ift))))-fric(13,nftnd(ift),ift)/fric(10,nftnd(ift),ift))!fric(11,nftnd(ift),ift)/1.0d-9!fric(19,nftnd(ift),ift)
+						!fric(8,nftnd(ift),ift) = - fric(7,nftnd(ift),ift) * (fric(13,nftnd(ift),ift) + (fric(9,nftnd(ift),ift) - fric(10,nftnd(ift),ift))*dlog(1.0d-9/fric(12,nftnd(ift),ift)))
 						! if( fric(9,nftnd(ift),ift) - fric(10,nftnd(ift),ift) > 0.0001d0 ) then
 							! fric(20,nftnd(ift),ift)=fric(11,nftnd(ift),ift)/1.0d-9!					
 						! end if	
@@ -487,7 +519,7 @@ do ix = 1, nxt
 				if (center(1)<0.0d0) then 
 					kinkx=dy/2.0d0
 				else
-					kinkx=center(1)/30.0d3*5289.8d0
+					kinkx=dy/2.0d0!center(1)/30.0d3*5289.8d0
 				endif				
 				
 				if((center(2)>0.0d0 + kinkx - dy/2.0d0).and.(center(2)<(dy/2.0d0 + tol +kinkx))) then
@@ -503,12 +535,6 @@ do ix = 1, nxt
 						enddo
 					enddo
 				endif				
-				
-				if((center(2)<(ylinet(1)+15.0d0*dx)).or.(center(2)>(ylinet(nyt)-15.0d0*dx))) then
-					et(nelement)=3!Regular boundaries, essential boundary treatment.
-					! open(1093,file='boundelem.txt',form='formatted',status='unknown',position='append')
-					!	 write(1093,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)						
-				endif
 				if((center(2)>(-2.0d0*dy-tol+kinkx)).and.(center(2)<(2.0d0*dy+tol+kinkx))) then
 					et(nelement)=2!Fault boundary, essential boundary treatment.
 					! open(1002,file='faultelem.txt',form='formatted',status='unknown',position='append')
@@ -521,6 +547,11 @@ do ix = 1, nxt
 						! ien(7,nelement),id(1,ien(7,nelement)),id(2,ien(7,nelement)),id(3,ien(7,nelement)),&
 						! ien(8,nelement),id(1,ien(8,nelement)),id(2,ien(8,nelement)),id(3,ien(8,nelement))
 				endif	
+				if((center(2)<(ylinet(1)+30.0d3)).or.(center(2)>(ylinet(nyt)-30.0d3))) then
+					et(nelement)=3!Regular boundaries, essential boundary treatment.
+					! open(1003,file='boundelem.txt',form='formatted',status='unknown',position='append')
+						! write(1003,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)						
+				endif
 			endif !if element
 		enddo!iy
 	enddo!iz

@@ -42,7 +42,8 @@ real(kind=8),dimension(nftmx,ntotft)::fnft,arn,r4nuc,slp4fri
 real(kind=8),dimension(3,nftmx,ntotft)::un,us,ud,fltslp
 real(kind=8),dimension(50,nftmx,ntotft)::fric
 real(kind=8),dimension(10,nstep,nonmx)::fltsta
-real(kind=8)::dtev,dtev1
+real(kind=8),dimension(10,nstep)::globaldat
+real(kind=8)::dtev,dtev1,totmomrate,maxsliprate,totruptarea,tottaoruptarea, totslipruptarea,tdynastart,tdynaend,tcheck,tcheckstatus
 integer(kind=8)::nev
 !Parameters for pardiso
 integer(kind=8)::pt(64)
@@ -67,13 +68,21 @@ CALL DMUMPS(mumps_par)
 
 	status0 = 0
 	status1 = 0
-	
+        fnft = -1000.0d0
+	fltsta = 0.0d0
+        globaldat = 0.0d0
+        totmomrate = 0.0d0
+        maxsliprate = 0.0d0
+        tdynastart = -1000.0d0
+        tdynaend = -1000.0d0
+        tcheck = 0.0d0
+        tcheckstatus = -1.0d0
 	if (me.eq.0) then
 	!LOOP 2000 ![MUMPS]
 	write(*,*) 'LOOP 2000: CONSTRUCT KSTIFF in CRS; CONVERT CRS to MUMPS FORMAT'
 	!Define problem on the host (processor 0)
-	dtev = ksi*LL/1.0d-9
-	dtev1 = ksi*LL/1.0d-9!Initial dtev1>dt to enter static state.
+	dtev = ksi*LL/1.0d-3
+	dtev1 = ksi*LL/1.0d-3!Initial dtev1>dt to enter static state.
 	constrain = 0.0d0!Initialize constrain, displacements.
 	constraintmp = 0.0d0
 	constrainvtmp = 0.0d0
@@ -324,12 +333,12 @@ CALL DMUMPS(mumps_par)
 	endif
 	if (nftnd(1) > 0) then !RSF
 		do l=1,nftnd(1)
-			constrainv(1,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(1,l,1)!Slave
-			constrainv(2,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(2,l,1)
-			constrainv(3,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(3,l,1)
-			constrainv(1,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(1,l,1)!Master 
-			constrainv(2,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(2,l,1) 
-			constrainv(3,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * 1.0d-9 *us(3,l,1) 	
+			constrainv(1,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(1,l,1)!Slave
+			constrainv(2,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(2,l,1)
+			constrainv(3,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(3,l,1)
+			constrainv(1,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(1,l,1)!Master 
+			constrainv(2,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(2,l,1) 
+			constrainv(3,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(3,l,1) 	
 		enddo
 		
 	endif
@@ -380,28 +389,55 @@ CALL DMUMPS(mumps_par)
 		if (me.eq.0) then
 	!PART3===ENTER TIME LOOP===!
 	!write(*,*) '!---3.1===CHECK CURRENT STATUS DYNAMIC/NON-DYNAMIC',me    
-			if (dtev1>epsi*dt) then!dtev1 was calculated in last timestep's faulting.
-				status1=0
-			elseif (dtev1<=epsi*dt) then
-				dtev1 = dt
-				status1=1
-				exit
-			endif
+			!if (dtev1>dt) then!dtev1 was calculated in last timestep's faulting.
+			!	status1=0
+			!elseif (dtev1<=dt) then
+		        !		dtev1 = dt
+			!	status1=1
+		!		exit
+			!endif
 	!write(*,*) '!---3.2===ADJUST LEFT_HAND MATRIX ACCORDING TO STATUS'   		
-			if ((status1-status0)==1) then
-				write(*,*) 'CHANGE STATUS from STATIC to DYNAMIC'
-			elseif ((status1-status0)==-1) then
-				write(*,*) 'CHANGE STATUS from DYNAMIC to STATIC'	
-			endif!
+			!if ((status1-status0)==1) then
+			!	write(*,*) 'CHANGE STATUS from STATIC to DYNAMIC'
+			!elseif ((status1-status0)==-1) then
+			!	write(*,*) 'CHANGE STATUS from DYNAMIC to STATIC'	
+			!endif!
 	!write(*,*) '!---3.3===UPDATE TIME & PRINT' 
 			!time=(it)*dt
 			time=time+dtev1
 			write(*,*) it,'time step'
 			write(*,*) time/60.0d0/60.0d0/24.0d0/365.0d0, 'year'
+                        if (time/60/60/24/365>term) then
+                                exit
+                        endif
+                        if (maxsliprate>1.0d-3)then 
+                          if (status0 == 0) then        
+                            status1 = 1
+                          elseif (status0 == 1) then
+                            if (tcheckstatus>0.0d0) then
+                              tcheckstatus = -1.0d0
+                              tdynaend = -1000.0d0
+                            endif
+                          endif
+                        elseif (maxsliprate<=1.0d-3) then
+                          if (status0 == 0) then
+                            status1 = 0
+                          elseif (status0 == 1) then
+                            if (tcheckstatus<0.0d0) then
+                                tcheckstatus = 1.0d0
+                                tdynaend = time
+                            else
+                              if ((time-tdynaend)>=10.0d0.and.tdynaend>0.0d0) exit
+                            endif
+                          endif
+                        endif
+                        if ((status1-status0)==1) then
+                                tdynastart = time
+                        endif
 	!write(*,*) '!---3.4===COSEISMIC DYNAMIC: STATUS == 1'
 		endif!MYID==0	
-		if (status1 == 1) then		
-		elseif (status1==0) then
+		if (status1 == 1.or.status1 ==0) then		
+		!elseif (status1==0) then
 			
 			if (me.eq.0) then
 			
@@ -433,11 +469,11 @@ CALL DMUMPS(mumps_par)
 							!-2->-x; -3->+x; -5->fault
 							if (elemvar(ntag)<0)then
 								if (elemvar(ntag)==-2) then
-									constrainv(j,node_num)=-9.513d-10!-5.0d-10
+									constrainv(j,node_num)=-loadrate!-5.0d-10
 									constrainvtmp(j,node_num) = constrainv(j,node_num)
 									constraina(j,node_num)=0.0d0
 								elseif (elemvar(ntag)==-3) then
-									constrainv(j,node_num)=9.513d-10!5.0d-10
+									constrainv(j,node_num)=loadrate!5.0d-10
 									constrainvtmp(j,node_num) = constrainv(j,node_num)
 									constraina(j,node_num)=0.0d0					
 								elseif (elemvar(ntag)==-1) then
@@ -551,7 +587,8 @@ CALL DMUMPS(mumps_par)
 							nsmp(1,1,ift),fnft(1,ift),fltslp(1,1,ift),&
 							un(1,1,ift),us(1,1,ift),ud(1,1,ift),fric(1,1,ift),arn(1,ift),r4nuc(1,ift),&
 							slp4fri(1,ift),anonfs,nonmx,it,x,&
-							kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp)
+							kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp, &
+                                                        maxsliprate,totmomrate,totruptarea,tottaoruptarea,totslipruptarea)
 					endif
 				enddo
 	!write(*,*) '!---3.5.5===V*(t+1) OBTAINED. <-> REPEAT 3.5.1'
@@ -581,10 +618,10 @@ CALL DMUMPS(mumps_par)
 							if (elemvar(ntag)<0)then
 								!-2->-x; -3->+x; -5->fault
 								if (elemvar(ntag)==-2) then
-									constrainv(j,node_num)=-9.513d-10!-5.0d-10
+									constrainv(j,node_num)=-loadrate!-5.0d-10
 									constraina(j,node_num)=0.0d0
 								elseif (elemvar(ntag)==-3) then
-									constrainv(j,node_num)=9.513d-10!5.0d-10
+									constrainv(j,node_num)=loadrate!5.0d-10
 									constraina(j,node_num)=0.0d0					
 								elseif (elemvar(ntag)==-1) then
 									constrainv(j,node_num)=0.0d0
@@ -644,12 +681,12 @@ CALL DMUMPS(mumps_par)
 							constrain(j,i)=constraintmp(j,i)
 						endif
 					enddo 
-					if (x(1,i)==0.0d0.and.x(2,i)>=0.0d0) then 
-						if (it==1) then 
-							write(1123,'(3e32.21e4)') x(1,i),x(2,i),x(3,i)
-						endif
-						write(1122,'(6e32.21e4)') constrain(1,i),constrain(2,i),constrain(3,i),right(id(1,i)),right(id(2,i)),right(id(3,i))
-					endif
+					! if (x(1,i)==0.0d0.and.x(2,i)>=0.0d0) then 
+						! if (it==1) then 
+							! write(1123,'(3e32.21e4)') x(1,i),x(2,i),x(3,i)
+						! endif
+						! write(1122,'(6e32.21e4)') constrain(1,i),constrain(2,i),constrain(3,i),right(id(1,i)),right(id(2,i)),right(id(3,i))
+					! endif
 				enddo
 	!write(*,*) '!---3.5.7===COMPUTE F**=KU**(t+1)=[KSTIFF].DOT.[CONSTRAIN]'
 	!--------===NO NEED TO COMPUTE LUMPED MASS	FOR SPLIT NODES			
@@ -699,7 +736,8 @@ CALL DMUMPS(mumps_par)
 							nsmp(1,1,ift),fnft(1,ift),fltslp(1,1,ift),&
 							un(1,1,ift),us(1,1,ift),ud(1,1,ift),fric(1,1,ift),arn(1,ift),r4nuc(1,ift),&
 							slp4fri(1,ift),anonfs,nonmx,it,x,&
-							kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp)
+							kstiff,ia,maxa,right2,itag,dtev1,dtev,status1,constrainvtmp,&
+                                                        maxsliprate,totmomrate,totruptarea,tottaoruptarea,totslipruptarea)
 					endif
 				enddo
 			endif!MYID==0				
@@ -709,14 +747,20 @@ CALL DMUMPS(mumps_par)
 			!------REFRESH STATUS,DTEV1		
 			status0=status1
 			nev=int8(dtev/dt)
-			if (status1==0) then
+			!if (status1==0) then
 				dtev1=max(dt,nev*dt)	
-			else
-				dtev1=dt
-			endif		
+			!else
+			!	dtev1=dt
+			!endif	
+                        globaldat(1,it) = time
+                        globaldat(2,it) = maxsliprate
+                        globaldat(3,it) = totmomrate	
+                        globaldat(4,it) = tottaoruptarea
+                        globaldat(5,it) = totslipruptarea
+						globaldat(6,it) = totruptarea
 			write(*,*) 'New time step dtev1 = ', dtev1, 'seconds'
                         write(*,*) 'Pma = ', pma
-                        write(*,*) 'Sliprate max =', sliprmax
+                        write(*,*) 'Sliprate max =', maxsliprate
 			write(*,*) '******* Confirm Status 0',status1,'Confirmed*******'
 		endif!MYID==0
 		
@@ -733,8 +777,8 @@ if (me.eq.0) then
 				sttmp = '      '
 				dptmp = '      '
 				write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/100.d0) 
-				write(dptmp,'(i4.3)') int(abs(xonfs(2,anonfs(2,i),j))/100.d0) 
-				open(51,file='faultst'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
+				write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j)-60.0d3)/100.d0) 
+				open(51,file='fltst_strk-'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
 
 				! sttmp = '      '
 				! dptmp = '      '
@@ -742,17 +786,19 @@ if (me.eq.0) then
 				! write(dptmp,'(f5.1)') abs(xonfs(2,anonfs(2,i),j)/1000.d0) 
 				! loca = '# location = on fault, '//trim(adjustl(sttmp))//' km along strike, '//trim(adjustl(dptmp))//' km down-dip'		
 			endif
-			! write(51,*) '#For SCEC TPV8'
+                        !write(51,*) '# This is the file header'
+			!write(51,*) '# problem=SEAS Benchmark No.4'
 			! write(51,*) '#Author=D.Liu'
-			! write(51,*) '#code = EQquasi3d'
-			! write(51,*) '#code_version=1.0'
-			! write(51,*) '#element_size = 200 m x 200 m on fault'
+		        !write(51,*) '# code = EQSimu'
+			!write(51,*) '# version=1.0'
+			!write(51,*) '# modeler = A.Modeler'
+                        !write(51,*) '#element_size = 200 m x 200 m on fault'
 			! write(51,*) '# Time series in 8 columns in format e15.7'
 			! write(51,*) '# Column #1 = Time (s)'
 			! write(51,*) '# Column #2 = horizontal slip (m)'
 			! write(51,*) '# Column #3 = horizontal slip rate (m/s)'
 			! write(51,*) '# Column #4 = horizontal shear stress (MPa)'
-			! write(51,*) '# Column #5 = down-dip slip (m)'
+			! write(51,*) '# Column #3 = down-dip slip (m)'
 			! write(51,*) '# Column #6 = down-dip slip rate (m/s)'
 			! write(51,*) '# Column #7 = down-dip shear stress (MPa)'
 			! !write(51,*) '# Column #8 = normal stress (MPa)'
@@ -760,8 +806,8 @@ if (me.eq.0) then
 			! write(51,*) 't h-slip h-slip-rate h-shear-stress v-slip v-slip-rate v-shear-stress'
 			! write(51,*) '#'		
 			do j=1,it-1
-			write(51,'( 9e32.21e4)') fltsta(1,j,i),fltsta(5,j,i),fltsta(2,j,i),fltsta(8,j,i)/1.e6,&
-					-fltsta(6,j,i),-fltsta(3,j,i),-fltsta(9,j,i)/1.e6,-fltsta(10,j,i)/1.e6,fltsta(4,j,i)
+			write(51,'( 8e32.21e4)') fltsta(1,j,i),fltsta(5,j,i),-fltsta(6,j,i), fltsta(2,j,i), &
+                                fltsta(3,j,i),fltsta(8,j,i)/1.d6,-fltsta(9,j,i)/1.d6,dlog10(fltsta(4,j,i))
 			enddo
 			close(51)
 		enddo
@@ -790,13 +836,21 @@ if (me.eq.0) then
 		!!-FORMAT
 		!!-1,    2,     3, fric(26,i),4,fric(20,i),5,fric(28,i),6,fric(29,i),7,fric(30,i)   
 		!!-XCOOR,+ZCOOR, V_trial,     psi,        ,tstk,       ,tdip,       ,tnrm0
-		write(1111,'(1x,15e32.21e4)') (x(1,nsmp(1,i,1)),-x(3,nsmp(1,i,1)),fric(26,i,1),fric(20,i,1),fric(28,i,1), &
+		write(1111,'(1x,16e32.21e4)') (x(1,nsmp(1,i,1)),-x(3,nsmp(1,i,1)),fric(26,i,1),fric(20,i,1),fric(28,i,1), &
 				fric(29,i,1),fric(30,i,1),fric(31,i,1),fric(32,i,1),fric(33,i,1),fric(34,i,1),fric(35,i,1),fric(36,i,1), &
-                                fric(44,i,1), fric(45,i,1), i=1,nftnd(1))	
+                                fric(44,i,1), fric(45,i,1), fnft(i,1), i=1,nftnd(1))	
 		close(1111)
 	endif
+        
+        write(*,*) 'Writing out tdynastart and tdynaend'
+        open(1112,file='tdyna.txt',form = 'formatted', status = 'unknown')
+                write(1112,'(2e32.21e4)') tdynastart, tdynaend
+        close(1112)
 
-
+        write(*,*) 'Writing out global.dat'
+        open(1113,file='global.dat',form='formatted',status='unknown')
+                write(1113,'(6e32.21e4)') (globaldat(1,i),globaldat(2,i),globaldat(3,i),globaldat(4,i),globaldat(5,i),globaldat(6,i),i=1,it-1)
+        close(1113)
 endif!MYID==0
 ! Deallocate user data
 IF ( me.eq.0 )THEN

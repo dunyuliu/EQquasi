@@ -1,4 +1,4 @@
-#BSUB -J M8AutoSharp-NormCap-NewSwitch
+#BSUB -J jobname
 #BSUB -L /bin/bash
 #BSUB -W 20:00
 #BSUB -n 100              # 100: total number of cores/jobslots to allocate for the job
@@ -13,9 +13,9 @@
 ##BSUB -B -N              # send emails on job begin (-B) and end (-N)
 #
 export OMP_NUM_THREADS=1
+
 #load intel toolchain
-ml intel/2018a
-#
+
 for i in `seq 16 17`;
 do
   echo "Cycle #:" $i

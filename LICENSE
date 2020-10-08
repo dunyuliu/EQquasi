@@ -1,23 +1,43 @@
-Copyright (C) 2018-2020 Dunyu Liu, dunyuliu@tamu.edu
+				      EQquasi Software Licence Agreement
 
-If you copy, download, install or use EQquasi if you agree to be bound
-by the terms and conditions of the following agreement. 
+/* Copyright (C) 2018-2020, Earthquake Modeling Lab @ Texas A&M University.
+*  All rights reserved. 
+*  Authors: Benchun Duan (bduan@tamu.edu), Dunyu Liu (dunyuliu@tamu.edu)/  
 
-EQquasi Software Licence Agreement
+If you copy, download, install or use EQquasi, you agree to be bound by the
+terms and conditions of the following agreement: 
 
-'Software' shall mean the EQquasi in the binary excutable 
-format, together with a user guide, exemplary source code files included 
-in the package. The author grants to the licensee a non-exclusive, non-
-transferable license to download, install and use the Software free of 
-charge for non-commercial, academic research, including industry-sponsored 
-research, and education purposes, except for the part of MUMPS, a parallel 
-iterative solver, which is distributed under CeCILL-C license (please see
-https://cecill.info/licences/Licence_CeCILL-C_V1-en.html) abd the part of
-AZTEC, a parallel iterative solver, which is distributed under the Aztec 
-License Agreesment that can be referred to at http://www.cs.sandia.gov/CRF/Aztec_download.html.
+'Software' shall mean EQquasi in the binary excutable format, together with 
+a user guide, exemplary source code files included in the package. Permission 
+to use, copy, modify, and distribute this software and its documentation for 
+educational, research, and not-for-profit purposes, without fee and without a 
+signed licensing agreement, is hereby granted, except for that the MUMPS 5.1.2, the 
+parallel direct solver used by EQquasi, is released under CeCill-C license, which
+can be referred to by the link https://cecill.info/licences/Licence_CeCILL-C_V1-en.html.)
+provided that the above copyright notice, this paragraph and the following six 
+paragraphs appear in all copies, modifications, and distributions, Please contact 
+Dr. Benchun Duan by bduan@tamu.edu for commercial licensing opportunities.
 
-Disclaimer and Limitation of Warranty and Liability. The licensee acknowledge 
-that the Software is a research tool, provided with potential faults and bugs,
-wihtout any maintenance, debugging, improvement and other support. 
+IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, 
+INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF 
+THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF REGENTS HAS BEEN ADVISED 
+OF THE POSSIBILITY OF SUCH DAMAGE.
 
+THE AUTHORS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. 
+THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF ANY, PROVIDED HEREUNDER IS 
+PROVIDED "AS IS". REGENTS HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, 
+UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
+You can acknowlege (using references [1], [2], and [3]) the contribution of EQquasi in 
+any scientific publication dependent on the use of the package.  
+
+[1] D. Liu, B. Duan and B. Luo, EQsimu: a 3-D finite element dynamic earthquake simulator 
+	for multicycle dynamics of geometrically complex faults governed by rate- and state-
+	dependent friction." Geophysical Journal International 220(1): 598-609 (2020).
+[2] P. R. Amestoy, I. S. Duff, J. Koster and J.-Y. L'Excellent, A fully asynchronous 
+	multifrontal solver using distributed dynamic scheduling, SIAM Journal on Matrix Analysis
+	and Applications, Vol 23, No 1, pp 15-41 (2001).
+[3] P. R. Amestoy, A. Buttari, J.-Y. L'Excellent and T. Mary, Performance and scalability 
+	of the block low-rank multifrontal factorization on multicore architectures, ACM 
+	Transactions on Mathematical Software, Vol 45, Issue 1, pp 2:1-2:26 (2019)

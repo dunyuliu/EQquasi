@@ -10,6 +10,24 @@ handle the heavy computing loads. Rate- and state- friction law with various for
 mented. 
 
 ### Author:  Dunyu Liu
+### Date:    08/2020-10/08/2020
+### Contact: dunyuliu@tamu.edu
+## Version 1.2.0; Git tag v1.2.0; Parent 1.1.0.
+# Major changes:
+* significant simplification of the code structure.
+* files are renamed. 
+* New files library_bound.f90, library_output.f90, Read_Input_Files.f90, crs.f90, elemcal.f9 
+*	are created. 
+* Subroutines bound_load, bound_ft_ku, output_onfault_st, output_offfault_st, output_onfault_transfer, 
+*	output_timedy, output_globaldat, and output_prof  crs, elemcal, readcurrentcycle, 
+*	readstations1 and readstations2 are created. 
+* ./script/ is created to hold MATLAB post processing scripts. 
+* The license is improved. 
+* On-sreen printing is improved. 
+* [Verification] It is applied to SCEC SEAS BP5-QD. 
+* Detailed changes please refer to the Changelog.md/the google doc.
+
+### Author:  Dunyu Liu
 ### Date:    11/25/2019-01/06/2020
 ### Contact: dunyuliu@tamu.edu
 ## Version 1.1.0; Git tag v1.1.0; Parent 1.0.0.

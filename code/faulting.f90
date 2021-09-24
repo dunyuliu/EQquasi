@@ -261,10 +261,10 @@ do ift = 1, ntotft
 						v_trial = vtmp
 					endif				
 				enddo !iv	
-				if(v_trial < fric(19,i,ift)) then
-					v_trial = fric(19,i,ift)
-					tau_fric_trial = ttao0
-				endif	
+				!if(v_trial < fric(19,i,ift)) then
+				!	v_trial = fric(19,i,ift)
+				!	tau_fric_trial = ttao0
+				!endif	
 				
 				tstk=tau_fric_trial*tstk0/ttao0
 				tdip=tau_fric_trial*tdip0/ttao0
@@ -397,9 +397,22 @@ do ift = 1, ntotft
 				write(*,*) 'PROBLEMATIC V_TRIAL = ', v_trial
 				stop 502
 			endif
+			! Record rupture area, average stress vector, slip
+			if (itag==1) then
+			fric(82,i,ift) = sqrt(slips**2 + slipn**2) ! Total slip
+				if (fric(26,i,ift) > 1.0d-3) then 
+					fric(81,i,ift) = arn(i,ift) ! Record ruptured area
+				endif 
+				if (abs(tdynastart-time)<dt/100.0) then 
+					fric(83,i,ift) = sqrt(fric(28,i,ift)**2 + fric(29,i,ift)**2) !Total shear traction when dyna starts.
+				endif
+				if (abs(tdynaend-time)<dt/100.0) then 
+					fric(84,i,ift) = sqrt(fric(28,i,ift)**2 + fric(29,i,ift)**2) !Total shear traction when dyna ends.	
+				endif					
+			endif 
 		endif
 
-		if ((status1==0.and.itag==1).or.(status1==1)) then
+		if (itag==1) then
 			if(n4onf>0) then
 				do j=1,n4onf
 					if(anonfs(1,j)==i.and.anonfs(3,j)==ift) then !only selected stations. B.D. 10/25/09    
@@ -417,6 +430,8 @@ do ift = 1, ntotft
 				enddo 
 			endif   
 		endif
+		
+		
 	enddo	!ending i
 enddo ! ending ift
 

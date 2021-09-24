@@ -1,35 +1,57 @@
 clear all; close all;
+mod = 11;
+icend = 4;
 
-for ic = 1:1
-    path = strcat('../work/C',num2str(ic-1),'/')
-    glo = load(strcat(path,'global.dat'));
-    tt = load(strcat(path,'tdyna.txt'));
+[path,dx,nzz,l] = model_info(mod);
+path
+
+out = strcat(path,'res/global.dat');
+
+finalt = 0; finald = 0;
+for ic = 1:icend
+    path0 = strcat(path,'Q',num2str(ic-1),'/')
+    glo = load(strcat(path0,'global.dat'));
+    % 1-time 2-maxsliprate 3-momrate 4-tao*A 5-slip*A 6-A
+    glo(:,1) = glo(:,1) + finalt;
     n = size(glo,1);
-    for i = 1: n
-        if glo(i,1)==tt(1,1)
-            ntagstart = i;
-        end
-        if glo(i,1) ==tt(1,2)
-            ntagend = i;
-        end
+
+    if ic ==1
+        totglo = glo;
+        finalt = glo(n,1);
+    elseif ic >1
+        finalt = glo(n,1);
+        totglo =[totglo;glo;];
     end
-    if ic ==1 
-        res = glo;
+        
+end
+totglo(:,2) = log10(totglo(:,2));
+
+np = size(totglo,1);
+for i = 1:np
+    if totglo(i,6) > 0 
+        totglo(i,4) =  totglo(i,4)/ totglo(i,6)/1e6;
+        totglo(i,5) =  totglo(i,5)/ totglo(i,6);
     else
-        res = [res;glo];
+        totglo(i,4) = 0;
+        totglo(i,5) = 0;
     end
 end
 
 h1 = figure(1);
 set(h1,'position',[100 100 700 500]);
 subplot(4,1,1)
-plot(res(:,1),log10(res(:,2))); title('Maxsliprate (m/s)');
+plot(totglo(:,1),totglo(:,2)); title('Max Sliprate s (m/s)');
 subplot(4,1,2)
-plot(res(:,1),res(:,3)); title('Momment rate (N-m/s)');
+plot(totglo(:,1),totglo(:,3)); title('Moment rate (N-m/s)');
 subplot(4,1,3)
-plot(res(ntagstart:ntagend,1)-tt(1,1),res(ntagstart:ntagend,4)/1e6); 
-ylim([20 40]);
-title('Average shear stress (MPa)');
+plot(totglo(:,1),totglo(:,4)); title('Ave Shear MPa');
 subplot(4,1,4)
-plot(res(ntagstart:ntagend,1)-tt(1,1),res(ntagstart:ntagend,5)); 
-title('Average slip (m)');
+plot(totglo(:,1),totglo(:,5)); title('Ave slip m');
+
+%%output the combined file
+delete(out)
+fileID = fopen('tmp','w');
+fprintf(fileID,'%22.14e %15.7e %15.7e\n',totglo(:,1:3)');
+fclose(fileID);
+system(strcat('type'," ",'.\header\sourceheader.txt'," ",'>'," ",out));
+system(strcat('type'," ",'tmp'," ",'>>'," ",out));

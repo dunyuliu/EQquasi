@@ -84,6 +84,7 @@ subroutine meshgen
 	ycoor=-dy*(dis4uniF)
 	do iy=1,np
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ycoor=ycoor-ystep
 		if(ycoor<=ymin) exit
 	enddo
@@ -92,6 +93,7 @@ subroutine meshgen
 	ycoor=dy*(dis4uniB)
 	do iy=1,np
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ycoor=ycoor+ystep
 		if(ycoor>=ymax) exit
 	enddo
@@ -103,6 +105,7 @@ subroutine meshgen
 	ystep=dy
 	do iy=edgey1,1,-1
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ylinet(iy)=ylinet(iy+1)-ystep
 	enddo
 	ymin1=ylinet(1)
@@ -112,6 +115,7 @@ subroutine meshgen
 	ystep=dy
 	do iy=edgey1+nyuni+1,nyt
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ylinet(iy)=ylinet(iy-1)+ystep
 	enddo
 	ymax1=ylinet(nyt)
@@ -339,8 +343,8 @@ subroutine meshgen
 							! endif											
 							fric(10,nftnd0(ift),ift) = 0.03d0                                            
 							fric(11,nftnd0(ift),ift)=0.14d0 !RSF critical distance.
-							if (xcoor<-30.0d3+12.0d3.and.xcoor>-30.0d3.and.zcoor<-4.0d3 &
-								 .and.zcoor>-16.0d3) then
+							if (xcoor<-30.0d3+12.0d3+tol.and.xcoor>-30.0d3-tol.and.zcoor<-4.0d3+tol &
+								 .and.zcoor>-16.0d3-tol) then
 								fric(11,nftnd0(ift),ift)=0.13d0
 							endif						
 							fric(12,nftnd0(ift),ift)=1.0d-6!RSF:V0
@@ -372,11 +376,11 @@ subroutine meshgen
 							fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
 							fric(45, nftnd0(ift), ift) = 0.0d0
 							fric(46, nftnd0(ift), ift) = 1.0d-9 	! initial sliprate m/s
-							if (xcoor<-30.0d3+12.0d3.and.xcoor>-30.0d3.and.zcoor<-4.0d3 &
-								 .and.zcoor>-16.0d3) then
-								fric(46,nftnd0(ift),ift)=1.0d-2
+							if (xcoor<-30.0d3+12.0d3+tol.and.xcoor>-30.0d3-tol.and.zcoor<-4.0d3+tol &
+								 .and.zcoor>-16.0d3-tol) then
+								fric(46,nftnd0(ift),ift)=3.0d-2
 								fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
-									1.0d-2/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + 2670.0d0*3464.0d0/2.0d0*1.0d-2		
+									fric(46,nftnd0(ift),ift)/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + 2670.0d0*3464.0d0/2.0d0*fric(46,nftnd0(ift),ift)		
 								fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift)		
 								fric(45, nftnd0(ift), ift) = 0.0d0
 							endif	

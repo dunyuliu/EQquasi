@@ -3,16 +3,16 @@
 #  on Thur March 22 10:27:00 CDT 2018
 #
 
-topdir = /scratch/user/dunyuliu/0LIBRARY/MUMPS_5.1.2
+topdir = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2
 libdir = $(topdir)/lib
-
+incdir = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2/include
 include $(topdir)/Makefile.inc
 
 LIBMUMPS_COMMON = $(libdir)/libmumps_common$(PLAT)$(LIBEXT)
 
 LIBDMUMPS = $(libdir)/libdmumps$(PLAT)$(LIBEXT) $(LIBMUMPS_COMMON)
 
-F90 = mpiifort
+F90 = mpif90
 OPT = -c -qopenmp 
 OPT1 = -qopenmp
 OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o \

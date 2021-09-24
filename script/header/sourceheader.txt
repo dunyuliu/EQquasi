@@ -1,0 +1,17 @@
+# This is the file header:
+# problem=SEAS BP5-QD
+# code=EQsimu
+# version=1.2.1
+# modeler=D.Liu
+# date=2021/06/16
+# element size=1000 m
+# location= VW patch + 2*transition zone
+# minimum time step=0.05
+# maximum time step=unknown
+# num time steps=unknown
+# Column #1 = Time (s)
+# Column #2 = Max_slip_rate (log10 m/s)
+# Column #3 = Moment_rate (N-m/s)
+# The line below lists the names of the data fields
+t max_slip_rate moment_rate
+# Here is the time-series data.

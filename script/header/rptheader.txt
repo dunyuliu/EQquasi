@@ -1,0 +1,14 @@
+# This is the file header:
+# problem=SEAS BP5-QD
+# code=EQsimu
+# version=1.2.1
+# modeler=D.Liu
+# date=2021/06/16
+# element size=1000 m
+# Column #1 = x2 (m)
+# Column #2 = x3 (m)
+# Column #3 = time (s)
+# Computational domain size: 120X100X60 or 180X200X90 km (strXfault-normalXdepth)
+# The line below lists the names of the data fields
+x2 x3 t
+# Here is the time-series data

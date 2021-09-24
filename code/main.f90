@@ -28,7 +28,7 @@ subroutine main
 		maxsliprate = maxval(tmparr)
 		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
 	elseif (icstart == 1) then 
-		maxsliprate = 1.0d-2 
+		maxsliprate = 3.0d-2 
 		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
 	endif 
 	
@@ -98,15 +98,18 @@ subroutine main
 
 	mumps_par%JOB = 4! 1 + 2
 	CALL DMUMPS(mumps_par)
+	
+	stoptag = 0 
+   	do it=1,nstep 
+		if (stoptag == 1) exit
 
-    do it=1,nstep 
 		if (me.eq.0) then
 		
 			resu_1 = resu
 			
 			time=time+dtev1
 			
-			if (mod(it,nhplt) == 1) then
+			if (mod(it,nhplt) == 1 .and. me ==0) then
 				write(*,*) '=                                                                   ='
 				write(*,*) '=     Current time =                                                ='
 				write(*,'(X,A,40X,E15.7,4X,A)') '=',  time/60.0d0/60.0d0/24.0d0/365.0d0, 'year'						
@@ -124,8 +127,8 @@ subroutine main
 				if (status0 == 0) then        
 					status1 = 1
 				elseif (status0 == 1) then
-					if (tcheckstatus>0.0d0) then
-						tcheckstatus = -1.0d0
+					if (t_end_status>0.0d0) then
+						t_end_status = -1.0d0
 						tdynaend = -1000.0d0
 					endif
 				endif
@@ -133,11 +136,14 @@ subroutine main
 				if (status0 == 0) then
 					status1 = 0
 				elseif (status0 == 1) then
-					if (tcheckstatus<0.0d0) then
-						tcheckstatus = 1.0d0
+					if (t_end_status<0.0d0) then
+						t_end_status = 1.0d0
 						tdynaend = time
 					else
-						if ((time-tdynaend)>=100.0d0.and.tdynaend>0.0d0) exit
+						if ((time-tdynaend)>=100.0d0.and.tdynaend>0.0d0) then !exit
+							stoptag = 1
+							!call MPI_Bcast(stoptag, 1, MPI_INT, 0, MPI_COMM_WORLD, IERR)
+						endif
 						!if ((time-tdynaend)>=1.0d0*7*24*60*60.and.tdynaend>0.0d0) exit
 					endif
 				endif
@@ -145,6 +151,7 @@ subroutine main
 			
 			if ((status1-status0)==1) then
 				tdynastart = time
+				t_start_status = 1
 			endif
 
 			if(ndout>0) then
@@ -170,7 +177,8 @@ subroutine main
 
 			mumps_par%RHS = right
 		endif
-		
+		call MPI_BCAST(stoptag, 1, MPI_INT, 0, MPI_COMM_WORLD, IERR)
+
 		mumps_par%JOB = 3
 		mumps_par%ICNTL(3) = -1 ! Goblal info, default 6 
 		CALL DMUMPS( mumps_par )!MPI
@@ -254,27 +262,17 @@ subroutine main
 		endif!MYID==0
 	enddo!it
 
-	if (me.eq.0) then
-		call output_onfault_st
-		
-		call output_offfault_st
-		
-		call output_onfault_transfer
-		
-		call output_timedy
-		
-		call output_globaldat
-		
-		DEALLOCATE( mumps_par%IRN )
-		DEALLOCATE( mumps_par%JCN )
-		DEALLOCATE( mumps_par%A )
-		DEALLOCATE( mumps_par%RHS )
-	endif
+	!if (me.eq.0) then		
+	!	DEALLOCATE( mumps_par%IRN )
+	!	DEALLOCATE( mumps_par%JCN )
+	!	DEALLOCATE( mumps_par%A )
+	!	DEALLOCATE( mumps_par%RHS )
+	!endif
 	
 	!Destroy the instance (deallocate internal data structures)
-	! mumps_par%JOB = -2
-	! CALL DMUMPS( mumps_par )	
+	!mumps_par%JOB = -2
+	!CALL DMUMPS( mumps_par )	
 	
-	! CALL MPI_FINALIZE ( IERR )
+	!CALL MPI_FINALIZE ( IERR )
 	
 end subroutine main

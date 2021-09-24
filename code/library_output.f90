@@ -64,13 +64,13 @@ subroutine output_offfault_st
 			dptmp = '      '
 			write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))/1000.d0) 
 			write(sttmp,'(i4.3)') int(x4nds(1,an4nds(1,i))/1000.d0) 
-			!write(dptmp,'(i4.3)') int(abs(x4nds(3,an4nds(1,i)))/1000.d0) 
+			write(dptmp,'(i4.3)') int(abs(x4nds(3,an4nds(1,i)))/1000.d0) 
 			
 			write(*,*) '=       xcoor',bodytmp,sttmp,dptmp,'                                ='
 			write(*,*) '=                                                                   ='
 			write(*,*) '====================================================================='		
 			
-			open(51,file='srfst_strk'//trim(adjustl(sttmp))//'st'//trim(adjustl(bodytmp))//'.txt',status='unknown')
+			open(51,file='srfst_strk'//trim(adjustl(sttmp))//'st'//trim(adjustl(bodytmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
 
 			! bodytmp = '      '
 			! sttmp = '      '
@@ -199,3 +199,21 @@ subroutine output_prof
 			enddo				
     endif
 end subroutine output_prof
+
+subroutine output_ruptarea_trac_slip
+
+	use globalvar
+	implicit none
+	
+	integer (kind = 4) :: i, j 
+	
+	if(nftnd(1) > 0) then
+		open(unit=1114,file='cplot_ruptarea_trac_slip.txt',status='unknown')	!rupture time
+		! 1,    2,     3,     4
+		!fric(81,i),fric(82,i),fric(83,i),fric(84,i)   
+		!Ruptured area, total slip, tract at the beginning, tract at the end.
+		write(1114,'(1x,4e32.21e4)') (fric(81,i,1),fric(82,i,1),fric(83,i,1),fric(84,i,1), i=1,nftnd(1))	
+		close(1114)
+	endif
+	
+end subroutine output_ruptarea_trac_slip

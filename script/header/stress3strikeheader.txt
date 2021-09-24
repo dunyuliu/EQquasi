@@ -1,0 +1,16 @@
+# author=D. Liu
+# date=2021/06/16	
+# code=EQsimu 
+# code version=1.2.1
+# element size=1000 m
+# Row #1 = Depth (m) with two zeros first
+# Column #1 = Time (s)
+# Column #2 = Max slip rate (log10 m/s)
+# Columns #3-80 = Vertical stress along strike (Stress 3) (MPa)
+# Computational domain size: 120X100X60 or 180X200X90 km (strXfault-normalXdepth)
+# The line below lists the names of the data fields
+x3
+t
+max slip rate
+stress 3
+# Here are the data

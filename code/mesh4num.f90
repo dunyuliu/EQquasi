@@ -63,6 +63,7 @@ subroutine mesh4num
 	ycoor=-dy*(dis4uniF)
 	do iy=1,np
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ycoor=ycoor-ystep
 		if(ycoor<=ymin) exit
 	enddo
@@ -71,6 +72,7 @@ subroutine mesh4num
 	ycoor=dy*(dis4uniB)
 	do iy=1,np
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ycoor=ycoor+ystep
 		if(ycoor>=ymax) exit
 	enddo
@@ -82,6 +84,7 @@ subroutine mesh4num
 	ystep=dy
 	do iy=edgey1,1,-1
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ylinet(iy)=ylinet(iy+1)-ystep
 	enddo
 	ymin1=ylinet(1)
@@ -91,6 +94,7 @@ subroutine mesh4num
 	ystep=dy
 	do iy=edgey1+nyuni+1,nyt
 		ystep=ystep*rat
+		if (ystep>=dymax) ystep = dymax
 		ylinet(iy)=ylinet(iy-1)+ystep
 	enddo
 	ymax1=ylinet(nyt)

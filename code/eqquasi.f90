@@ -118,7 +118,8 @@ program eqquasi3d
 	tdynastart    = -1000.0d0
 	tdynaend      = -1000.0d0
 	tcheck        = 0.0d0
-	tcheckstatus  = -1.0d0
+	t_end_status  = -1.0d0
+	t_start_status  = -1.0d0
 	
 	call meshgen
 	
@@ -145,7 +146,25 @@ program eqquasi3d
 	endif
 	
 	call main
+	
+	if (me == 0) then
+		call output_onfault_st
+		
+		call output_offfault_st
+		
+		call output_onfault_transfer
+		
+		call output_timedy
+		
+		call output_globaldat
+		
+		call output_ruptarea_trac_slip
+	endif
+	
+	CALL MPI_FINALIZE ( IERR )
+	
+	write(*,*) '====================================================================='		
+	write(*,*) '=       Job done, exiting...                                        ='
+	write(*,*) '====================================================================='	
 
-	STOP
-
-end 
+end

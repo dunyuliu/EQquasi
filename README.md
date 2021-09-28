@@ -20,4 +20,4 @@ EQquasi is still under heavy development and comes without any guaranteed functi
 
 Collaboration
 -------------
-If you are interested in using EQquasi, please contact Dunyu Liu (dliu@ig.utexas.edu). 
+If you are interested in collaboration using EQquasi, please contact Dunyu Liu (dliu@ig.utexas.edu). 

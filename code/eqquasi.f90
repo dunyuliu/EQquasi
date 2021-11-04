@@ -1,4 +1,4 @@
-!/* Copyright (C) 2018-2020, Earthquake Modeling Lab @ Texas A&M University. 
+!/* Copyright (C) 2018-2021, Earthquake Modeling Lab @ Texas A&M University. 
 ! * All Rights Reserved.
 ! * This code is part of software EQquasi, please see EQquasi License Agreement
 ! * attached before you copy, download, install or use EQquasi./
@@ -10,6 +10,7 @@ program eqquasi3d
 	include 'mpif.h'
 
 	integer (kind = 4) :: itmp, i, l, k, j
+	real (kind = dp) :: tmp
 
 	CALL MPI_INIT(IERR)
 	call mpi_comm_rank(MPI_COMM_WORLD,me,IERR)
@@ -17,7 +18,7 @@ program eqquasi3d
 	
 	if (me == 0) then 
 	write(*,*) '====================================================================='
-	write(*,*) '==================  Welcome to EQquasi 1.2.0  ======================='
+	write(*,*) '==================  Welcome to EQquasi 1.3.0  ======================='
 	write(*,*) '===== Product of Earthquake Modeling Lab @ Texas A&M University ====='
 	write(*,*) '========== Website https://seismotamu.wixsite.com/emlam ============='
 	write(*,*) '=========== Contacts: dunyuliu@tamu.edu, bduan@tamu.edu ============='
@@ -39,8 +40,9 @@ program eqquasi3d
 	endif 
 	
 	call readcurrentcycle 
-	
+	call readglobal
 	allocate(nonfs(ntotft))
+	
 	call readstations1
 	itmp = maxval(nonfs)
 
@@ -89,6 +91,8 @@ program eqquasi3d
 	consf    = 0.0d0 
 	consm    = 0.0d0 
 	
+	tmp = neq/nprocs
+	dimestimate = floor(tmp)*2	
 	nftmx=maxval(nftnd) !max fault nodel num for all faults, used for arrays.
 	if(nftmx<=0) nftmx=1  !fortran arrays cannot be zero size,use 1 for 0
 	nonmx=sum(nonfs)    !max possible on-fault stations number
@@ -145,7 +149,11 @@ program eqquasi3d
 		enddo			
 	endif
 	
-	call main
+	if (sol_op == 1) then 
+		call main
+	elseif (sol_op == 2) then 
+		call main_aztec
+	endif
 	
 	if (me == 0) then
 		call output_onfault_st

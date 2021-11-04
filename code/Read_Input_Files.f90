@@ -8,6 +8,40 @@ subroutine readcurrentcycle
 	close(1)
 
 end subroutine readcurrentcycle
+subroutine readglobal
+! This subroutine is read information from FE_Global.txt
+	use globalvar
+	implicit none
+	include 'mpif.h'
+
+	logical::file_exists
+	integer(kind=4):: i, j 
+	
+	if (me == 0) then 
+		INQUIRE(FILE="FE_Global.txt", EXIST=file_exists)
+		!write(*,*) 'Checking FE_Stations.txt by the master procs', me
+		if (file_exists == 0) then
+			write(*,*) 'FE_Stations.txt is required but missing ...'
+			pause
+		endif 
+	endif 
+	if (me == 0) then 
+		INQUIRE(FILE="FE_Global.txt", EXIST=file_exists)
+		if (file_exists == 0) then
+			write(*,*) 'FE_Stations.txt is still missing, so exiting EQdyna'
+			stop
+		endif 
+	endif 	
+	
+	open(unit = 1001, file = 'FE_Global.txt', form = 'formatted', status = 'old')
+		read(1001,*) dx
+		read(1001,*) sol_op
+		read(1001,*) AZTEC_OPTIONS
+		read(1001,*) azmaxiter
+		read(1001,*) aztol		
+		!write(*,*) 'n4nds,nonfs',n4nds, (nonfs(i), i = 1, ntotft), me
+	close(1006)
+end subroutine readglobal
 ! #6 readstations --------------------------------------------------------
 subroutine readstations1
 ! This subroutine is read information from FE_Stations.txt

@@ -8,7 +8,7 @@ MODULE globalvar
 	!---------------------------------------------------------------!
 	!------------------------- FE system ---------------------------!
 	real (kind = dp)::timebegin, timeover
-	integer(kind=4)::numnp, numel, neq, maxa, IERR, me, nprocs, np=1000000, status0, status1, it, itag, ivmax = 100
+	integer(kind=4)::numnp, numel, neq, maxa, IERR, me, nprocs, np=1000000, status0, status1, it, itag, ivmax = 100, sol_op
 	real (kind = dp), allocatable, dimension(:,:) :: x, mat, fnft,arn,r4nuc,arn4m,slp4fri,globaldat, &
 										cons,constmp,consv,consvtmp,consa,consf,consm
 	real (kind = dp), allocatable, dimension(:) :: brhs, d, v, mass, kstiff, dump, f, right, resu, resu_1, eledet
@@ -25,7 +25,7 @@ MODULE globalvar
 	integer(kind=4)::ProType=1
 	integer(kind=4)::C_Nuclea=1
 	integer(kind=4)::dis4uniF=5,dis4uniB=5
-	real (kind = dp)::dx=1000.d0,rat=1.3d0
+	real (kind = dp)::dx,rat=1.3d0
 	real (kind = dp)::srcrad0=3.0d3
 	real (kind = dp)::xmin=-60.0d3,xmax=60.0d3,ymin=-50.0d3,ymax=50.0d3,zmin=-60.0d3,zmax=0.0d3
 	real (kind = dp)::xsource=-9.0d3,ysource=0.0d0,zsource=-6.0d3
@@ -45,4 +45,16 @@ MODULE globalvar
 	REAL*8  dparm(64)
 	real*8 ddum(1)
 	data nrhs/1/,maxfct/1/,mnum/1/	
+	
+	!Parameters for AZTEC
+	
+	integer(kind=4)::dimestimate, AZTEC_OPTIONS, minneq,maxneq, N_update
+	real (kind = dp), allocatable :: val(:)
+	integer (kind = 4), allocatable :: bindx(:), update(:)
+	real (kind = dp) :: azmaxiter, aztol
+	!AZTEC_OPTIONS == 1: default setup
+	!AZTEC_OPTIONS == 2: options(AZ_max_iter) = 2000; options(AZ_output) = AZ_last; params(AZ_tol) = 1.0d-8
+	!		params(AZ_drop) = 0.0d0; options(AZ_solver) = AZ_gmres; options(AZ_precond) = AZ_dom_decomp
+	!		options(AZ_subdomain_solve) = AZ_ilu; params(AZ_ilut_fill) = 0;
+	!AZTEC_OPTIONS == 3: 
 end MODULE globalvar 

@@ -20,15 +20,10 @@ HPC=1
 #topdirpord = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2
 
 # Locally installed mumps
-topdir = ../library/MUMPS
+topdir = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2
 libdir = ${topdir}/lib
 incdir = ${topdir}/include
 topdirpord = ${topdir}
-
-top_dir_aztec = ../library/AZTEC/libaztec.a
-inc_dir_aztec = ../library/AZTEC
-additional_fortran_code1 = ../library/AZTEC/*.f 
-additional_fortran_code2 = ../library/AZTEC/*.F 
 
 MKLROOT=/opt/intel/mkl/lib/intel64
 
@@ -77,50 +72,45 @@ LIBSEQNEEDED =
 LIBMUMPS_COMMON = ${libdir}/libmumps_common${PLAT}${LIBEXT}
 LIBDMUMPS = ${libdir}/libdmumps${PLAT}${LIBEXT} ${LIBMUMPS_COMMON}
 
-F90 = mpiifort
 OPT = -c -qopenmp 
 OPT1 = -qopenmp
-OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o main.o c8g2.o shl.o faulting.o fric.o library_bound.o \
-		library_output.o crs.o elemcal.o Read_Input_Files.o main_aztec.o elemcal_aztec.o msr.o\
+OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o \
+		main.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o crs.o elemcal.o Read_Input_Files.o\
 		
 clean : eqquasi
 	rm -r *.o
 	
-eqquasi: $(OBJ) 
-	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(top_dir_aztec)
+F90 = ${FC}
+eqquasi: ${OBJ} 
+	${F90} ${OPT1} ${OBJ} -o equasi ${LIBDMUMPS} ${LORDERINGS} ${LIBS} ${LIBBLAS} ${LIBOTHERS} ${LPORD}
+
+##${LORDERINGS} ${LIBS} ${LIBBLAS} ${LIBOTHERS}
 	
-eqquasi.o: eqquasi.f90 main.o main_aztec.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
-			library_output.o crs.o elemcal.o elemcal_aztec.o Read_Input_Files.o msr.o
-	$(F90) $(OPT) eqquasi.f90 
+eqquasi.o: eqquasi.f90 main.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o library_output.o crs.o elemcal.o Read_Input_Files.o
+	${F90} ${OPT} eqquasi.f90 
 globalvar.o:  globalvar.f90
-	$(F90) $(OPT) globalvar.f90 	
+	${F90} ${OPT} globalvar.f90 	
 mesh4num.o:  mesh4num.f90  globalvar.o
-	$(F90) $(OPT) mesh4num.f90
+	${F90} ${OPT} mesh4num.f90
 meshgen.o:  meshgen.f90 globalvar.o
-	$(F90) $(OPT) meshgen.f90
+	${F90} ${OPT} meshgen.f90
 main.o: main.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o crs.o elemcal.o 
-	$(F90) $(OPT) main.f90	-I${incdir}		
-main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o msr.o elemcal_aztec.o 
-	$(F90) $(OPT) main_aztec.f90 -I${inc_dir_aztec}		
+	${F90} ${OPT} main.f90 -I${incdir}			
 c8g2.o:  c8g2.f90 globalvar.o shl.o
-	$(F90) $(OPT) c8g2.f90	
+	${F90} ${OPT} c8g2.f90	
 shl.o:  shl.f90 globalvar.o
-	$(F90) $(OPT) shl.f90
+	${F90} ${OPT} shl.f90
 faulting.o:  faulting.f90 fric.o globalvar.o library_output.o
-	$(F90) $(OPT) faulting.f90		
+	${F90} ${OPT} faulting.f90		
 fric.o: fric.f90 globalvar.o
-	$(F90) $(OPT) fric.f90		
+	${F90} ${OPT} fric.f90		
 library_bound.o: library_bound.f90  globalvar.o
-	$(F90) $(OPT) library_bound.f90
+	${F90} ${OPT} library_bound.f90
 library_output.o: library_output.f90  globalvar.o
-	$(F90) $(OPT) library_output.f90
+	${F90} ${OPT} library_output.f90
 crs.o : crs.f90  globalvar.o
-	$(F90) $(OPT) crs.f90
+	${F90} ${OPT} crs.f90
 elemcal.o : elemcal.f90  globalvar.o
-	$(F90) $(OPT) elemcal.f90	
-elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
-	$(F90) $(OPT) elemcal_aztec.f90		
-msr.o : msr.f90  globalvar.o
-	$(F90) $(OPT) msr.f90		
+	${F90} ${OPT} elemcal.f90	
 Read_Input_Files.o: Read_Input_Files.f90 globalvar.o
-	$(F90) $(OPT) Read_Input_Files.f90
+	${F90} ${OPT} Read_Input_Files.f90

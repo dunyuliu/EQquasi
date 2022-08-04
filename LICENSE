@@ -1,43 +1,21 @@
-		     EQquasi Software Licence Agreement
+EQquasi is released under MIT License, as shown below, except that MUMPS and AZTEC are distributed under their own licenses. 
 
-/* Copyright (C) 2018-2021, Earthquake Modeling Lab @ Texas A&M University.
-*  All rights reserved. 
-*  Authors: Dunyu Liu (dliu@ig.utexas.edu) and Benchun Duan (bduan@tamu.edu)/  
+Copyright (c) [2022] [Dunyu Liu]
 
-If you copy, download, install or use EQquasi, you agree to be bound by the
-terms and conditions of the following agreement: 
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-'Software' shall mean EQquasi in the binary excutable format, together with 
-a user guide, exemplary source code files included in the package. Permission 
-to use, copy, modify, and distribute this software and its documentation for 
-educational, research, and not-for-profit purposes, without fee and without a 
-signed licensing agreement, is hereby granted, except for that the MUMPS 5.1.2, the 
-parallel direct solver used by EQquasi, is released under CeCill-C license, which
-can be referred to by the link https://cecill.info/licences/Licence_CeCILL-C_V1-en.html.)
-provided that the above copyright notice, this paragraph and the following six 
-paragraphs appear in all copies, modifications, and distributions, Please contact 
-Dr. Benchun Duan by bduan@tamu.edu for commercial licensing opportunities.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, 
-INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF 
-THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF REGENTS HAS BEEN ADVISED 
-OF THE POSSIBILITY OF SUCH DAMAGE.
-
-THE AUTHORS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, 
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. 
-THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF ANY, PROVIDED HEREUNDER IS 
-PROVIDED "AS IS". REGENTS HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, 
-UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
-
-You can acknowlege (using references [1], [2], and [3]) the contribution of EQquasi in 
-any scientific publication dependent on the use of the package.  
-
-[1] D. Liu, B. Duan and B. Luo, EQsimu: a 3-D finite element dynamic earthquake simulator 
-	for multicycle dynamics of geometrically complex faults governed by rate- and state-
-	dependent friction." Geophysical Journal International 220(1): 598-609 (2020).
-[2] P. R. Amestoy, I. S. Duff, J. Koster and J.-Y. L'Excellent, A fully asynchronous 
-	multifrontal solver using distributed dynamic scheduling, SIAM Journal on Matrix Analysis
-	and Applications, Vol 23, No 1, pp 15-41 (2001).
-[3] P. R. Amestoy, A. Buttari, J.-Y. L'Excellent and T. Mary, Performance and scalability 
-	of the block low-rank multifrontal factorization on multicore architectures, ACM 
-	Transactions on Mathematical Software, Vol 45, Issue 1, pp 2:1-2:26 (2019)
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

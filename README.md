@@ -4,8 +4,8 @@
 
 This repository hosts the source code, compiling instruction, post-processing scripts, batch scripts for some High Perforamnce Computing systems, and input files of different benchmark models.
 
-*MUMPS* is distributed under the [CeCILL-C license](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html) and for proper ackowledgement, please read the LICENCE for MUMPS. The newest version of MUMPS can be downloaded through this [link](http://mumps-tech.com/mumps-2/).
-*AZTEC* now comes with [Trilinos](https://github.com/trilinos/Trilinos) in the name of AZTECOO, but the current EQquasi still uses the standalone AZTEC2.1. (To-do-list: need to update its license.) 
+*MUMPS* is distributed under the [CeCILL-C license](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html) and for proper ackowledgement, please read the LICENCE for *MUMPS*. The newest version of MUMPS can be downloaded through this [link](http://mumps-tech.com/mumps-2/). <br/>
+*AZTEC* now comes with [Trilinos](https://github.com/trilinos/Trilinos) in the name of AZTECOO, but the current *EQquasi* still uses the standalone AZTEC2.1. (To-do-list: need to update its license.) 
 
 Operating environment
 ---------------------

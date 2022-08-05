@@ -21,15 +21,16 @@ libdir = ${topdir}/lib
 incdir = ${topdir}/include
 topdirpord = ${topdir}
 
-top_dir_aztec = ../lib/AZTEC/libaztec.a
-inc_dir_aztec = ../lib/AZTEC
-additional_fortran_code1 = ../lib/AZTEC/*.f 
-additional_fortran_code2 = ../lib/AZTEC/*.F 
+top_dir_aztec = ../lib/AZTEC2.1/
+lib_dir_aztec = ../lib/AZTEC2.1/lib/libaztec.a
+inc_dir_aztec = ../lib/AZTEC2.1/include
+additional_fortran_code1 = ../lib/AZTEC2.1/additional_fortran/*.f 
+additional_fortran_code2 = ../lib/AZTEC2.1/additional_fortran/*.F 
 
 MKLROOT=/opt/intel/mkl/lib/intel64
 
-LPORDDIR = $(topdirpord)/PORD/lib/
-IPORD    = -I$(topdirpord)/PORD/include/
+LPORDDIR = $(topdirpord)/lib/
+IPORD    = -I$(topdirpord)/include/
 LPORD    = -L$(LPORDDIR) -lpord
 
 PLAT    =
@@ -83,7 +84,7 @@ clean : eqquasi
 	rm -r *.o
 	
 eqquasi: $(OBJ) 
-	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(top_dir_aztec)
+	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(lib_dir_aztec)
 	
 eqquasi.o: eqquasi.f90 main.o main_aztec.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
 			library_output.o crs.o elemcal.o elemcal_aztec.o read_input.o msr.o

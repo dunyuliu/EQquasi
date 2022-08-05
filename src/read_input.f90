@@ -40,7 +40,7 @@ subroutine readglobal
 		read(1001,*) azmaxiter
 		read(1001,*) aztol		
 		!write(*,*) 'n4nds,nonfs',n4nds, (nonfs(i), i = 1, ntotft), me
-	close(1006)
+	close(1001)
 end subroutine readglobal
 ! #6 readstations --------------------------------------------------------
 subroutine readstations1

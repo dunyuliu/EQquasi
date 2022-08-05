@@ -1,3 +1,4 @@
+Change log before v1.2.1
 # Version 1.2.0
 *modified:   LICENSE
 *renamed:    batch/AutoEQcycRSF.txt -> batch/ADArun.txt

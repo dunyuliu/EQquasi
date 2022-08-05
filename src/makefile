@@ -2,14 +2,10 @@
 
 # This makefile file is part of software EQquasi.
 
-# This makefile is to compile EQquasi v1.2.1 with MUMPS, a high-performance, 
-# parallel direct solver to sparse linear system of equations. It is modified from
-# the Makefile.inc that comes with MUMPS5.1.2 package. 
+# This makefile is to compile EQquasi v1.3.0 with MUMPS, a high-performance, 
+# parallel direct solver to sparse linear system of equations, and AZTEC, an interative solver. 
+# It is modified from the Makefile.inc that comes with MUMPS5.1.2 package. 
 
-# Created in 2018. 
-# Last updated on 09/28/2021. 
-# Dunyu Liu (dliu@ig.utexas.edu)
-# 
 HPC=1 
 
 # For HPC Frontera with MUMPS installed with PETSC
@@ -20,15 +16,15 @@ HPC=1
 #topdirpord = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2
 
 # Locally installed mumps
-topdir = ../library/MUMPS
+topdir = ../lib/MUMPS
 libdir = ${topdir}/lib
 incdir = ${topdir}/include
 topdirpord = ${topdir}
 
-top_dir_aztec = ../library/AZTEC/libaztec.a
-inc_dir_aztec = ../library/AZTEC
-additional_fortran_code1 = ../library/AZTEC/*.f 
-additional_fortran_code2 = ../library/AZTEC/*.F 
+top_dir_aztec = ../lib/AZTEC/libaztec.a
+inc_dir_aztec = ../lib/AZTEC
+additional_fortran_code1 = ../lib/AZTEC/*.f 
+additional_fortran_code2 = ../lib/AZTEC/*.F 
 
 MKLROOT=/opt/intel/mkl/lib/intel64
 
@@ -81,7 +77,7 @@ F90 = mpiifort
 OPT = -c -qopenmp 
 OPT1 = -qopenmp
 OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o main.o c8g2.o shl.o faulting.o fric.o library_bound.o \
-		library_output.o crs.o elemcal.o Read_Input_Files.o main_aztec.o elemcal_aztec.o msr.o\
+		library_output.o crs.o elemcal.o read_input.o main_aztec.o elemcal_aztec.o msr.o\
 		
 clean : eqquasi
 	rm -r *.o
@@ -90,7 +86,7 @@ eqquasi: $(OBJ)
 	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(top_dir_aztec)
 	
 eqquasi.o: eqquasi.f90 main.o main_aztec.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
-			library_output.o crs.o elemcal.o elemcal_aztec.o Read_Input_Files.o msr.o
+			library_output.o crs.o elemcal.o elemcal_aztec.o read_input.o msr.o
 	$(F90) $(OPT) eqquasi.f90 
 globalvar.o:  globalvar.f90
 	$(F90) $(OPT) globalvar.f90 	
@@ -122,5 +118,5 @@ elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
 	$(F90) $(OPT) elemcal_aztec.f90		
 msr.o : msr.f90  globalvar.o
 	$(F90) $(OPT) msr.f90		
-Read_Input_Files.o: Read_Input_Files.f90 globalvar.o
-	$(F90) $(OPT) Read_Input_Files.f90
+read_input.o: read_input.f90 globalvar.o
+	$(F90) $(OPT) read_input.f90

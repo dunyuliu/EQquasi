@@ -298,6 +298,7 @@ subroutine main_aztec
 		call MPI_Allgatherv(update,N_update,MPI_INT, &
 					N_update4u0,N_update_count,N_update_disp,MPI_INT,MPI_COMM_WORLD,ierror)	
 		do i =0, neq-1
+			azx(i) = u0(i) ! Use the solution as the initial guess for the next solve. 
 			resu(N_update4u0(i)+1) = u0(i)
 		enddo	
 		
@@ -341,6 +342,7 @@ subroutine main_aztec
 					N_update4u0,N_update_count,N_update_disp,MPI_INT,MPI_COMM_WORLD,ierror)		
 
 		do i =0, neq-1
+			azx(i) = u0(i) ! Use the solution as the initial guess for the next solve. 
 			resu(N_update4u0(i)+1) = u0(i)
 		enddo
 				

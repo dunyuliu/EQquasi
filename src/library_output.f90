@@ -183,21 +183,22 @@ subroutine output_prof
 	integer (kind = 4) :: i, ift 
 	
 	ift = 1 
-	
-	if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
-		open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
-			do i = 1,nftnd(1)
-				if (abs(x(1,nsmp(1,i,ift) ))<=38.0d3.and.abs(x(3,nsmp(1,i,ift) )--10.0d3)<0.01d0) then
-					write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
-				endif
-			enddo
-		open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
-			do i = 1,nftnd(1)
-				if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0.and.abs(x(3,nsmp(1,i,ift) ))<=40.0d3) then
-					write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
-				endif
-			enddo				
-    endif
+	if (bp == 5) then
+		if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
+			open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
+				do i = 1,nftnd(1)
+					if (abs(x(1,nsmp(1,i,ift) ))<=38.0d3.and.abs(x(3,nsmp(1,i,ift) )--10.0d3)<0.01d0) then
+						write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+					endif
+				enddo
+			open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
+				do i = 1,nftnd(1)
+					if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0.and.abs(x(3,nsmp(1,i,ift) ))<=40.0d3) then
+						write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+					endif
+				enddo				
+		endif
+	endif
 end subroutine output_prof
 
 subroutine output_ruptarea_trac_slip

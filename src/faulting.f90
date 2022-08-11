@@ -358,7 +358,7 @@ do ift = 1, ntotft
 	enddo	!ending i
 enddo ! ending ift
 
-	call output_prof
+	if (me == 0) call output_prof
 
 	if (itag==1) then
 		pma = maxval(ma_bar_ku_arr)

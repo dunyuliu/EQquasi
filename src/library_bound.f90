@@ -33,11 +33,11 @@ subroutine bound_load
 				if (elemvar(ntag)<0)then
 					if (itag == 0) then 
 						if (elemvar(ntag)==-2) then
-							consv(j,node_num)=-loadrate!-5.0d-10
+							consv(j,node_num)=-far_load_rate!-5.0d-10
 							consvtmp(j,node_num) = consv(j,node_num)
 							consa(j,node_num)=0.0d0
 						elseif (elemvar(ntag)==-3) then
-							consv(j,node_num)=loadrate!5.0d-10
+							consv(j,node_num)=far_load_rate!5.0d-10
 							consvtmp(j,node_num) = consv(j,node_num)
 							consa(j,node_num)=0.0d0					
 						elseif (elemvar(ntag)==-1) then
@@ -51,10 +51,10 @@ subroutine bound_load
 					elseif (itag == 1) then 
 						!-2->-x; -3->+x; -5->fault
 						if (elemvar(ntag)==-2) then
-							consv(j,node_num)=-loadrate!-5.0d-10
+							consv(j,node_num)=-far_load_rate!-5.0d-10
 							consa(j,node_num)=0.0d0
 						elseif (elemvar(ntag)==-3) then
-							consv(j,node_num)=loadrate!5.0d-10
+							consv(j,node_num)=far_load_rate!5.0d-10
 							consa(j,node_num)=0.0d0					
 						elseif (elemvar(ntag)==-1) then
 							consv(j,node_num)=0.0d0

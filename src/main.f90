@@ -38,8 +38,8 @@ subroutine main
 		!LOOP 2000 ![MUMPS]
 		write(*,*) 'LOOP 2000: CONSTRUCT KSTIFF in CRS; CONVERT CRS to MUMPS FORMAT'
 		!Define problem on the host (processor 0)
-		dtev = ksi*LL/maxsliprate
-		dtev1 = ksi*LL/maxsliprate!Initial dtev1>dt to enter static state.
+		dtev = ksi*minDc/maxsliprate
+		dtev1 = ksi*minDc/maxsliprate!Initial dtev1>dt to enter static state.
 		cons = 0.0d0!Initialize cons, displacements.
 		constmp = 0.0d0
 		consvtmp = 0.0d0

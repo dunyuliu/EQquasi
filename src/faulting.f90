@@ -26,8 +26,7 @@ real (kind = dp) :: v_trial,v_trial_new,sliprs_trial,sliprd_trial, tau_fric_tria
 	anm,asm,adm,ans,ass,ads,&
 	slipratemast,sliprateslav,&
 	slipaccn,slipaccs,slipaccd
-real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),momrate_arr(nftnd(1)),ruptarea_arr(nftnd(1)),taoruptarea_arr(nftnd(1)), &
-                slipruptarea_arr(nftnd(1))
+real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),momrate_arr(nftnd(1)),ruptarea_arr(nftnd(1)),taoruptarea_arr(nftnd(1)), slipruptarea_arr(nftnd(1))
 
 ruptarea_arr = 0.0d0
 taoruptarea_arr = 0.0d0 
@@ -111,67 +110,7 @@ do ift = 1, ntotft
 		!... based on choices, call corresponding friction laws.
 		! B.D. 10/8/08
 		if (friclaw==1.or.friclaw==2) then!Differ 1&2 and 3&4	
-		!PART2:SLIP-WEAKENING
-			if(friclaw == 1) then
-				call slip_weak(slp4fri(i,ift),fric(1,i,ift),xmu)
-			elseif(friclaw == 2) then
-				trupt =  time - fnft(i,ift)
-				call time_weak(trupt,fric(1,i,ift),xmu)
-			endif
-
-			if (C_Nuclea==1) then	
-				if(r4nuc(i,ift)<=srcrad0) then !only within nucleation zone, do...
-					tr=(r4nuc(i,ift)+0.081d0*srcrad0*(1.d0/(1.d0-(r4nuc(i,ift)/srcrad0)*(r4nuc(i,ift)/srcrad0))-1.d0))/(0.7d0*3464.d0)
-				else
-					tr=1.0d9 
-				endif
-				if(time<tr) then 
-					fb=0.0d0
-				elseif ((time<(tr+critt0)).and.(time>=tr)) then 
-					fb=(time-tr)/critt0
-				else 
-					fb=1.0d0
-				endif
-				tmp1=fric(1,i,ift)+(fric(2,i,ift)-fric(1,i,ift))*fb
-				tmp2=xmu
-				xmu=min(tmp1,tmp2)  !minimum friction used. B.D. 2/16/13	
-			endif
-
-			if((tnrm+fric(6,i,ift))>0.d0) then
-				tnrm0 = 0.0d0
-			else
-				tnrm0 = tnrm+fric(6,i,ift)
-			endif
-			taoc = fric(4,i,ift) - xmu *tnrm0
-			!taoc = cohes - xmu * tnrm0
-			!if(tnrm > 0) tnrm = 0   !norm must be <= 0, otherwise no adjust
-			!taoc = fistr(5,i) - xmu * tnrm
-			if(ttao > taoc) then
-				tstk = tstk * taoc / ttao
-				tdip = tdip * taoc / ttao
-				if(fnft(i,ift)>600.d0) then	!fnft should be initialized by >10000
-					if(sliprate >= 0.001d0) then	!first time to reach 1mm/s
-						fnft(i,ift) = time	!rupture time for the node
-					endif
-				endif
-			endif
-
-			taox = (tnrm0*un(1,i,ift) + tstk*us(1,i,ift) + tdip*ud(1,i,ift))*arn(i,ift)
-			taoy = (tnrm0*un(2,i,ift) + tstk*us(2,i,ift) + tdip*ud(2,i,ift))*arn(i,ift)
-			taoz = (tnrm0*un(3,i,ift) + tstk*us(3,i,ift) + tdip*ud(3,i,ift))*arn(i,ift)
-			
-			ftix = (fnfault*un(1,i,ift) + fsfault*us(1,i,ift) + fdfault*ud(1,i,ift))*arn(i,ift)
-			ftiy = (fnfault*un(2,i,ift) + fsfault*us(2,i,ift) + fdfault*ud(2,i,ift))*arn(i,ift)
-			ftiz = (fnfault*un(3,i,ift) + fsfault*us(3,i,ift) + fdfault*ud(3,i,ift))*arn(i,ift)  
-
-			right(id(1,isn)) = right(id(1,isn)) + taox - ftix
-			right(id(2,isn)) = right(id(2,isn)) + taoy - ftiy
-			right(id(3,isn)) = right(id(3,isn)) + taoz - ftiz
-			right(id(1,imn)) = right(id(1,imn)) - taox + ftix
-			right(id(2,imn)) = right(id(2,imn)) - taoy + ftiy
-			right(id(3,imn)) = right(id(3,imn)) - taoz + ftiz
 		elseif (friclaw==3.or.friclaw==4) then 	
-
 		!---3.2: DECLARE THE TIME FOR RUPTURING.	
 			if(fnft(i,ift)<0.0d0) then	!fnft should be initialized by >10000
 				if(sliprate >= 0.001d0) then	!first time to reach 1mm/s
@@ -184,9 +123,8 @@ do ift = 1, ntotft
 			sliprd_trial=sliprated
 			statetmp=fric(20,i,ift)
 		!---3.4: FRICTIONAL/NON FRIVTIONAL REGION	
-			if 	(abs(x(3,isn)) <= 40.0d3 .and. abs(x(1,isn)) <= 50.0d3) then 
+			if 	(x(3,isn) >= zminc .and. x(1,isn) <= xmaxc .and. x(1,isn) >= xminc) then 
 		!---3.4.1: FRICTIONAL REGION CONTROLLED BY RSF. 
-
 	!---3.4.1.2: Dynamic + NON-DYNAMIC PROCESS: [STATUS1]==0		
 				tstk0 = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
 				tdip0 = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
@@ -237,7 +175,7 @@ do ift = 1, ntotft
 					endif		
 				endif
 
-				T_coeff = 3464.0d0*2670.0d0/2.0d0 
+				T_coeff = mat0(1,2)*mat0(1,3)/2.0d0 
 				
 				do iv = 1,ivmax	
 					if(friclaw == 3) then
@@ -261,10 +199,6 @@ do ift = 1, ntotft
 						v_trial = vtmp
 					endif				
 				enddo !iv	
-				!if(v_trial < fric(19,i,ift)) then
-				!	v_trial = fric(19,i,ift)
-				!	tau_fric_trial = ttao0
-				!endif	
 				
 				tstk=tau_fric_trial*tstk0/ttao0
 				tdip=tau_fric_trial*tdip0/ttao0
@@ -286,16 +220,7 @@ do ift = 1, ntotft
 				vxs=v_s_new_slav*us(1,i,ift)+v_d_new_slav*ud(1,i,ift)
 				vys=v_s_new_slav*us(2,i,ift)+v_d_new_slav*ud(2,i,ift)
 				vzs=v_s_new_slav*us(3,i,ift)+v_d_new_slav*ud(3,i,ift)
-	!---3.4.1.5: V* FOR ITAG==0 AND V** FOR ITAG==1 OBTAINED. 			
-				! if (x(1,isn) == -20.0d3.and.x(3,isn)==-10.0d3) then 
-					! write(*,*) 'v_trial', v_trial, 'itag',itag
-					! write(*,*) 'tstk,tdip',tstk/1e6, tdip/1e6
-							! do j=1,4    !1-force,2-vel,3-disp,4-acc
-								! do k=1,2  !1-slave,2-master
-									! write(*,*) fvd(4,k,j), fvd(5,k,j), fvd(6,k,j) 
-								! enddo
-							! enddo
-				! endif 
+
 				if (itag == 0) then 		
 					consvtmp(1,imn)=vxm
 					consvtmp(2,imn)=vym 
@@ -307,10 +232,11 @@ do ift = 1, ntotft
 					fric(20,i,ift) = fric(22,i,ift)
 					ma_bar_ku_arr(i) = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
 					ma_bar_ku_arr(i) = abs(ma_bar_ku_arr(i))
-					momrate_arr(i) =0.0d0 
-					if ((abs(x(1,isn))<=34.0d3).and.(abs(x(3,isn)) < 20.0d3)) then
-						momrate_arr(i) = 3464.0d0**2*2670.0d0*v_trial*dx*dx
-					endif
+					!momrate_arr(i) =0.0d0 
+					! Seems not need to define zones to calculate moment rate. 
+					!if ((abs(x(1,isn))<=34.0d3).and.(abs(x(3,isn)) < 20.0d3)) then
+						momrate_arr(i) = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+					!endif
 					
 					ruptarea_arr(i) = 0.0d0
 					taoruptarea_arr(i) = 0.0d0
@@ -340,33 +266,35 @@ do ift = 1, ntotft
 		!----------: WHEN ITAG==1, DECLARE [FRIC(22,:)] AND FINAL V** INTO [CONSTRAINV]			
 
 			else ! The if for fault regions.
-		! !---3.4.2: LOADING BOTTOM AT A FIXED SLIDING RATE	
-				 tstk0=2.585534683723515d7/2.0d0
-				 tdip0=0.0d6
-				 tnrm=-25.0d6	 
-				 if((tnrm+fric(6,i,ift))>0) then
-					 tnrm0 = 0.0d0
-				 else
-					 tnrm0 = tnrm+fric(6,i,ift)
-				 endif
-				 
-				 v_trial = 1.0d-9
-				 fric(26,i,ift) = v_trial
-				 fric(28,i,ift) = tstk0
-				 fric(29,i,ift) = tdip0
-				 fric(30,i,ift) = tnrm0
-				 slipratemast=(v_trial)*mslav/(mmast+mslav)
-				 sliprateslav=-(v_trial)*mslav/(mmast+mslav)
-				 v_s_new_mast=slipratemast
-				 v_d_new_mast=0.0d0
-				 v_s_new_slav=sliprateslav
-				 v_d_new_slav=0.0d0
-				 vxm=v_s_new_mast*us(1,i,ift)+v_d_new_mast*ud(1,i,ift)
-				 vym=v_s_new_mast*us(2,i,ift)+v_d_new_mast*ud(2,i,ift)
-				 vzm=v_s_new_mast*us(3,i,ift)+v_d_new_mast*ud(3,i,ift)
-				 vxs=v_s_new_slav*us(1,i,ift)+v_d_new_slav*ud(1,i,ift)
-				 vys=v_s_new_slav*us(2,i,ift)+v_d_new_slav*ud(2,i,ift)
-				 vzs=v_s_new_slav*us(3,i,ift)+v_d_new_slav*ud(3,i,ift)
+		! !---3.4.2: LOADING BOTTOM & SIDES AT A FIXED SLIDING RATE	
+				!tstk0 = 2.585534683723515d7/2.0d0
+				tdip0 = 0.0d6
+				tnrm = init_norm ! -25.0d6 for bp5. No change for creeping region. 
+				if((tnrm+fric(6,i,ift))>0) then
+					tnrm0 = 0.0d0
+				else
+					tnrm0 = tnrm+fric(6,i,ift)
+				endif
+				! shear stress tstk0 at steady state.
+				call rsf_rd(tstk0, tnrm0, fric(9,i,ift), fric(10,i,ift), fric(13,i,ift), fric(12,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
+				
+				v_trial = load_slip_rate
+				fric(26,i,ift) = v_trial
+				fric(28,i,ift) = tstk0
+				fric(29,i,ift) = tdip0
+				fric(30,i,ift) = tnrm0
+				slipratemast=(v_trial)*mslav/(mmast+mslav)
+				sliprateslav=-(v_trial)*mslav/(mmast+mslav)
+				v_s_new_mast=slipratemast
+				v_d_new_mast=0.0d0
+				v_s_new_slav=sliprateslav
+				v_d_new_slav=0.0d0
+				vxm=v_s_new_mast*us(1,i,ift)+v_d_new_mast*ud(1,i,ift)
+				vym=v_s_new_mast*us(2,i,ift)+v_d_new_mast*ud(2,i,ift)
+				vzm=v_s_new_mast*us(3,i,ift)+v_d_new_mast*ud(3,i,ift)
+				vxs=v_s_new_slav*us(1,i,ift)+v_d_new_slav*ud(1,i,ift)
+				vys=v_s_new_slav*us(2,i,ift)+v_d_new_slav*ud(2,i,ift)
+				vzs=v_s_new_slav*us(3,i,ift)+v_d_new_slav*ud(3,i,ift)
 				 
 				 consvtmp(1,imn)=vxm
 				 consvtmp(2,imn)=vym 
@@ -387,10 +315,7 @@ do ift = 1, ntotft
 				fric(34,i,ift) = vxs
 				fric(35,i,ift) = vys 
 				fric(36,i,ift) = vzs
-				 
-			endif	
-
-
+			endif
 			dtev1D(i)=ksi*fric(11,i,ift)/v_trial
 			if (dtev1D(i) < 0) then
 				write(*,*) 'NEGATIVE SLIPRATE, ITS LOC = ', x(1,isn),x(3,isn)
@@ -399,7 +324,7 @@ do ift = 1, ntotft
 			endif
 			! Record rupture area, average stress vector, slip
 			if (itag==1) then
-			fric(82,i,ift) = sqrt(slips**2 + slipn**2) ! Total slip
+				fric(82,i,ift) = sqrt(slips**2 + slipn**2) ! Total slip
 				if (fric(26,i,ift) > 1.0d-3) then 
 					fric(81,i,ift) = arn(i,ift) ! Record ruptured area
 				endif 
@@ -430,8 +355,6 @@ do ift = 1, ntotft
 				enddo 
 			endif   
 		endif
-		
-		
 	enddo	!ending i
 enddo ! ending ift
 

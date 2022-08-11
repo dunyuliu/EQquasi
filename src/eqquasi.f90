@@ -18,10 +18,10 @@ program eqquasi3d
 	
 	if (me == 0) then 
 	write(*,*) '====================================================================='
-	write(*,*) '==================  Welcome to EQquasi 1.3.0  ======================='
-	write(*,*) '===== Product of Earthquake Modeling Lab @ Texas A&M University ====='
+	write(*,*) '==================  Welcome to EQquasi 1.3.1  ======================='
+	write(*,*) '===== Product of UTIG & Earthquake Modeling Lab @ TAMU          ====='
 	write(*,*) '========== Website https://seismotamu.wixsite.com/emlam ============='
-	write(*,*) '=========== Contacts: dunyuliu@tamu.edu, bduan@tamu.edu ============='
+	write(*,*) '=========== Contacts: dliu@ig.utexas.edu                ============='
 	write(*,*) '=                                                                   ='
 	write(*,*) '=   EQquasi uses FEM to simulate earthquake dynamic ruptures        ='
 	write(*,*) '=   on geometrically realistic fault systems for quasi-static/      ='
@@ -29,18 +29,16 @@ program eqquasi3d
 	write(*,*) '=   earthquake simulator EQsimu.                                    ='
 	write(*,*) '=                                                                   ='
 	write(*,*) '=   Model and system related parameters can be adjusted in          ='
-	write(*,*) '=       FE_Global.txt,                                              ='
-	write(*,*) '=       FE_Model_Geometry.txt,                                      ='
-	write(*,*) '=       FE_Fault_Geometry.txt,                                      ='
-	write(*,*) '=       FE_Material.txt,                                            ='
-	write(*,*) '=       FE_Fric.txt,                                                ='		
-	write(*,*) '=       FE_Stations.txt,                                            ='
+	write(*,*) '=       model.txt,                                                  ='
+	write(*,*) '=       fric.txt,                                                   ='
+	write(*,*) '=       stations.txt,                                               ='
 	write(*,*) '=                                                                   ='
-	write(*,*) '====================================================================='	
+	write(*,*) '====================================================================='
 	endif 
 	
 	call readcurrentcycle 
-	call readglobal
+	call readmodel
+	call readfric
 	allocate(nonfs(ntotft))
 	
 	call readstations1

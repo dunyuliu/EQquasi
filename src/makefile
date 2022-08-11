@@ -78,7 +78,7 @@ F90 = mpiifort
 OPT = -c -qopenmp 
 OPT1 = -qopenmp
 OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o main.o c8g2.o shl.o faulting.o fric.o library_bound.o \
-		library_output.o crs.o elemcal.o read_input.o main_aztec.o elemcal_aztec.o msr.o\
+		library_output.o crs.o elemcal.o read_input.o main_aztec.o elemcal_aztec.o msr.o func_lib.o\
 		
 clean : eqquasi
 	rm -r *.o
@@ -87,13 +87,13 @@ eqquasi: $(OBJ)
 	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(lib_dir_aztec)
 	
 eqquasi.o: eqquasi.f90 main.o main_aztec.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
-			library_output.o crs.o elemcal.o elemcal_aztec.o read_input.o msr.o
+			library_output.o crs.o elemcal.o elemcal_aztec.o read_input.o msr.o func_lib.o
 	$(F90) $(OPT) eqquasi.f90 
 globalvar.o:  globalvar.f90
 	$(F90) $(OPT) globalvar.f90 	
 mesh4num.o:  mesh4num.f90  globalvar.o
 	$(F90) $(OPT) mesh4num.f90
-meshgen.o:  meshgen.f90 globalvar.o
+meshgen.o:  meshgen.f90 globalvar.o func_lib.o
 	$(F90) $(OPT) meshgen.f90
 main.o: main.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o crs.o elemcal.o 
 	$(F90) $(OPT) main.f90	-I${incdir}		
@@ -103,7 +103,7 @@ c8g2.o:  c8g2.f90 globalvar.o shl.o
 	$(F90) $(OPT) c8g2.f90	
 shl.o:  shl.f90 globalvar.o
 	$(F90) $(OPT) shl.f90
-faulting.o:  faulting.f90 fric.o globalvar.o library_output.o
+faulting.o:  faulting.f90 fric.o globalvar.o library_output.o func_lib.o
 	$(F90) $(OPT) faulting.f90		
 fric.o: fric.f90 globalvar.o
 	$(F90) $(OPT) fric.f90		
@@ -121,3 +121,5 @@ msr.o : msr.f90  globalvar.o
 	$(F90) $(OPT) msr.f90		
 read_input.o: read_input.f90 globalvar.o
 	$(F90) $(OPT) read_input.f90
+func_lib.o: func_lib.f90
+	$(F90) $(OPT) func_lib.f90

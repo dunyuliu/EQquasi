@@ -1,5 +1,0 @@
-500 # dx
-2   # solver option. 1:MUMPS; 2:AZTEC
-2   # AZTEC_OPTIONS.
-2000 # az_max_iter.
-1e-7 # az_tol.

@@ -11,6 +11,7 @@ program eqquasi3d
 
 	integer (kind = 4) :: itmp, i, l, k, j
 	real (kind = dp) :: tmp
+	character (len = 50) :: filenametmp, output_type
 
 	CALL MPI_INIT(IERR)
 	call mpi_comm_rank(MPI_COMM_WORLD,me,IERR)
@@ -18,7 +19,7 @@ program eqquasi3d
 	
 	if (me == 0) then 
 	write(*,*) '====================================================================='
-	write(*,*) '==================  Welcome to EQquasi 1.3.1  ======================='
+	write(*,*) '==================  Welcome to EQquasi 1.3.2  ======================='
 	write(*,*) '===== Product of UTIG & Earthquake Modeling Lab @ TAMU          ====='
 	write(*,*) '========== Website https://seismotamu.wixsite.com/emlam ============='
 	write(*,*) '=========== Contacts: dliu@ig.utexas.edu                ============='
@@ -39,6 +40,7 @@ program eqquasi3d
 	call readcurrentcycle 
 	call readmodel
 	call readfric
+	if (rough_fault == 1) call read_fault_rough_geometry 
 	allocate(nonfs(ntotft))
 	
 	call readstations1
@@ -124,6 +126,28 @@ program eqquasi3d
 	t_start_status  = -1.0d0
 	
 	call meshgen
+	
+	! Write out mesh information
+	! coor, ien, and nsmp.
+	if (me == 0) then 
+		filenametmp = 'mesh.coor.nc'
+		output_type = 'coor'
+		call netcdf_write(filenametmp, output_type)
+		write(*,*) '=                                                                   ='
+		write(*,*) '=       Writing out mesh.coor.nc                                    ='
+		
+		filenametmp = 'mesh.ien.nc'
+		output_type = 'ien'
+		call netcdf_write(filenametmp, output_type)
+		write(*,*) '=                                                                   ='
+		write(*,*) '=       Writing out mesh.ien.nc                                     ='
+		
+		filenametmp = 'mesh.nsmp.nc'
+		output_type = 'nsmp'
+		call netcdf_write(filenametmp, output_type)
+		write(*,*) '=                                                                   ='
+		write(*,*) '=       Writing out mesh.nsmp.nc                                    ='
+	endif 
 	
 	if(n4out>0) then 
 		ndout=n4out*ndof*noid !3 components of 2 quantities: v and d

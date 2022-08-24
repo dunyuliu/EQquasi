@@ -1,6 +1,6 @@
 clear all; close all;
-mod = 11;
-icend = 4;
+mod = 31;
+icend = 1;
 
 [path,dx,nzz,l] = model_info(mod);
 path

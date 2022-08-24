@@ -25,10 +25,15 @@ elseif mod == 22
     dx = 1;
     nzz = fix(l/dx)+1;   
 elseif mod == 31
-    path = '../res/202106-BP5-productive-run/frontera/dliu.10_case0_dx2000_xi0.015_load4e-10_newst/';
+    path = '../res/bp5_2000m/';
     l = 60;
     dx = 2;
-    nzz = fix(l/dx)+1;    
+    nzz = fix(l/dx)+1;  
+ elseif mod == 1001
+    path = '../res/gm-cycle-bp1001-1000m/';
+    l = 60;
+    dx = 1;
+    nzz = fix(l/dx)+1;     
 elseif mod == 2
     path = '../res/202104-preliminary4Junle/case2_dx500/';
     l = 60;

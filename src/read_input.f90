@@ -43,6 +43,7 @@ subroutine readmodel
 		read(1002,*) rat
 		read(1002,*) dx 
 		read(1002,*) mat0(1,1), mat0(1,2), mat0(1,3)
+		read(1002,*) rough_fault
 		read(1002,*) C_elastic
 		read(1002,*) friclaw
 		read(1002,*) ntotft ! 10
@@ -56,6 +57,7 @@ subroutine readmodel
 		read(1002,*) AZTEC_OPTIONS
 		read(1002,*) azmaxiter
 		read(1002,*) aztol
+		read(1002,*) nt_output_stress
 	close(1002)
 	
 	if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) stop ! Creeping zone bounds should be within model bounds. 
@@ -253,11 +255,11 @@ subroutine read_fault_rough_geometry
 	implicit none
 	include 'mpif.h'
 
-	logical::file_exists
-	integer(kind=4):: i, j
+	logical :: file_exists
+	integer (kind = 4) :: i, j, nnx1, nnz1
 	
 	if (me == 0) then 
-		INQUIRE(FILE="rough_geo.txt", EXIST=file_exists)
+		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
 		!write(*,*) 'Checking rough_geo.txt by the master procs', me
 		if (file_exists == 0) then
 			write(*,*) 'rough_geo.txt is required but missing ...'
@@ -265,21 +267,24 @@ subroutine read_fault_rough_geometry
 		endif 
 	endif 
 	if (me == 0) then 
-		INQUIRE(FILE="rough_geo.txt", EXIST=file_exists)
+		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
 		if (file_exists == 0) then
 			write(*,*) 'rough_geo.txt is still missing, so exiting EQdyna'
 			stop
 		endif 
 	endif 	
 	
-	open(unit = 1008, file = 'rough_geo.txt', form = 'formatted', status = 'old')
-		read(1008,*) nnx, nnz
-		read(1008,*) dxtmp 
+	open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
+		read(1008,*) nnx1, nnz1, nres ! nums of grids along strike by dip, and nums of grids to pick a data point.
+		read(1008,*) dxtmp, rough_fx_min, rough_fz_min 
 	close(1008)
+	nnx = int(nnx1/nres)
+	nnz = int(nnz1/nres)
+	rough_fx_max = (nnx-1)*dxtmp*nres + rough_fx_min
 	
 	allocate(rough_geo(3,nnx*nnz))
 	
-	open(unit = 1008, file = 'rough_geo.txt', form = 'formatted', status = 'old')
+	open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
 		read(1008,*)
 		read(1008,*)
 		do i = 1, nnx*nnz

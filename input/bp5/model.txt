@@ -4,8 +4,9 @@
 -50.0d3 50.0d3 -40.0d3 # xminc, xmaxc, zminc
 5 5     # dis4uniF, dis4uniB
 1.3d0   # rat
-2000.0d0 # dx 
+500.0d0 # dx 
 6.0d3 3.464d3 2.67d3 # Vp, Vs, Rou
+0 # rough_fault yes(1) or not(0)
 1 # C_elastic
 3 # friclaw
 1 # ntotft
@@ -19,4 +20,4 @@
 2 # AZTEC_OPTIONS
 2000 # maximum iteration for AZTEC
 1d-7 # tolerance for AZTEC
-
+100 # nt_output. Every nt steps to write out results.

@@ -4,7 +4,7 @@ subroutine mesh4num
 	implicit none
 	include 'mpif.h'
 
-	integer(kind=4)::nnode0,nelement0,neq0,nxt,nyt,nzt,ix,iy,iz,&
+	integer(kind=4)::nnode0,nelement0,neq0,ix,iy,iz,&
 		edgex1,edgey1,edgez1,edgezn,&
 		i,j,k,ift
 

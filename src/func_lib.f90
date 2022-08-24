@@ -2,19 +2,19 @@
 ! #1 insert_rough_fault
 
 ! #1 insert_rough_fault
-subroutine insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz)
+subroutine insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz, ymax1, ymin1)
 	! This subroutine is to modify ycoor if a rough_fault interface is inserted.
 	
 	use globalvar
 	implicit none
-	real (kind = dp) :: xcoor, ycoor, zcoor, peak, ycoort, pfx, pfz
+	real (kind = dp) :: xcoor, ycoor, zcoor, peak, ycoort, pfx, pfz, ymax1, ymin1
 	real (kind = dp) :: fx1, fx2, fz1, tol
 	integer (kind = 4) :: ixx, izz
 	tol = dx/1.0d3
 	
-	fx1 = fltxyz(1,1,1)
-	fx2 = fltxyz(2,1,1)
-	fz1 = fltxyz(1,3,1)
+	fx1 = rough_fx_min
+	fx2 = rough_fx_max
+	fz1 = rough_fz_min
 	if ((xcoor < fx2 + tol) .and. (xcoor > fx1 - tol) .and. (zcoor > fz1 - tol)) then 
 		ixx = (xcoor - fx1)/dx + 1
 		izz = (zcoor - fz1)/dx + 1
@@ -40,9 +40,9 @@ subroutine insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz)
 	pfz = rough_geo(3,nnz*(ixx-1)+izz)	
 	
 	if (ycoor > -tol) then
-		ycoort = ycoor*(ymax - peak)/ymax + peak
+		ycoort = ycoor*(ymax1 - peak)/ymax1 + peak
 	elseif (ycoor < -tol) then 
-		ycoort = ycoor*(peak - ymin)/(-ymin) + peak 
+		ycoort = ycoor*(peak - ymin1)/(-ymin1) + peak 
 	endif 
 	
 end subroutine insert_rough_fault

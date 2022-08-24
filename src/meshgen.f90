@@ -4,7 +4,7 @@ subroutine meshgen
 	implicit none
 	include 'mpif.h'	
 		
-	integer(kind=4)::nnode,nelement,neq0,nxt,nyt,nzt,ix,iy,iz,&
+	integer(kind=4)::nnode,nelement,neq0,ix,iy,iz,&
 		edgex1,edgey1,edgez1,edgezn,&
 		i,j,k,i1,j1,ift
 	real(kind=dp)::dy,dz
@@ -12,9 +12,9 @@ subroutine meshgen
 	integer (kind=4)::nxuni,nyuni,nzuni	
 	real(kind=dp)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
 			xmin1,xmax1,ymin1,ymax1,zmin1
-	real(kind=dp),allocatable,dimension(:)::xlinet,ylinet,zlinet,xline,yline,zline
-	integer(kind=4),allocatable,dimension(:,:) :: plane1,plane2
-	integer(kind=4),allocatable,dimension(:,:,:,:) :: fltrc	
+	real (kind = dp), allocatable, dimension(:) :: xlinet,ylinet,zlinet,xline,yline,zline
+	integer (kind = 4), allocatable, dimension(:,:) :: plane1,plane2
+	integer (kind = 4), allocatable, dimension(:,:,:,:) :: fltrc	
 
 	integer(kind=4)::n1,n2,n3,n4,m1,m2,m3,m4
 	real(kind=dp)::a1,b1,c1,d1,p1,q1,area 
@@ -168,7 +168,7 @@ subroutine meshgen
 				x(3,nnode) = zcoor			
 				strtmp=270.0d0/180.0d0*pi
 				if (rough_fault == 1) then 
-					call insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz)
+					call insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz, ymax1, ymin1)
 					x(2,nnode) = ycoort
 				endif 
 							!The normal vector at x = 0 belongs to the left segment.
@@ -282,6 +282,17 @@ subroutine meshgen
 						ud(1,nftnd0(ift),ift) = dcos(strtmp)*dcos(fltxyz(2,4,ift))
 						ud(2,nftnd0(ift),ift) = dsin(strtmp)*dcos(fltxyz(2,4,ift))
 						ud(3,nftnd0(ift),ift) = dsin(fltxyz(2,4,ift))
+						if (rough_fault == 1) then
+							un(1,nftnd0(ift),ift) = -pfx/(pfx**2 + 1.0d0 + pfz**2)**0.5
+							un(2,nftnd0(ift),ift) = 1.0d0/(pfx**2 + 1.0d0 + pfz**2)**0.5
+							un(3,nftnd0(ift),ift) = -pfz/(pfx**2 + 1.0d0 + pfz**2)**0.5
+							us(1,nftnd0(ift),ift) = 1.0d0/(1.0d0 + pfx**2)**0.5
+							us(2,nftnd0(ift),ift) = pfx/(1.0d0 + pfx**2)**0.5
+							us(3,nftnd0(ift),ift) = 0.0d0
+							ud(1,nftnd0(ift),ift) = us(2,nftnd0(ift),ift)*un(3,nftnd0(ift),ift) - us(3,nftnd0(ift),ift)*un(2,nftnd0(ift),ift)
+							ud(2,nftnd0(ift),ift) = us(3,nftnd0(ift),ift)*un(1,nftnd0(ift),ift) - us(1,nftnd0(ift),ift)*un(3,nftnd0(ift),ift)
+							ud(3,nftnd0(ift),ift) = us(1,nftnd0(ift),ift)*un(2,nftnd0(ift),ift) - us(2,nftnd0(ift),ift)*un(1,nftnd0(ift),ift)
+						endif
 						!...prepare for area calculation
 						if(ixfi(ift)==0) ixfi(ift)=ix
 						if(izfi(ift)==0) izfi(ift)=iz
@@ -352,6 +363,7 @@ subroutine meshgen
 									fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift)
 									fric(45, nftnd0(ift), ift) = 0.0d0
 								endif
+								fric(47,nftnd0(ift),ift) = fric(46,nftnd0(ift),ift)! Peak slip rate
 							elseif (icstart > 1) then
 								! If icstart > 1, and use eqquasi to simulate 2nd and later cycles, adopts initials from previous models.
 								! This is the elastic version that only transfers quantities on the fault. 
@@ -373,6 +385,70 @@ subroutine meshgen
 								fric(45, nftnd0(ift), ift) = 0.0d0
 							 endif
 						endif !end case bp==5.
+						if (friclaw == 3 .and. bp == 1001) then
+							! Setting a, b, Dc, v0, r0
+							if(abs(zcoor)>=18.0d3.or.abs(xcoor)>=20.0d3.or.abs(zcoor)<=2.0d3) then
+								fric(9,nftnd0(ift),ift) = fric_rsf_a + fric_rsf_deltaa0
+							elseif (abs(zcoor)<=16.0d3.and.abs(zcoor)>=4.0d3.and.abs(xcoor)<=18.0d3) then
+								fric(9,nftnd0(ift),ift) = fric_rsf_a
+							else
+								tmp1 = abs(abs(zcoor)-2.0d3-2.0d3-12.0d3/2.0d0) - 12.0d3/2.0d0
+								tmp1 = tmp1 / 2.0d3
+								tmp2 = (abs(xcoor)-18.0d3)/2.0d3		
+								fric(9,nftnd0(ift),ift) = fric_rsf_a + max(tmp1,tmp2)*fric_rsf_deltaa0					 
+							endif	
+							fric(10,nftnd0(ift),ift) = fric_rsf_b                                            
+							fric(11,nftnd0(ift),ift) = fric_rsf_Dc !RSF critical distance.
+							fric(12,nftnd0(ift),ift) = fric_rsf_v0 !RSF:V0
+							fric(13,nftnd0(ift),ift) = fric_rsf_r0 !RSF:miu0
+							fric(16,nftnd0(ift),ift) = 0.0d0 !RSF: initial normal slip rate 
+							fric(17,nftnd0(ift),ift) = fric_rsf_vinix !RSF:s 
+							fric(18,nftnd0(ift),ift) = fric_rsf_viniz !RSF:d
+							fric(19,nftnd0(ift),ift) = sqrt(fric_rsf_vinix**2+fric_rsf_viniz**2) !RSF:mag		
+							! Setting theta
+							if (icstart == 1) then 
+								fric(7,nftnd0(ift),ift) = init_norm !-25.0d6 ! Initial normal stress 
+								fric(20,nftnd0(ift),ift )= fric(11,nftnd0(ift),ift)/load_slip_rate ! theta0 for steady state at v==load_slip_rate.
+								! Setting initial shear stress. 
+								!fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
+								!	1.0d-9/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + 2670.0d0*3464.0d0/2.0d0*1.0d-9
+								fric(45, nftnd0(ift), ift) = 0.0d0
+								fric(46, nftnd0(ift), ift) = load_slip_rate ! initial slip rate.
+								call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
+								fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
+								
+								! Specify initial high slip rate patch. 
+								! if (xcoor<-8.0d3+tol.and.xcoor>-20.0d3-tol.and.zcoor<-4.0d3+tol &
+									 ! .and.zcoor>-16.0d3-tol) then
+									! fric(46,nftnd0(ift),ift)=3.0d-2 ! In the special patch, increase initial slip rate. 
+									! fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
+										! fric(46,nftnd0(ift),ift)/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + mat0(1,2)*mat0(1,3)/2.0d0*fric(46,nftnd0(ift),ift)
+									! !call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
+									! fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift)
+									! fric(45, nftnd0(ift), ift) = 0.0d0
+								! endif
+								fric(47,nftnd0(ift),ift) = fric(46,nftnd0(ift),ift)! Peak slip rate
+							elseif (icstart > 1) then
+								! If icstart > 1, and use eqquasi to simulate 2nd and later cycles, adopts initials from previous models.
+								! This is the elastic version that only transfers quantities on the fault. 
+								nfx = (xcoor - xmin)/dx+1
+								nfz = (zcoor - zmin)/dx+1
+								ntmp = (zmax-zmin)/dx + 1
+								fric(20,nftnd0(ift),ift) = initial(4,(nfx-1)*ntmp +nfz) !theta0
+								fric(7,nftnd0(ift),ift) = initial(7,(nfx-1)*ntmp +nfz) !tnrm0
+								fric(8,nftnd0(ift),ift) = initial(5,(nfx-1)*ntmp +nfz) !tstk
+								fric(49,nftnd0(ift),ift) = initial(6,(nfx-1)*ntmp +nfz) !tdip
+								fric(31,nftnd0(ift),ift) = initial(8,(nfx-1)*ntmp +nfz) ! vx0+
+								fric(32,nftnd0(ift),ift) = initial(9,(nfx-1)*ntmp +nfz) ! vy0+
+								fric(33,nftnd0(ift),ift) = initial(10,(nfx-1)*ntmp +nfz) ! vz0+
+								fric(34,nftnd0(ift),ift) = initial(11,(nfx-1)*ntmp +nfz) ! vx0-
+								fric(35,nftnd0(ift),ift) = initial(12,(nfx-1)*ntmp +nfz)
+								fric(36,nftnd0(ift),ift) = initial(13,(nfx-1)*ntmp +nfz)
+								fric(47,nftnd0(ift),ift) = initial(3,(nfx-1)*ntmp +nfz)! Peak slip rate
+								fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
+								fric(45, nftnd0(ift), ift) = 0.0d0
+							 endif
+						endif !end case bp==1001.
 						exit !can only be on 1 fault, thus if ynft(ift), exit do loop       
 					endif  !if flt range
 				enddo  !do ift
@@ -415,11 +491,10 @@ subroutine meshgen
 						kinkx=dy/2.0d0!center(1)/30.0d3*5289.8d0
 					endif				
 					
-					if((center(2)>0.0d0 + kinkx - dy/2.0d0).and.(center(2)<(dy/2.0d0 + tol +kinkx))) then
-						! if (me==0) then
-							! open(1000,file='Slave-Master-Elem-Replace.txt',form='formatted',status='unknown',position='append')
-								! write(1000,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)
-						! endif
+					!if((center(2)>0.0d0 + kinkx - dy/2.0d0).and.(center(2)<(dy/2.0d0 + tol +kinkx))) then
+					! The fault resides on x-z plane and penetrates the whole model.
+					! Use undistorted mesh ycoor to locate elements on the y+ side of the fault.
+					if (ycoor>0 .and. abs(ycoor-dy)<tol) then
 						do i=1,nftnd0(1)
 							do k=1,8
 								if(ien(k,nelement)==nsmp(1,i,1)) then
@@ -427,8 +502,11 @@ subroutine meshgen
 								endif
 							enddo
 						enddo
-					endif				
-					if((center(2)>(-2.0d0*dy-tol+kinkx)).and.(center(2)<(2.0d0*dy+tol+kinkx))) then
+					endif
+					!if((center(2)>(-2.0d0*dy-tol+kinkx)).and.(center(2)<(2.0d0*dy+tol+kinkx))) then
+					! Use undistorted mesh ycoor to locate fault elements. 
+					! Assign element et to 2.
+					if (abs(ycoor)<2.0d0*dy) then  
 						et(nelement)=2!Fault boundary, essential boundary treatment.
 						! open(1002,file='faultelem.txt',form='formatted',status='unknown',position='append')
 							! write(1002,'(1x,i10,3e18.7e4,32i10)') nelement,center(1),center(2),center(3),ien(1,nelement),id(1,ien(1,nelement)),id(2,ien(1,nelement)),id(3,ien(1,nelement)),&
@@ -440,7 +518,9 @@ subroutine meshgen
 							! ien(7,nelement),id(1,ien(7,nelement)),id(2,ien(7,nelement)),id(3,ien(7,nelement)),&
 							! ien(8,nelement),id(1,ien(8,nelement)),id(2,ien(8,nelement)),id(3,ien(8,nelement))
 					endif	
-					if((center(2)<(ylinet(1)+30.0d3)).or.(center(2)>(ylinet(nyt)-30.0d3))) then
+					!if((center(2)<(ylinet(1)+30.0d3)).or.(center(2)>(ylinet(nyt)-30.0d3))) then
+					! Locate far field elements by ycoor. Assign et = 3. 
+					if (ycoor < ymin1 + 2.0d0*dymax .or. ycoor > ymax1 - 2.0d0*dymax) then  
 						et(nelement)=3!Regular boundaries, essential boundary treatment.
 						! open(1003,file='boundelem.txt',form='formatted',status='unknown',position='append')
 							! write(1003,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)						

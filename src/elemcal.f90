@@ -9,9 +9,9 @@ subroutine elemcal
 	
 	do  nel=1,numel	
 		if (mod(nel,1000000)==0) then 
-			write(*,*) 'Constructing overall stiffness'
-			write(*,*) 'Progress..'
-			write(*,*) int(nel/1000000),'M elems constructed'
+			write(*,*) '=                                                                   ='
+			write(*,*) '=       Building KSTIFF in progress ... ...                         ='
+			write(*,'(X,A,40X,E15.7,4X,A)') '=', int(nel/1000000),' millions elements constructed ... ...'
 		endif
 	!LOOP 130 ：Give the coordinate information of elements
 		do j=1,nen

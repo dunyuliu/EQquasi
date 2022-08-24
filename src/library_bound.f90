@@ -3,8 +3,8 @@ subroutine bound_load
 	use globalvar
 	implicit none
 	
-	integer (kind = 4) :: nel, node_num, i, j, ntag, inv, jnv, temp, elemvar(nee), Vol
-	real (kind = dp) :: elemmat(5), elemx(ndof,nen), es(nee,nee), em(nee), ef(nee), elemu(nee)
+	integer (kind = 4) :: nel, node_num, i, j, ntag, inv, jnv, temp, elemvar(nee)
+	real (kind = dp) :: elemmat(5), elemx(ndof,nen), es(nee,nee), em(nee), ef(nee), elemu(nee), Vol
 	
 	right=0.0d0
 	constmp=0.0d0

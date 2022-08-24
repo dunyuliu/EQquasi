@@ -6,9 +6,10 @@ subroutine main
 	include 'dmumps_struc.h'
 	
 	TYPE (DMUMPS_STRUC) mumps_par
-	integer(kind=8)::nev
-	integer(kind=4)::i,j,inv,jnv,ntag,node_num,var,l,k
-	real(kind=8)::tmparr(nftmx)
+	integer (kind = 8) :: nev
+	integer (kind = 4) :: i,j,inv,jnv,ntag,node_num,var,l,k
+	real (kind = dp) :: tmparr(nftmx)
+	character (len = 50) :: netcdf_outfile, output_type
 	
 	![MUMPS]-2018/03
 	!Define a communicator for the package
@@ -19,24 +20,18 @@ subroutine main
 	mumps_par%SYM = 1! 0: unsymmetric; 1: Positive definite symmetric ; 2: general symmetric
 	mumps_par%PAR = 1
 	CALL DMUMPS(mumps_par)
-
-	if (icstart > 1) then 
-		tmparr = 0.0d0
-		do i = 1,nftnd(1)
+ 
+	tmparr = 0.0d0
+	do i = 1,nftnd(1)
 		tmparr(i) = fric(47,i,1)
-		enddo         
-		maxsliprate = maxval(tmparr)
-		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
-	elseif (icstart == 1) then 
-		maxsliprate = 3.0d-2 
-		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
-	endif 
-	
-
-	
+	enddo         
+	maxsliprate = maxval(tmparr) 
 	if (me.eq.0) then
 		!LOOP 2000 ![MUMPS]
-		write(*,*) 'LOOP 2000: CONSTRUCT KSTIFF in CRS; CONVERT CRS to MUMPS FORMAT'
+		write(*,*) '=                                                                   ='
+		write(*,*) '=       Building KSTIFF in CRS format                               ='
+		write(*,*) '=                                                                   ='
+		write(*,*) '=       Converting CRS to MUMPS format                              ='
 		!Define problem on the host (processor 0)
 		dtev = ksi*minDc/maxsliprate
 		dtev1 = ksi*minDc/maxsliprate!Initial dtev1>dt to enter static state.
@@ -49,9 +44,6 @@ subroutine main
 		call crs
 
 		!LOOP 2001 : Calculating element stiff, mass, damp and constructing the overall stiffness
-		write(*,*) 'LOOP 2001'
-		write(*,*) 'Calculating element stiff, mass, damp and constructing the overall stiffness.'
-
 		call elemcal
 		
 		mumps_par%N = neq ![MUMPS]
@@ -79,6 +71,12 @@ subroutine main
 				consv(1,nsmp(2,l,1)) =  fric(46,l,1)/2.0d0!mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(1,l,1)!Master 
 				consv(2,nsmp(2,l,1)) =  0.0d0!mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(2,l,1) 
 				consv(3,nsmp(2,l,1)) =  0.0d0!mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(3,l,1) 
+				! consv(1,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(1,l,1)!Slave
+				! consv(2,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(2,l,1)
+				! consv(3,nsmp(1,l,1)) =  -mass(id(1,nsmp(2,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(3,l,1)
+				! consv(1,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(1,l,1)!Master 
+				! consv(2,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(2,l,1) 
+				! consv(3,nsmp(2,l,1)) =  mass(id(1,nsmp(1,l,1)))/(mass(id(1,nsmp(1,l,1)))+mass(id(1,nsmp(2,l,1)))) * fric(46,l,1) *us(3,l,1) 
 				! write(*,*) 'l,',l,consv(1,nsmp(1,l,1)),consv(2,nsmp(1,l,1)),consv(3,nsmp(1,l,1))
 				! write(*,*) 'mass,',mass(id(1,nsmp(2,l,1))),fric(46,l,1),us(1,l,1)
 			   else
@@ -107,7 +105,7 @@ subroutine main
 		
 			resu_1 = resu
 			
-			time=time+dtev1
+			time = time + dtev1
 			
 			if (mod(it,nhplt) == 1 .and. me ==0) then
 				write(*,*) '=                                                                   ='
@@ -235,10 +233,6 @@ subroutine main
 			
 			!GET SECOND PREDICTIONS OF V**(t+1), AND DECLARE V(t+1)=V**(t+1).'	
 			call faulting
-			
-		endif!MYID==0				
-			
-		if (me.eq.0) then
 
 			status0=status1
 			nev=int8(dtev/dt)
@@ -258,7 +252,17 @@ subroutine main
 			globaldat(4,it) = tottaoruptarea
 			globaldat(5,it) = totslipruptarea
 			globaldat(6,it) = totruptarea
-	
+			
+			! Write disp field. 
+			if (mod(it,nt_output_stress) == 1) then 
+				write(proc_str,'(I5.5)') it
+				netcdf_outfile = 'disp.'//trim(proc_str)//'.nc'
+				output_type = 'disp'
+				call netcdf_write(netcdf_outfile, output_type)
+				
+				netcdf_outfile = 'fault.'//trim(proc_str)//'.nc'
+				call netcdf_write_on_fault(netcdf_outfile)
+			endif
 		endif!MYID==0
 	enddo!it
 

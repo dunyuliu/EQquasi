@@ -256,7 +256,8 @@ subroutine read_fault_rough_geometry
 	include 'mpif.h'
 
 	logical :: file_exists
-	integer (kind = 4) :: i, j, nnx1, nnz1
+	integer (kind = 4) :: i, j, i1, j1, nnx1, nnz1, itmp
+	real (kind = dp), allocatable, dimension(:,:) :: rough_geo_tmp
 	
 	if (me == 0) then 
 		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
@@ -280,16 +281,27 @@ subroutine read_fault_rough_geometry
 	close(1008)
 	nnx = int(nnx1/nres)
 	nnz = int(nnz1/nres)
-	rough_fx_max = (nnx-1)*dxtmp*nres + rough_fx_min
+	rough_fx_max = nnx*dxtmp*nres + rough_fx_min
 	
 	allocate(rough_geo(3,nnx*nnz))
+	allocate(rough_geo_tmp(3,nnx1*nnz1))
 	
 	open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
 		read(1008,*)
 		read(1008,*)
-		do i = 1, nnx*nnz
-			read(1008,*) rough_geo(1,i), rough_geo(2,i), rough_geo(3,i)
+		do i = 1, nnx1*nnz1 
+			read(1008,*) rough_geo_tmp(1,i), rough_geo_tmp(2,i), rough_geo_tmp(3,i)
 		enddo
-	close(1008)	
+	close(1008)
+	
+	do i = 1, nnx
+		do j = 1, nnz
+			i1 = (i-1)*nres + 1
+			j1 = (j-1)*nres + 1
+			rough_geo(1,(i-1)*nnz+j) = rough_geo_tmp(1, (i1-1)*nnz1 + j1)
+			rough_geo(2,(i-1)*nnz+j) = rough_geo_tmp(2, (i1-1)*nnz1 + j1)
+			rough_geo(3,(i-1)*nnz+j) = rough_geo_tmp(3, (i1-1)*nnz1 + j1)
+		enddo 
+	enddo 
 		
 end subroutine read_fault_rough_geometry

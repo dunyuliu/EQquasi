@@ -18,20 +18,19 @@ subroutine main_aztec
 
 	call AZ_set_proc_config(proc_config, MPI_COMM_WORLD)
 	allocate(val(0:dimestimate*81),bindx(0:dimestimate*81), update(0:dimestimate))
+	if (icstart > 1) then 
+		tmparr = 0.0d0
+		do i = 1,nftnd(1)
+		tmparr(i) = fric(47,i,1)
+		enddo         
+		maxsliprate = maxval(tmparr)
+		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
+	elseif (icstart == 1) then 
+		maxsliprate = 3.0d-2 
+		!write(*,*) 'Maxsliprate from last cycle = ',maxsliprate
+	endif 
 	
-	tmparr = 0.0d0
-	do i = 1,nftnd(1)
-	tmparr(i) = fric(47,i,1)
-	enddo         
-	maxsliprate = maxval(tmparr)
-	
-	if (me.eq.0) then
-		!LOOP 2000 ![MUMPS]
-		write(*,*) '=                                                                   ='
-		write(*,*) '=       Building KSTIFF in CRS format                               ='
-		write(*,*) '=                                                                   ='
-		write(*,*) '=       Converting CRS to MRS format                                ='
-	endif
+
 	
 
 	!Define problem on the host (processor 0)
@@ -44,6 +43,11 @@ subroutine main_aztec
 	consa = 0.0d0
 
 	call msr
+	
+	if (me == 0) then
+		write(*,*) 'Finished LOOP 1001:'
+		write(*,*) 'Arrays lie and num are generated.'
+	endif	
 	
 	div=neq/nprocs
 	dimtmp = floor(div)+nprocs		

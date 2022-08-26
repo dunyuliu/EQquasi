@@ -128,7 +128,7 @@ do ift = 1, ntotft
 	!---3.4.1.2: Dynamic + NON-DYNAMIC PROCESS: [STATUS1]==0		
 				tstk0 = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
 				tdip0 = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
-				tnrm = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
+				tnrm0 = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
 				! fric(41,i,ift) is abs(KU)
 				fric(41,i,ift) = sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
 				ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		

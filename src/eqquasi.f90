@@ -40,7 +40,11 @@ program eqquasi3d
 	call readcurrentcycle 
 	call readmodel
 	call readfric
-	if (rough_fault == 1) call read_fault_rough_geometry 
+	if (rough_fault == 1) then 
+		call read_fault_rough_geometry 
+		filenametmp = 'roughness.nc'
+		call netcdf_write_roughness(filenametmp)
+	endif 
 	allocate(nonfs(ntotft))
 	
 	call readstations1

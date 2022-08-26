@@ -14,7 +14,7 @@ zmin, zmax = -60.0e3, 0.0e3
 # the RSF controlled region and will slide at fixed loading slip rate.
 xminc, xmaxc, zminc = -50.0e3, 50.0e3, -40.0e3
 
-dx = 500.0e0 # cell size, spatial resolution
+dx = 1000.0e0 # cell size, spatial resolution
 nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
 enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 

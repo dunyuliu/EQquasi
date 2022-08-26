@@ -51,6 +51,36 @@ def plot_fault(fname):
 
   return (fig1,)
 
+def plot_roughness(fname):
+  a = xr.open_dataset(fname)
+  #print (a)
+
+  b1 = a.peak
+  b2 = a.pypx
+  b3 = a.pypz
+
+  fig1 = plt.figure()
+  plt.rc('font', size=SMALL_SIZE)
+
+  ax11 = fig1.add_subplot(2,2,1)
+  b1.plot()
+  ax11.set_xlabel('')
+  #ax11.set_ylabel('')
+
+  ax12 = fig1.add_subplot(2,2,2)
+  b2.plot()
+  ax12.set_xlabel('')
+  ax12.set_ylabel('')
+
+  ax21 = fig1.add_subplot(2,2,3)
+  b3.plot()
+  #ax21.set_ylabel('')
+
+  plt.savefig(fname + ".png", dpi = 600)
+  plt.close()
+
+  return (fig1,)
+
 def seek_numbers_filename(x):
     return (x[6:10])
 
@@ -62,6 +92,9 @@ def _main_func(description):
         if 'fault.' in name and '.nc' in file_extension:
             dirFiles += fname
             plot_fault(str(fname))
+        if 'roughness' in name and '.nc' in file_extension:
+            dirFiles += fname
+            plot_roughness(str(fname))
 
 if __name__ == "__main__":
     _main_func(__doc__)

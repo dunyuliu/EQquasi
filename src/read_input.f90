@@ -279,10 +279,11 @@ subroutine read_fault_rough_geometry
 		read(1008,*) nnx1, nnz1, nres ! nums of grids along strike by dip, and nums of grids to pick a data point.
 		read(1008,*) dxtmp, rough_fx_min, rough_fz_min 
 	close(1008)
-	nnx = int(nnx1/nres)
-	nnz = int(nnz1/nres)
-	rough_fx_max = nnx*dxtmp*nres + rough_fx_min
+	nnx = int((nnx1-1)/nres) + 1
+	nnz = int((nnz1-1)/nres) + 1
+	rough_fx_max = (nnx - 1)*dxtmp*nres + rough_fx_min
 	
+	write(*,*) 'nnx, nnz, rough_fx_max, rough_fx_min = ', nnx, nnz, rough_fx_max, rough_fx_min
 	allocate(rough_geo(3,nnx*nnz))
 	allocate(rough_geo_tmp(3,nnx1*nnz1))
 	

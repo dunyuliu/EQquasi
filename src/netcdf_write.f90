@@ -203,6 +203,95 @@ subroutine netcdf_write_on_fault(outfile)
 
 end subroutine netcdf_write_on_fault
 
+subroutine netcdf_write_roughness(outfile)
+	use netcdf
+	use globalvar
+	implicit none 
+	character (len = 50 ) :: outfile, outtype, lat_name, lon_name, lat_units, lon_units, UNITS
+	character (len = 50), allocatable, dimension(:) :: var_name, var_unit
+	integer (kind = 4) :: ncid, lat_dimid, lon_dimid, lat_varid, lon_varid, var_id(20), ilat, ilon, i, j, nlat, nlon, nvar
+	integer (kind = 4) :: dimids(2)
+	integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index
+	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
+
+	nvar = 3 ! nvar variables.
+	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nnx, nnz, nvar))
+	on_fault_vars = 0.0d0
+	
+	UNITS = 'units'
+	lat_name = 'nid_dip'
+	lon_name = 'nid_strike'
+	lat_units = 'unit'
+	lon_units = 'unit'
+	var_name = [ character(len=20) :: 'peak', 'pypx', 'pypz' ]
+	var_unit = [ character(len=20) :: 'm'          , 'unit'       , 'unit']
+	nlat = nnz ! Total nodes along dip. 
+	nlon = nnx ! Total nodes along strike.  
+	
+	allocate(lat_index(nlat))
+	allocate(lon_index(nlon))
+	
+	lat_index = (/ (i, i = 1, nlat) /)
+	lon_index = (/ (i, i = 1, nlon) /)
+	
+	do i = 1, nnx
+		do j = 1, nnz
+			on_fault_vars(i,j, 1) = rough_geo(1, (i-1)*nnz+j) ! tstk0
+			on_fault_vars(i,j, 2) = rough_geo(2, (i-1)*nnz+j) ! tdip0
+			on_fault_vars(i,j, 3) = rough_geo(3, (i-1)*nnz+j) ! tnorm0
+		enddo 
+	enddo 
+	! Create the netCDF file.
+	call check(nf90_create(outfile, NF90_CLOBBER, ncid))
+	
+	! Define the dimensions.
+	call check(nf90_def_dim(ncid, lat_name, nlat, lat_dimid))
+	call check(nf90_def_dim(ncid, lon_name, nlon, lon_dimid))
+	
+	! Define coordiante variables. They will hold the coordinate 
+	! information, that is, the latitudes (y), and longitudes (x). A varid is 
+	! returned for each.
+	call check(nf90_def_var(ncid, lat_name, NF90_INT, lat_dimid, lat_varid))
+	call check(nf90_def_var(ncid, lon_name, NF90_INT, lon_dimid, lon_varid))
+	
+	! Assign units attributes to coordinate var data. This attaches a
+	! text attribute to each of the coordinate variables, containing the
+	! units.
+	call check( nf90_put_att(ncid, lat_varid, UNITS, lat_units) )
+	call check( nf90_put_att(ncid, lon_varid, UNITS, lon_units) )	
+
+	! Define the netcdf variables. The dimids array is used to pass the 
+	! dimids of the dimensions of the netCDF variables.
+	dimids = (/ lon_dimid, lat_dimid /)
+	
+	do i = 1, nvar
+		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 
+		! Assign units attributes to the pressure and temperature netCDF
+		! variables.
+		call check(nf90_put_att(ncid, var_id(i), UNITS, var_unit(i)))
+	enddo 
+
+	! End definitions.
+	call check(nf90_enddef(ncid))
+	
+	! Write data.
+	! Write the coordinate variable data. This will put the x, and y 
+	! of our data grid into the netCDF file.
+	call check(nf90_put_var(ncid, lat_varid, lat_index))
+	call check(nf90_put_var(ncid, lon_varid, lon_index))
+	
+	! Write the data. This will write our displacement fields "cons" which is defined 
+	! globally. Its dimension is 3 by numnp (row by column).
+	do i = 1,nvar
+		call check(nf90_put_var(ncid, var_id(i), on_fault_vars(:,:,i)))
+	enddo
+	
+	! Close the file.
+	call check(nf90_close(ncid))
+	!call writegrid(outfile, xpos, ypos, zpos, data_arr, nxtmp, nytmp, nztmp)
+
+end subroutine netcdf_write_roughness
+
 subroutine check(status)
 	use netcdf
     integer, intent ( in) :: status

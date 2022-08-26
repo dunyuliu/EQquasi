@@ -14,6 +14,24 @@ git clone https://github.com/dunyuliu/EQquasi.git
 cd EQquasi
 source install-eqquasi.sh
 ```
+Quick Start Guide
+---------------------
+After the installation, you need three steps to run a new case. <br/>
+First, create a new case with the utility *create_newcase*. <br/> 
+*create_newcase* takes in two parameters: <br/> 
+  (a) case_dir - the case directory where you want to run the job, and
+  (b) compset  - the predefined case (bp5, bp1001)
+```
+create_newcase case_dir compset
+```
+Second, cd into the case_dir, modifiy the *user_defined_params.py* and then run the utility *case.setup*.
+```
+case.setup
+```
+Third, run the utility *case.submit*, which will submit the job to the HPC system.
+```
+case.submit
+```
 
 Key progress
 ---------------------

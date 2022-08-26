@@ -14,7 +14,7 @@ zmin, zmax = -60.0e3, 0.0e3
 # the RSF controlled region and will slide at fixed loading slip rate.
 xminc, xmaxc, zminc = -50.0e3, 50.0e3, -40.0e3
 
-dx = 1000.0e0 # cell size, spatial resolution
+dx = 2000.0e0 # cell size, spatial resolution
 nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
 enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
@@ -47,9 +47,9 @@ exit_slip_rate = 1.0e-3 # exiting slip rate for EQquasi [m/s].
 ####################################
 ##### HPC resource allocation ######
 ####################################
-casename = "bp1001test"
+casename = "bp5test"
 HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
-HPC_ncpu = 30 # Number of CPUs requested.
+HPC_ncpu = 3 # Number of CPUs requested.
 HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
 HPC_time = "00:10:00" # WALLTIME, in hh:mm:ss format.
 HPC_account = "EAR22013" # Project account to be charged SUs against.

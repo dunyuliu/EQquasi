@@ -1,0 +1,34 @@
+#! /usr/bin/env python3
+"""
+Script to connect eqquasi and sord.
+"""
+import xarray as xr
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from user_defined_params import *
+
+def connect(src, dst):
+    coor_in = xr.open_dataset(str(src) + ".coor.nc")
+    ien_in = xr.open_dataset(str(src) + ".ien.nc")
+    nsmp_in = xr.open_dataset(str(src) + ".nsmp.nc")
+    nx = (xmax - xmin)/dx + 1
+    nz = (zmax - zmin)/dx + 1
+    ny = 
+    
+
+eqquasi = xr.open_dataset()
+
+def _main_func(description):
+    dirFiles = list()
+    for fname in os.listdir(os.getcwd()):
+        name, file_extension = os.path.splitext(fname)
+        if 'fault.' in name and '.nc' in file_extension:
+            dirFiles += fname
+            plot_fault(str(fname))
+        if 'roughness' in name and '.nc' in file_extension:
+            dirFiles += fname
+            plot_roughness(str(fname))
+
+if __name__ == "__main__":
+    _main_func(__doc__)

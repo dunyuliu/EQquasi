@@ -66,10 +66,10 @@ st_coor_on_fault = [[-36.0, 0.0], [-16.0,0.0], [0.0,0.0], [16.0,0.0], \
    [36.0,0.0], [-24.0,0.0], [-16.0,0.0], [0.0,-10.0], [16.0,-10.0], [0.0,-22.0]]
    
 # (x,y,z) coordinates for off-fault stations (in km).
-st_coor_off_fault = [[0,8,0], [0,8,-10], [0,16,0], [0,32,0], [0,32,-10], \
-   [0,48,0], [16,8,0], [-16,8,0]]
-n_on_fault = st_coor_on_fault.shape[0]
-n_off_fault = st_coor_off_fault.shape[0]
+st_coor_off_fault = [[0,8,0], [0,8,-10], [0,16,0], [0,16,-10], [0,32,0], \
+   [0,32,-10], [0,48,0], [16,8,0], [-16,8,0]]
+n_on_fault = len(st_coor_on_fault)
+n_off_fault = len(st_coor_off_fault)
 
 # Additional solver options for AZTEC
 az_op = 2 # AZTEC options

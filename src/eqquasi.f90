@@ -139,19 +139,19 @@ program eqquasi3d
 		write(*,*) '=     Total elements =                                              ='
 		write(*,'(X,A,40X,i7,4X,A)') '=',  numel			
 		
-		filenametmp = 'mesh.coor.nc'
+		filenametmp = 'eqquasi.mesh.coor.nc'
 		output_type = 'coor'
 		call netcdf_write(filenametmp, output_type)
 		write(*,*) '=                                                                   ='
 		write(*,*) '=       Writing out mesh.coor.nc                                    ='
 		
-		filenametmp = 'mesh.ien.nc'
+		filenametmp = 'wqquasi.mesh.ien.nc'
 		output_type = 'ien'
 		call netcdf_write(filenametmp, output_type)
 		write(*,*) '=                                                                   ='
 		write(*,*) '=       Writing out mesh.ien.nc                                     ='
 		
-		filenametmp = 'mesh.nsmp.nc'
+		filenametmp = 'eqquasi.mesh.nsmp.nc'
 		output_type = 'nsmp'
 		call netcdf_write(filenametmp, output_type)
 		write(*,*) '=                                                                   ='

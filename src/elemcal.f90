@@ -11,7 +11,7 @@ subroutine elemcal
 		if (mod(nel,1000000)==0) then 
 			write(*,*) '=                                                                   ='
 			write(*,*) '=       Building KSTIFF in progress ... ...                         ='
-			write(*,'(X,A,40X,I10,4X,A)') '=', int(nel/1000000),' millions elements constructed ... ...'
+			write(*,'(X,A,40X,I7,4X,A)') '=', int(nel/1000000),' millions elements constructed ... ...'
 		endif
 	!LOOP 130 ：Give the coordinate information of elements
 		do j=1,nen

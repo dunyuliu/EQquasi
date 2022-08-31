@@ -134,6 +134,11 @@ program eqquasi3d
 	! Write out mesh information
 	! coor, ien, and nsmp.
 	if (me == 0) then 
+		write(*,*) '=     Total nodes =                                                 ='
+		write(*,'(X,A,40X,i7,4X,A)') '=',  numnp			
+		write(*,*) '=     Total elements =                                              ='
+		write(*,'(X,A,40X,i7,4X,A)') '=',  numel			
+		
 		filenametmp = 'mesh.coor.nc'
 		output_type = 'coor'
 		call netcdf_write(filenametmp, output_type)

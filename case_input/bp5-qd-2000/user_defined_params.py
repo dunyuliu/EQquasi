@@ -49,11 +49,11 @@ exit_slip_rate = 1.0e-3 # exiting slip rate for EQquasi [m/s].
 ####################################
 ##### HPC resource allocation ######
 ####################################
-casename = "bp5test"
+casename = "bp5-qd-2000"
 HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 HPC_ncpu = 3 # Number of CPUs requested.
 HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-HPC_time = "00:10:00" # WALLTIME, in hh:mm:ss format.
+HPC_time = "00:30:00" # WALLTIME, in hh:mm:ss format.
 HPC_account = "EAR22013" # Project account to be charged SUs against.
 HPC_email = "dliu@ig.utexas.edu" # Email to receive job status.
 

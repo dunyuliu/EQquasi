@@ -33,6 +33,14 @@ Third, run the utility *case.submit*, which will submit the job to the HPC syste
 case.submit
 ```
 
+Example
+---------------------
+A good starting example would be compset=bp5-qd-2000 (benchmark problem 5, quasi-dynamic, 2000 m on-fault resolution). <br/>
+The case can be created by the following command:
+```
+create_newcase case_dir bp5-qd-2000
+```
+
 Key progress
 ---------------------
 *v1.2.1* with *MUMPS* is benchmarked in [SEAS BP5](https://strike.scec.org/cvws/seas/benchmark_descriptions.html) and results are published in [*Jiang et al. (2022, JGR)*](https://doi.org/10.1029/2021JB023519).

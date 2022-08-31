@@ -191,7 +191,8 @@ program eqquasi3d
 		
 		call output_offfault_st
 		
-		call output_onfault_transfer
+		! phasing out
+		!call output_onfault_transfer 
 		
 		call output_timedy
 		

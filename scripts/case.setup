@@ -39,7 +39,7 @@ def create_station_input_file():
         f.write(str(n_on_fault) + "\n")
         f.write(str(" ") + "\n")
         for i in range(len(st_coor_on_fault)):
-            f.write(str(st_coor_on_fault[i][0]) + " " + str(st_coor_on_fault[i][1]) "\n")
+            f.write(str(st_coor_on_fault[i][0]) + " " + str(st_coor_on_fault[i][1]) + "\n")
         f.write(str(" ") + "\n")
         for i in range(len(st_coor_on_fault)):
             f.write(str(st_coor_off_fault[i][0]) + " " + str(st_coor_off_fault[i][1]) + " " str(st_coor_off_fault[i][2]) + "\n")

@@ -30,6 +30,7 @@ def create_model_input_file():
         f.write(str(az_maxiter) + "\n")
         f.write(str(az_tol) + "\n")
         f.write(str(nt_out) + "\n")
+        f.write(str(mode) + "\n")
     
 def create_batch_script():
     # Function to create batch script used by HPC system.

@@ -97,9 +97,10 @@ subroutine main
 	mumps_par%JOB = 4! 1 + 2
 	CALL DMUMPS(mumps_par)
 	
-	stoptag = 0 
-   	do it=1,nstep 
-		if (stoptag == 1) exit
+	stoptag = 0 ! set stoptag to FALSE.
+	
+   	do it = 1, nstep 
+		if (stoptag == 1) exit ! exit EQquasi if stoptag is TRUE.
 
 		if (me.eq.0) then
 		
@@ -121,36 +122,7 @@ subroutine main
 				write(*,'(X,A,40X,E15.7,4X,A)') '=',  maxsliprate, 'm/s'
 			endif			
 			
-			if (maxsliprate>slipr_thres)then 
-				if (status0 == 0) then        
-					status1 = 1
-				elseif (status0 == 1) then
-					if (t_end_status>0.0d0) then
-						t_end_status = -1.0d0
-						tdynaend = -1000.0d0
-					endif
-				endif
-			elseif (maxsliprate<=slipr_thres) then
-				if (status0 == 0) then
-					status1 = 0
-				elseif (status0 == 1) then
-					if (t_end_status<0.0d0) then
-						t_end_status = 1.0d0
-						tdynaend = time
-					else
-						if ((time-tdynaend)>=100.0d0.and.tdynaend>0.0d0) then !exit
-							stoptag = 1
-							!call MPI_Bcast(stoptag, 1, MPI_INT, 0, MPI_COMM_WORLD, IERR)
-						endif
-						!if ((time-tdynaend)>=1.0d0*7*24*60*60.and.tdynaend>0.0d0) exit
-					endif
-				endif
-			endif
-			
-			if ((status1-status0)==1) then
-				tdynastart = time
-				t_start_status = 1
-			endif
+			call exit_criteria ! determine if to exit EQquasi.
 
 			if(ndout>0) then
 				dout(1,it)=time
@@ -280,3 +252,61 @@ subroutine main
 	!CALL MPI_FINALIZE ( IERR )
 	
 end subroutine main
+
+subroutine exit_criteria
+! Subroutine to compute if to exit EQquasi. 
+! If mode == 1 (quasi-dynamic/quasi-static), the exit happens AFTER 
+!	a rupture when maxsliprate falls below slipr_thres.
+! If mode == 2 (fully dynamic), the exit happens BEFORE a rupture when 
+!	the maxsliprate rises above the slipr_thres.
+
+! The system is determined by the combination of two status variables - status0/1 and t_end_status.
+! status0/status1: code status in the last/current time step.
+! 0: interseismic; 1: rupture. 
+! 
+	use globalvar
+	implicit none
+	
+	if (eqquasi_mode == 1) then ! quasi-dynamic/quasi-static
+		if (maxsliprate>slipr_thres)then
+		! if maximum slip rate rises above the slipr_thres, entering/in the co-seismic phase.
+			if (status0 == 0) then ! convert from inter-seismic to co-seismic.
+				status1 = 1 ! current status is changed to co-seismic.
+			elseif (status0 == 1) then ! convert from co-seismic to inter-seismic.
+				if (t_end_status>0.0d0) then ! if t_end_status is TRUE, set it to FALSE and continue rupturing.
+					t_end_status = -1.0d0 ! t_end_status is FALSE.
+					tdynaend = -1000.0d0 ! don't need to record end time in the rupture phase.
+				endif
+			endif
+		elseif (maxsliprate<=slipr_thres) then
+		! if maximum slip rate falls below the slipr_thres, consider exiting the code. 
+			if (status0 == 0) then 
+				status1 = 0 ! if last step was in inter-seismic, no need to change.
+			elseif (status0 == 1) then !if last step was in co-seismic, consider to exit.
+				if (t_end_status<0.0d0) then 
+					t_end_status = 1.0d0 ! change exit status to be TRUE.
+					tdynaend = time ! record the end time of the rupture.
+				else
+					if ((time-tdynaend)>=100.0d0.and.tdynaend>0.0d0) then ! exit if the low slip rate status is kept for over 100 seconds.
+					! NOTE: the 100 seconds threshold is subjective to change. 
+						stoptag = 1 ! stoptag is TRUE now. Direct the code to exit.
+					endif
+					!if ((time-tdynaend)>=1.0d0*7*24*60*60.and.tdynaend>0.0d0) exit
+				endif
+			endif
+		endif
+		
+		if ((status1-status0)==1) then ! record time if changing from inter-seismic to co-seismic.
+			tdynastart = time
+			t_start_status = 1
+		endif
+	elseif (eqquasi_mode == 2) then ! fully dynamic
+		if (maxsliprate>slipr_thres)then
+		! In this mode, if maximum slip rate rises above the slipr_thres, exit. 
+			if (status0 == 0) then ! convert from inter- to co-seismic.
+				status1 = 1
+				stoptag = 1 ! stoptag is TRUE now. Direct the code to exit.
+			endif
+		endif
+	endif 
+end subroutine exit_criteria

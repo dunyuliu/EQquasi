@@ -3,6 +3,8 @@
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
 istart = 1
 iend = 1
+# mode of the code - quasi-dynamic (0) or fully-dynamic (1). 
+mode = 2 
 
 # model_domain (in meters)
 xmin, xmax = -60.0e3, 60.0e3

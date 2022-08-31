@@ -58,6 +58,7 @@ subroutine readmodel
 		read(1002,*) azmaxiter
 		read(1002,*) aztol
 		read(1002,*) nt_output_stress
+		read(1002,*) eqquasi_mode
 	close(1002)
 	
 	if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) stop ! Creeping zone bounds should be within model bounds. 

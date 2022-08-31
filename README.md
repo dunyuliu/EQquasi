@@ -11,7 +11,7 @@ Dependence
 ---------------------
 The code requires netCDF libraries, python, FORTRAN and MPI compilers. Currently, it is tested to work on Lonestar6 at TACC.
 
-Installation
+Installation on Lonestar6
 ---------------------
 ```
 git clone https://github.com/dunyuliu/EQquasi.git

@@ -3,7 +3,7 @@
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
 istart = 1
 iend = 1
-# mode of the code - quasi-dynamic (0) or fully-dynamic (1). 
+# mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
 mode = 2 
 
 # model_domain (in meters)
@@ -57,6 +57,19 @@ HPC_time = "00:10:00" # WALLTIME, in hh:mm:ss format.
 HPC_account = "EAR22013" # Project account to be charged SUs against.
 HPC_email = "dliu@ig.utexas.edu" # Email to receive job status.
 
+##############################################
+##### Single station time series output ######
+##############################################
+
+# (x,z) coordinate pairs for on-fault stations (in km).
+st_coor_on_fault = [[-36.0, 0.0], [-16.0,0.0], [0.0,0.0], [16.0,0.0], \
+   [36.0,0.0], [-24.0,0.0], [-16.0,0.0], [0.0,-10.0], [16.0,-10.0], [0.0,-22.0]]
+   
+# (x,y,z) coordinates for off-fault stations (in km).
+st_coor_off_fault = [[0,8,0], [0,8,-10], [0,16,0], [0,32,0], [0,32,-10], \
+   [0,48,0], [16,8,0], [-16,8,0]]
+n_on_fault = st_coor_on_fault.shape[0]
+n_off_fault = st_coor_off_fault.shape[0]
 
 # Additional solver options for AZTEC
 az_op = 2 # AZTEC options

@@ -100,8 +100,20 @@ subroutine main
 	stoptag = 0 ! set stoptag to FALSE.
 	
    	do it = 1, nstep 
-		if (stoptag == 1) exit ! exit EQquasi if stoptag is TRUE.
-
+		if (stoptag == 1) then 
+			! Before exiting, write out final results.
+			! '.r.' in file names stand for 'restart'.
+			write(proc_str,'(I5.5)') it
+			netcdf_outfile = 'disp.r.'//trim(proc_str)//'.nc'
+			output_type = 'disp'
+			call netcdf_write(netcdf_outfile, output_type)
+			
+			netcdf_outfile = 'fault.r.'//trim(proc_str)//'.nc'
+			call netcdf_write_on_fault(netcdf_outfile)
+			
+			exit ! exit EQquasi if stoptag is TRUE.
+		endif 
+		
 		if (me.eq.0) then
 		
 			resu_1 = resu

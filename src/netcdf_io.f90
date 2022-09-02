@@ -351,6 +351,7 @@ subroutine netcdf_read_on_fault(infile)
 			fric(8, (i-1)*nzt+j, 1) = on_fault_vars(j,i,7)! shear
 			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(j,i,8)! norm
 			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! norm
+			fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
 		enddo 
 	enddo 
 

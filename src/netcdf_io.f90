@@ -318,7 +318,7 @@ subroutine netcdf_read_on_fault(infile)
 	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
 	
 	nvar = 9
-	allocate(on_fault_vars(nzt,nxt,nvar))
+	allocate(on_fault_vars(nxt,nzt,nvar))
 	
 	! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
 	call check( nf90_open(infile, NF90_NOWRITE, ncid))
@@ -341,15 +341,15 @@ subroutine netcdf_read_on_fault(infile)
 	
 	do i = 1, nxt
 		do j = 1, nzt
-			fric(9, (i-1)*nzt+j, 1) = on_fault_vars(j,i,1) ! a
-			fric(10, (i-1)*nzt+j, 1) = on_fault_vars(j,i,2)! b
-			fric(11, (i-1)*nzt+j, 1) = on_fault_vars(j,i,3)! Dc
-			fric(12, (i-1)*nzt+j, 1) = on_fault_vars(j,i,4)! v0
-			fric(13, (i-1)*nzt+j, 1) = on_fault_vars(j,i,5)! r0
-			fric(46, (i-1)*nzt+j, 1) = on_fault_vars(j,i,6)! init_slip_rate
-			fric(8, (i-1)*nzt+j, 1) = on_fault_vars(j,i,7)! shear
-			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(j,i,8)! norm
-			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! norm
+			fric(9, (i-1)*nzt+j, 1) = on_fault_vars(i,j,1) ! a
+			fric(10, (i-1)*nzt+j, 1) = on_fault_vars(i,j,2)! b
+			fric(11, (i-1)*nzt+j, 1) = on_fault_vars(i,j,3)! Dc
+			fric(12, (i-1)*nzt+j, 1) = on_fault_vars(i,j,4)! v0
+			fric(13, (i-1)*nzt+j, 1) = on_fault_vars(i,j,5)! r0
+			fric(46, (i-1)*nzt+j, 1) = on_fault_vars(i,j,6)! init_slip_rate
+			fric(8, (i-1)*nzt+j, 1) = on_fault_vars(i,j,7)! shear
+			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(i,j,8)! norm
+			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(i,j,9)! norm
 		enddo 
 	enddo 
 

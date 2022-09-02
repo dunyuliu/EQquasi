@@ -335,11 +335,11 @@ subroutine netcdf_read_on_fault(infile)
 	do i = 1, nvar
 		call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
 	enddo		
-	do i = 1,nxt
-		do j = 1,nzt
-			write(*,*) j,i, on_fault_vars(j,i,1)
-		enddo 
-	enddo 
+	! do i = 1,nxt
+		! do j = 1,nzt
+			! write(*,*) j,i, on_fault_vars(j,i,1)
+		! enddo 
+	! enddo 
 	do i = 1, nxt
 		do j = 1, nzt
 			fric(9, (i-1)*nzt+j, 1) = on_fault_vars(j,i,1) ! a

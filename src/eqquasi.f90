@@ -39,7 +39,7 @@ program eqquasi3d
 	
 	call readcurrentcycle 
 	call readmodel
-	call readfric
+	!call readfric
 	if (rough_fault == 1) then 
 		call read_fault_rough_geometry 
 		filenametmp = 'roughness.nc'

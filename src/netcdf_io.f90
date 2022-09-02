@@ -332,7 +332,7 @@ subroutine netcdf_read_on_fault(infile)
 	call check( nf90_inq_varid(ncid, "init_slip_rate", var_id(6)))
 	call check( nf90_inq_varid(ncid, "init_shear_stress", var_id(7)))
 	call check( nf90_inq_varid(ncid, "init_normal_stress", var_id(8)))
-	call check( nf90_inq_varid(ncid, "init_state", varid(9)))
+	call check( nf90_inq_varid(ncid, "init_state", var_id(9)))
 	
 	! Read the data
 	do i = 1, nvar

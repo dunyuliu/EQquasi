@@ -67,7 +67,7 @@ nfz = int((zmax - zmin)/dx + 1)
 fx = np.linspace(xmin,xmax,nfx) # coordinates of fault grids along strike.
 fz = np.linspace(zmin,zmax,nfz) # coordinates of fault grids along dip.
 # Create on_fault_vars array for on_fault varialbes.
-on_fault_vars = np.zeros((nfx,nfz,100))
+on_fault_vars = np.zeros((nfz,nfx,100))
 def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
   # calculate shear stress at steady state
   res = -norm*asinh(slip_rate/2.0/v0*exp((r0+b*log(r0/load_rate))/a)) + rou*vs/2.0*slip_rate

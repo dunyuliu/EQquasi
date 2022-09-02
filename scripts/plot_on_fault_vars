@@ -6,8 +6,8 @@ Script to plot on fault variables.
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-from matplotlib import animation, rc
+import os, glob, re, imageio
+from pdf2image import convert_from_path
 
 #
 SMALL_SIZE = 6
@@ -46,7 +46,7 @@ def plot_fault(fname):
   slip_rate.plot()
   ax22.set_ylabel('')
 
-  plt.savefig(fname + ".png", dpi = 600)
+  plt.savefig(fname + ".pdf", dpi = 600)
   plt.close()
 
   return (fig1,)
@@ -76,10 +76,43 @@ def plot_roughness(fname):
   b3.plot()
   #ax21.set_ylabel('')
 
-  plt.savefig(fname + ".png", dpi = 600)
+  plt.savefig(fname + ".pdf", dpi = 600)
   plt.close()
 
   return (fig1,)
+
+def tryint(s):
+    try:
+        return int(s)
+    except:
+        return s
+
+def alphanum_key(s):
+    return [tryint(c) for c in re.split('([0-9]+)', s)]
+
+def sort_nicely(l):
+    l.sort(key=alphanum_key, reverse=False)
+    return l
+
+def generate_gif():
+  #images = []
+  #dirFiles = []
+  #for fname in os.listdir(os.getcwd()):
+  #  name, file_extension = os.path.splitext(fname)
+  #  if '.png' in file_extension:
+  #    dirFiles += fname
+  #print(dirFiles)
+  #for fname in sorted(dirFiles):
+  #  print(fname)
+  #  images.append(imageio.imread(fname))
+  #imageio.mimsave('on_fault_vars.gif',images)
+  filenames = glob.glob('.//*.pdf')
+  filenames = sort_nicely(filenames)
+  with imageio.get_writer('./on_fault_vars.gif', mode='I') as writer:
+      for filename in filenames:
+          img = convert_from_path(filename)[0]
+          image = np.array(img.getdata(), np.uint8).reshape(img.size[1], img.size[0], 3)
+          writer.append_data(image)
 
 def seek_numbers_filename(x):
     return (x[6:10])
@@ -91,10 +124,11 @@ def _main_func(description):
         name, file_extension = os.path.splitext(fname)
         if 'fault.' in name and '.nc' in file_extension:
             dirFiles += fname
-            plot_fault(str(fname))
+            if os.path.exists(fname + '.pdf') == False: plot_fault(str(fname))
         if 'roughness' in name and '.nc' in file_extension:
             dirFiles += fname
             plot_roughness(str(fname))
+    generate_gif()
 
 if __name__ == "__main__":
     _main_func(__doc__)

@@ -19,7 +19,7 @@ zmin, zmax = -60.0e3, 0.0e3
 # the RSF controlled region and will slide at fixed loading slip rate.
 xminc, xmaxc, zminc = -50.0e3, 50.0e3, -40.0e3
 
-dx = 500.0e0 # cell size, spatial resolution
+dx = 50.0e0 # cell size, spatial resolution
 nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
 enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
@@ -94,6 +94,7 @@ for ix, xcoor in enumerate(fx):
     on_fault_vars[ix,iz,46] = creep_slip_rate # initial slip rates
     if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
       on_fault_vars[ix,iz,46] = 0.03 # initial high slip rate patch.
+    on_fault_vars[ix,iz,20] = on_fault_vars[ix,iz,11]/creep_slip_rate # initial state var.
     on_fault_vars[ix,iz,7] = init_norm # initial normal stress.
     on_fault_vars[ix,iz,8] = shear_steady_state(on_fault_vars[ix,iz,9], 
                                                 on_fault_vars[ix,iz,10],

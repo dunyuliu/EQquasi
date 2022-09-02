@@ -131,6 +131,8 @@ program eqquasi3d
 	
 	call meshgen
 	
+	call netcdf_read_on_fault("on_fault_vars_input.nc")
+	
 	! Write out mesh information
 	! coor, ien, and nsmp.
 	if (me == 0) then 

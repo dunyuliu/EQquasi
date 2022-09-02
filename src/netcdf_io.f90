@@ -1,5 +1,10 @@
-!netcdf_write writes out arrays into netcdf format.
+! netcdf_io reads and writes out arrays into netcdf format.
 ! A Fortran example code is shown here https://www.unidata.ucar.edu/software/netcdf/examples/programs/sfc_pres_temp_wr.f90
+
+! subroutines contained in this file includes: 
+! - netcdf_write
+! - netcdf_write_on_fault
+
 subroutine netcdf_write(outfile, outtype)
 	use netcdf
 	use globalvar
@@ -298,6 +303,62 @@ subroutine netcdf_write_roughness(outfile)
 	!call writegrid(outfile, xpos, ypos, zpos, data_arr, nxtmp, nytmp, nztmp)
 
 end subroutine netcdf_write_roughness
+
+! Subroutine #4.
+! netcdf_read_on_fault reads in on-fault quantities from netcdf files created by case.setup.
+subroutine netcdf_read_on_fault(infile)
+	use netcdf
+	use globalvar
+	implicit none 
+	character (len = 50 ) :: infile, outtype, lat_name, lon_name, lat_units, lon_units, UNITS
+	character (len = 50), allocatable, dimension(:) :: var_name, var_unit
+	integer (kind = 4) :: ncid, lat_dimid, lon_dimid, lat_varid, lon_varid, var_id(20), ilat, ilon, i, j, nlat, nlon, nvar
+	integer (kind = 4) :: dimids(2)
+	integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index
+	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
+	
+	nvar = 9
+	allocate(on_fault_vars(nzt,nxt,nvar))
+	
+	! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
+	call check( nf90_open(infile, NF90_NOWRITE, ncid))
+	
+	! Get the varid of the data variables, based on their names.
+	call check( nf90_inq_varid(ncid, "a", varid(1)))
+	call check( nf90_inq_varid(ncid, "b", varid(2)))
+	call check( nf90_inq_varid(ncid, "Dc", varid(3)))
+	call check( nf90_inq_varid(ncid, "v0", varid(4)))
+	call check( nf90_inq_varid(ncid, "r0", varid(5)))
+	call check( nf90_inq_varid(ncid, "init_slip_rate", varid(6)))
+	call check( nf90_inq_varid(ncid, "init_shear_stress", varid(7)))
+	call check( nf90_inq_varid(ncid, "init_normal_stress", varid(8)))
+	call check( nf90_inq_varid(ncid, "init_state", varid(9)))
+	
+	! Read the data
+	do i = 1, nvar
+		call check( nf90_get_var(ncid, varid(i), on_fault_vars(:,:,i)))
+	enddo		
+	
+	do i = 1, nxt
+		do j = 1, nzt
+			fric(9, (i-1)*nzt+j, 1) = on_fault_vars(j,i,1) ! a
+			fric(10, (i-1)*nzt+j, 1) = on_fault_vars(j,i,2)! b
+			fric(11, (i-1)*nzt+j, 1) = on_fault_vars(j,i,3)! Dc
+			fric(12, (i-1)*nzt+j, 1) = on_fault_vars(j,i,4)! v0
+			fric(13, (i-1)*nzt+j, 1) = on_fault_vars(j,i,5)! r0
+			fric(46, (i-1)*nzt+j, 1) = on_fault_vars(j,i,6)! init_slip_rate
+			fric(8, (i-1)*nzt+j, 1) = on_fault_vars(j,i,7)! shear
+			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(j,i,8)! norm
+			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! norm
+		enddo 
+	enddo 
+
+	! Close the file, freeing all resources.
+	call check( nf90_close(ncid))
+
+end subroutine netcdf_read_on_fault
+
+
 
 subroutine check(status)
 	use netcdf

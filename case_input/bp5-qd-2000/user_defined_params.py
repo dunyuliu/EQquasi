@@ -94,6 +94,7 @@ for ix, xcoor in enumerate(fx):
     on_fault_vars[ix,iz,46] = creep_slip_rate # initial slip rates
     if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
       on_fault_vars[ix,iz,46] = 0.03 # initial high slip rate patch.
+    on_fault_vars[ix,iz,20] = on_fault_vars[ix,iz,11]/creep_slip_rate # initial state var.
     on_fault_vars[ix,iz,7] = init_norm # initial normal stress.
     on_fault_vars[ix,iz,8] = shear_steady_state(on_fault_vars[ix,iz,9], 
                                                 on_fault_vars[ix,iz,10],

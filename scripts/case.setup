@@ -60,6 +60,7 @@ def netcdf_write_on_fault_vars():
   var5 = ds.createVariable('init_slip_rate', 'f4', ('strike','dip',))
   var6 = ds.createVariable('init_shear_stress', 'f4', ('strike','dip',))
   var7 = ds.createVariable('init_normal_stress', 'f4', ('strike','dip',))
+  var8 = ds.createVariable('init_state', 'f4', ('strike','dip',))
   var0.units = 'unit'
   var1.units = 'unit'
   var2.units = 'meters'
@@ -68,6 +69,7 @@ def netcdf_write_on_fault_vars():
   var5.units = 'm/s'
   var6.units = 'Pa'
   var7.units = 'Pa'
+  var8.units = 'unit'
   strike_var[:] = fx[:]
   dip_var[:] = fz[:]
   var0[:,:] = on_fault_vars[:,:,9]
@@ -78,6 +80,7 @@ def netcdf_write_on_fault_vars():
   var5[:,:] = on_fault_vars[:,:,46]
   var6[:,:] = on_fault_vars[:,:,8]
   var7[:,:] = on_fault_vars[:,:,7]
+  var8[:,:] = on_fault_vars[:,:,20]
   ds.close()
   
 def create_batch_script():

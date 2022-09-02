@@ -147,7 +147,7 @@ program eqquasi3d
 		write(*,*) '=                                                                   ='
 		write(*,*) '=       Writing out mesh.coor.nc                                    ='
 		
-		filenametmp = 'wqquasi.mesh.ien.nc'
+		filenametmp = 'eqquasi.mesh.ien.nc'
 		output_type = 'ien'
 		call netcdf_write(filenametmp, output_type)
 		write(*,*) '=                                                                   ='

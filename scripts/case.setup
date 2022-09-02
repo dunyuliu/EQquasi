@@ -3,6 +3,7 @@
 Script to setup the case via user_defined_params.py.
 """
 from user_defined_params import *
+import netCDF4 as nc
 
 def create_model_input_file():
     # Function to create model.txt used by EQquasi.
@@ -44,6 +45,41 @@ def create_station_input_file():
         for i in range(len(st_coor_off_fault)):
             f.write(str(st_coor_off_fault[i][0]) + " " + str(st_coor_off_fault[i][1]) + " " + str(st_coor_off_fault[i][2]) + "\n")
 
+def netcdf_write_on_fault_vars():
+  # Function to on_fault_vars input used by EQquasi.
+  ds = nc.Dataset("on_fault_vars_input.nc", "w", format="NETCDF4")
+  strike = ds.createDimension('strike', nfx)
+  dip = ds.createDimension('dip', nfz)
+  strike_var = ds.createVariable('strike', 'f4', ('strike',))
+  dip_var = ds.createVariable('dip', 'f4', ('dip',))
+  var0 = ds.createVariable('a', 'f4', ('strike','dip',))
+  var1 = ds.createVariable('b', 'f4', ('strike','dip',))
+  var2 = ds.createVariable('Dc', 'f4', ('strike','dip',))
+  var3 = ds.createVariable('v0', 'f4', ('strike','dip',))
+  var4 = ds.createVariable('r0', 'f4', ('strike','dip',))
+  var5 = ds.createVariable('init_slip_rate', 'f4', ('strike','dip',))
+  var6 = ds.createVariable('init_shear_stress', 'f4', ('strike','dip',))
+  var7 = ds.createVariable('init_normal_stress', 'f4', ('strike','dip',))
+  var0.units = 'unit'
+  var1.units = 'unit'
+  var2.units = 'meters'
+  var3.units = 'm/s'
+  var4.units = 'unit'
+  var5.units = 'm/s'
+  var6.units = 'Pa'
+  var7.units = 'Pa'
+  strike_var[:] = fx[:]
+  dip_var[:] = fz[:]
+  var0[:,:] = on_fault_vars[:,:,9]
+  var1[:,:] = on_fault_vars[:,:,10]
+  var2[:,:] = on_fault_vars[:,:,11]
+  var3[:,:] = on_fault_vars[:,:,12]
+  var4[:,:] = on_fault_vars[:,:,13]
+  var5[:,:] = on_fault_vars[:,:,46]
+  var6[:,:] = on_fault_vars[:,:,8]
+  var7[:,:] = on_fault_vars[:,:,7]
+  ds.close()
+  
 def create_batch_script():
     # Function to create batch script used by HPC system.
     with open("batch.hpc", "w") as f:
@@ -79,10 +115,11 @@ def estimate_HPC_resource():
     print("Estimated number of CPUs to be requested is " + str(estimate_ncpu))
 
 def _main_func(description):
-    create_model_input_file()
-    create_batch_script()
-    create_station_input_file()
-    estimate_HPC_resource()
+  create_model_input_file()
+  create_batch_script()
+  create_station_input_file()
+  estimate_HPC_resource()
+  netcdf_write_on_fault_vars()
 
 if __name__ == "__main__":
     _main_func(__doc__)

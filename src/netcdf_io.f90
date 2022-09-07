@@ -414,7 +414,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 	! Phase two, read in initial conditions from restart files fault.r.nc 
 	nvar = 11 
 	! NOTE. the array structure is different than loading python generated nc file.
-	! here we follow the structure of Fortran netcdf_write_on_fault.
+	! here we follow the structure of subroutine netcdf_write_on_fault.
+	! on_fault_vars is now nxt by nzt!!!
 	allocate(on_fault_vars(nxt,nzt,nvar))
 	! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
 	call check( nf90_open(infile2, NF90_NOWRITE, ncid))

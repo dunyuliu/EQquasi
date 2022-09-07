@@ -413,7 +413,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 	
 	! Phase two, read in initial conditions from restart files fault.r.nc 
 	nvar = 11 
-	
+	allocate(on_fault_vars(nzt,nxt,nvar))
 	! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
 	call check( nf90_open(infile2, NF90_NOWRITE, ncid))
 

@@ -1,5 +1,8 @@
 #! /usr/bin/env python3
 
+import numpy as np
+from math import *
+
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
 istart = 1
 iend = 1

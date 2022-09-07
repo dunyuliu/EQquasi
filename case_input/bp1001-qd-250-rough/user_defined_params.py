@@ -10,14 +10,14 @@ iend = 1
 mode = 2 
 
 # model_domain (in meters)
-xmin, xmax = -60.0e3, 60.0e3
-ymin, ymax = -20.0e3, 20.0e3
-zmin, zmax = -60.0e3, 0.0e3
+xmin, xmax = -40.0e3, 40.0e3
+ymin, ymax = -10.0e3, 10.0e3
+zmin, zmax = -40.0e3, 0.0e3
 
 # creeping zone bounaries.
 # creeping zones are assinged on the lateral sides and bottom of 
 # the RSF controlled region and will slide at fixed loading slip rate.
-xminc, xmaxc, zminc = -40.0e3, 40.0e3, -40.0e3
+xminc, xmaxc, zminc = -35.0e3, 35.0e3, -35.0e3
 
 dx = 250.0e0 # cell size, spatial resolution
 nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.

@@ -100,7 +100,7 @@ def create_batch_script():
         # Executable part.
         f.write("for i in $(seq " + str(istart) + " " + str(iend) + ");" + "\n")
         f.write("do" + "\n")
-        f.write("  echo $i >> currentcycle.txt" + "\n")
+        f.write("  echo $i > currentcycle.txt" + "\n")
         f.write("  ibrun eqquasi" + "\n")
         f.write("  mkdir \"./Q$((i-1))\"" + "\n")
         f.write("  mv fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"./Q$((i-1))\"" + "\n")

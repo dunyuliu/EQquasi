@@ -235,6 +235,15 @@ subroutine main
 				netcdf_outfile = 'fault.'//trim(proc_str)//'.nc'
 				call netcdf_write_on_fault(netcdf_outfile)
 			endif
+			! If exiting, write again the restart files.
+			if (stoptag == 1) then
+				netcdf_outfile = 'disp.r.nc'
+				output_type = 'disp'
+				call netcdf_write(netcdf_outfile, output_type)
+				
+				netcdf_outfile = 'fault.r.nc'
+				call netcdf_write_on_fault(netcdf_outfile)
+			endif
 		endif!MYID==0
 	enddo!it
 

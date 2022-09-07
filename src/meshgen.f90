@@ -385,70 +385,70 @@ subroutine meshgen
 								! fric(45, nftnd0(ift), ift) = 0.0d0
 							 ! endif
 						! endif !end case bp==5.
-						if (friclaw == 3 .and. bp == 1001) then
-							! Setting a, b, Dc, v0, r0
-							if(abs(zcoor)>=18.0d3.or.abs(xcoor)>=20.0d3.or.abs(zcoor)<=2.0d3) then
-								fric(9,nftnd0(ift),ift) = fric_rsf_a + fric_rsf_deltaa0
-							elseif (abs(zcoor)<=16.0d3.and.abs(zcoor)>=4.0d3.and.abs(xcoor)<=18.0d3) then
-								fric(9,nftnd0(ift),ift) = fric_rsf_a
-							else
-								tmp1 = abs(abs(zcoor)-2.0d3-2.0d3-12.0d3/2.0d0) - 12.0d3/2.0d0
-								tmp1 = tmp1 / 2.0d3
-								tmp2 = (abs(xcoor)-18.0d3)/2.0d3		
-								fric(9,nftnd0(ift),ift) = fric_rsf_a + max(tmp1,tmp2)*fric_rsf_deltaa0					 
-							endif	
-							fric(10,nftnd0(ift),ift) = fric_rsf_b                                            
-							fric(11,nftnd0(ift),ift) = fric_rsf_Dc !RSF critical distance.
-							fric(12,nftnd0(ift),ift) = fric_rsf_v0 !RSF:V0
-							fric(13,nftnd0(ift),ift) = fric_rsf_r0 !RSF:miu0
-							fric(16,nftnd0(ift),ift) = 0.0d0 !RSF: initial normal slip rate 
-							fric(17,nftnd0(ift),ift) = fric_rsf_vinix !RSF:s 
-							fric(18,nftnd0(ift),ift) = fric_rsf_viniz !RSF:d
-							fric(19,nftnd0(ift),ift) = sqrt(fric_rsf_vinix**2+fric_rsf_viniz**2) !RSF:mag		
-							! Setting theta
-							if (icstart == 1) then 
-								fric(7,nftnd0(ift),ift) = init_norm !-25.0d6 ! Initial normal stress 
-								fric(20,nftnd0(ift),ift )= fric(11,nftnd0(ift),ift)/load_slip_rate ! theta0 for steady state at v==load_slip_rate.
-								! Setting initial shear stress. 
-								!fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
-								!	1.0d-9/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + 2670.0d0*3464.0d0/2.0d0*1.0d-9
-								fric(45, nftnd0(ift), ift) = 0.0d0
-								fric(46, nftnd0(ift), ift) = load_slip_rate ! initial slip rate.
-								call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
-								fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
+						! if (friclaw == 3 .and. bp == 1001) then
+							! ! Setting a, b, Dc, v0, r0
+							! if(abs(zcoor)>=18.0d3.or.abs(xcoor)>=20.0d3.or.abs(zcoor)<=2.0d3) then
+								! fric(9,nftnd0(ift),ift) = fric_rsf_a + fric_rsf_deltaa0
+							! elseif (abs(zcoor)<=16.0d3.and.abs(zcoor)>=4.0d3.and.abs(xcoor)<=18.0d3) then
+								! fric(9,nftnd0(ift),ift) = fric_rsf_a
+							! else
+								! tmp1 = abs(abs(zcoor)-2.0d3-2.0d3-12.0d3/2.0d0) - 12.0d3/2.0d0
+								! tmp1 = tmp1 / 2.0d3
+								! tmp2 = (abs(xcoor)-18.0d3)/2.0d3		
+								! fric(9,nftnd0(ift),ift) = fric_rsf_a + max(tmp1,tmp2)*fric_rsf_deltaa0					 
+							! endif	
+							! fric(10,nftnd0(ift),ift) = fric_rsf_b                                            
+							! fric(11,nftnd0(ift),ift) = fric_rsf_Dc !RSF critical distance.
+							! fric(12,nftnd0(ift),ift) = fric_rsf_v0 !RSF:V0
+							! fric(13,nftnd0(ift),ift) = fric_rsf_r0 !RSF:miu0
+							! fric(16,nftnd0(ift),ift) = 0.0d0 !RSF: initial normal slip rate 
+							! fric(17,nftnd0(ift),ift) = fric_rsf_vinix !RSF:s 
+							! fric(18,nftnd0(ift),ift) = fric_rsf_viniz !RSF:d
+							! fric(19,nftnd0(ift),ift) = sqrt(fric_rsf_vinix**2+fric_rsf_viniz**2) !RSF:mag		
+							! ! Setting theta
+							! if (icstart == 1) then 
+								! fric(7,nftnd0(ift),ift) = init_norm !-25.0d6 ! Initial normal stress 
+								! fric(20,nftnd0(ift),ift )= fric(11,nftnd0(ift),ift)/load_slip_rate ! theta0 for steady state at v==load_slip_rate.
+								! ! Setting initial shear stress. 
+								! !fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
+								! !	1.0d-9/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + 2670.0d0*3464.0d0/2.0d0*1.0d-9
+								! fric(45, nftnd0(ift), ift) = 0.0d0
+								! fric(46, nftnd0(ift), ift) = load_slip_rate ! initial slip rate.
+								! call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
+								! fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
 								
-								! Specify initial high slip rate patch. 
-								! if (xcoor<-8.0d3+tol.and.xcoor>-20.0d3-tol.and.zcoor<-4.0d3+tol &
-									 ! .and.zcoor>-16.0d3-tol) then
-									! fric(46,nftnd0(ift),ift)=3.0d-2 ! In the special patch, increase initial slip rate. 
-									! fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
-										! fric(46,nftnd0(ift),ift)/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + mat0(1,2)*mat0(1,3)/2.0d0*fric(46,nftnd0(ift),ift)
-									! !call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
-									! fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift)
-									! fric(45, nftnd0(ift), ift) = 0.0d0
-								! endif
-								fric(47,nftnd0(ift),ift) = fric(46,nftnd0(ift),ift)! Peak slip rate
-							elseif (icstart > 1) then
-								! If icstart > 1, and use eqquasi to simulate 2nd and later cycles, adopts initials from previous models.
-								! This is the elastic version that only transfers quantities on the fault. 
-								nfx = (xcoor - xmin)/dx+1
-								nfz = (zcoor - zmin)/dx+1
-								ntmp = (zmax-zmin)/dx + 1
-								fric(20,nftnd0(ift),ift) = initial(4,(nfx-1)*ntmp +nfz) !theta0
-								fric(7,nftnd0(ift),ift) = initial(7,(nfx-1)*ntmp +nfz) !tnrm0
-								fric(8,nftnd0(ift),ift) = initial(5,(nfx-1)*ntmp +nfz) !tstk
-								fric(49,nftnd0(ift),ift) = initial(6,(nfx-1)*ntmp +nfz) !tdip
-								fric(31,nftnd0(ift),ift) = initial(8,(nfx-1)*ntmp +nfz) ! vx0+
-								fric(32,nftnd0(ift),ift) = initial(9,(nfx-1)*ntmp +nfz) ! vy0+
-								fric(33,nftnd0(ift),ift) = initial(10,(nfx-1)*ntmp +nfz) ! vz0+
-								fric(34,nftnd0(ift),ift) = initial(11,(nfx-1)*ntmp +nfz) ! vx0-
-								fric(35,nftnd0(ift),ift) = initial(12,(nfx-1)*ntmp +nfz)
-								fric(36,nftnd0(ift),ift) = initial(13,(nfx-1)*ntmp +nfz)
-								fric(47,nftnd0(ift),ift) = initial(3,(nfx-1)*ntmp +nfz)! Peak slip rate
-								fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
-								fric(45, nftnd0(ift), ift) = 0.0d0
-							 endif
-						endif !end case bp==1001.
+								! ! Specify initial high slip rate patch. 
+								! ! if (xcoor<-8.0d3+tol.and.xcoor>-20.0d3-tol.and.zcoor<-4.0d3+tol &
+									 ! ! .and.zcoor>-16.0d3-tol) then
+									! ! fric(46,nftnd0(ift),ift)=3.0d-2 ! In the special patch, increase initial slip rate. 
+									! ! fric(8,nftnd0(ift),ift) = - fric(7,nftnd0(ift),ift) * fric(9,nftnd0(ift),ift) *dasinh( &
+										! ! fric(46,nftnd0(ift),ift)/2.0d-6*dexp((0.6d0+0.03d0*dlog(1.0d-6/1.0d-9))/fric(9,nftnd0(ift),ift))) + mat0(1,2)*mat0(1,3)/2.0d0*fric(46,nftnd0(ift),ift)
+									! ! !call rsf_rd(fric(8,nftnd0(ift),ift), fric(7,nftnd0(ift),ift), fric(9,nftnd0(ift),ift), fric(10,nftnd0(ift),ift), fric(13,nftnd0(ift),ift), fric(12,nftnd0(ift),ift), mat0(1,2), mat0(1,3), fric(46, nftnd0(ift), ift))
+									! ! fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift)
+									! ! fric(45, nftnd0(ift), ift) = 0.0d0
+								! ! endif
+								! fric(47,nftnd0(ift),ift) = fric(46,nftnd0(ift),ift)! Peak slip rate
+							! elseif (icstart > 1) then
+								! ! If icstart > 1, and use eqquasi to simulate 2nd and later cycles, adopts initials from previous models.
+								! ! This is the elastic version that only transfers quantities on the fault. 
+								! nfx = (xcoor - xmin)/dx+1
+								! nfz = (zcoor - zmin)/dx+1
+								! ntmp = (zmax-zmin)/dx + 1
+								! fric(20,nftnd0(ift),ift) = initial(4,(nfx-1)*ntmp +nfz) !theta0
+								! fric(7,nftnd0(ift),ift) = initial(7,(nfx-1)*ntmp +nfz) !tnrm0
+								! fric(8,nftnd0(ift),ift) = initial(5,(nfx-1)*ntmp +nfz) !tstk
+								! fric(49,nftnd0(ift),ift) = initial(6,(nfx-1)*ntmp +nfz) !tdip
+								! fric(31,nftnd0(ift),ift) = initial(8,(nfx-1)*ntmp +nfz) ! vx0+
+								! fric(32,nftnd0(ift),ift) = initial(9,(nfx-1)*ntmp +nfz) ! vy0+
+								! fric(33,nftnd0(ift),ift) = initial(10,(nfx-1)*ntmp +nfz) ! vz0+
+								! fric(34,nftnd0(ift),ift) = initial(11,(nfx-1)*ntmp +nfz) ! vx0-
+								! fric(35,nftnd0(ift),ift) = initial(12,(nfx-1)*ntmp +nfz)
+								! fric(36,nftnd0(ift),ift) = initial(13,(nfx-1)*ntmp +nfz)
+								! fric(47,nftnd0(ift),ift) = initial(3,(nfx-1)*ntmp +nfz)! Peak slip rate
+								! fric(44, nftnd0(ift), ift) = fric(8, nftnd0(ift), ift) !tstk0
+								! fric(45, nftnd0(ift), ift) = 0.0d0
+							 ! endif
+						! endif !end case bp==1001.
 						exit !can only be on 1 fault, thus if ynft(ift), exit do loop       
 					endif  !if flt range
 				enddo  !do ift

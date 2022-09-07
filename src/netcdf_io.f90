@@ -430,6 +430,10 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 	call check( nf90_inq_varid(ncid, "vxs", var_id(9)))
 	call check( nf90_inq_varid(ncid, "vys", var_id(10)))
 	call check( nf90_inq_varid(ncid, "vzs", var_id(11)))
+	! Read the data
+	do i = 1, nvar
+		call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
+	enddo		 
 	
 	do i = 1, nxt
 		do j = 1, nzt

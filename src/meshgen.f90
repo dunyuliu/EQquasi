@@ -29,16 +29,16 @@ subroutine meshgen
 	n4yn = 0
 	
 	ntmp = (int((xmax-xmin)/dx)+1)*(int((zmax-zmin)/dx)+1)										
-	allocate(initial(16,ntmp))
-	initial = 0.0d0 
+	! allocate(initial(16,ntmp))
+	! initial = 0.0d0 
 	
-	if (icstart > 1) then 
-		open(111,file = 'cplot_EQquasi.txt', form = 'formatted', status ='old')
-		  do i = 1,ntmp 
-			read(111,*) (initial(j,i),j=1,16)
-		  enddo
-		close(111)
-	endif 
+	! if (icstart > 1) then 
+		! open(111,file = 'cplot_EQquasi.txt', form = 'formatted', status ='old')
+		  ! do i = 1,ntmp 
+			! read(111,*) (initial(j,i),j=1,16)
+		  ! enddo
+		! close(111)
+	! endif 
 	dy=dx
 	dz=dx
 	tol=dx/100.d0

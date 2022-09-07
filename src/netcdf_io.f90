@@ -358,7 +358,7 @@ subroutine netcdf_read_on_fault(infile)
 	! Close the file, freeing all resources.
 	call check( nf90_close(ncid))
 
-end subroutine netcdf_read_on_fault_restart
+end subroutine netcdf_read_on_fault
 
 ! Subroutine #5.
 ! netcdf_read_on_fault_restart reads in additional on-fault quantities from netcdf files created by previous cycles.

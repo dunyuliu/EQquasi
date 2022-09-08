@@ -11,7 +11,7 @@ from pdf2image import convert_from_path
 
 #
 SMALL_SIZE = 6
-
+r = 10e6 # half range to show stresses in Pa.
 # Read in file name from terminal.
 # fname = input("Enter the file name : ")
 
@@ -19,34 +19,39 @@ SMALL_SIZE = 6
 def plot_fault(fname):
   a = xr.open_dataset(fname)
   #print (a)
-
   shear_strike = a.shear_strike
   shear_dip = a.shear_dip
   norm = a.effective_normal
-  slip_rate = a.slip_rate
+  slip_rate = a.slip_rate + 1e-30
 
   fig1 = plt.figure()
   plt.rc('font', size=SMALL_SIZE)
 
   ax11 = fig1.add_subplot(2,2,1)
-  shear_strike.plot()
+  mean = shear_strike.mean()
+  shear_strike.plot(vmin=mean-r, vmax=mean+r)
+  mean = shear_strike.mean()
   ax11.set_xlabel('')
   #ax11.set_ylabel('')
 
   ax12 = fig1.add_subplot(2,2,2)
-  shear_dip.plot()
+  mean = shear_dip.mean()
+  shear_dip.plot(vmin=mean-r, vmax=mean+r)
   ax12.set_xlabel('')
   ax12.set_ylabel('')
 
   ax21 = fig1.add_subplot(2,2,3)
-  norm.plot()
+  mean = norm.mean()
+  norm.plot(vmin=mean-r, vmax = mean+r)
   #ax21.set_ylabel('')
 
   ax22 = fig1.add_subplot(2,2,4)
-  slip_rate.plot()
+  log10_slip_rate = np.log10(slip_rate)
+  #log10_slip_rate.rename(name_dict = {"slip_rate":"log10(slip_rate)"})
+  log10_slip_rate.plot(vmin=-20, vmax=2)
   ax22.set_ylabel('')
 
-  plt.savefig(fname + ".pdf", dpi = 600)
+  plt.savefig(fname + ".pdf", dpi = 300)
   plt.close()
 
   return (fig1,)

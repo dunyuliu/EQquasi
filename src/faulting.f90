@@ -426,6 +426,6 @@ end subroutine rate_state_normal_stress
 subroutine newton_solver(a_tmp, b_tmp)
 	use globalvar
 	implicit none
-	real (kind = dp):: a_tmp, b_tmp, 
+	real (kind = dp):: a_tmp, b_tmp
 
 end subroutine newton_solver

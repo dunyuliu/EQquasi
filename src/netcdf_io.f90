@@ -452,6 +452,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 			fric(35, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 10)! vys
 			fric(36, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 11)! vzs
 			fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
+			fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
 		enddo 
 	enddo 
 	! Close the file, freeing all resources.

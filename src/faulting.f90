@@ -14,7 +14,7 @@ real (kind = dp) :: dtev1D(nftnd(1))
 real (kind = dp),dimension(6,2,4)::fvd=0.0d0
 real (kind = dp)::fa, fb, phi
 real (kind = dp) :: rr,R0,T,dtao0,dtao,mr!RSF
-real (kind = dp) :: statetmp, T_coeff!RSF
+real (kind = dp) :: statetmp, eta!RSF
 integer (kind=4) :: iv
 real (kind = dp) :: tstk0, tdip0,ttao0, tstk1, tdip1, ttao1, taoc_old, taoc_new !RSF
 real (kind = dp) :: dxmudv, rsfeq, drsfeqdv, vtmp
@@ -175,45 +175,67 @@ do ift = 1, ntotft
 					endif		
 				endif
 
-				T_coeff = mat0(1,2)*mat0(1,3)/2.0d0 
+				eta = mat0(1,2)*mat0(1,3)/2.0d0 
 				
+				! Newton-Raphson method to solve the slip_rate from RSF given the tractions and other params for every on-fault grids. Tractions are calculated from the finite element volume and projected to the fault surface. 
+				! x_n+1 = x_n - f(x_n)/f'(x_n)
+				! Here, residual f(v) = shear_traction - frictional_strength. eq(8), Jiang et al. (2022).
+				! shear_traction = static_shear_traction - eta*v. 
+				! Use theta_pc, the state variable that accounts for normal stress change for the effective normal stress.
 				do iv = 1,ivmax	
 					if(friclaw == 3) then
 						call rate_state_ageing_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
 					elseif(friclaw == 4) then
 						call rate_state_slip_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
 					endif 	
-					tau_fric_trial = fric(4,i,ift) - xmu * tnrm0
 					
-					rsfeq = (tau_fric_trial-ttao0) + v_trial*T_coeff
-					drsfeqdv = -dxmudv * tnrm0 +  1.0d0*T_coeff
-									
-				!if(abs(rsfeq/drsfeqdv) < 1.d-14 * abs(v_trial).and. abs(rsfeq) < 1.d-6 * abs(v_trial)) exit 
-					if (abs(rsfeq) < 1.0d-10 * ttao0) exit
+					fric(23,i,ift) = theta_pc_tmp ! retrieve the state variable theta_pc_tmp.
+					! update fric(23,i,ift) for next time step by calling rate_state_normal_stress. 
+					call rate_state_normal_stress(v_trial, fric(23,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
+					! trial shear traction = xmu * theta_pc_tmp 
+					tau_fric_trial = xmu * theta_pc_tmp ! new frictional traction.
+					! [NOTE] what we input here - tstk0, tdip0, tnrm0, ttao0 are already new static tractions we want to match. We try to seek solution of v_trial that allows tau_fric_trial = (ttao0-eta*v_trial) to match ttao0.
+					! calculate the residual of RSF friction equation. See eq (8) in Jiang et al. (2022).
+					! default case: residual = trial shear traction - (friction - eta*sliprate), where eta*sliprate is the radiation damping approximation of inertia (Rice, 1993).
+					! static case: residual = trial shear traction - old shear traction. When slip rate is low, it should be equivalent to the default case.
 					
-					vtmp = v_trial -  rsfeq / drsfeqdv
+					!rsfeq = (tau_fric_trial-ttao0) + v_trial*eta
+					!drsfeqdv = -dxmudv * tnrm0 +  1.0d0*eta
+					rsfeq = tau_fric_trial - (ttao0 - v_trial*eta) ! f(v_n)
+					drsfeqdv = dxmudv * theta_pc_tmp + eta ! f'(v_n)
 					
-					if(vtmp <= 0.0d0) then
+					! exiting critera for the Newton-Raphson solver.
+					! residul stress is 1e-10 time of the new static traction.
+					if (abs(rsfeq) < 1.0d-10 * ttao0) exit 
+					
+					vtmp = v_trial -  rsfeq / drsfeqdv ! v_n+1 = v_n - f(v_n)/f'(v_n+1)
+					
+					if(vtmp <= 0.0d0) then ! avoid negative slip_rate
 						v_trial = v_trial/2.0d0
 					else
-						v_trial = vtmp
+						v_trial = vtmp ! renew v_n with v_n+1
 					endif				
-				enddo !iv	
+				enddo ! end looping for the Newton-Raphson solver.	
 				
-				tstk=tau_fric_trial*tstk0/ttao0
-				tdip=tau_fric_trial*tdip0/ttao0
-				ttao=sqrt(tstk**2+tdip**2)
-				fric(26,i,ift)=v_trial
+				tstk=tau_fric_trial*tstk0/ttao0 ! new shear traction along strike.
+				tdip=tau_fric_trial*tdip0/ttao0 ! new shear traction along dip.
+				ttao=sqrt(tstk**2+tdip**2) ! new total shear traction.
+				fric(26,i,ift)=v_trial 
 				fric(28,i,ift)=tstk
 				fric(29,i,ift)=tdip
 				fric(30,i,ift)=tnrm0
-				slipratemast=(v_trial)*mslav/(mmast+mslav)
+				
+				! distribute slip rate to master-slave nodes according to masses to preserve moments. 
+				! [NOTE]: this is for right-lateral strike-slip fault. How could we make it general?
+				slipratemast=(v_trial)*mslav/(mmast+mslav) 
 				sliprateslav=-(v_trial)*mmast/(mmast+mslav)
-
+				
+				! convert slip rates to velocities in the FEM coordinate system.
 				v_s_new_mast=slipratemast*tstk/ttao
 				v_d_new_mast=slipratemast*tdip/ttao
 				v_s_new_slav=sliprateslav*tstk/ttao
 				v_d_new_slav=sliprateslav*tdip/ttao
+				
 				vxm=v_s_new_mast*us(1,i,ift)+v_d_new_mast*ud(1,i,ift)
 				vym=v_s_new_mast*us(2,i,ift)+v_d_new_mast*ud(2,i,ift)
 				vzm=v_s_new_mast*us(3,i,ift)+v_d_new_mast*ud(3,i,ift)
@@ -316,7 +338,11 @@ do ift = 1, ntotft
 				fric(35,i,ift) = vys 
 				fric(36,i,ift) = vzs
 			endif
-			dtev1D(i)=ksi*fric(11,i,ift)/v_trial
+			
+			! update new time step size according to new slip rate v_trial.
+			dtev1D(i) = ksi * fric(11,i,ift)/v_trial
+			
+			! [WARNING]: exit the code if time step size is negative.
 			if (dtev1D(i) < 0) then
 				write(*,*) 'NEGATIVE SLIPRATE, ITS LOC = ', x(1,isn),x(3,isn)
 				write(*,*) 'PROBLEMATIC V_TRIAL = ', v_trial
@@ -374,3 +400,32 @@ enddo ! ending ift
 	dtev=minval(dtev1D)
 !-------------------------------------------------------------------!	
 end subroutine faulting	 
+
+! Subroutine rate_state_normal_stress calculates the effect of normal stress change
+! from RSF. The formulation follows Shi and Day (2013), eq B8. {"Frictional sliding experiments with variable normal stress show that the shear strength responds gradually to abrupt changes of normal stress (e.g., Prakash and Clifton, 1993; Prakash, 1998)."}
+
+! theta_pc_dot = - V/L_pc*[theta_pc - abs(tnrm)]
+
+! Input: slip_rate, L_pc, theta_pc, tnrm. 
+! Output: theta_pc, the state variable which is used to calculate shear stress in eq B2
+! B2: abs(traction) = friction * theta_pc.
+subroutine rate_state_normal_stress(V2, theta_pc, theta_pc_dot, tnrm, fricsgl)
+	use globalvar
+	implicit none
+	real (kind = dp) :: V2, theta_pc, theta_pc_dot, tnrm, L_pc
+	real (kind = dp),dimension(100) :: fricsgl
+	
+	L_pc  = fricsgl(11) ! Use Dc as L_pc
+	
+	theta_pc_dot = - V2/L*(theta_pc - abs(tnrm))
+	!theta_pc = theta_pc + theta_pc_dot*dt
+	theta_pc = abs(tnrm) + (theta_pc - abs(tnrm))*dexp(-V2*dt/L)
+	
+end subroutine rate_state_normal_stress
+
+subroutine newton_solver(a_tmp, b_tmp)
+	use globalvar
+	implicit none
+	real (kind = dp):: a_tmp, b_tmp, 
+
+end subroutine newton_solver

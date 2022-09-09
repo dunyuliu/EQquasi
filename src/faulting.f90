@@ -17,7 +17,7 @@ real (kind = dp) :: rr,R0,T,dtao0,dtao,mr!RSF
 real (kind = dp) :: statetmp, eta!RSF
 integer (kind=4) :: iv
 real (kind = dp) :: tstk0, tdip0,ttao0 !RSF
-real (kind = dp) :: dxmudv, rsfeq, drsfeqdv, vtmp, theta_pc_dot
+real (kind = dp) :: dxmudv, rsfeq, drsfeqdv, vtmp, theta_pc_dot, theta_pc_tmp
 real (kind = dp) :: v_trial,v_trial_new,sliprs_trial,sliprd_trial, tau_fric_trial,&
 	v_s_new_mast,v_s_new_slav,v_d_new_mast,v_d_new_slav,&
 	uxm,uym,uzm,uxs,uys,uzs,&

@@ -174,7 +174,12 @@ do ift = 1, ntotft
 						fric(22,i,ift) = fric(11,i,ift)/fric(12,i,ift)*dexp(fric(22,i,ift))
 					endif		
 				endif
-
+				
+				! initialize theta_pc and theta_pc_dot
+				theta_pc_tmp = fric(23,i,ift)
+				call rate_state_normal_stress(v_trial, fric(23,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
+				fric(24,i,ift) = theta_pc_dot
+				
 				eta = mat0(1,2)*mat0(1,3)/2.0d0 
 				
 				! Newton-Raphson method to solve the slip_rate from RSF given the tractions and other params for every on-fault grids. Tractions are calculated from the finite element volume and projected to the fault surface. 
@@ -189,7 +194,7 @@ do ift = 1, ntotft
 						call rate_state_slip_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
 					endif 	
 					
-					fric(23,i,ift) = theta_pc_tmp ! retrieve the state variable theta_pc_tmp.
+					fric(23,i,ift) = theta_pc_tmp! retrieve the state variable theta_pc_tmp.
 					! update fric(23,i,ift) for next time step by calling rate_state_normal_stress. 
 					call rate_state_normal_stress(v_trial, fric(23,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
 					! trial shear traction = xmu * theta_pc_tmp 

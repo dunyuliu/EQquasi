@@ -417,9 +417,9 @@ subroutine rate_state_normal_stress(V2, theta_pc, theta_pc_dot, tnrm, fricsgl)
 	
 	L_pc  = fricsgl(11) ! Use Dc as L_pc
 	
-	theta_pc_dot = - V2/L*(theta_pc - abs(tnrm))
+	theta_pc_dot = - V2/L_pc*(theta_pc - abs(tnrm))
 	!theta_pc = theta_pc + theta_pc_dot*dt
-	theta_pc = abs(tnrm) + (theta_pc - abs(tnrm))*dexp(-V2*dt/L)
+	theta_pc = abs(tnrm) + (theta_pc - abs(tnrm))*dexp(-V2*dt/L_pc)
 	
 end subroutine rate_state_normal_stress
 

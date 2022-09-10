@@ -271,39 +271,26 @@ subroutine read_fault_rough_geometry
 	if (me == 0) then 
 		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
 		if (file_exists == 0) then
-			write(*,*) 'rough_geo.txt is still missing, so exiting EQdyna'
+			write(*,*) 'rough_geo.txt is still missing, so exiting EQquasi'
 			stop
 		endif 
 	endif 	
 	
 	open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
-		read(1008,*) nnx1, nnz1, nres ! nums of grids along strike by dip, and nums of grids to pick a data point.
+		read(1008,*) nnx, nnz ! nums of grids along strike by dip, and nums of grids to pick a data point.
 		read(1008,*) dxtmp, rough_fx_min, rough_fz_min 
 	close(1008)
-	nnx = int((nnx1-1)/nres) + 1
-	nnz = int((nnz1-1)/nres) + 1
-	rough_fx_max = (nnx - 1)*dxtmp*nres + rough_fx_min
+	rough_fx_max = (nnx - 1)*dxtmp + rough_fx_min
 	
 	write(*,*) 'nnx, nnz, rough_fx_max, rough_fx_min = ', nnx, nnz, rough_fx_max, rough_fx_min
 	allocate(rough_geo(3,nnx*nnz))
-	allocate(rough_geo_tmp(3,nnx1*nnz1))
 	
 	open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
 		read(1008,*)
 		read(1008,*)
-		do i = 1, nnx1*nnz1 
-			read(1008,*) rough_geo_tmp(1,i), rough_geo_tmp(2,i), rough_geo_tmp(3,i)
+		do i = 1, nnx*nnz 
+			read(1008,*) rough_geo(1,i), rough_geo(2,i), rough_geo(3,i)
 		enddo
 	close(1008)
-	
-	do i = 1, nnx
-		do j = 1, nnz
-			i1 = (i-1)*nres + 1
-			j1 = (j-1)*nres + 1
-			rough_geo(1,(i-1)*nnz+j) = rough_geo_tmp(1, (i1-1)*nnz1 + j1)
-			rough_geo(2,(i-1)*nnz+j) = rough_geo_tmp(2, (i1-1)*nnz1 + j1)
-			rough_geo(3,(i-1)*nnz+j) = rough_geo_tmp(3, (i1-1)*nnz1 + j1)
-		enddo 
-	enddo 
 		
 end subroutine read_fault_rough_geometry

@@ -51,7 +51,7 @@ def plot_fault(fname):
   log10_slip_rate.plot(vmin=-20, vmax=2, extend = 'both')
   ax22.set_ylabel('')
 
-  plt.savefig(fname + ".pdf", dpi = 300)
+  plt.savefig(fname + ".png", dpi = 600)
   plt.close()
 
   return (fig1,)
@@ -81,7 +81,7 @@ def plot_roughness(fname):
   b3.plot()
   #ax21.set_ylabel('')
 
-  plt.savefig(fname + ".pdf", dpi = 600)
+  plt.savefig(fname + ".png", dpi = 600)
   plt.close()
 
   return (fig1,)
@@ -111,12 +111,13 @@ def generate_gif():
   #  print(fname)
   #  images.append(imageio.imread(fname))
   #imageio.mimsave('on_fault_vars.gif',images)
-  filenames = glob.glob('.//*.pdf')
+  filenames = glob.glob('.//*.png')
   filenames = sort_nicely(filenames)
   with imageio.get_writer('./on_fault_vars.gif', mode='I') as writer:
       for filename in filenames:
-          img = convert_from_path(filename)[0]
-          image = np.array(img.getdata(), np.uint8).reshape(img.size[1], img.size[0], 3)
+          image = imageio.v2.imread(filename)
+          #img = convert_from_path(filename)[0]
+          #image = np.array(img.getdata(), np.uint8).reshape(img.size[1], img.size[0], 3)
           writer.append_data(image)
 
 def seek_numbers_filename(x):
@@ -129,7 +130,7 @@ def _main_func(description):
         name, file_extension = os.path.splitext(fname)
         if 'fault.' in name and '.nc' in file_extension:
             dirFiles += fname
-            if os.path.exists(fname + '.pdf') == False: plot_fault(str(fname))
+            if os.path.exists(fname + '.png') == False: plot_fault(str(fname))
         if 'roughness' in name and '.nc' in file_extension:
             dirFiles += fname
             plot_roughness(str(fname))

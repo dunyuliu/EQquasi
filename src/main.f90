@@ -275,6 +275,7 @@ subroutine exit_criteria
 ! 
 	use globalvar
 	implicit none
+	real (kind = dp) :: hang_time = 1e5
 	
 	if (eqquasi_mode == 1) then ! quasi-dynamic/quasi-static
 		if (maxsliprate>slipr_thres)then
@@ -296,7 +297,7 @@ subroutine exit_criteria
 					t_end_status = 1.0d0 ! change exit status to be TRUE.
 					tdynaend = time ! record the end time of the rupture.
 				else
-					if ((time-tdynaend)>=100.0d0.and.tdynaend>0.0d0) then ! exit if the low slip rate status is kept for over 100 seconds.
+					if ((time-tdynaend)>=hang_time .and. tdynaend>0.0d0) then ! exit if the low slip rate status is kept for over 100 seconds.
 					! NOTE: the 100 seconds threshold is subjective to change. 
 						stoptag = 1 ! stoptag is TRUE now. Direct the code to exit.
 					endif

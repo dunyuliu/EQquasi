@@ -29,7 +29,7 @@ MODULE globalvar
 	integer (kind = 4) :: C_elastic, C_Nuclea, friclaw, rough_fault, bp, ntotft, nnx, nnz, nres, nplpts, nhplt=20, nstep=1000000, dis4uniF, dis4uniB, C_farfield = 0
 	integer (kind = 4) :: nt_output_stress
 	real (kind = dp)::srcrad0=3.0d3, rdalfa=0.0d0, rdbeta=0.0d0, fltxyz(2,4,1), init_norm, critt0
-	real (kind = dp)::xmin, xmax, ymin, ymax, zmin, zmax, dx, rat, dymax = 3.0d3, dxtmp
+	real (kind = dp)::xmin, xmax, ymin, ymax, zmin, zmax, dx, rat, dymax = 3.0d3, dxtmp, min_norm = -1.0d6
 	real (kind = dp) :: xminc, xmaxc, zminc ! creeping zone boundaries. Outside of x>xmaxc, x<xminc, and z<zminc, the fault creeps at v = load_slip_rate assigned through input model.txt.
 	real (kind = dp) :: rough_fx_min, rough_fx_max, rough_fz_min
 	real (kind = dp)::xsource=-9.0d3,ysource=0.0d0,zsource=-6.0d3

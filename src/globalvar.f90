@@ -33,7 +33,7 @@ MODULE globalvar
 	real (kind = dp) :: xminc, xmaxc, zminc ! creeping zone boundaries. Outside of x>xmaxc, x<xminc, and z<zminc, the fault creeps at v = load_slip_rate assigned through input model.txt.
 	real (kind = dp) :: rough_fx_min, rough_fx_max, rough_fz_min
 	real (kind = dp)::xsource=-9.0d3,ysource=0.0d0,zsource=-6.0d3
-	real (kind = dp)::term=200.0d0,dt=0.06d0
+	real (kind = dp)::term=200.0d0,dt
 	real (kind = dp)::pi=3.14159265358979323846d0,time=0.0d0
 	real (kind = dp) :: mat0(1,3), ksi, minDc, slipr_thres, ttheta=10.0d0, far_load_rate, load_slip_rate, pma, sliprmax
 	real (kind = dp) :: fric_sw_fs, fric_sw_fd, fric_sw_D0, fric_rsf_a, fric_rsf_b, fric_rsf_Dc, fric_rsf_deltaa0, fric_rsf_vinix, fric_rsf_viniz, fric_rsf_r0, fric_rsf_v0, fric_rsf_fw, fric_rsf_vw, fric_rsf_deltavw0, fric_tp_a_th, fric_tp_rouc, fric_tp_lambda, fric_tp_h, fric_tp_a_hy, fric_tp_deltaa_hy0, fric_ww, fric_w, fric_ini_sliprate, fric_tp_Tini, fric_tp_pini

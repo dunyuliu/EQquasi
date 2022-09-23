@@ -129,7 +129,7 @@ subroutine netcdf_write_on_fault(outfile)
 	integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index
 	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
 
-	nvar = 11 ! nvar variables.
+	nvar = 12 ! nvar variables.
 	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nxt, nzt, nvar))
 	on_fault_vars = 0.0d0
 	
@@ -138,8 +138,8 @@ subroutine netcdf_write_on_fault(outfile)
 	lon_name = 'nid_strike'
 	lat_units = 'unit'
 	lon_units = 'unit'
-	var_name = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs']
-	var_unit = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit',           'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s']
+	var_name = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'state_normal', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs']
+	var_unit = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit'          , 'Pa'          , 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s']
 	nlat = nzt ! Total nodes along dip. 
 	nlon = nxt ! Total nodes along strike.  
 	
@@ -156,12 +156,13 @@ subroutine netcdf_write_on_fault(outfile)
 			on_fault_vars(i,j, 3) = fric(30, (i-1)*nzt+j, 1) ! tnorm0
 			on_fault_vars(i,j, 4) = fric(26, (i-1)*nzt+j, 1) ! sliprate
 			on_fault_vars(i,j, 5) = fric(20, (i-1)*nzt+j, 1) ! state
-			on_fault_vars(i,j, 6) = fric(31, (i-1)*nzt+j, 1) ! vxm
-			on_fault_vars(i,j, 7) = fric(32, (i-1)*nzt+j, 1) ! vym
-			on_fault_vars(i,j, 8) = fric(33, (i-1)*nzt+j, 1) ! vzm
-			on_fault_vars(i,j, 9) = fric(34, (i-1)*nzt+j, 1) ! vxs
-			on_fault_vars(i,j, 10) = fric(35, (i-1)*nzt+j, 1) ! vys
-			on_fault_vars(i,j, 11) = fric(36, (i-1)*nzt+j, 1) ! vzs
+			on_fault_vars(i,j, 6) = fric(23, (i-1)*nzt+j, 1) ! state variable for normal stress, theta_pc
+			on_fault_vars(i,j, 7) = fric(31, (i-1)*nzt+j, 1) ! vxm
+			on_fault_vars(i,j, 8) = fric(32, (i-1)*nzt+j, 1) ! vym
+			on_fault_vars(i,j, 9) = fric(33, (i-1)*nzt+j, 1) ! vzm
+			on_fault_vars(i,j, 10) = fric(34, (i-1)*nzt+j, 1) ! vxs
+			on_fault_vars(i,j, 11) = fric(35, (i-1)*nzt+j, 1) ! vys
+			on_fault_vars(i,j, 12) = fric(36, (i-1)*nzt+j, 1) ! vzs
 		enddo 
 	enddo 
 	! Create the netCDF file.
@@ -350,7 +351,7 @@ subroutine netcdf_read_on_fault(infile)
 			fric(46, (i-1)*nzt+j, 1) = on_fault_vars(j,i,6)! init_slip_rate
 			fric(8, (i-1)*nzt+j, 1) = on_fault_vars(j,i,7)! shear
 			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(j,i,8)! norm
-			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! norm
+			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! state variable
 			fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
 			fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
 		enddo 
@@ -413,7 +414,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 	deallocate(on_fault_vars)
 	
 	! Phase two, read in initial conditions from restart files fault.r.nc 
-	nvar = 11 
+	nvar = 12 
 	! NOTE. the array structure is different than loading python generated nc file.
 	! here we follow the structure of subroutine netcdf_write_on_fault.
 	! on_fault_vars is now nxt by nzt!!!
@@ -428,12 +429,13 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 	call check( nf90_inq_varid(ncid, "effective_normal", var_id(3)))
 	call check( nf90_inq_varid(ncid, "slip_rate", var_id(4)))
 	call check( nf90_inq_varid(ncid, "state_variable", var_id(5)))
-	call check( nf90_inq_varid(ncid, "vxm", var_id(6)))
-	call check( nf90_inq_varid(ncid, "vym", var_id(7)))
-	call check( nf90_inq_varid(ncid, "vzm", var_id(8)))
-	call check( nf90_inq_varid(ncid, "vxs", var_id(9)))
-	call check( nf90_inq_varid(ncid, "vys", var_id(10)))
-	call check( nf90_inq_varid(ncid, "vzs", var_id(11)))
+	call check( nf90_inq_varid(ncid, "state_normal", var_id(6)))
+	call check( nf90_inq_varid(ncid, "vxm", var_id(7)))
+	call check( nf90_inq_varid(ncid, "vym", var_id(8)))
+	call check( nf90_inq_varid(ncid, "vzm", var_id(9)))
+	call check( nf90_inq_varid(ncid, "vxs", var_id(10)))
+	call check( nf90_inq_varid(ncid, "vys", var_id(11)))
+	call check( nf90_inq_varid(ncid, "vzs", var_id(12)))
 	! Read the data
 	do i = 1, nvar
 		call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
@@ -446,14 +448,15 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 			fric(7, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 3)! tnorm0
 			fric(46, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 4)! sliprate
 			fric(20, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 5)! state
-			fric(31, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 6)! vxm
-			fric(32, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 7)! vym
-			fric(33, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 8)! vzm
-			fric(34, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 9)! vxs
-			fric(35, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 10)! vys
-			fric(36, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 11)! vzs
+			fric(23, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 6)! state_normal
+			fric(31, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 7)! vxm
+			fric(32, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 8)! vym
+			fric(33, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 9)! vzm
+			fric(34, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 10)! vxs
+			fric(35, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 11)! vys
+			fric(36, (i-1)*nzt+j, 1) = on_fault_vars(i,j, 12)! vzs
 			fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
-			fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
+			!fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
 		enddo 
 	enddo 
 	! Close the file, freeing all resources.

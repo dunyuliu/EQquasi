@@ -39,11 +39,12 @@ case.submit
 
 Example
 ---------------------
-A good starting example would be compset=bp5-qd-2000 (benchmark problem 5, quasi-dynamic, 2000 m on-fault resolution). <br/>
+A good starting example would be compset==bp5-qd-2000 (benchmark problem 5, quasi-dynamic, 2000 m on-fault resolution). <br/>
 The case can be created by the following command:
 ```
 create_newcase case_dir bp5-qd-2000
 ```
+With the default user_defined_params.py, the code should take about 27 minutes to finish the 1st earthquake cycle. For 1st + 2nd earthquake cycles, 1 hour 33 minutes will be expected on Lonestar6. <br/>
 
 Key progress
 ---------------------

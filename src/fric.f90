@@ -9,8 +9,8 @@ SUBROUTINE slip_weak(slip,fricsgl,xmu)
   !  fricsgl(i,*),i=1 mus, 2 mud, 3 do, 4 cohesion, 
   !  5 time for fixed rutpure, 6 for pore pressure
   !
-  real (kind=8) :: xmu,slip
-  real (kind=8),dimension(6) :: fricsgl
+  real (kind = dp) :: xmu,slip
+  real (kind = dp),dimension(6) :: fricsgl
   !
   if(abs(slip).lt.1.0d-10) then
     xmu = fricsgl(1)	!xmu is frictional coefficient, node by node on fault
@@ -32,8 +32,8 @@ SUBROUTINE time_weak(trupt,fricsgl,xmu)
   !### subroutine to implement linear time-weakening
   ! friction law for fault dynamics. B.D. 8/19/06
   !
-  real (kind=8) :: xmu,trupt
-  real (kind=8),dimension(2) :: fricsgl
+  real (kind = dp) :: xmu,trupt
+  real (kind = dp),dimension(2) :: fricsgl
   !
   if(trupt <= 0.0d0) then
     xmu = fricsgl(1)
@@ -47,37 +47,44 @@ end SUBROUTINE time_weak
 
 !2017.2.1 Incorporated RSF into EQQuasi. D.Liu
 SUBROUTINE rate_state_ageing_law(V2,theta,fricsgl,xmu,dxmudv)
-  use globalvar
-  implicit none
-  !
-  !### subroutine to implement rate- and state- 
-  ! friction law for fault dynamics. Bin Luo 4/9/2014
-  !
-  real (kind=8) :: xmu, dxmudv
-  real (kind=8) :: V2,theta
-  real (kind=8) :: A,B,L,f0,V0
-  real (kind=8),dimension(30) :: fricsgl
-  real (kind=8) :: tmp, tmpc
-  !
-  A  = fricsgl(9)
-  B  = fricsgl(10)
-  L  = fricsgl(11)
-  f0 = fricsgl(13)
-  V0 = fricsgl(12)
+	use globalvar
+	implicit none
+	!
+	!### subroutine to implement rate- and state- 
+	! friction law for fault dynamics. Bin Luo 4/9/2014
+	!
+	real (kind = dp) :: xmu, dxmudv, V2,theta, A,B,L,f0,V0,tmp, tmpc, phi, sta
+	real (kind = dp),dimension(100) :: fricsgl
+	!
+	A  = fricsgl(9)
+	B  = fricsgl(10)
+	L  = fricsgl(11)
+	f0 = fricsgl(13)
+	V0 = fricsgl(12)
+	sta = fricsgl(20) ! state variable
+	
+	tmpc = 1.0d0 / (2.0d0 * V0) * dexp((f0 + B * dlog(V0*theta/L)) / A)
+	tmp = (V2) * tmpc
+	xmu = A * dlog(tmp + sqrt(tmp**2 + 1.0d0)) !arcsinh(z)= ln(z+sqrt(z^2+1))
+	dxmudv = A * tmpc / sqrt(1.0d0 + tmp**2.0d0) ! d(arcsinh(z))/dz = 1/sqrt(1+z^2)
+	
+	phi = dlog(V0*sta/L)
+	if (V2*dtev1/L <= 1.0d-6) then 
+		theta = dlog(dexp(phi)*(1-V2*dtev1/L) + V0*dtev1/L)
+		theta = L/V0*dexp(theta)
+	elseif (V2*dtev1/L > 1.0d-6) then 
+		theta = dlog(V0/V2 + (dexp(phi)-V0/V2)*dexp(-V2*dtev1/L)) 
+		theta = L/V0*dexp(theta)
+	endif
 
-  tmpc = 1.0d0 / (2.0d0 * V0) * dexp((f0 + B * dlog(V0*theta/L)) / A)
-  tmp = (V2) * tmpc
-  xmu = A * dlog(tmp + sqrt(tmp**2 + 1.0d0)) !arcsinh(z)= ln(z+sqrt(z^2+1))
-  dxmudv = A * tmpc / sqrt(1.0d0 + tmp**2.0d0) ! d(arcsinh(z))/dz = 1/sqrt(1+z^2)
-  !
 end SUBROUTINE rate_state_ageing_law
 !================================================
 SUBROUTINE state_evolution_ageing(V2,theta,fricsgl)
   use globalvar
   implicit none
-  real (kind=8) :: V2,theta
-  real (kind=8) :: L
-  real (kind=8),dimension(10) :: fricsgl
+  real (kind = dp) :: V2,theta
+  real (kind = dp) :: L
+  real (kind = dp),dimension(10) :: fricsgl
 
   L  = fricsgl(3)
 
@@ -92,11 +99,11 @@ SUBROUTINE rate_state_slip_law(V2,psi,fricsgl,xmu,dxmudv)
   !### subroutine to implement rate- and state- 
   ! friction law for fault dynamics. Bin Luo 4/9/2014
   !
-  real (kind=8) :: xmu, dxmudv
-  real (kind=8) :: V2,psi,psiss,fLV,fss
-  real (kind=8) :: A,B,L,f0,V0,fw,Vw
-  real (kind=8),dimension(30) :: fricsgl
-  real (kind=8) :: tmp, tmpc,vold,V1,psi0
+  real (kind = dp) :: xmu, dxmudv
+  real (kind = dp) :: V2,psi,psiss,fLV,fss
+  real (kind = dp) :: A,B,L,f0,V0,fw,Vw
+  real (kind = dp),dimension(30) :: fricsgl
+  real (kind = dp) :: tmp, tmpc,vold,V1,psi0
   !
   A  = fricsgl(9)
   B  = fricsgl(10)

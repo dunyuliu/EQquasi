@@ -62,7 +62,7 @@ program eqquasi3d
 	fltxyz(1,4,1)=270.0d0/180.0d0*pi
 	fltxyz(2,4,1)=90.0d0/180.0d0*pi
 
-	dt = min(0.5d0*dx/mat0(1,1), 0.06d0) ! minimum time step size based on CFL criteria with alpha = 0.5.
+	dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
 	
 	!...time hostories output steps
 	nplpts = 0	!initialize number of time history plot

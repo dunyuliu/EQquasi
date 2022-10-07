@@ -133,8 +133,14 @@ do ift = 1, ntotft
 				tdip0 = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
 				tnrm0 = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
 				
-				tnrm0 = min(min_norm, tnrm0) ! Maintain a minimum normal stress level.
-				
+				!tnrm0 = min(min_norm, tnrm0) ! Maintain a minimum normal stress level.
+                                max_norm = -40.0d6
+                                min_norm = -10.0d6
+                                if (abs(tnrm0)<abs(min_norm)) then 
+                                        tnrm0 = min_norm
+                                elseif (abs(tnrm0)>abs(max_norm)) then
+                                        tnrm0 = max_norm
+                                endif
 				! fric(41,i,ift) is abs(KU)
 				fric(41,i,ift) = sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
 				ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		

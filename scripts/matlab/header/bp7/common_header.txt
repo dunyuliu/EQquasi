@@ -1,0 +1,11 @@
+# This is the file header:
+# problem = SEAS BP7-QD-A-10
+# code    = EQquasi
+# version = 1.3.3
+# modeler = D.Liu
+# date    = 2022/10/18
+# element size = 10 m
+# location= 1.5 times VW patch radius
+# minimum time step = 0.5*dx/Vp
+# maximum time step = 0.02*Dc/1e-9
+# num time steps    = unknown

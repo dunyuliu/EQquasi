@@ -1,7 +1,7 @@
 clear all; close all;
-mod =21 % model number
-icend = 7;
-mode = 2; % 1 strike; 2 depth profile
+mod    = 1 % model number
+icend  = 7;
+mode   = 2; % 1 strike; 2 depth profile
 [path0,dx,nzz,l] = model_info(mod);
 path0
 

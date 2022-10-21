@@ -25,7 +25,7 @@ subroutine main
 	do i = 1,nftnd(1)
 		tmparr(i) = fric(47,i,1)
 	enddo         
-	maxsliprate = maxval(tmparr) 
+	maxSlipRate = maxval(tmparr) 
 	if (me.eq.0) then
 		!LOOP 2000 ![MUMPS]
 		write(*,*) '=                                                                   ='
@@ -33,24 +33,24 @@ subroutine main
 		write(*,*) '=                                                                   ='
 		write(*,*) '=       Converting CRS to MUMPS format                              ='
 		!Define problem on the host (processor 0)
-		dtev = ksi*minDc/maxsliprate
-		dtev1 = ksi*minDc/maxsliprate!Initial dtev1>dt to enter static state.
-		cons = 0.0d0!Initialize cons, displacements.
-		constmp = 0.0d0
-		consvtmp = 0.0d0
-		consv = 0.0d0
-		consa = 0.0d0
+		dtev       = ksi*minDc/maxSlipRate
+		dtev1      = ksi*minDc/maxSlipRate!Initial dtev1>dt to enter static state.
+		cons       = 0.0d0!Initialize cons, displacements.
+		constmp    = 0.0d0
+		consvtmp   = 0.0d0
+		consv      = 0.0d0
+		consa      = 0.0d0
 
-		call crs
+		call       crs
 
 		!LOOP 2001 : Calculating element stiff, mass, damp and constructing the overall stiffness
-		call elemcal
+		call       elemcal
 		
-		mumps_par%N = neq ![MUMPS]
+		mumps_par%N   = neq ![MUMPS]
 		mumps_par%NNZ = maxa
 		ALLOCATE( mumps_par%IRN (mumps_par%NNZ))
 		ALLOCATE( mumps_par%JCN (mumps_par%NNZ))
-		ALLOCATE( mumps_par%A (mumps_par%NNZ))
+		ALLOCATE( mumps_par%A   (mumps_par%NNZ))
 		ALLOCATE( mumps_par%RHS (mumps_par%N))
 		do i = 1, neq
 			if (i >= 1.and. i<= neq) then
@@ -60,7 +60,7 @@ subroutine main
 			endif
 		enddo
 		mumps_par%JCN = ja
-		mumps_par%A = kstiff
+		mumps_par%A   = kstiff
 
 		if (nftnd(1) > 0) then !RSF
 			do l=1,nftnd(1)
@@ -106,6 +106,12 @@ subroutine main
 		
 			resu_1 = resu
 			
+			if (bp == 7 .and. icstart == 1) then ! for the first cycle of bp7, if time<nuct, use dt for dtev1.
+				if (it < (nuct/dt)) then 
+					dtev1 = dt 
+				endif
+			endif 
+			
 			time = time + dtev1
 			
 			if (mod(it,nhplt) == 1 .and. me ==0) then
@@ -119,7 +125,7 @@ subroutine main
 				write(*,*) '=     pma = MA/KU =                                                 ='
 				write(*,'(X,A,40X,E15.7,4X,A)') '=',  pma
 				write(*,*) '=     maximum sliprate =                                            ='
-				write(*,'(X,A,40X,E15.7,4X,A)') '=',  maxsliprate, 'm/s'
+				write(*,'(X,A,40X,E15.7,4X,A)') '=',  maxSlipRate, 'm/s'
 			endif			
 			
 			call exit_criteria ! determine if to exit EQquasi.
@@ -219,11 +225,12 @@ subroutine main
 				enddo 
 			enddo						
 			globaldat(1,it) = time
-			globaldat(2,it) = maxsliprate
-			globaldat(3,it) = totmomrate	
-			globaldat(4,it) = tottaoruptarea
-			globaldat(5,it) = totslipruptarea
-			globaldat(6,it) = totruptarea
+			globaldat(2,it) = maxSlipRate
+			globaldat(3,it) = totMomRate	
+			globaldat(4,it) = totTaoRuptArea
+			globaldat(5,it) = totSlipRuptArea
+			globaldat(6,it) = totRuptArea
+                        globaldat(7,it) = totMomRateVW
 			
 			! Write disp field. 
 			if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1)) then 
@@ -265,9 +272,9 @@ end subroutine main
 subroutine exit_criteria
 ! Subroutine to compute if to exit EQquasi. 
 ! If mode == 1 (quasi-dynamic/quasi-static), the exit happens AFTER 
-!	a rupture when maxsliprate falls below slipr_thres.
+!	a rupture when maxSlipRate falls below slipr_thres.
 ! If mode == 2 (fully dynamic), the exit happens BEFORE a rupture when 
-!	the maxsliprate rises above the slipr_thres.
+!	the maxSlipRate rises above the slipr_thres.
 
 ! The system is determined by the combination of two status variables - status0/1 and t_end_status.
 ! status0/status1: code status in the last/current time step.
@@ -278,7 +285,7 @@ subroutine exit_criteria
 	real (kind = dp) :: hang_time = 1e5
 	
 	if (eqquasi_mode == 1) then ! quasi-dynamic/quasi-static
-		if (maxsliprate>slipr_thres)then
+		if (maxSlipRate>slipr_thres)then
 		! if maximum slip rate rises above the slipr_thres, entering/in the co-seismic phase.
 			if (status0 == 0) then ! convert from inter-seismic to co-seismic.
 				status1 = 1 ! current status is changed to co-seismic.
@@ -288,7 +295,7 @@ subroutine exit_criteria
 					tdynaend = -1000.0d0 ! don't need to record end time in the rupture phase.
 				endif
 			endif
-		elseif (maxsliprate<=slipr_thres) then
+		elseif (maxSlipRate<=slipr_thres) then
 		! if maximum slip rate falls below the slipr_thres, consider exiting the code. 
 			if (status0 == 0) then 
 				status1 = 0 ! if last step was in inter-seismic, no need to change.
@@ -311,7 +318,7 @@ subroutine exit_criteria
 			t_start_status = 1
 		endif
 	elseif (eqquasi_mode == 2) then ! fully dynamic
-		if (maxsliprate>slipr_thres)then
+		if (maxSlipRate>slipr_thres)then
 		! In this mode, if maximum slip rate rises above the slipr_thres, exit. 
 			if (status0 == 0) then ! convert from inter- to co-seismic.
 				status1 = 1

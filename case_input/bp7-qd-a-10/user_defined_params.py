@@ -4,10 +4,10 @@ import numpy as np
 from math import *
 
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
-istart = 1
-iend = 1
+istart     = 1
+iend       = 3
 # mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
-mode = 1
+mode       = 1
 
 # model_domain (in meters)
 xmin, xmax = -500, 500
@@ -42,11 +42,11 @@ bp          = 7 # for description only
 # 1001 (GM-cycle)
 
 # xi, minimum Dc
-xi = 0.015 # xi used to limit variable time step size. See Lapusta et al. (2009).
-minDc = 0.13 # meters
+xi = 0.05 # xi used to limit variable time step size. See Lapusta et al. (2009).
+minDc = 0.5e-3 # meters
 
 # loading 
-far_vel_load = 4e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
+far_vel_load = 5e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
 creep_slip_rate = 1.0e-9 # creeping slip rate outside of RSF controlled region.
 exit_slip_rate = 1.0e-3 # exiting slip rate for EQquasi [m/s].
 
@@ -58,7 +58,7 @@ fric_sw_fs = 0
 fric_sw_fd = 0
 fric_sw_D0 = 0
 # friclaw == 3, rate- and state- friction with aging law.
-fric_rsf_a, fric_rsf_b, fric_rsf_Dc = 0.004, 0.01, 0.05
+fric_rsf_a, fric_rsf_b, fric_rsf_Dc = 0.004, 0.01, 0.5e-3
 fric_rsf_deltaa = 0.012
 fric_rsf_r0 = 0.6
 fric_rsf_v0 = 1e-6
@@ -81,7 +81,7 @@ for ix, xcoor in enumerate(fx):
     radii = sqrt(xcoor*xcoor + zcoor*zcoor)
     if radii <= rad:
       on_fault_vars[ix,iz,9] = fric_rsf_a
-    elif: 
+    else: 
       on_fault_vars[ix,iz,9] = fric_rsf_a + fric_rsf_deltaa
     on_fault_vars[ix,iz,10] = fric_rsf_b # assign b in RSF 
     on_fault_vars[ix,iz,11] = fric_rsf_Dc # assign Dc in RSF.
@@ -108,31 +108,30 @@ for ix, xcoor in enumerate(fx):
 ####################################
 ##### HPC resource allocation ######
 ####################################
-casename = "bp7-qd-a-10"
-HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
-HPC_ncpu = 3 # Number of CPUs requested.
-HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-HPC_time = "00:30:00" # WALLTIME, in hh:mm:ss format.
-HPC_account = "EAR22013" # Project account to be charged SUs against.
-HPC_email = "dliu@ig.utexas.edu" # Email to receive job status.
+casename       = "bp7-qd-a-10.002"
+HPC_nnode      = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
+HPC_ncpu       = 20 # Number of CPUs requested.
+HPC_queue      = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
+HPC_time       = "35:00:00" # WALLTIME, in hh:mm:ss format.
+HPC_account    = "EAR22012" # Project account to be charged SUs against.
+HPC_email      = "dliu@ig.utexas.edu" # Email to receive job status.
 
 ##############################################
 ##### Single station time series output ######
 ##############################################
 
 # (x,z) coordinate pairs for on-fault stations (in km).
-st_coor_on_fault = [[0, 0], [-100,0], [0,100], [100,0], \
-   [0,-100], [-100,-100], [-100,100], [100,-100], [100,100], \
-   [-300,0], [0, 300], [300,0], [0,-300]]
-st_coor_on_fault = st_coor_off_fault/1000
-   
+st_coor_on_fault  = [[0, 0], [-100,0], [0,100], [100,0], \
+                    [0,-100], [-100,-100], [-100,100], [100,-100], [100,100], \
+                    [-300,0], [0, 300], [300,0], [0,-300]]
+st_coor_on_fault  = np.asarray(st_coor_on_fault)/1000.0
 # (x,y,z) coordinates for off-fault stations (in km).
 st_coor_off_fault = [[0,200,0], [0,400,0], [-300,400,0], [0,400,-300], [300,400,0], \
-   [0,400,300]]
-st_coor_off_fault = st_coor_off_fault/1000
+                     [0,400,300]]
+st_coor_off_fault = np.asarray(st_coor_off_fault)/1000.0
 
-n_on_fault = len(st_coor_on_fault)
-n_off_fault = len(st_coor_off_fault)
+n_on_fault        = len(st_coor_on_fault)
+n_off_fault       = len(st_coor_off_fault)
 
 # Additional solver options for AZTEC
 az_op = 2 # AZTEC options

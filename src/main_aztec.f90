@@ -23,7 +23,7 @@ subroutine main_aztec
 	do i = 1,nftnd(1)
 	tmparr(i) = fric(47,i,1)
 	enddo         
-	maxsliprate = maxval(tmparr)
+	maxSlipRate = maxval(tmparr)
 	
 	if (me.eq.0) then
 		!LOOP 2000 ![MUMPS]
@@ -35,8 +35,8 @@ subroutine main_aztec
 	
 
 	!Define problem on the host (processor 0)
-	dtev = ksi*minDc/maxsliprate
-	dtev1 = ksi*minDc/maxsliprate!Initial dtev1>dt to enter static state.
+	dtev = ksi*minDc/maxSlipRate
+	dtev1 = ksi*minDc/maxSlipRate!Initial dtev1>dt to enter static state.
 	cons = 0.0d0!Initialize cons, displacements.
 	constmp = 0.0d0
 	consvtmp = 0.0d0
@@ -224,10 +224,10 @@ subroutine main_aztec
 			write(*,*) '=     pma = MA/KU =                                                 ='
 			write(*,'(X,A,40X,E15.7,4X,A)') '=',  pma
 			write(*,*) '=     maximum sliprate =                                            ='
-			write(*,'(X,A,40X,E15.7,4X,A)') '=',  maxsliprate, 'm/s'
+			write(*,'(X,A,40X,E15.7,4X,A)') '=',  maxSlipRate, 'm/s'
 		endif			
 		
-		if (maxsliprate>slipr_thres)then 
+		if (maxSlipRate>slipr_thres)then 
 			if (status0 == 0) then        
 				status1 = 1
 			elseif (status0 == 1) then
@@ -236,7 +236,7 @@ subroutine main_aztec
 					tdynaend = -1000.0d0
 				endif
 			endif
-		elseif (maxsliprate<=slipr_thres) then
+		elseif (maxSlipRate<=slipr_thres) then
 			if (status0 == 0) then
 				status1 = 0
 			elseif (status0 == 1) then
@@ -373,11 +373,11 @@ subroutine main_aztec
 			enddo 
 		enddo						
 		globaldat(1,it) = time
-		globaldat(2,it) = maxsliprate
-		globaldat(3,it) = totmomrate	
-		globaldat(4,it) = tottaoruptarea
-		globaldat(5,it) = totslipruptarea
-		globaldat(6,it) = totruptarea
+		globaldat(2,it) = maxSlipRate
+		globaldat(3,it) = totMomRate	
+		globaldat(4,it) = totTaoRuptArea
+		globaldat(5,it) = totSlipRuptArea
+		globaldat(6,it) = totRuptArea
 	
 	enddo!it
 	

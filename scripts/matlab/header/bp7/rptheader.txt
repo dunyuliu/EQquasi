@@ -1,0 +1,7 @@
+# Column #1 = x2 (m)
+# Column #2 = x3 (m)
+# Column #3 = time (s)
+# Computational domain size: 1X1X1 kms (strXfault-normalXdepth)
+# The line below lists the names of the data fields
+x2 x3 t
+# Here is the time-series data

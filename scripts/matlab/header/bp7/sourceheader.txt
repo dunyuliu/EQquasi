@@ -1,0 +1,7 @@
+# Column #1 = Time (s)
+# Column #2 = Max_slip_rate (log10 m/s)
+# Column #3 = Moment_rate (N-m/s)
+# Column #4 = Moment_rate of VW patch (N-m/s)
+# The line below lists the names of the data fields
+t max_slip_rate moment_rate moment_rate_vw
+# Here is the time-series data.

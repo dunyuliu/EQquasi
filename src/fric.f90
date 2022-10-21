@@ -101,27 +101,29 @@ SUBROUTINE rate_state_slip_law(V2,psi,fricsgl,xmu,dxmudv)
   !
   real (kind = dp) :: xmu, dxmudv
   real (kind = dp) :: V2,psi,psiss,fLV,fss
-  real (kind = dp) :: A,B,L,f0,V0,fw,Vw
+  real (kind = dp) :: A,B,L,f0,V0,fw,Vw,sta
   real (kind = dp),dimension(30) :: fricsgl
   real (kind = dp) :: tmp, tmpc,vold,V1,psi0
   !
-  A  = fricsgl(9)
-  B  = fricsgl(10)
-  L  = fricsgl(11)
-  f0 = fricsgl(13)
-  V0 = fricsgl(12)
-  fw = fricsgl(14)
-  Vw = fricsgl(15)
-  tmpc = 1.0d0 / (2.0d0 * V0) * dexp(psi/A)
-  tmp = (V2+1.d-30) * tmpc
-  xmu = A * dlog(tmp + sqrt(tmp**2 + 1.0d0)) !arcsinh(z)= ln(z+sqrt(z^2+1))
-  dxmudv = A * tmpc / sqrt(1.0d0 + tmp**2)  ! d(arcsinh(z))/dz = 1/sqrt(1+z^2)
-  fLV = f0 - (B - A) * dlog(V2/V0)
-  fss = fw + (fLV - fw) / ((1.0d0 + (V2/Vw)**8)**0.125d0)
-  psiss = A * dlog(2.0d0 * V0 / V2 * dsinh(fss/A))
-  psi = psiss + (psi - psiss) * dexp(-V2*dt/L)
+  A     = fricsgl(9)
+  B     = fricsgl(10)
+  L     = fricsgl(11)
+  f0    = fricsgl(13)
+  V0    = fricsgl(12)
+  !fw = fricsgl(14)
+  !Vw = fricsgl(15)
+  sta   = fricsgl(20)
   
-
+  tmpc  = 1.0d0 / (2.0d0 * V0) * dexp(psi/A)
+  tmp   = V2 * tmpc
+  xmu   = A * dlog(tmp + sqrt(tmp**2 + 1.0d0)) !arcsinh(z)= ln(z+sqrt(z^2+1))
+  dxmudv = A * tmpc / sqrt(1.0d0 + tmp**2)  ! d(arcsinh(z))/dz = 1/sqrt(1+z^2)
+  
+  fLV   = f0 - (B - A) * dlog(V2/V0)
+  fss   = fLV
+  !fss = fw + (fLV - fw) / ((1.0d0 + (V2/Vw)**8)**0.125d0)
+  psiss = A * dlog(2.0d0 * V0 / V2 * dsinh(fss/A))
+  psi   = psiss + (sta - psiss) * dexp(-V2*dt/L) 
 
 end SUBROUTINE rate_state_slip_law
 

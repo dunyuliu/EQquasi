@@ -1,0 +1,11 @@
+# Column #1 = Time (s)
+# Column #2 = Slip_2 (m)
+# Column #3 = Slip_3 (m)
+# Column #4 = Slip_rate_2 (log10 m/s)
+# Column #5 = Slip_rate_3 (log10 m/s)
+# Column #6 = Shear_stress_2 (MPa)
+# Column #7 = Shear_stress_3 (MPa)
+# Column #8 = State_(log10 s)
+# The line below lists the names of the data fields
+t slip_2 slip_3 slip_rate_2 slip_rate_3 shear_stress_2 shear_stress_3 state
+# Here is the time-series data

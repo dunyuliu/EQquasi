@@ -62,7 +62,8 @@ program eqquasi3d
 	fltxyz(1,4,1)=270.0d0/180.0d0*pi
 	fltxyz(2,4,1)=90.0d0/180.0d0*pi
 
-	dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
+	dt           = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
+	dymax        = min(12.0d0*dx, 3.0d3) ! The coarsest element size near ymax/ymin in m.
 	
 	!...time hostories output steps
 	nplpts = 0	!initialize number of time history plot
@@ -124,7 +125,7 @@ program eqquasi3d
 	status1 = 0
 	fltsta  = 0.0d0
     globaldat     = 0.0d0
-    totmomrate    = 0.0d0	
+    totMomRate    = 0.0d0	
 	tdynastart    = -1000.0d0
 	tdynaend      = -1000.0d0
 	tcheck        = 0.0d0
@@ -199,8 +200,8 @@ program eqquasi3d
 		
 		call output_offfault_st
 		
-		! phasing out
-		!call output_onfault_transfer 
+		! phasing out, not yet.
+		call output_onfault_transfer 
 		
 		call output_timedy
 		

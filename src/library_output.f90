@@ -11,8 +11,13 @@ subroutine output_onfault_st
 			if(j==1)  then  !main fault stations
 				sttmp = '      '
 				dptmp = '      '
-				write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/1000.d0) 
-				write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j))/1000.d0) 
+                                if (bp == 7) then 
+				  write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)) 
+				  write(dptmp,'(i4.3)') int(-xonfs(2,anonfs(2,i),j)) 
+                                else
+                                  write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/1000.d0)
+                                  write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j))/1000.d0)
+                                endif
 				open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
 
 				! sttmp = '      '
@@ -62,10 +67,15 @@ subroutine output_offfault_st
 			bodytmp = '      '
 			sttmp = '      '
 			dptmp = '      '
-			write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))/1000.d0) 
-			write(sttmp,'(i4.3)') int(x4nds(1,an4nds(1,i))/1000.d0) 
-			write(dptmp,'(i4.3)') int(abs(x4nds(3,an4nds(1,i)))/1000.d0) 
-			
+                        if (bp == 7) then
+			  write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))) 
+			  write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))) 
+			  write(dptmp,'(i4.3)')   int(abs(x4nds(3,an4nds(1,i)))) 
+                        else
+                          write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))/1000.d0)
+                          write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))/1000.d0)
+                          write(dptmp,'(i4.3)')   int(x4nds(3,an4nds(1,i))/1000.d0)
+                        endif
 			write(*,*) '=       xcoor',bodytmp,sttmp,dptmp,'                                ='
 			write(*,*) '=                                                                   ='
 			write(*,*) '====================================================================='		
@@ -169,7 +179,8 @@ subroutine output_globaldat
 	integer (kind = 4) :: i 
 	
 	open(1113,file='global.dat',form='formatted',status='unknown')
-			write(1113,'(6e32.21e4)') (globaldat(1,i),globaldat(2,i),globaldat(3,i),globaldat(4,i),globaldat(5,i),globaldat(6,i),i=1,it-1)
+	        write(1113,'(7e32.21e4)') (globaldat(1,i), globaldat(2,i), globaldat(3,i), globaldat(4,i), globaldat(5,i), &
+                                           globaldat(6,i), globaldat(7,i), i=1,it-1)
 	close(1113)
 
 end subroutine output_globaldat
@@ -180,7 +191,7 @@ subroutine output_prof
 	use globalvar
 	implicit none
 	
-	integer (kind = 4) :: i, ift 
+	integer (kind = 4)  :: i, ift 
 	
 	ift = 1 
 	if (bp == 5) then
@@ -194,6 +205,23 @@ subroutine output_prof
 			open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
 				do i = 1,nftnd(1)
 					if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0.and.abs(x(3,nsmp(1,i,ift) ))<=40.0d3) then
+						write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+					endif
+				enddo				
+		endif
+	endif
+
+	if (bp == 7) then
+		if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
+			open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
+				do i = 1,nftnd(1)
+					if (abs(x(3,nsmp(1,i,ift) )-0.0d3)<0.01d0) then
+						write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+					endif
+				enddo
+			open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
+				do i = 1,nftnd(1)
+					if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0) then
 						write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
 					endif
 				enddo				

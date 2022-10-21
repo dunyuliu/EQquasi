@@ -13,7 +13,7 @@ tmp1,tmp2,tmp3,tmp4,tnrm0,xmu1,xmu2
 real (kind = dp) :: dtev1D(nftnd(1))
 real (kind = dp),dimension(6,2,4)::fvd=0.0d0
 real (kind = dp)::fa, fb, phi
-real (kind = dp) :: rr,R0,T,dtao0,dtao,mr!RSF
+real (kind = dp) :: rr,R0,T,dtao0, dtao, mr!RSF
 real (kind = dp) :: statetmp, eta!RSF
 integer (kind=4) :: iv
 real (kind = dp) :: tstk0, tdip0,ttao0 !RSF
@@ -26,7 +26,9 @@ real (kind = dp) :: v_trial,v_trial_new,sliprs_trial,sliprd_trial, tau_fric_tria
 	anm,asm,adm,ans,ass,ads,&
 	slipratemast,sliprateslav,&
 	slipaccn,slipaccs,slipaccd
-real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),momrate_arr(nftnd(1)),ruptarea_arr(nftnd(1)),taoruptarea_arr(nftnd(1)), slipruptarea_arr(nftnd(1))
+real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),    momrate_arr(nftnd(1)),      &
+                    momRateVW(nftnd(1)),     ruptarea_arr(nftnd(1)),    taoruptarea_arr(nftnd(1)),  &
+                    slipruptarea_arr(nftnd(1))
 
 ruptarea_arr = 0.0d0
 taoruptarea_arr = 0.0d0 
@@ -126,25 +128,33 @@ do ift = 1, ntotft
 			sliprd_trial=sliprated
 			
 		!---3.4: FRICTIONAL/NON FRIVTIONAL REGION	
-			if 	(x(3,isn) >= zminc .and. x(1,isn) <= xmaxc .and. x(1,isn) >= xminc) then 
+			if (abs(x(3,isn)) <= abs(zminc) .and. x(1,isn) <= xmaxc .and. x(1,isn) >= xminc) then 
 		!---3.4.1: FRICTIONAL REGION CONTROLLED BY RSF. 
 	!---3.4.1.2: Dynamic + NON-DYNAMIC PROCESS: [STATUS1]==0		
-				tstk0 = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
-				tdip0 = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
-				tnrm0 = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
+				tstk0         = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
+				tdip0         = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault	
+				tnrm0         = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
+				
+				! Nucleation
+				if (bp == 7 .and. icstart == 1) then 
+					call nucleation1(x(1,isn), x(3,isn), dtao)
+					tstk0     = tstk0 + dtao
+				endif
 				
 				!tnrm0 = min(min_norm, tnrm0) ! Maintain a minimum normal stress level.
-                                max_norm = -40.0d6
-                                min_norm = -10.0d6
-                                if (abs(tnrm0)<abs(min_norm)) then 
-                                        tnrm0 = min_norm
-                                elseif (abs(tnrm0)>abs(max_norm)) then
-                                        tnrm0 = max_norm
-                                endif
-				! fric(41,i,ift) is abs(KU)
-				fric(41,i,ift) = sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
-				ttao0 = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		
+				max_norm      = -40.0d6
+				min_norm      = -10.0d6
 				
+				if (abs(tnrm0)<abs(min_norm)) then 
+						tnrm0 = min_norm
+				elseif (abs(tnrm0)>abs(max_norm)) then
+						tnrm0 = max_norm
+				endif
+				! fric(41,i,ift) is abs(KU)
+				fric(41,i,ift)= sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
+				ttao0         = sqrt(tstk0 * tstk0 + tdip0 * tdip0)		
+				
+
 				!theta = L/V + (theta - L/V)*dexp(-V*dtev1/L)
 				!- fric(22): theta*
 				!- fric(21): theta_dot
@@ -152,7 +162,7 @@ do ift = 1, ntotft
 	!---3.4.1.3: TO COMPUTE THETA*(t+1) [FRIC(22,:)] FOR ITAG==0, USING [V_TRIAL]=[CONSTRAINV] 
 	!----------: THETA**(t+1) [FRIC(22,:)] FOR ITAG==1, , USING [V_TRIAL]={[CONSTRAINV]+[CONSTRAINVTMP]}*0.5	
 				!if (itag == 0) then 
-					v_trial = sliprate
+					v_trial   = sliprate
 					fric(42,i,ift) = sliprate !Only record the final sliprate in fric(42,i) in the last time step.
 					! phi = dlog(fric(12,i,ift) * fric(20,i,ift) / fric(11,i,ift))
 					! if (v_trial * dtev1 / fric(11,i,ift) <= 1.0d-6) then 
@@ -288,23 +298,24 @@ do ift = 1, ntotft
 					consvtmp(2,isn)=vys 
 					consvtmp(3,isn)=vzs 	
 				elseif (itag == 1) then 
-					fric(20,i,ift) = fric(22,i,ift)  ! update state at itag == 1
-					fric(23,i,ift) = fric(24,i,ift)  ! update state2 at itag == 1
-					ma_bar_ku_arr(i) = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
-					ma_bar_ku_arr(i) = abs(ma_bar_ku_arr(i))
-					!momrate_arr(i) =0.0d0 
-					! Seems not need to define zones to calculate moment rate. 
-					!if ((abs(x(1,isn))<=34.0d3).and.(abs(x(3,isn)) < 20.0d3)) then
-						momrate_arr(i) = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
-					!endif
-					
-					ruptarea_arr(i) = 0.0d0
-					taoruptarea_arr(i) = 0.0d0
+					fric(20,i,ift)      = fric(22,i,ift)  ! update state at itag == 1
+					fric(23,i,ift)      = fric(24,i,ift)  ! update state2 at itag == 1
+					ma_bar_ku_arr(i)    = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
+					ma_bar_ku_arr(i)    = abs(ma_bar_ku_arr(i))
+					momrate_arr(i)      = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                                        momRateVW(i)        = 0.0d0
+                                        if (bp == 7) then 
+                                          if (sqrt(x(1,isn)**2+x(3,isn)**2)<200.0d0) then 
+                                            momRateVW(i)    = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                                          endif
+                                        endif
+					ruptarea_arr(i)     = 0.0d0
+					taoruptarea_arr(i)  = 0.0d0
 					slipruptarea_arr(i) = 0.0d0
 					
 					if (v_trial>=slipr_thres) then
-						ruptarea_arr(i) = dx*dx
-						taoruptarea_arr(i) = ttao*dx*dx
+						ruptarea_arr(i)     = dx*dx
+						taoruptarea_arr(i)  = ttao*dx*dx
 						slipruptarea_arr(i) = slip*dx*dx
 					endif
 									
@@ -425,14 +436,15 @@ enddo ! ending ift
 	if (me == 0) call output_prof
 
 	if (itag==1) then
-		pma = maxval(ma_bar_ku_arr)
-		maxsliprate = maxval(sliprate_arr) 
-		loc = maxloc(sliprate_arr)
-		!write(*,*) 'maxsliprate at ', loc(1)
-		totmomrate = sum(momrate_arr)
-		totruptarea = sum(ruptarea_arr)
-		tottaoruptarea = sum(taoruptarea_arr)
-		totslipruptarea = sum(slipruptarea_arr)
+		pma             = maxval(ma_bar_ku_arr)
+		maxSlipRate     = maxval(sliprate_arr) 
+		loc             = maxloc(sliprate_arr)
+		!write(*,*) 'maxSlipRate at ', loc(1)
+		totMomRate      = sum(momrate_arr)
+                totMomRateVW    = sum(momRateVW)
+		totRuptArea     = sum(ruptarea_arr)
+		totTaoRuptArea  = sum(taoruptarea_arr)
+		totSlipRuptArea = sum(slipruptarea_arr)
 	endif 		
 	
 	dtev=minval(dtev1D)
@@ -468,3 +480,29 @@ subroutine newton_solver(a_tmp, b_tmp)
 	real (kind = dp):: a_tmp, b_tmp
 
 end subroutine newton_solver
+
+subroutine nucleation1(xtmp, ztmp, dtao)
+! Subroutine nucleation1 takes in on-fault node coordinates and return the stress perturbation
+!   for the nucleation of first rupture in SCEC SEAS benchmark bp7-qd.
+	use              globalvar
+	implicit         none
+	real (kind = dp) :: xtmp, ztmp, dtao, G1, G2, rtmp
+	
+	dtao       = 0.0d0 ! initialize 
+	rtmp       = sqrt((xtmp - nucx)**2 + (ztmp - nucz)**2)
+	
+	if (rtmp < nucr) then 
+		G1     = exp(rtmp**2/(rtmp**2-nucr**2))
+	else
+		G1     = 0.0d0
+	endif 
+	
+	if (time < nuct) then 
+		G2     = exp((time-nuct)**2/time/(time-2.0d0*nuct))
+	else
+		G2     = 1.0d0
+	endif 
+	
+	dtao       = nucdtao0*G1*G2
+
+end subroutine

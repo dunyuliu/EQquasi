@@ -107,6 +107,25 @@ def create_batch_script():
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
         f.write("done" + "\n")
         # End excutable part.
+
+def create_batch_script_cycle():
+    # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.
+    # Compared to batch.hpc, we don't do cycle id looping here. 
+    with open("batch.cycle.hpc", "w") as f:
+        f.write("#! /bin/bash" + "\n")
+        f.write("#SBATCH -J " + str(casename) + "\n")
+        f.write("#SBATCH -o a.eqquasi.log%j" + "\n")
+        f.write("#SBATCH -N " + str(HPC_nnode) + "\n")
+        f.write("#SBATCH -n " + str(HPC_ncpu) + "\n")
+        f.write("#SBATCH -p " + str(HPC_queue) + "\n")
+        f.write("#SBATCH -t " + str(HPC_time) + "\n")
+        f.write("#SBATCH -A " + str(HPC_account) + "\n")
+        f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
+        f.write("#SBATCH --mail-type=begin" + "\n")
+        f.write("#SBATCH --mail-type=end" + "\n")
+        # Executable part.
+        f.write("  ibrun eqquasi" + "\n")
+        # End excutable part.
 def estimate_HPC_resource():
     nx = int((xmax-xmin)/dx)
     nz = int((zmax-zmin)/dx)
@@ -120,6 +139,7 @@ def estimate_HPC_resource():
 def _main_func(description):
   create_model_input_file()
   create_batch_script()
+  create_batch_script_cycle()
   create_station_input_file()
   estimate_HPC_resource()
   netcdf_write_on_fault_vars()

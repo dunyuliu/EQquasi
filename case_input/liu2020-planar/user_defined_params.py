@@ -43,13 +43,13 @@ bp          = 1000 # for description only
 # 1000 (liu2020-planar, GM-cycle)
 
 # xi, minimum Dc
-xi = 0.05 # xi used to limit variable time step size. See Lapusta et al. (2009).
-minDc = 11e-3 # meters
+xi              = 0.2 # xi used to limit variable time step size. See Lapusta et al. (2009).
+minDc           = 11e-3 # meters
 
 # loading 
-far_vel_load = 5e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
+far_vel_load    = 5e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
 creep_slip_rate = 1.0e-9 # creeping slip rate outside of RSF controlled region.
-exit_slip_rate = 1.0e-3 # exiting slip rate for EQquasi [m/s].
+exit_slip_rate  = 1.0e-3 # exiting slip rate for EQquasi [m/s].
 
 #################################
 ##### Frictional variables ######
@@ -59,10 +59,12 @@ fric_sw_fs = 0
 fric_sw_fd = 0
 fric_sw_D0 = 0
 # friclaw == 3, rate- and state- friction with aging law.
-fric_rsf_a, fric_rsf_b, fric_rsf_Dc = 0.004, 0.01, 0.5e-3
-fric_rsf_deltaa = 0.012
-fric_rsf_r0 = 0.6
-fric_rsf_v0 = 1e-6
+fric_rsf_a      = 0.007 
+fric_rsf_b      = 0.011 
+fric_rsf_Dc     = 11e-3
+fric_rsf_deltaa = 0.01
+fric_rsf_r0     = 0.6
+fric_rsf_v0     = 1e-6
 # Creating the fault interface
 nfx = int((xmax - xmin)/dx + 1)
 nfz = int((zmax - zmin)/dx + 1)
@@ -78,8 +80,8 @@ def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
 for ix, xcoor in enumerate(fx):
   for iz, zcoor in enumerate(fz):
   # assign a in RSF. a is a 2D distribution.
-    tmp1  = B1(xcoor, 20.e3, 3.e3)
-    tmp2  = B2(-zcoor, 20.e3, 3.e3)
+    tmp1  = linear1(xcoor, 20.e3, 3.e3)
+    tmp2  = linear1(-zcoor, 20.e3, 3.e3)
     on_fault_vars[ix,iz,9]  = fric_rsf_a + (1. - tmp1*tmp2)*fric_rsf_deltaa
     on_fault_vars[ix,iz,10] = fric_rsf_b # assign b in RSF 
     on_fault_vars[ix,iz,11] = fric_rsf_Dc # assign Dc in RSF.
@@ -106,13 +108,13 @@ for ix, xcoor in enumerate(fx):
 ####################################
 ##### HPC resource allocation ######
 ####################################
-casename       = "liu2020-planar"
+casename       = "liu2020-planar-quasi"
 HPC_nnode      = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 HPC_ncpu       = 20 # Number of CPUs requested.
 HPC_queue      = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-HPC_time       = "35:00:00" # WALLTIME, in hh:mm:ss format.
+HPC_time       = "20:00:00" # WALLTIME, in hh:mm:ss format.
 HPC_account    = "EAR22012" # Project account to be charged SUs against.
-HPC_email      = "dliu@ig.utexas.edu" # Email to receive job status.
+HPC_email      = ""#dliu@ig.utexas.edu" # Email to receive job status.
 
 ##############################################
 ##### Single station time series output ######

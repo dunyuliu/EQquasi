@@ -23,42 +23,42 @@ def plot_initials():
   plt.contourf(on_fault_vars[:,:,9].T)
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("RSF_a")
 
   ax11 = fig.add_subplot(322)
   plt.contourf(on_fault_vars[:,:,10].T)
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("RSF_b")
   
   ax11 = fig.add_subplot(323)
   plt.contourf(on_fault_vars[:,:,11].T)
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("RSF_Dc")
 
   ax11 = fig.add_subplot(324)
   plt.contourf(on_fault_vars[:,:,46].T)  
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("Initial slip rate")
 
   ax11 = fig.add_subplot(325)
   plt.contourf(on_fault_vars[:,:,7].T)  
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("Initial normal")
   
   ax11 = fig.add_subplot(326)
   plt.contourf(on_fault_vars[:,:,8].T)  
   ax = plt.gca()
   ax.set_aspect('equal')
-  plt.colorbar
+  plt.colorbar()
   plt.title("Initial shear")
   
   plt.savefig("Initials.png", dpi = 600)

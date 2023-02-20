@@ -151,8 +151,8 @@ subroutine netcdf_write_on_fault(outfile)
 	
 	do i = 1, nxt
 		do j = 1, nzt
-			on_fault_vars(j,i 1)  = fric(28, (i-1)*nzt+j, 1) ! tstk0
-			on_fault_vars(j,i 2)  = fric(29, (i-1)*nzt+j, 1) ! tdip0
+			on_fault_vars(j,i,1)  = fric(28, (i-1)*nzt+j, 1) ! tstk0
+			on_fault_vars(j,i,2)  = fric(29, (i-1)*nzt+j, 1) ! tdip0
 			on_fault_vars(j,i,3)  = fric(30, (i-1)*nzt+j, 1) ! tnorm0
 			on_fault_vars(j,i,4)  = fric(26, (i-1)*nzt+j, 1) ! sliprate
 			on_fault_vars(j,i,5)  = fric(20, (i-1)*nzt+j, 1) ! state

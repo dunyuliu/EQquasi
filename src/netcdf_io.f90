@@ -130,7 +130,7 @@ subroutine netcdf_write_on_fault(outfile)
 	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
 
 	nvar = 12 ! nvar variables.
-	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nzt, nxt, nvar))
+	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nxt, nzt, nvar))
 	on_fault_vars = 0.0d0
 	
 	UNITS     = 'units'
@@ -151,18 +151,18 @@ subroutine netcdf_write_on_fault(outfile)
 	
 	do i = 1, nxt
 		do j = 1, nzt
-			on_fault_vars(j,i,1)  = fric(28, (i-1)*nzt+j, 1) ! tstk0
-			on_fault_vars(j,i,2)  = fric(29, (i-1)*nzt+j, 1) ! tdip0
-			on_fault_vars(j,i,3)  = fric(30, (i-1)*nzt+j, 1) ! tnorm0
-			on_fault_vars(j,i,4)  = fric(26, (i-1)*nzt+j, 1) ! sliprate
-			on_fault_vars(j,i,5)  = fric(20, (i-1)*nzt+j, 1) ! state
-			on_fault_vars(j,i,6)  = fric(23, (i-1)*nzt+j, 1) ! state variable for normal stress, theta_pc
-			on_fault_vars(j,i,7)  = fric(31, (i-1)*nzt+j, 1) ! vxm
-			on_fault_vars(j,i,8)  = fric(32, (i-1)*nzt+j, 1) ! vym
-			on_fault_vars(j,i,9)  = fric(33, (i-1)*nzt+j, 1) ! vzm
-			on_fault_vars(j,i,10) = fric(34, (i-1)*nzt+j, 1) ! vxs
-			on_fault_vars(j,i,11) = fric(35, (i-1)*nzt+j, 1) ! vys
-			on_fault_vars(j,i,12) = fric(36, (i-1)*nzt+j, 1) ! vzs
+			on_fault_vars(i,j,1)  = fric(28, (i-1)*nzt+j, 1) ! tstk0
+			on_fault_vars(i,j,2)  = fric(29, (i-1)*nzt+j, 1) ! tdip0
+			on_fault_vars(i,j,3)  = fric(30, (i-1)*nzt+j, 1) ! tnorm0
+			on_fault_vars(i,j,4)  = fric(26, (i-1)*nzt+j, 1) ! sliprate
+			on_fault_vars(i,j,5)  = fric(20, (i-1)*nzt+j, 1) ! state
+			on_fault_vars(i,j,6)  = fric(23, (i-1)*nzt+j, 1) ! state variable for normal stress, theta_pc
+			on_fault_vars(i,j,7)  = fric(31, (i-1)*nzt+j, 1) ! vxm
+			on_fault_vars(i,j,8)  = fric(32, (i-1)*nzt+j, 1) ! vym
+			on_fault_vars(i,j,9)  = fric(33, (i-1)*nzt+j, 1) ! vzm
+			on_fault_vars(i,j,10) = fric(34, (i-1)*nzt+j, 1) ! vxs
+			on_fault_vars(i,j,11) = fric(35, (i-1)*nzt+j, 1) ! vys
+			on_fault_vars(i,j,12) = fric(36, (i-1)*nzt+j, 1) ! vzs
 		enddo 
 	enddo 
 	! Create the netCDF file.
@@ -186,7 +186,7 @@ subroutine netcdf_write_on_fault(outfile)
 
 	! Define the netcdf variables. The dimids array is used to pass the 
 	! dimids of the dimensions of the netCDF variables.
-	dimids = (/ lat_dimid, lon_dimid /)
+	dimids = (/ lot_dimid, lan_dimid /)
 	
 	do i = 1, nvar
 		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 
@@ -228,7 +228,7 @@ subroutine netcdf_write_roughness(outfile)
 	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
 
 	nvar = 3 ! nvar variables.
-	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nnz, nnx, nvar))
+	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nnx, nnz, nvar))
 	on_fault_vars = 0.0d0
 	
 	UNITS     = 'units'
@@ -249,9 +249,9 @@ subroutine netcdf_write_roughness(outfile)
 	
 	do i = 1, nnx
 		do j = 1, nnz
-			on_fault_vars(j,i,1) = rough_geo(1, (i-1)*nnz+j) ! tstk0
-			on_fault_vars(j,i,2) = rough_geo(2, (i-1)*nnz+j) ! tdip0
-			on_fault_vars(j,i,3) = rough_geo(3, (i-1)*nnz+j) ! tnorm0
+			on_fault_vars(i,j,1) = rough_geo(1, (i-1)*nnz+j) ! tstk0
+			on_fault_vars(i,j,2) = rough_geo(2, (i-1)*nnz+j) ! tdip0
+			on_fault_vars(i,j,3) = rough_geo(3, (i-1)*nnz+j) ! tnorm0
 		enddo 
 	enddo 
 	! Create the netCDF file.
@@ -275,7 +275,7 @@ subroutine netcdf_write_roughness(outfile)
 
 	! Define the netcdf variables. The dimids array is used to pass the 
 	! dimids of the dimensions of the netCDF variables.
-	dimids = (/ lat_dimid, lon_dimid /)
+	dimids = (/ lon_dimid, lat_dimid /)
 	
 	do i = 1, nvar
 		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 

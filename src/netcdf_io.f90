@@ -186,7 +186,7 @@ subroutine netcdf_write_on_fault(outfile)
 
 	! Define the netcdf variables. The dimids array is used to pass the 
 	! dimids of the dimensions of the netCDF variables.
-	dimids = (/ lot_dimid, lan_dimid /)
+	dimids = (/ lon_dimid, lat_dimid /)
 	
 	do i = 1, nvar
 		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 

@@ -140,8 +140,8 @@ subroutine netcdf_write_on_fault(outfile)
 	lon_units = 'unit'
 	var_name  = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'state_normal', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs']
 	var_unit  = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit'          , 'Pa'          , 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s']
-	nlon = nzt ! Total nodes along dip. 
-	nlat = nxt ! Total nodes along strike.  
+	nlat = nzt ! Total nodes along dip.  
+	nlon = nxt ! Total nodes along strike. 
 	
 	allocate(lat_index(nlat))
 	allocate(lon_index(nlon))
@@ -186,7 +186,7 @@ subroutine netcdf_write_on_fault(outfile)
 
 	! Define the netcdf variables. The dimids array is used to pass the 
 	! dimids of the dimensions of the netCDF variables.
-	dimids = (/ lon_dimid, lat_dimid /)
+	dimids = (/ lat_dimid, lon_dimid /)
 	
 	do i = 1, nvar
 		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 
@@ -275,7 +275,7 @@ subroutine netcdf_write_roughness(outfile)
 
 	! Define the netcdf variables. The dimids array is used to pass the 
 	! dimids of the dimensions of the netCDF variables.
-	dimids = (/ lon_dimid, lat_dimid /)
+	dimids = (/ lat_dimid, lon_dimid /)
 	
 	do i = 1, nvar
 		call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 

@@ -71,7 +71,7 @@ nfz = int((zmax - zmin)/dx + 1)
 fx = np.linspace(xmin,xmax,nfx) # coordinates of fault grids along strike.
 fz = np.linspace(zmin,zmax,nfz) # coordinates of fault grids along dip.
 # Create on_fault_vars array for on_fault varialbes.
-on_fault_vars = np.zeros((nfx,nfz,100))
+on_fault_vars = np.zeros((nfz,nfx,100))
 def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
   # calculate shear stress at steady state
   res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
@@ -82,21 +82,21 @@ for ix, xcoor in enumerate(fx):
   # assign a in RSF. a is a 2D distribution.
     tmp1  = linear1(xcoor, 20.e3, 3.e3)
     tmp2  = linear1(-zcoor, 20.e3, 3.e3)
-    on_fault_vars[ix,iz,9]  = fric_rsf_a + (1. - tmp1*tmp2)*fric_rsf_deltaa
-    on_fault_vars[ix,iz,10] = fric_rsf_b # assign b in RSF 
-    on_fault_vars[ix,iz,11] = fric_rsf_Dc # assign Dc in RSF.
-    on_fault_vars[ix,iz,12] = fric_rsf_v0 # initial reference slip rate.
-    on_fault_vars[ix,iz,13] = fric_rsf_r0 # initial reference friction.
-    on_fault_vars[ix,iz,46] = creep_slip_rate # initial slip rates
-    on_fault_vars[ix,iz,20] = on_fault_vars[ix,iz,11]/creep_slip_rate # initial state var.
-    on_fault_vars[ix,iz,7] = init_norm # initial normal stress.
-    on_fault_vars[ix,iz,8] = shear_steady_state(on_fault_vars[ix,iz,9], 
-                                                on_fault_vars[ix,iz,10],
-                                                on_fault_vars[ix,iz,12],
-                                                on_fault_vars[ix,iz,13],
+    on_fault_vars[iz,ix,9]  = fric_rsf_a + (1. - tmp1*tmp2)*fric_rsf_deltaa
+    on_fault_vars[iz,ix,10] = fric_rsf_b # assign b in RSF 
+    on_fault_vars[iz,ix,11] = fric_rsf_Dc # assign Dc in RSF.
+    on_fault_vars[iz,ix,12] = fric_rsf_v0 # initial reference slip rate.
+    on_fault_vars[iz,ix,13] = fric_rsf_r0 # initial reference friction.
+    on_fault_vars[iz,ix,46] = creep_slip_rate # initial slip rates
+    on_fault_vars[iz,ix,20] = on_fault_vars[iz,ix,11]/creep_slip_rate # initial state var.
+    on_fault_vars[iz,ix,7] = init_norm # initial normal stress.
+    on_fault_vars[iz,ix,8] = shear_steady_state(on_fault_vars[iz,ix,9], 
+                                                on_fault_vars[iz,ix,10],
+                                                on_fault_vars[iz,ix,12],
+                                                on_fault_vars[iz,ix,13],
                                                 creep_slip_rate,
-                                                on_fault_vars[ix,iz,7],
-                                                on_fault_vars[ix,iz,46])
+                                                on_fault_vars[iz,ix,7],
+                                                on_fault_vars[iz,ix,46])
 ###############################################
 ##### Domain boundaries for transferring ######
 ###############################################

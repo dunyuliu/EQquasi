@@ -43,7 +43,8 @@ bp          = 1000 # for description only
 # 1000 (liu2020-planar, GM-cycle)
 
 # xi, minimum Dc
-xi              = 0.2 # xi used to limit variable time step size. See Lapusta et al. (2009).
+xi              = 0.02 # xi used to limit variable time step size. See Lapusta et al. (2009).
+# xi=0.2/0.05 all show diverging results.
 minDc           = 11e-3 # meters
 
 # loading 

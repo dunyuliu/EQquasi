@@ -128,13 +128,12 @@ def create_batch_script_cycle():
         f.write("  if ((i > 1))" + "\n")
         f.write("  then" + "\n")
         f.write("    echo 'Simulating cycle 1 ... ...'" + "\n")
-        f.write("    cp \"../D$((i-1))/\"*.r.nc ./" + "\n")
+        f.write("    cp \"../D$((i-2))/\"fault.dyna.r.nc ./" + "\n")
+        f.write("    cp fault.dyna.r.nc fault.r.nc" + "\n")
         f.write("  fi" + "\n")
         f.write("  ibrun eqquasi" + "\n")
         f.write("  mkdir \"../Q$((i-1))\"" + "\n")
         f.write("  mv a.* fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"../Q$((i-1))\"" + "\n")
-        f.write("  i=$((i+1))" + "\n")
-        f.write("  echo $i > currentcycle.txt" + "\n")
         # End excutable part.
 def estimate_HPC_resource():
     nx = int((xmax-xmin)/dx)

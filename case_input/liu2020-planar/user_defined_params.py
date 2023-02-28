@@ -83,7 +83,7 @@ for ix, xcoor in enumerate(fx):
   for iz, zcoor in enumerate(fz):
   # assign a in RSF. a is a 2D distribution.
     tmp1  = linear1(xcoor, 20.e3, 3.e3)
-    tmp2  = linear1(-zcoor, 20.e3, 3.e3)
+    tmp2  = linear1(-zcoor-10.e3, 7.e3, 3.e3)
     on_fault_vars[iz,ix,9]  = fric_rsf_a + (1. - tmp1*tmp2)*fric_rsf_deltaa
     on_fault_vars[iz,ix,10] = fric_rsf_b # assign b in RSF 
     on_fault_vars[iz,ix,11] = fric_rsf_Dc # assign Dc in RSF.
@@ -114,7 +114,7 @@ casename       = "liu2020-planar-quasi"
 HPC_nnode      = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 HPC_ncpu       = 20 # Number of CPUs requested.
 HPC_queue      = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-HPC_time       = "20:00:00" # WALLTIME, in hh:mm:ss format.
+HPC_time       = "48:00:00" # WALLTIME, in hh:mm:ss format.
 HPC_account    = "EAR22012" # Project account to be charged SUs against.
 HPC_email      = ""#dliu@ig.utexas.edu" # Email to receive job status.
 

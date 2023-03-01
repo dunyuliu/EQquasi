@@ -50,7 +50,7 @@ minDc           = 11e-3 # meters
 # loading 
 far_vel_load    = 5e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
 creep_slip_rate = 1.0e-9 # creeping slip rate outside of RSF controlled region.
-exit_slip_rate  = 1.0e-2 # exiting slip rate for EQquasi [m/s].
+exit_slip_rate  = 1.5e-2 # exiting slip rate for EQquasi [m/s].
 # setting exit_slip_rate to be 1.0e-2 m/s. Dynamic rupture slip rates may drop to the level 1e-2~1e-3 m/s after 100 seconds. It would be inefficient to run dynamic ruptures longer than a few hundreds seconds.
 
 #################################

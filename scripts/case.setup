@@ -107,8 +107,64 @@ def create_batch_script():
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
         f.write("done" + "\n")
         # End excutable part.
-
 def create_batch_script_cycle():
+    # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.
+    # Compared to batch.hpc, we don't do cycle id looping here. 
+    with open("batch.cycle.eqquasi.hpc", "w") as f:
+        f.write("#! /bin/bash"                      + "\n")
+        f.write("#SBATCH -J " + str(casename)       + "\n")
+        f.write("#SBATCH -o a.eqquasi.log%j"        + "\n")
+        f.write("#SBATCH -N " + str(HPC_nnode)      + "\n")
+        f.write("#SBATCH -n " + str(HPC_ncpu)       + "\n")
+        f.write("#SBATCH -p " + str(HPC_queue)      + "\n")
+        f.write("#SBATCH -t " + str(HPC_time)       + "\n")
+        f.write("#SBATCH -A " + str(HPC_account)    + "\n")
+        f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
+        f.write("#SBATCH --mail-type=begin"         + "\n")
+        f.write("#SBATCH --mail-type=end"           + "\n")
+        # Executable part.
+        f.write("  read i < currentcycle.txt"       + "\n")
+        f.write("# fetch input files from /eqquasi" + "\n")
+        f.write("  cp eqquasi/model.txt ./"         + "\n")
+        f.write("  cp eqquasi/stations.txt ./"      + "\n")
+        f.write("  cp eqquasi/on_fault_vars_input.nc ./" + "\n")
+        f.write("# if cycle id>1, then fetch fault.dyna.r.nc from D(i-2)" + "\n")
+        f.write("  if ((i > 1))"                    + "\n")
+        f.write("  then"                            + "\n")
+        f.write("    echo 'Simulating cycle ' $i '... ...'"  + "\n")
+        f.write("    cp -r \"D$((i-2))/\"fault.dyna.r.nc ./" + "\n")
+        f.write("    cp -r fault.dyna.r.nc fault.r.nc"       + "\n")
+        f.write("  fi"                                       + "\n")
+        f.write("# run eqquasi"                     + "\n")
+        f.write("  ibrun eqquasi"                   + "\n")
+        f.write("# move results to Q(i-1)"          + "\n")
+        f.write("# delete Q(i-1)"                   + "\n")
+        f.write("  rm -rf \"Q$((i-1))\""            + "\n")
+        f.write("# create Q(i-1) and copy results and inputs over" + "\n")
+        f.write("  mkdir \"Q$((i-1))\""             + "\n")
+        f.write("  cp -r a.eqquasi.log* \"Q$((i-1))\""         + "\n")
+        f.write("  cp -r on_fault_vars_input.nc \"Q$((i-1))\"" + "\n")
+        f.write("  cp -r currentcycle.txt \"Q$((i-1))\""       + "\n")
+        f.write("  cp -r fltst* srfst* tdyna* \"Q$((i-1))\""   + "\n")
+        f.write("  cp -r global* p1* p2* disp.* \"Q$((i-1))\"" + "\n")
+        f.write("  cp -r fault.* cplot* \"Q$((i-1))\""         + "\n")
+        f.write("  cp -r eqquasi/plot_on_fault_vars2 \"Q$((i-1))\"" + "\n")
+        f.write("  cp -r eqquasi/user_defined_params.py \"Q$((i-1))\"" + "\n")
+        f.write("  cp -r eqquasi/lib.py \"Q$((i-1))\""                 + "\n")
+        f.write("# clean up the root for running eqdyna"               + "\n")
+        f.write("  rm -rf a.eqquasi.log* model.txt stations.txt"       + "\n")
+        f.write("  rm -rf on_fault_vars_input.nc"                      + "\n")
+        f.write("  rm -rf fltst* srfst* tdyna* global* p1* p2* disp.*" + "\n")
+        f.write("  rm -rf fault.* cplot* "                             + "\n")
+        f.write("  rm -rf eqquasi.mesh.*"                              + "\n")
+        f.write("# postprocessing"                                     + "\n")
+        f.write("  cd \"Q$((i-1))\""                                   + "\n")
+        f.write("  ibrun -np 1 python plot_on_fault_vars2"             + "\n")
+        f.write("  cd .."                                              + "\n")
+        # End excutable part.
+
+def create_batch_script_cycle_old():
+    # made obsolete on 20230228 but kept. 
     # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.
     # Compared to batch.hpc, we don't do cycle id looping here. 
     with open("batch.cycle.hpc", "w") as f:

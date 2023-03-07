@@ -83,7 +83,7 @@ for ix, xcoor in enumerate(fx):
   for iz, zcoor in enumerate(fz):
   # assign a in RSF. a is a 2D distribution.
     tmp1  = linear1(xcoor, 20.e3, 3.e3)
-    tmp2  = linear1(-zcoor-10.e3, 7.e3, 3.e3)
+    tmp2  = linear1(-zcoor-10.e3, 7.e3, 1.e3)
     on_fault_vars[iz,ix,9]  = fric_rsf_a + (1. - tmp1*tmp2)*fric_rsf_deltaa
     on_fault_vars[iz,ix,10] = fric_rsf_b # assign b in RSF 
     on_fault_vars[iz,ix,11] = fric_rsf_Dc # assign Dc in RSF.

@@ -114,7 +114,7 @@ dx_trans = 50
 ####################################
 ##### HPC resource allocation ######
 ####################################
-casename = "bp1001-fd-250-rough"
+casename = "bp1001test"
 HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 HPC_ncpu = 30 # Number of CPUs requested.
 HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.

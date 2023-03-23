@@ -9,6 +9,7 @@ cd ..
 mkdir bin
 mv src/eqquasi bin
 
+export EQQUASIROOT=$(pwd)
 export PATH=$(pwd)/bin:$PATH
 export PATH=$(pwd)/scripts:$PATH
 

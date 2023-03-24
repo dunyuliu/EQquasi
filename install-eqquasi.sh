@@ -3,6 +3,10 @@
 module load netcdf
 ml
 
+export TACC_NETCDF_INC=/usr/include
+export TACC_NETCDF_LIB=/usr/lib/x86_64-linux-gnu
+export FC=mpif90
+
 cd src
 make
 cd ..

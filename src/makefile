@@ -77,8 +77,8 @@ LIBMUMPS_COMMON = ${libdir}/libmumps_common${PLAT}${LIBEXT}
 LIBDMUMPS = ${libdir}/libdmumps${PLAT}${LIBEXT} ${LIBMUMPS_COMMON}
 
 F90 = ${FC}
-OPT = -c -qopenmp 
-OPT1 = -qopenmp
+OPT = -c ${OMPFLAG} 
+OPT1 = ${OMPFLAG}
 OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o main.o c8g2.o shl.o faulting.o fric.o library_bound.o \
 		library_output.o crs.o elemcal.o read_input.o main_aztec.o elemcal_aztec.o msr.o func_lib.o netcdf_io.o\
 		

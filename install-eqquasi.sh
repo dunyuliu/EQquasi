@@ -6,7 +6,7 @@ ml
 export TACC_NETCDF_INC=/usr/include
 export TACC_NETCDF_LIB=/usr/lib/x86_64-linux-gnu
 export FC=mpif90
-export OMPFLAG=-fopenmp
+export OBJ=-fopenmp -ffree-line-length-none
 
 cd src
 make

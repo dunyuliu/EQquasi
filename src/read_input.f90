@@ -21,14 +21,13 @@ subroutine readmodel
 	if (me == 0) then 
 		INQUIRE(FILE="model.txt", EXIST=file_exists)
 		!write(*,*) 'Checking FE_Model_Geometry.txt by the master procs', me
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'model.txt is required but missing ...'
-			pause
 		endif 
 	endif 
 	if (me == 0) then 
 		INQUIRE(FILE="model.txt", EXIST=file_exists)
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'model.txt is still missing, so exiting EQdyna'
 			stop
 		endif 
@@ -83,14 +82,13 @@ subroutine readfric
 	if (me == 0) then 
 		INQUIRE(FILE="fric.txt", EXIST=file_exists)
 		!write(*,*) 'Checking FE_Fric.txt by the master procs', me
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'fric.txt is required but missing ...'
-			pause
 		endif 
 	endif 
 	if (me == 0) then 
 		INQUIRE(FILE="fric.txt", EXIST=file_exists)
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'fric.txt is still missing, so exiting EQdyna'
 			stop
 		endif 
@@ -182,14 +180,13 @@ subroutine readstations1
 	if (me == 0) then 
 		INQUIRE(FILE="stations.txt", EXIST=file_exists)
 		!write(*,*) 'Checking stations.txt by the master procs', me
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'stations.txt is required but missing ...'
-			pause
 		endif 
 	endif 
 	if (me == 0) then 
 		INQUIRE(FILE="stations.txt", EXIST=file_exists)
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'stations.txt is still missing, so exiting EQdyna'
 			stop
 		endif 
@@ -214,14 +211,13 @@ subroutine readstations2
 	if (me == 0) then 
 		INQUIRE(FILE="stations.txt", EXIST=file_exists)
 		!write(*,*) 'Checking stations.txt by the master procs', me
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'stations.txt is required but missing ...'
-			pause
 		endif 
 	endif 
 	if (me == 0) then 
 		INQUIRE(FILE="stations.txt", EXIST=file_exists)
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'stations.txt is still missing, so exiting EQdyna'
 			stop
 		endif 
@@ -263,14 +259,13 @@ subroutine read_fault_rough_geometry
 	if (me == 0) then 
 		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
 		!write(*,*) 'Checking rough_geo.txt by the master procs', me
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'rough_geo.txt is required but missing ...'
-			pause
 		endif 
 	endif 
 	if (me == 0) then 
 		INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
-		if (file_exists == 0) then
+		if (file_exists .eqv. .FALSE.) then
 			write(*,*) 'rough_geo.txt is still missing, so exiting EQquasi'
 			stop
 		endif 

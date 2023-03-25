@@ -18,7 +18,7 @@ clean : eqquasi
 	rm -r *.o
 	
 eqquasi: $(OBJ) 
-	$(F90) $(OPT1) $(OBJ) -o eqquasi -lmumps_common -lpord -lscalapack-openmpi -lblas -llapack $(lib_dir_aztec) -L$(netcdf_libdir) -lnetcdf -L$(netcdf_libdir) -lnetcdff
+	$(F90) $(OPT1) $(OBJ) -o eqquasi -ldmumps -lmumps_common -lpord -lscalapack-openmpi -lblas -llapack -L$(netcdf_libdir) -lnetcdf -L$(netcdf_libdir) -lnetcdff
 	
 eqquasi.o: eqquasi.f90 main.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
 			library_output.o crs.o elemcal.o read_input.o msr.o func_lib.o netcdf_io.o

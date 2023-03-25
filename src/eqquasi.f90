@@ -12,7 +12,8 @@ program eqquasi3d
 	integer (kind = 4) :: itmp, i, l, k, j
 	real (kind = dp) :: tmp
 	character (len = 50) :: filenametmp, output_type
-
+	logical :: file_exists
+	
 	CALL MPI_INIT(IERR)
 	call mpi_comm_rank(MPI_COMM_WORLD,me,IERR)
 	call mpi_comm_size(MPI_COMM_WORLD,nprocs,IERR)
@@ -29,16 +30,22 @@ program eqquasi3d
 	write(*,*) '=   quasi-dynamic deformation. It is part of the fully dynamic      ='
 	write(*,*) '=   earthquake simulator EQsimu.                                    ='
 	write(*,*) '=                                                                   ='
-	write(*,*) '=   Model and system related parameters can be adjusted in          ='
+	write(*,*) '=   Following model and system files should be provided:            ='
 	write(*,*) '=       model.txt,                                                  ='
-	write(*,*) '=       fric.txt,                                                   ='
-	write(*,*) '=       stations.txt,                                               ='
+	write(*,*) '=       on_fault_vars_input.nc (fault.r.nc for cycle id>1),         ='
+	write(*,*) '=       stations.txt.                                               ='
 	write(*,*) '=                                                                   ='
 	write(*,*) '====================================================================='
 	endif 
 	
 	call readcurrentcycle 
+	write(*,*) '====================================================================='
+	write(*,*) '=====   model.txt is loaded ... ...                                 ='
+	
 	call readmodel
+	write(*,*) '====================================================================='
+	write(*,*) '=====   stations.txt is loaded ... ...                              ='
+	
 	!call readfric
 	if (rough_fault == 1) then 
 		call read_fault_rough_geometry 
@@ -134,10 +141,30 @@ program eqquasi3d
 	
 	call meshgen
 	
-	if (icstart == 1) then 
+	if (icstart == 1) then
+		INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
+        	! 'Checking on_fault_vars_input.nc'
+        	if (file_exists .eqv. .FALSE.) then
+            		write(*,*) 'on_fault_vars_input.nc is required but missing ...'
+        	endif 
+		
 		call netcdf_read_on_fault("on_fault_vars_input.nc")
+		write(*,*) '====================================================================='
+		write(*,*) '===== on_fault_vars_input.nc is loaded ... ...                      ='
 	else
+		INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
+        	if (file_exists .eqv. .FALSE.) then
+            		write(*,*) 'on_fault_vars_input.nc is required but missing ...'
+        	endif 
+		
+		INQUIRE(FILE="fault.r.nc", EXIST=file_exists)
+        	if (file_exists .eqv. .FALSE.) then
+            		write(*,*) 'icstart>1, fault.r.nc is required but missing ...'
+        	endif
+		
 		call netcdf_read_on_fault_restart("on_fault_vars_input.nc", "fault.r.nc")
+		write(*,*) '====================================================================='
+		write(*,*) '===== on_fault_vars_input.nc and fault.r.nc are loaded ... ...      ='
 	endif 
 	
 	! Write out mesh information

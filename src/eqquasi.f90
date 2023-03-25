@@ -192,7 +192,8 @@ program eqquasi3d
 	if (sol_op == 1) then 
 		call main
 	elseif (sol_op == 2) then 
-		call main_aztec
+		write(*,*) 'aztec is temporarily disabled.'
+		!call main_aztec
 	endif
 	
 	if (me == 0) then

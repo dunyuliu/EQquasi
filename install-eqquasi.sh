@@ -9,6 +9,7 @@
 #	ubuntu: Ubuntu 22.04
 
 # Usage: install-eqquasi [-h] [-m Machine_name] [-c Machine_name]
+set -- "$@"
 
 while getopts "hm:c:" OPTION; do
     case $OPTION in

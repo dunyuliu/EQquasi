@@ -8,32 +8,42 @@
 #	ls6:	Lonestar6 at TACC
 #	 ubuntu: Ubuntu 22.04
 
-# check for --help option
-for arg in "$@"; do 
-    case $arg in 
-        --help)
-            echo "Usage: install-eqquasi [--help] MACH_name"
-            echo "Options:"
-            echo "  --help  Display this help message"
-            echo "Currently supported MACH name:"
-            echo "  ls6/ubuntu"
-            echo "Example:"
-            echo "  source install-eqquasi ls6"
+# Usage: install-eqquasi [-h] [-m] Machine_name
+
+while getopts "hm:" OPTION; do
+    case $OPTION in
+        m)
+            MACH=$OPTARG
+        h)
+            echo "Full command: install-eqquasi [-h] [-m] Machine_name       "
+            echo "Usage:                                                     "
+            echo " source install-eqquasi -h                                 "
+            echo "      Display this help message                            "
+            echo " source install-eqquasi -m ls6                             "
+            echo "      Install EQquasi on Lonestar6 at TACC                 "
+            echo "                                                           "
+            echo "Currently supported machines:                              "
+            echo "  ls6/ubuntu                                               "
             ;;
     esac
 done 
+            ;;
+# for arg in "$@"; do 
+    # case $arg in 
+        # --help)
+            # echo "Usage: install-eqquasi [--help] MACH_name"
+            # echo "Options:"
+            # echo "  --help  Display this help message"
+            # echo "Currently supported MACH name:"
+            # echo "  ls6/ubuntu"
+            # echo "Example:"
+            # echo "  source install-eqquasi ls6"
+            # ;;
+    # esac
+# done 
 
-echo "Users need to specify the environment variable MACHINE"
-
-MACH=$1 # ls6/ubuntu
-
-if [ MACH == "-help" ]; then 
-    echo "Please provide the Machine name for compiling EQquasi ... ..."
-    echo "Currently supported machines includes: "
-    echo "  ls6/ubuntu"
-else
+if [ -n "$MACH" ]; then 
     export MACHINE=$MACH
-
     if [ $MACHINE == "ls6" ]; then 
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
         module load netcdf mumps
@@ -50,16 +60,16 @@ else
         ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
         ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
     fi 
+    cd src
+    make
+    cd ..
+    mkdir bin
+    mv src/eqquasi bin
+
+    export EQQUASIROOT=$(pwd)
+    export PATH=$(pwd)/bin:$PATH
+    export PATH=$(pwd)/scripts:$PATH
+
+    chmod -R 755 scripts
 fi
 
-cd src
-make
-cd ..
-mkdir bin
-mv src/eqquasi bin
-
-export EQQUASIROOT=$(pwd)
-export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/scripts:$PATH
-
-chmod -R 755 scripts

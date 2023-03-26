@@ -25,10 +25,16 @@ ifeq ($(SYSTEM), ubuntu)
     LAPACK_LIB = -L${LIB} -llapack
 
 else ifeq ($(SYSTEM), ls6)
-    FFLAGS = -qopenmp
-    FC     = mpiifort
+    FFLAGS     = -qopenmp
+    FC         = mpiifort
+    LIB        = ${TACC_MKL_LIB}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
+    MUMPS_LIB  = -L${TACC_MUMPS_LIB} -lmumps_common -L${TACC_MUMPS_LIB} -ldmumps
+    PORD_LIB   = -L${TACC_MUMPS_LIB} -lpord
+    BLAS_LIB   = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread
+    SCALAPACK_LIB = -L${LIB} -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64
+    LAPACK_LIB = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
 endif 
 
 OPT  = -c ${FFLAGS} 

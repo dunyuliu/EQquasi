@@ -8,40 +8,37 @@
 #	ls6:	Lonestar6 at TACC
 #	ubuntu: Ubuntu 22.04
 
-# Usage: install-eqquasi [-h] [-m] Machine_name
+# Usage: install-eqquasi [-h] [-m Machine_name] [-c Machine_name]
 
-while getopts "hm:" OPTION; do
+while getopts "hm:c:" OPTION; do
     case $OPTION in
         m)
             MACH=$OPTARG
             ;;
+        c)
+            MACH=$OPTARG
+            CONFIG="True"
+            ;;
         h)
-            echo "Full command: install-eqquasi [-h] [-m] Machine_name       "
-            echo "Usage:                                                     "
-            echo " source install-eqquasi -h                                 "
-            echo "      Display this help message                            "
-            echo " source install-eqquasi -m ls6                             "
-            echo "      Install EQquasi on Lonestar6 at TACC                 "
-            echo "                                                           "
-            echo "Currently supported machines:                              "
-            echo "  ls6/ubuntu                                               "
+            echo "Usage: ./install-eqquasi.sh [-h] [-m Machine_name] [-c Machine_name] "
+            echo "                                                                     "
+            echo "Examples:                                                            "
+            echo "                                                                     "
+            echo "./install-eqquasi.sh -h                                              "
+            echo " -----Display this help message                                      "
+            echo "                                                                     "
+            echo "./install-eqquasi.sh -m ls6                                          "
+            echo " -----Install EQquasi on Lonestar6 at TACC                           "
+            echo "                                                                     "
+            echo "./install-eqquasi.sh -c ubuntu                                       "
+            echo " -----Simply set up envs for EQquasi without installation            "
+            echo " -----on ubuntu                                                      "
+            echo "                                                                     "
+            echo "Currently supported machines include:                                "
+            echo " ls6/ubuntu                                                          "
             ;;
     esac
 done 
-
-# for arg in "$@"; do 
-    # case $arg in 
-        # --help)
-            # echo "Usage: install-eqquasi [--help] MACH_name"
-            # echo "Options:"
-            # echo "  --help  Display this help message"
-            # echo "Currently supported MACH name:"
-            # echo "  ls6/ubuntu"
-            # echo "Example:"
-            # echo "  source install-eqquasi ls6"
-            # ;;
-    # esac
-# done 
 
 if [ -n "$MACH" ]; then 
     export MACHINE=$MACH
@@ -61,11 +58,16 @@ if [ -n "$MACH" ]; then
         ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
         ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
     fi 
-    cd src
-    make
-    cd ..
-    mkdir bin
-    mv src/eqquasi bin
+    
+    if [ -n "$CONFIG" ]; then 
+        echo "Simply configure EQquasi without installation ... ..."
+    else
+        cd src
+        make
+        cd ..
+        mkdir bin
+        mv src/eqquasi bin
+    fi
 
     export EQQUASIROOT=$(pwd)
     export PATH=$(pwd)/bin:$PATH

@@ -19,7 +19,6 @@ for arg in "$@"; do
             echo "  ls6/ubuntu"
             echo "Example:"
             echo "  source install-eqquasi ls6"
-            exit 0
             ;;
     esac
 done 

@@ -1,4 +1,4 @@
-#! user/bin/bash 
+#! /bin/bash 
 
 # The shell script is to set up environments for EQquasi and 
 #	install it. It will call the makefile inside src/ and generate 
@@ -6,7 +6,7 @@
 
 # Currently, the machines supported are:
 #	ls6:	Lonestar6 at TACC
-#	 ubuntu: Ubuntu 22.04
+#	ubuntu: Ubuntu 22.04
 
 # Usage: install-eqquasi [-h] [-m] Machine_name
 

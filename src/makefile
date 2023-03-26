@@ -50,9 +50,8 @@ clean : eqquasi
 	rm -r *.o
     
 eqquasi: $(OBJ) 
-	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} ${BLAS_LIB} \
-        ${SCALAPACK_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
-    
+	$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
+            ${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
 eqquasi.o:   eqquasi.f90 main.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      library_bound.o \
              library_output.o        crs.o       elemcal.o   \

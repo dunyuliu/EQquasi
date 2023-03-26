@@ -16,12 +16,14 @@ export MACHINE=$MACH
 
 if [ $MACHINE == "ls6" ]; then 
 	echo "Installing EQquasi on Lonestar6 at TACC ... ..."
-	module load netcdf
+	module load netcdf mumps
 	ml
 	echo "NETCDF INC and LIB PATH"
 	echo $TACC_NETCDF_INC
 	echo $TACC_NETCDF_LIB
-	
+	echo $TACC_MUMPS_INC
+	echo $TACC_MUMPS_LIB
+    
 elif [ $MACHINE == "ubuntu" ]; then 
 	echo "Installing EQquasi on Ubuntu 22.04 ... ..."
 	export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH

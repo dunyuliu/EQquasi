@@ -12,27 +12,26 @@
 SYSTEM = ${MACHINE}
 
 ifeq ($(SYSTEM), ubuntu)
-	FFLAGS = '-fopenmp -ffree-line-length-none'
-	FC     = mpif90
-	TARGET = eqquasi
+	FFLAGS     = -fopenmp -ffree-line-length-none
+	FC         = mpif90
 	LIB        = /usr/lib/x86_64-linux-gnu
 	INC        = /usr/include
-	NETCDF_LIB = -L${LIB} -netcdf -L{LIB} -netcdff
+	NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
 	NETCDF_INC = -I${INC}
 	MUMPS_LIB  = -L${LIB} -lmumps_common -L${LIB} -ldmumps
 	PORD_LIB   = -L${LIB} -lpord
-	BLAS_LIB   = -L${LIB} -ll
+	BLAS_LIB   = -L${LIB} -lblas
 	SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
 	LAPACK_LIB = -L${LIB} -llapack
+
 else ifeq ($(SYSTEM), ls6)
-	FFLAGS = '-qopenmp'
+	FFLAGS = -qopenmp
 	FC     = mpiifort
-	TARGET = eqquasi
-	netcdf_incdir = ${TACC_NETCDF_INC}
-	netcdf_libdir = ${TACC_NETCDF_LIB}
+	NETCDF_INC = -I${TACC_NETCDF_INC}
+	NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
 endif 
 
-OPT = -c ${FFLAGS} 
+OPT  = -c ${FFLAGS} 
 OPT1 = ${FFLAGS}
 OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         main.o      c8g2.o      shl.o       faulting.o  \

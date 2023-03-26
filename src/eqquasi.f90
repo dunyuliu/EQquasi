@@ -1,4 +1,4 @@
-!/* Copyright (C) 2018-2021, Earthquake Modeling Lab @ Texas A&M University. 
+!/* Copyright (C) 2018-2023, Earthquake Modeling Lab @ Texas A&M University. 
 ! * All Rights Reserved.
 ! * This code is part of software EQquasi, please see EQquasi License Agreement
 ! * attached before you copy, download, install or use EQquasi./
@@ -150,7 +150,7 @@ program eqquasi3d
 		
 		call netcdf_read_on_fault("on_fault_vars_input.nc")
 		write(*,*) '====================================================================='
-		write(*,*) '===== on_fault_vars_input.nc is loaded ... ...                      ='
+		write(*,*) '=====   on_fault_vars_input.nc is loaded ... ...                    ='
 	else
 		INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
         	if (file_exists .eqv. .FALSE.) then
@@ -164,7 +164,7 @@ program eqquasi3d
 		
 		call netcdf_read_on_fault_restart("on_fault_vars_input.nc", "fault.r.nc")
 		write(*,*) '====================================================================='
-		write(*,*) '===== on_fault_vars_input.nc and fault.r.nc are loaded ... ...      ='
+		write(*,*) '=====   on_fault_vars_input.nc and fault.r.nc are loaded ... ...    ='
 	endif 
 	
 	! Write out mesh information

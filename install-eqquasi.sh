@@ -8,6 +8,22 @@
 #	ls6:	Lonestar6 at TACC
 #	 ubuntu: Ubuntu 22.04
 
+# check for --help option
+for arg in "$@"; do 
+    case $arg in 
+        --help)
+            echo "Usage: install-eqquasi [--help] MACH_name"
+            echo "Options:"
+            echo "  --help  Display this help message"
+            echo "Currently supported MACH name:"
+            echo "  ls6/ubuntu"
+            echo "Example:"
+            echo "  source install-eqquasi ls6"
+            exit 0
+            ;;
+    esac
+done 
+
 echo "Users need to specify the environment variable MACHINE"
 
 MACH=$1 # ls6/ubuntu

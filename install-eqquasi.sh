@@ -12,7 +12,7 @@ echo "Users need to specify the environment variable MACHINE"
 
 MACH=ubuntu # ls6/ubuntu
 	
-export MACHINE=$(MACH)
+export MACHINE=$MACH
 
 if [ $MACHINE == "ls6" ]; then 
 	echo "Installing EQquasi on Lonestar6 at TACC ... ..."

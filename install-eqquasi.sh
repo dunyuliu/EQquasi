@@ -10,26 +10,32 @@
 
 echo "Users need to specify the environment variable MACHINE"
 
-MACH=ubuntu # ls6/ubuntu
-	
-export MACHINE=$MACH
+MACH=$1 # ls6/ubuntu
 
-if [ $MACHINE == "ls6" ]; then 
-	echo "Installing EQquasi on Lonestar6 at TACC ... ..."
-	module load netcdf mumps
-	ml
-	echo "NETCDF INC and LIB PATH"
-	echo $TACC_NETCDF_INC
-	echo $TACC_NETCDF_LIB
-	echo $TACC_MUMPS_INC
-	echo $TACC_MUMPS_LIB
-    
-elif [ $MACHINE == "ubuntu" ]; then 
-	echo "Installing EQquasi on Ubuntu 22.04 ... ..."
-	export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-	ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
-	ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
-fi 
+if [ MACH == "-help" ]; then 
+    echo "Please provide the Machine name for compiling EQquasi ... ..."
+    echo "Currently supported machines includes: "
+    echo "  ls6/ubuntu"
+else
+    export MACHINE=$MACH
+
+    if [ $MACHINE == "ls6" ]; then 
+        echo "Installing EQquasi on Lonestar6 at TACC ... ..."
+        module load netcdf mumps
+        ml
+        echo "NETCDF INC and LIB PATH"
+        echo $TACC_NETCDF_INC
+        echo $TACC_NETCDF_LIB
+        echo $TACC_MUMPS_INC
+        echo $TACC_MUMPS_LIB
+        
+    elif [ $MACHINE == "ubuntu" ]; then 
+        echo "Installing EQquasi on Ubuntu 22.04 ... ..."
+        export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+        ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
+        ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
+    fi 
+fi
 
 cd src
 make

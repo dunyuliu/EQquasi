@@ -28,6 +28,7 @@ else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort
     LIB        = ${TACC_MKL_LIB}
+    INC        = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
     MUMPS_LIB  = -L${TACC_MUMPS_LIB} -lmumps_common -L${TACC_MUMPS_LIB} -ldmumps

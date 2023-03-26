@@ -44,11 +44,16 @@ if [ -n "$MACH" ]; then
     export MACHINE=$MACH
     if [ $MACHINE == "ls6" ]; then 
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
+        
+        echo "Loading netcdf and mumps modules ... ..."
         module load netcdf mumps
         ml
+        
         echo "NETCDF INC and LIB PATH"
         echo $TACC_NETCDF_INC
         echo $TACC_NETCDF_LIB
+        
+        echo "TACC_MUMPS INC and LIB PATH"
         echo $TACC_MUMPS_INC
         echo $TACC_MUMPS_LIB
         
@@ -72,7 +77,10 @@ if [ -n "$MACH" ]; then
     export EQQUASIROOT=$(pwd)
     export PATH=$(pwd)/bin:$PATH
     export PATH=$(pwd)/scripts:$PATH
-
+    
+    echo EQQUASIROOT
+    echo PATH 
+    
     chmod -R 755 scripts
 fi
 

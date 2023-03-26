@@ -28,7 +28,7 @@ while getopts "hm:" OPTION; do
             ;;
     esac
 done 
-            ;;
+
 # for arg in "$@"; do 
     # case $arg in 
         # --help)

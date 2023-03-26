@@ -31,10 +31,15 @@ else ifeq ($(SYSTEM), ls6)
     INC        = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
-    MUMPS_LIB  = -L../lib/MUMPS/lib/ -ldmumps -lmumps_common -lpord # Good for the precompiled libs with the repo.
     
-    # for ls6 precompiled libraries. The order of libs are important. Use Bing AI search for the ordering.
-    #MUMPS_LIB  = -L${TACC_MUMPS_LIB} -ldmumps -lmumps_common -lpord -lptscotch -lptscotcherr -lptesmumps -lesmumps -lscotch -lscotcherr -lmetis -lparmetis
+    # Good for precompiled libs on LS6 in 2021. The libs come along with the repo.
+    # MUMPS_LIB  = -L../lib/MUMPS/lib/ -ldmumps -lmumps_common -lpord 
+    
+    # Good for LS6 precompiled mumps module. The order of libs are important. 
+    # Used Bing AI search for the ordering.
+    MUMPS_LIB  = -L${TACC_MUMPS_LIB} -ldmumps -lmumps_common -lpord -lptscotch \
+                                    -lptscotcherr -lptesmumps -lesmumps -lscotch \
+                                    -lscotcherr -lmetis -lparmetis
     #PORD_LIB   = -L${TACC_MUMPS_LIB} -lpord
     BLAS_LIB   = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread
     SCALAPACK_LIB = -L${LIB} -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64

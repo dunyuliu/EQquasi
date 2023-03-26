@@ -14,6 +14,7 @@ while getopts "hm:" OPTION; do
     case $OPTION in
         m)
             MACH=$OPTARG
+            ;;
         h)
             echo "Full command: install-eqquasi [-h] [-m] Machine_name       "
             echo "Usage:                                                     "

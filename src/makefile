@@ -3,127 +3,94 @@
 # This makefile file is part of software EQquasi.
 
 # This makefile is to compile EQquasi v1.3.0 with MUMPS, a high-performance, 
-# parallel direct solver to sparse linear system of equations, and AZTEC, an interative solver. 
-# It is modified from the Makefile.inc that comes with MUMPS5.1.2 package. 
+# for Ubuntu.
 
-HPC=1 
+# machine is defined in install-eqquasi.shl
+# currently, it supports: 
+# 	ls6
+# 	ubuntu
+SYSTEM = ${MACHINE}
 
-# For HPC Frontera with MUMPS installed with PETSC
-#ml mumps petcs
-#topdir = ${TACC_PETSC_DIR}
-#libdir = ${TACC_MUMPS_LIB}
-#incdir = ${TACC_MUMPS_INC}
-#topdirpord = /work2/07931/dunyuliu/0.Dunyu/P25-SEAS-BP5/MUMPS_5.1.2
+ifeq ($(SYSTEM), ubuntu)
+	FFLAGS = '-fopenmp -ffree-line-length-none'
+	FC     = mpif90
+	TARGET = eqquasi
+	LIB        = /usr/lib/x86_64-linux-gnu
+	INC        = /usr/include
+	NETCDF_LIB = -L${LIB} -netcdf -L{LIB} -netcdff
+	NETCDF_INC = -I${INC}
+	MUMPS_LIB  = -L${LIB} -lmumps_common -L${LIB} -ldmumps
+	PORD_LIB   = -L${LIB} -lpord
+	BLAS_LIB   = -L${LIB} -ll
+	SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
+	LAPACK_LIB = -L${LIB} -llapack
+else ifeq ($(SYSTEM), ls6)
+	FFLAGS = '-qopenmp'
+	FC     = mpiifort
+	TARGET = eqquasi
+	netcdf_incdir = ${TACC_NETCDF_INC}
+	netcdf_libdir = ${TACC_NETCDF_LIB}
+endif 
 
-# Locally installed mumps
-topdir = ../lib/MUMPS
-libdir = ${topdir}/lib
-incdir = ${topdir}/include 
-netcdf_incdir = ${TACC_NETCDF_INC}
-netcdf_libdir = ${TACC_NETCDF_LIB}
-topdirpord = ${topdir}
-
-top_dir_aztec = ../lib/AZTEC2.1/
-lib_dir_aztec = ../lib/AZTEC2.1/lib/libaztec.a
-inc_dir_aztec = ../lib/AZTEC2.1/include
-additional_fortran_code1 = ../lib/AZTEC2.1/additional_fortran/*.f 
-additional_fortran_code2 = ../lib/AZTEC2.1/additional_fortran/*.F 
-
-MKLROOT=/opt/intel/mkl/lib/intel64
-
-LPORDDIR = $(topdirpord)/lib/
-IPORD    = -I$(topdirpord)/include/
-LPORD    = -L$(LPORDDIR) -lpord
-
-PLAT    =
-LIBEXT  = .a
-OUTC    = -o 
-OUTF    = -o 
-RM = /bin/rm -f
-CC = mpiicc
-#FC = mpif90
-#FL = mpiifort
-AR = ar vr 
-#RANLIB = ranlib
-RANLIB  = echo
-# Make this variable point to the path where the Intel MKL library is
-# installed. It is set to the default install directory for Intel MKL.
-
-LAPACK = -L$(MKLROOT) -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
-SCALAP = -L$(MKLROOT) -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64
-
-LIBPAR = $(SCALAP) $(LAPACK)
-
-INCSEQ = -I$(topdir)/libseq
-LIBSEQ  = $(LAPACK) -L$(topdir)/libseq -lmpiseq
-
-LIBBLAS = -L$(MKLROOT) -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core 
-LIBOTHERS = -lpthread
-
-#Preprocessor defs for calling Fortran from C (-DAdd_ or -DAdd__ or -DUPPER)
-CDEFS   = -DAdd_
-
-#Begin Optimized options
-OPTF    = -O -nofor_main -DBLR_MT -qopenmp # or -openmp for old compilers
-OPTL    = -O -nofor_main -qopenmp
-OPTC    = -O -qopenmp
-#End Optimized options
- 
-INCS = $(INCPAR) 
-LIBS = $(LIBPAR)
-LIBSEQNEEDED =
-
-LIBMUMPS_COMMON = ${libdir}/libmumps_common${PLAT}${LIBEXT}
-LIBDMUMPS = ${libdir}/libdmumps${PLAT}${LIBEXT} ${LIBMUMPS_COMMON}
-
-F90 = ${FC}
-OPT = -c ${FLAG} 
-OPT1 = ${FLAG}
-OBJ = eqquasi.o globalvar.o mesh4num.o meshgen.o main.o c8g2.o shl.o faulting.o fric.o library_bound.o \
-		library_output.o crs.o elemcal.o read_input.o main_aztec.o elemcal_aztec.o msr.o func_lib.o netcdf_io.o\
+OPT = -c ${FFLAG} 
+OPT1 = ${FFLAG}
+OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
+        main.o      c8g2.o      shl.o       faulting.o  \
+		fric.o      library_bound.o         library_output.o \
+		crs.o       elemcal.o   read_input.o            \
+		msr.o       func_lib.o  netcdf_io.o\
 		
-clean : eqquasi
+clean : ${TARGET}
 	rm -r *.o
+
+all: ${TARGET}
 	
 eqquasi: $(OBJ) 
-	$(F90) $(OPT1) $(OBJ) $(additional_fortran_code1) $(additional_fortran_code2) -o eqquasi $(LIBDMUMPS) $(LORDERINGS) $(LIBS) $(LIBBLAS) $(LIBOTHERS) $(LPORD) $(lib_dir_aztec) -L$(netcdf_libdir) -lnetcdf -L$(netcdf_libdir) -lnetcdff
+	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} ${BLAS_LIB} \
+		${SCALAPACK_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
 	
-eqquasi.o: eqquasi.f90 main.o main_aztec.o globalvar.o mesh4num.o meshgen.o faulting.o fric.o library_bound.o \
-			library_output.o crs.o elemcal.o elemcal_aztec.o read_input.o msr.o func_lib.o netcdf_io.o
-	$(F90) $(OPT) eqquasi.f90 
-globalvar.o:  globalvar.f90
-	$(F90) $(OPT) globalvar.f90 	
+eqquasi.o:   eqquasi.f90 main.o      globalvar.o mesh4num.o  \
+             meshgen.o   faulting.o  fric.o      library_bound.o \
+		     library_output.o        crs.o       elemcal.o   \
+		     read_input.o            msr.o       func_lib.o  \
+		     netcdf_io.o
+	$(FC) $(OPT) eqquasi.f90 
+globalvar.o: globalvar.f90
+	$(FC) $(OPT) globalvar.f90 	
 mesh4num.o:  mesh4num.f90  globalvar.o
-	$(F90) $(OPT) mesh4num.f90
-meshgen.o:  meshgen.f90 globalvar.o func_lib.o
-	$(F90) $(OPT) meshgen.f90
-main.o: main.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o crs.o elemcal.o netcdf_io.o
-	$(F90) $(OPT) main.f90	-I${incdir}		
-main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o msr.o elemcal_aztec.o 
-	$(F90) $(OPT) main_aztec.f90 -I${inc_dir_aztec}		
-c8g2.o:  c8g2.f90 globalvar.o shl.o
-	$(F90) $(OPT) c8g2.f90	
-shl.o:  shl.f90 globalvar.o
-	$(F90) $(OPT) shl.f90
+	$(FC) $(OPT) mesh4num.f90
+meshgen.o:   meshgen.f90 globalvar.o func_lib.o
+	$(FC) $(OPT) meshgen.f90
+main.o:      main.f90    globalvar.o c8g2.o      shl.o       \
+             faulting.o  fric.o      library_bound.o         \
+			 library_output.o        crs.o       elemcal.o   \
+			 netcdf_io.o
+	$(FC) $(OPT) main.f90 -I${INC}		
+#main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o msr.o elemcal_aztec.o 
+#	$(FC) $(OPT) main_aztec.f90 -I${inc_dir_aztec}		
+c8g2.o:      c8g2.f90    globalvar.o shl.o
+	$(FC) $(OPT) c8g2.f90	
+shl.o:       shl.f90     globalvar.o
+	$(FC) $(OPT) shl.f90
 faulting.o:  faulting.f90 fric.o globalvar.o library_output.o func_lib.o
-	$(F90) $(OPT) faulting.f90		
-fric.o: fric.f90 globalvar.o
-	$(F90) $(OPT) fric.f90		
+	$(FC) $(OPT) faulting.f90		
+fric.o:      fric.f90 globalvar.o
+	$(FC) $(OPT) fric.f90		
 library_bound.o: library_bound.f90  globalvar.o
-	$(F90) $(OPT) library_bound.f90
+	$(FC) $(OPT) library_bound.f90
 library_output.o: library_output.f90  globalvar.o
-	$(F90) $(OPT) library_output.f90
-crs.o : crs.f90  globalvar.o
-	$(F90) $(OPT) crs.f90
-elemcal.o : elemcal.f90  globalvar.o
-	$(F90) $(OPT) elemcal.f90	
-elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
-	$(F90) $(OPT) elemcal_aztec.f90		
-msr.o : msr.f90  globalvar.o
-	$(F90) $(OPT) msr.f90		
+	$(FC) $(OPT) library_output.f90
+crs.o :      crs.f90  globalvar.o
+	$(FC) $(OPT) crs.f90
+elemcal.o :  elemcal.f90  globalvar.o
+	$(FC) $(OPT) elemcal.f90	
+#elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
+#	$(FC) $(OPT) elemcal_aztec.f90		
+msr.o :      msr.f90  globalvar.o
+	$(FC) $(OPT) msr.f90		
 read_input.o: read_input.f90 globalvar.o
-	$(F90) $(OPT) read_input.f90
-func_lib.o: func_lib.f90
-	$(F90) $(OPT) func_lib.f90
+	$(FC) $(OPT) read_input.f90
+func_lib.o:  func_lib.f90
+	$(FC) $(OPT) func_lib.f90
 netcdf_io.o: netcdf_io.f90 
-	$(F90) $(OPT) netcdf_io.f90 -I${netcdf_incdir}	
+	$(FC) $(OPT) netcdf_io.f90 ${NETCDF_INC}	

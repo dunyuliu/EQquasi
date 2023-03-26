@@ -31,7 +31,7 @@ else ifeq ($(SYSTEM), ls6)
     INC        = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
-    MUMPS_LIB  = -L${TACC_MUMPS_LIB} -lmumps_common -L${TACC_MUMPS_LIB} -ldmumps
+    MUMPS_LIB  = ${TACC_MUMPS_LIB}/libmumps_common.a ${TACC_MUMPS_LIB}/libdmumps.a
     PORD_LIB   = -L${TACC_MUMPS_LIB} -lpord
     BLAS_LIB   = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread
     SCALAPACK_LIB = -L${LIB} -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64

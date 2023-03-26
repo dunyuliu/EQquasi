@@ -10,9 +10,9 @@
 
 echo "Users need to specify the ENV VAR MACHINE"
 
-MACHINE = ubuntu # ls6/ubuntu
+MACHINE=ubuntu # ls6/ubuntu
 
-if [$MACHINE -eq "ls6"]; then 
+if [ $MACHINE == "ls6" ]; then 
 	echo "Installing EQquasi on Lonestar6 at TACC ... ..."
 	module load netcdf
 	ml
@@ -20,15 +20,15 @@ if [$MACHINE -eq "ls6"]; then
 	echo $TACC_NETCDF_INC
 	echo $TACC_NETCDF_LIB
 	
-elif [$MACHINE -eq "ubuntu"]; then 
+elif [ $MACHINE == "ubuntu" ]; then 
 	echo "Installing EQquasi on Ubuntu 22.04 ... ..."
 	export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-	ln -s /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
-	ln -s /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
+	ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
+	ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
 fi 
 
 cd src
-make all 
+make
 cd ..
 mkdir bin
 mv src/eqquasi bin

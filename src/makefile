@@ -32,18 +32,16 @@ else ifeq ($(SYSTEM), ls6)
 	netcdf_libdir = ${TACC_NETCDF_LIB}
 endif 
 
-OPT = -c ${FFLAG} 
-OPT1 = ${FFLAG}
+OPT = -c ${FFLAGS} 
+OPT1 = ${FFLAGS}
 OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         main.o      c8g2.o      shl.o       faulting.o  \
 		fric.o      library_bound.o         library_output.o \
 		crs.o       elemcal.o   read_input.o            \
 		msr.o       func_lib.o  netcdf_io.o\
 		
-clean : ${TARGET}
+clean : eqquasi
 	rm -r *.o
-
-all: ${TARGET}
 	
 eqquasi: $(OBJ) 
 	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} ${BLAS_LIB} \

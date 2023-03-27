@@ -35,6 +35,9 @@ while getopts "hm:c:" OPTION; do
             echo " -----Simply set up envs for EQquasi without installation            "
             echo " -----on ubuntu                                                      "
             echo "                                                                     "
+            echo "source install-eqquasi.sh                                            "
+            echo " -----Activate ENV VAR EQQUASIROOT and add exes to PATH              "
+            echo "                                                                     "
             echo "Currently supported machines include:                                "
             echo " ls6/ubuntu                                                          "
             ;;
@@ -85,3 +88,9 @@ if [ -n "$MACH" ]; then
     chmod -R 755 scripts
 fi
 
+export EQQUASIROOT=$(pwd)
+export PATH=$(pwd)/bin:$PATH
+export PATH=$(pwd)/scripts:$PATH
+
+echo EQQUASIROOT
+echo PATH 

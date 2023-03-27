@@ -1,3 +1,6 @@
+# News in 2023
+* 20230327 *```EQquasi```* works on Ubuntu.
+
 *EQquasi*
 =======
 *```EQquasi```* is a parallel finite-element software to simulate quasi-static/quasi-dynamic earthquake cycle deformation induced by fault slips governed by rate- and state- friction. It is part of the fully dynamic earthquake cycle simulator *```EQsimu```* [(*Liu et al.*, 2020, *GJI*)](https://doi.org/10.1093/gji/ggz475) to simulate deformation during the inter-seismic, nucleation, post-seismic, and dynamic rupture phases of earthquake cycles. It relies on parallel solvers [*MUMPS*](http://mumps-solver.org) or [*AZTEC*](https://trilinos.github.io/aztecoo.html#aztec-21-foundation-for-aztecoo) to handle the computing loads. It is written in FORTRAN90 with post-process scripts written in [*MATLAB*](https://www.mathworks.com/products/matlab.html).
@@ -7,17 +10,36 @@ This repository hosts the source code, compiling instruction, post-processing sc
 *MUMPS* is distributed under the [CeCILL-C license](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html) and for proper ackowledgement, please read the LICENCE for *MUMPS*. The newest version of MUMPS can be downloaded through this [link](http://mumps-tech.com/mumps-2/). <br/>
 *AZTEC* now comes with [*Trilinos*](https://github.com/trilinos/Trilinos) in the name of *AZTECOO*, but the current *EQquasi* still uses the standalone *AZTEC2.1*. (To-do-list: need to update its license.)  <br/>
 
-Dependence
+Dependency
 ---------------------
-The code requires netCDF libraries, python, FORTRAN and MPI compilers. Currently, it is tested to work on Lonestar6 at TACC.
+*```EQquasi```* relies on the following environments and packages. <br/>
+  - FORTRAN compilers and MPI <br/>
+  - python3 <br/>
+  - netCDF <br/>
 
-Installation on Lonestar6
+ubunyu.yml is a bash shell script that containes necessary packages for Ubuntu.
+
+Installation
 ---------------------
+
+*```EQquasi```* now supports Ubuntu and Lonestar6 at TACC. <br/> 
+To install it on Ubuntu, 
 ```
 git clone https://github.com/dunyuliu/EQquasi.git
 cd EQquasi
+chmod 755 install-eqquasi.sh
+./install-eqquasi.sh -m ubuntu
+```
+To install it on Lonestar6 TACC,
+```
+./install-eqquasi.sh -m ls6
+```
+
+To activate  environment variables and add executables to $PATH,
+```
 source install-eqquasi.sh
 ```
+
 Quick Start Guide
 ---------------------
 After the installation, you need three steps to run a new case. <br/>

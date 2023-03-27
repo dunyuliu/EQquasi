@@ -72,17 +72,8 @@ Key progress
 ---------------------
 *v1.2.1* with *MUMPS* is benchmarked in [SEAS BP5](https://strike.scec.org/cvws/seas/benchmark_descriptions.html) and results are published in [*Jiang et al. (2022, JGR)*](https://doi.org/10.1029/2021JB023519).
 
-Operating environment
----------------------
-* a Unix-like operating system
-* build tools cmake
-* Fortran compilers
-* a functioning MPI environment
-* MUMPS/AZTEC installed and paths correctly set up
-* Matlab installed for postprocessing
-
 Note
 ----
-*EQquasi* is still under development and comes without any guaranteed functionality.
+*```EQquasi```* is still under development and comes without any guaranteed functionality.
 
-If you are interested in using *EQquasi* or have any questions or comments, please contact Dunyu Liu (dliu@ig.utexas.edu). 
+If you are interested in using *```EQquasi```* or have any questions or comments, please contact Dunyu Liu (dliu@ig.utexas.edu). 

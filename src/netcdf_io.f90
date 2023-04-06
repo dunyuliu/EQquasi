@@ -140,7 +140,7 @@ subroutine netcdf_write_on_fault(outfile)
 	integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index
 	real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
 
-	nvar = 12 ! nvar variables.
+	nvar = 15 ! nvar variables.
 	allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nxt, nzt, nvar)) ! on_fault_vars(lon,lat,nvar)
 	on_fault_vars = 0.0d0
 	
@@ -149,8 +149,10 @@ subroutine netcdf_write_on_fault(outfile)
 	lon_name  = 'nid_strike'
 	lat_units = 'unit'
 	lon_units = 'unit'
-	var_name  = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'state_normal', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs']
-	var_unit  = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit'          , 'Pa'          , 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s']
+	var_name  = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', &
+        'state_normal', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs', 'slips', 'slipd', 'slipn']
+	var_unit  = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit'          , &
+        'Pa'          , 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'slips', 'slipd', 'slipn']
 	nlat = nzt ! Total nodes along dip.  
 	nlon = nxt ! Total nodes along strike. 
 	
@@ -174,6 +176,9 @@ subroutine netcdf_write_on_fault(outfile)
 			on_fault_vars(i,j,10) = fric(34, (i-1)*nzt+j, 1) ! vxs
 			on_fault_vars(i,j,11) = fric(35, (i-1)*nzt+j, 1) ! vys
 			on_fault_vars(i,j,12) = fric(36, (i-1)*nzt+j, 1) ! vzs
+			on_fault_vars(i,j,13) = fric(71, (i-1)*nzt+j, 1) ! vxs
+			on_fault_vars(i,j,14) = fric(72, (i-1)*nzt+j, 1) ! vys
+			on_fault_vars(i,j,15) = fric(73, (i-1)*nzt+j, 1) ! vzs
 		enddo 
 	enddo 
 	! Create the netCDF file.

@@ -34,7 +34,7 @@ MODULE globalvar
 	integer (kind = 4)   :: nen=8,      ned=3,      nee=24,     ndof=3,     nint=8,     noid=2
 	integer (kind = 4)   :: C_elastic,  C_Nuclea,   friclaw,    rough_fault,            bp,         &
                                 ntotft,     nnx,        nnz,        nres,       nplpts,     nhplt=20,   &
-                                nstep=1000000,          dis4uniF,   dis4uniB,   C_farfield = 0
+                                nstep=10000,            dis4uniF,   dis4uniB,   C_farfield = 0
 	integer (kind = 4)   :: nt_output_stress
 	real (kind = dp)     :: srcrad0=3.0d3, rdalfa=0.0d0, rdbeta=0.0d0, fltxyz(2,4,1), init_norm, critt0
 	real (kind = dp)     :: xmin, xmax, ymin, ymax, zmin, zmax, dx, rat, dymax, dxtmp, min_norm, max_norm 

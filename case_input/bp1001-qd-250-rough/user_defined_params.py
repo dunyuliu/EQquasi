@@ -7,7 +7,7 @@ from math import *
 istart = 1
 iend = 1
 # mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
-mode = 2 
+mode = 1 
 
 # model_domain (in meters)
 xmin, xmax = -40.0e3, 40.0e3
@@ -41,7 +41,7 @@ bp          = 1001
 # 1001 (GM-cycle)
 
 # xi, minimum Dc
-xi = 0.015 # xi used to limit variable time step size. See Lapusta et al. (2009).
+xi = 0.005 # xi used to limit variable time step size. See Lapusta et al. (2009).
 minDc = 0.13 # meters
 
 # loading 
@@ -118,8 +118,8 @@ casename = "bp1001-fd-250-rough"
 HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 HPC_ncpu = 30 # Number of CPUs requested.
 HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-HPC_time = "02:00:00" # WALLTIME, in hh:mm:ss format.
-HPC_account = "EAR22013" # Project account to be charged SUs against.
+HPC_time = "48:00:00" # WALLTIME, in hh:mm:ss format.
+HPC_account = "EAR22012" # Project account to be charged SUs against.
 HPC_email = ""#"dliu@ig.utexas.edu" # Email to receive job status.
 
 ##############################################

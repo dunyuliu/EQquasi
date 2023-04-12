@@ -123,6 +123,7 @@ def create_batch_script_cycle():
         f.write("#SBATCH --mail-type=begin"         + "\n")
         f.write("#SBATCH --mail-type=end"           + "\n")
         # Executable part.
+        f.write("  module load mumps"               + "\n")
         f.write("  read i < currentcycle.txt"       + "\n")
         f.write("# fetch input files from /eqquasi" + "\n")
         f.write("  cp eqquasi/model.txt ./"         + "\n")

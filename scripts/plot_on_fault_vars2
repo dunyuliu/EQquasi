@@ -30,39 +30,51 @@ def plot_fault(fname):
   state        = a.state_variable 
   state2       = a.state_normal
 
-  fig1 = plt.figure(figsize=(18,6))
+  b = np.loadtxt('global.dat')
+
+  n1 = re.findall(r'\d+',fname)
+  nstep = int(n1[0])
+
+  fig1 = plt.figure(figsize=(18,9))
   plt.rc('font', size=SMALL_SIZE)
 
-  ax11 = fig1.add_subplot(2,3,1)
+  ax11 = fig1.add_subplot(3,3,1)
   shear_strike.plot(vmin=ms-r, vmax=ms+r, extend = 'both')
   ax11.set_xlabel('')
   #ax11.set_ylabel('')
 
-  ax12 = fig1.add_subplot(2,3,2)
+  ax12 = fig1.add_subplot(3,3,2)
   shear_dip.plot(vmin=md-r, vmax=md+r, extend = 'both')
   ax12.set_xlabel('')
   ax12.set_ylabel('')
+  ax12.set_title(str(fname))
 
-  ax13 = fig1.add_subplot(2,3,3)
+  ax13 = fig1.add_subplot(3,3,3)
   norm.plot(vmin=mn-r, vmax = mn+r, extend = 'both')
   ax13.set_ylabel('')
   ax13.set_ylabel('')
 
-  ax21 = fig1.add_subplot(2,3,4)
+  ax21 = fig1.add_subplot(3,3,4)
   log10_slip_rate = np.log10(slip_rate)
   log10_slip_rate.rename('log10_slip_rate')
   #log10_slip_rate.rename(name_dict = {"slip_rate":"log10(slip_rate)"})
   log10_slip_rate.plot(vmin=-20, vmax=2, extend = 'both')
   #ax21.set_ylabel('')
 
-  ax22 = fig1.add_subplot(2,3,5)
+  ax22 = fig1.add_subplot(3,3,5)
   state2.plot(vmin=-mn-r, vmax=-mn+r, extend = 'both' )
   ax22.set_ylabel('')
 
-  ax23 = fig1.add_subplot(2,3,6)
+  ax23 = fig1.add_subplot(3,3,6)
   log10_state     = np.log10(state)
   log10_state.plot(vmin = 0, vmax = 10, extend = 'both')
   ax23.set_ylabel('')
+
+  ax31 = fig1.add_subplot(3,3,7)
+  ax31.plot(b[:,1])
+  ax31.plot(b[nstep-1,1],'ro',markersize=10)
+  ax31.set_xlabel('Steps')
+  ax31.set_ylabel('Peak Slip Rate (m/s)')
 
   plt.savefig(fname + ".png", dpi = 600)
   plt.close()

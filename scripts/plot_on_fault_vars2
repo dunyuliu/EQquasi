@@ -32,8 +32,9 @@ def plot_fault(fname):
 
   b = np.loadtxt('global.dat')
 
-  n1 = re.findall(r'\d+',fname)
-  nstep = int(n1[0])
+  #n1 = re.findall(r'\d+',fname)
+  #nstep = int(n1[0])
+  nstep = int(''.join(filter(str.isdigit,fname)))
 
   fig1 = plt.figure(figsize=(18,9))
   plt.rc('font', size=SMALL_SIZE)
@@ -72,7 +73,7 @@ def plot_fault(fname):
 
   ax31 = fig1.add_subplot(3,3,7)
   ax31.plot(b[:,1])
-  ax31.plot(b[nstep-1,1],'ro',markersize=10)
+  ax31.plot(nstep-1,b[nstep-1,1],'ro',markersize=10)
   ax31.set_xlabel('Steps')
   ax31.set_ylabel('Peak Slip Rate (m/s)')
 

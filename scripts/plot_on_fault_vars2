@@ -154,7 +154,7 @@ def _main_func(description):
     dirFiles = list()
     for fname in os.listdir(os.getcwd()):
         name, file_extension = os.path.splitext(fname)
-        if 'fault.' in name and '.nc' in file_extension:
+        if 'fault.' in name and '.nc' in file_extension and re.search(r'\.\d+',name):
             dirFiles += fname
             if os.path.exists(fname + '.png') == False: plot_fault(str(fname))
         if 'roughness' in name and '.nc' in file_extension:

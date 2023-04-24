@@ -237,9 +237,14 @@ do ift = 1, ntotft
 					
 					!rsfeq = (tau_fric_trial-ttao0) + v_trial*eta
 					!drsfeqdv = -dxmudv * tnrm0 +  1.0d0*eta
-					rsfeq = tau_fric_trial - (ttao0 - v_trial*eta) ! f(v_n)
-					drsfeqdv = dxmudv * theta_pc_tmp + eta ! f'(v_n)
-					
+                    if (eqquasi_mode == 1) then 
+                        rsfeq = tau_fric_trial - (ttao0 - v_trial*eta) ! f(v_n)
+                        drsfeqdv = dxmudv * theta_pc_tmp + eta ! f'(v_n)
+					elseif (eqquasi_mode == 2) then 
+                        rsfeq = tau_fric_trial - ttao0 ! f(v_n)
+                        drsfeqdv = dxmudv * theta_pc_tmp! f'(v_n)
+                    endif 
+                    
 					! exiting critera for the Newton-Raphson solver.
 					! residul stress is 1e-10 time of the new static traction.
 					if (abs(rsfeq) < 1.0d-10 * ttao0) exit 

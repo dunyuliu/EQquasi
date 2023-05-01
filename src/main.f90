@@ -233,7 +233,7 @@ subroutine main
                         globaldat(7,it) = totMomRateVW
 			
 			! Write disp field. 
-			if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1)) then 
+			if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1) .or. (it==nstep)) then 
 				write(proc_str,'(I5.5)') it
 				netcdf_outfile = 'disp.'//trim(proc_str)//'.nc'
 				output_type = 'disp'
@@ -243,7 +243,7 @@ subroutine main
 				call netcdf_write_on_fault(netcdf_outfile)
 			endif
 			! If exiting, write again the restart files.
-			if (stoptag == 1) then
+			if ((stoptag == 1) .or. (it==nstep)) then
 				netcdf_outfile = 'disp.r.nc'
 				output_type = 'disp'
 				call netcdf_write(netcdf_outfile, output_type)

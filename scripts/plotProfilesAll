@@ -7,7 +7,7 @@ Script to plot temporal evolutions of on-fault variables
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
-import os, glob, re, imageio
+import os, glob, re, imageio, sys
 from pdf2image import convert_from_path
 from user_defined_params import *
 
@@ -17,12 +17,17 @@ r = 10e6 # half range to show stresses in Pa.
 mn = init_norm # initial normal stress
 ms = -mn*fric_rsf_r0 # initial mean shear stress for plotting.
 md = 0 # initial mean shear dip stress
-ninterval = 20 # plot results in every 20 steps.
 # Read in file name from terminal.
 # fname = input("Enter the file name : ")
-    
-def generate_timeseries_profile(mode, var, ninterval):
-    filenames = glob.glob('./fault.?????.nc')
+ninterval = 20 # plot results in every 20 steps.
+
+
+
+
+def generate_timeseries_profile_all(model_path, mode, var, ninterval):
+    # extract time series information from all the model folders,
+    # and return them in the array data.
+    filenames = glob.glob(model_path+'/fault.?????.nc')
     filenames = sort_nicely(filenames)
     num_files = len(filenames)
 
@@ -77,15 +82,9 @@ def generate_timeseries_profile(mode, var, ninterval):
         elif mode == 2:
             for i in range(num_cols):
                 data[i,itag-1] = res[middle_row_index,i]
-
-    plt.figure()
-    for i in range(num_files):
-        plt.plot(data[::ninterval,i])
         
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.savefig(out_file, dpi=300)
+        data0 = data[:,::ninterval]
+    return data0 # [# of nodes, # of steps]
 
 def tryint(s):
     try:
@@ -126,17 +125,59 @@ def seek_numbers_filename(x):
 
 #dirFiles = os.listdir(os.getcwd())
 def _main_func(description):
+    
 
-    generate_timeseries_profile(1, 'effective_normal', ninterval)
-    generate_timeseries_profile(1, 'slip_rate', ninterval)
-    generate_timeseries_profile(1, 'shear_strike', ninterval)
-    generate_timeseries_profile(1, 'slips', ninterval)
+    
+    if len(sys.argv)==2 or len(sys.argv)==3:
 
-    generate_timeseries_profile(2, 'effective_normal', ninterval)
-    generate_timeseries_profile(2, 'slip_rate', ninterval)
-    generate_timeseries_profile(2, 'shear_strike', ninterval)
-    generate_timeseries_profile(2, 'slips', ninterval)
-
+        if sys.argv[1] == '-h':
+            print('plotProfilesAll plots accumulated slips on a horizontal/vertical profile')
+            print('Usage: plotProfilesAll [mode:1/2] [# of cycles: integer]')
+        else:
+        
+            mode = int(sys.argv[1]) # mode from terminal input
+            ncyc = int(sys.argv[2]) # # of cycles from terminal input
+            
+            if mode == 1:
+                xlabel = 'Along strike on-fault nodes'
+                ylabel = 'Slip along strike m'
+                out_file = 'cHorizontalProfile.slips.png'
+                title  = 'Accumulated slips on a horizontal profile'
+                print('Generating accumulated slips on a horizontal profile')
+            else:
+                xlabel = 'Along dip on-fault nodes'
+                ylabel = 'Slip along strike m'
+                out_file = 'cVerticalProfile.slips.png'
+                title  = 'Accumulated slips on a vertical profile'
+                print('Generating accumulated slips on a vertical profile')
+                
+            for i in range(ncyc):
+                model_path = 'Q'+str(i) 
+                print('Processing the '+str(i)+'th cycle')
+                tmp = generate_timeseries_profile_all(model_path, mode, 'slips', ninterval)
+                #print(tmp.shape)
+                if i == 0:
+                    data = tmp
+                else:
+                    # adding final slip from last batch to the new data - tmp.
+                    result = tmp + data[:, -1, np.newaxis] 
+                    data = np.concatenate((data, result), axis=1)
+                
+            num_cols = data.shape[1]
+            print('Plot every ',ninterval,' steps')
+            print('Time time steps are', num_cols)
+            
+            plt.figure()
+            for i in range(num_cols):
+                plt.plot(data[:,i])
+                
+            plt.xlabel(xlabel)
+            plt.ylabel(ylabel)
+            plt.title(title)
+            plt.savefig(out_file, dpi=300)
+    else:
+        print('Missing arguments. Type plotProfilesAll -h')
+    
 if __name__ == "__main__":
     _main_func(__doc__)
 

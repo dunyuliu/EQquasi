@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 from math import *
 from sys  import *
+import numpy as np
 
 # functions are defined in lib.py under scripts/
 # function lists:
@@ -8,6 +9,7 @@ from sys  import *
 # - state_steady_state
 # - B1, defined in TPV104 and TPV105
 # - B2 and B3, defined in TPV105
+# - boxcar_average
 
 def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
   # calculate shear stress at steady state
@@ -66,3 +68,11 @@ def linear1(x,ww,w):
   elif abs(x)>=ww+w:
     res = 0.0
   return res
+  
+
+def boxcar_average(data, window_size):
+    cumsum = np.cumsum(np.insert(data, 0, 0))
+    return (cumsum[window_size:] - cumsum[:-window_size]) / float(window_size)
+
+
+    

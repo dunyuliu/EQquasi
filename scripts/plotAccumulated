@@ -10,6 +10,7 @@ import numpy as np
 import os, glob, re, imageio, sys
 from pdf2image import convert_from_path
 from user_defined_params import *
+from lib import *
 
 #
 SMALL_SIZE = 10
@@ -22,9 +23,7 @@ md = 0 # initial mean shear dip stress
 ninterval = 20 # plot results in every 20 steps.
 
 
-
-
-def generate_timeseries_profile_all(model_path, mode, var, ninterval):
+def generate_timeseries_profile_all(model_path, mode, var, ninterval,nwindow):
     # extract time series information from all the model folders,
     # and return them in the array data.
     filenames = glob.glob(model_path+'/fault.?????.nc')
@@ -32,7 +31,8 @@ def generate_timeseries_profile_all(model_path, mode, var, ninterval):
     num_files = len(filenames)
 
     # fault.r.nc must exist
-    a =xr.open_dataset('fault.r.nc')
+    # extract dimension information from restart file.
+    a =xr.open_dataset(model_path+'/fault.r.nc')
     shear_strike = a.shear_strike
     num_rows = shear_strike.shape[0]
     num_cols = shear_strike.shape[1]
@@ -45,15 +45,11 @@ def generate_timeseries_profile_all(model_path, mode, var, ninterval):
     if mode==1:
         # plot vertical profile, count rows
         data = np.zeros((num_rows, num_files))
-        out_file = 'cVerticalProfile.'+var+'.png'
-        xlabel = 'Depth to surface on-fault nodes'
-        title = 'Vertical profile for '+var
+        data_ave = np.zeros((num_rows-nwindow+1, num_files))
     elif mode ==2:
         # plot horizontal profile, count columns
         data = np.zeros((num_cols, num_files))
-        out_file = 'cHorizontalProfile.'+var+'.png'
-        xlabel = 'Along strike on-fault nodes'
-        title = 'Horizontal profile for ' + var
+        data_ave = np.zeros((num_cols-nwindow+1, num_files))
     
     itag = 0
     for file1 in filenames:
@@ -83,7 +79,9 @@ def generate_timeseries_profile_all(model_path, mode, var, ninterval):
             for i in range(num_cols):
                 data[i,itag-1] = res[middle_row_index,i]
         
-        data0 = data[:,::ninterval]
+        data_ave[:,itag-1] = boxcar_average(data[:,itag-1],nwindow) 
+        
+        data0 = data_ave[:,::ninterval]
     return data0 # [# of nodes, # of steps]
 
 def tryint(s):
@@ -128,33 +126,34 @@ def _main_func(description):
     
 
     
-    if len(sys.argv)==2 or len(sys.argv)==3:
+    if len(sys.argv)==2 or len(sys.argv)==4:
 
         if sys.argv[1] == '-h':
-            print('plotProfilesAll plots accumulated slips on a horizontal/vertical profile')
-            print('Usage: plotProfilesAll [mode:1/2] [# of cycles: integer]')
+            print('plotAccumulated plots accumulated slips on a horizontal/vertical profile')
+            print('Usage: plotAccumulated [mode:1=Vert/2=Hori] [# of cycles: integer] [nwindow]')
         else:
         
             mode = int(sys.argv[1]) # mode from terminal input
             ncyc = int(sys.argv[2]) # # of cycles from terminal input
+            nwindow = int(sys.argv[3]) # # of fault nodes for the averaing window
             
             if mode == 1:
-                xlabel = 'Along strike on-fault nodes'
-                ylabel = 'Slip along strike m'
-                out_file = 'cHorizontalProfile.slips.png'
-                title  = 'Accumulated slips on a horizontal profile'
-                print('Generating accumulated slips on a horizontal profile')
-            else:
-                xlabel = 'Along dip on-fault nodes'
-                ylabel = 'Slip along strike m'
+                xlabel = 'Along Dip on-fault Nodes'
+                ylabel = 'Slip Along Dip m'
                 out_file = 'cVerticalProfile.slips.png'
-                title  = 'Accumulated slips on a vertical profile'
+                title  = 'Accumulated Slips on a Vertical Profile'
                 print('Generating accumulated slips on a vertical profile')
+            elif mode == 2:
+                xlabel = 'Along Strike on-fault Nodes'
+                ylabel = 'Slip Along Strike m'
+                out_file = 'cHorizontalProfile.slips.png'
+                title  = 'Accumulated Slips on a Horizontal Profile'
+                print('Generating accumulated slips on a Horizontal profile')
                 
             for i in range(ncyc):
                 model_path = 'Q'+str(i) 
                 print('Processing the '+str(i)+'th cycle')
-                tmp = generate_timeseries_profile_all(model_path, mode, 'slips', ninterval)
+                tmp = generate_timeseries_profile_all(model_path, mode, 'slips', ninterval,nwindow)
                 #print(tmp.shape)
                 if i == 0:
                     data = tmp
@@ -169,7 +168,7 @@ def _main_func(description):
             
             plt.figure()
             for i in range(num_cols):
-                plt.plot(data[:,i])
+                plt.plot(data[:,i],color='black', linewidth=1)
                 
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)

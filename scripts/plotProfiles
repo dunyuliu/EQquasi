@@ -10,6 +10,7 @@ import numpy as np
 import os, glob, re, imageio
 from pdf2image import convert_from_path
 from user_defined_params import *
+from lib import *
 
 #
 SMALL_SIZE = 10
@@ -21,7 +22,7 @@ ninterval = 20 # plot results in every 20 steps.
 # Read in file name from terminal.
 # fname = input("Enter the file name : ")
     
-def generate_timeseries_profile(mode, var, ninterval):
+def generate_timeseries_profile(mode, var, ninterval,nwindow):
     filenames = glob.glob('./fault.?????.nc')
     filenames = sort_nicely(filenames)
     num_files = len(filenames)
@@ -40,12 +41,14 @@ def generate_timeseries_profile(mode, var, ninterval):
     if mode==1:
         # plot vertical profile, count rows
         data = np.zeros((num_rows, num_files))
+        data_ave = np.zeros((num_rows-nwindow+1, num_files))
         out_file = 'cVerticalProfile.'+var+'.png'
         xlabel = 'Depth to surface on-fault nodes'
         title = 'Vertical profile for '+var
     elif mode ==2:
         # plot horizontal profile, count columns
         data = np.zeros((num_cols, num_files))
+        data_ave = np.zeros((num_cols-nwindow+1, num_files))
         out_file = 'cHorizontalProfile.'+var+'.png'
         xlabel = 'Along strike on-fault nodes'
         title = 'Horizontal profile for ' + var
@@ -78,15 +81,21 @@ def generate_timeseries_profile(mode, var, ninterval):
             for i in range(num_cols):
                 data[i,itag-1] = res[middle_row_index,i]
 
+        data_ave[:,itag-1] = boxcar_average(data[:,itag-1],nwindow)
+    
+    data0 = data_ave[:,::ninterval]
+    
     plt.figure()
-    for i in range(num_files):
-        plt.plot(data[::ninterval,i])
+    for i in range(data0.shape[1]):
+        plt.plot(data0[:,i])
         
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.savefig(out_file, dpi=300)
 
+    return data0
+    
 def tryint(s):
     try:
         return int(s)
@@ -127,15 +136,15 @@ def seek_numbers_filename(x):
 #dirFiles = os.listdir(os.getcwd())
 def _main_func(description):
 
-    generate_timeseries_profile(1, 'effective_normal', ninterval)
-    generate_timeseries_profile(1, 'slip_rate', ninterval)
-    generate_timeseries_profile(1, 'shear_strike', ninterval)
-    generate_timeseries_profile(1, 'slips', ninterval)
+    generate_timeseries_profile(1, 'effective_normal', ninterval,10)
+    generate_timeseries_profile(1, 'slip_rate', ninterval,10)
+    generate_timeseries_profile(1, 'shear_strike', ninterval,10)
+    generate_timeseries_profile(1, 'slips', ninterval,10)
 
-    generate_timeseries_profile(2, 'effective_normal', ninterval)
-    generate_timeseries_profile(2, 'slip_rate', ninterval)
-    generate_timeseries_profile(2, 'shear_strike', ninterval)
-    generate_timeseries_profile(2, 'slips', ninterval)
+    generate_timeseries_profile(2, 'effective_normal', ninterval,10)
+    generate_timeseries_profile(2, 'slip_rate', ninterval,10)
+    generate_timeseries_profile(2, 'shear_strike', ninterval,10)
+    generate_timeseries_profile(2, 'slips', ninterval,10)
 
 if __name__ == "__main__":
     _main_func(__doc__)

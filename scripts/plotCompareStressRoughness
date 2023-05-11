@@ -1,0 +1,196 @@
+#! /usr/bin/env python3
+"""
+Script to plot and compare stress and faut 
+    geometric roughness distributions along
+    a horizontal/vertical profile. 
+    
+    20230510, D. Liu, dliu@ig.utexas.edu
+"""
+
+import xarray as xr
+import matplotlib.pyplot as plt
+import numpy as np
+import os, glob, re, imageio
+from pdf2image import convert_from_path
+from user_defined_params import *
+from lib import *
+
+#
+SMALL_SIZE = 10
+r = 10e6 # half range to show stresses in Pa.
+mn = init_norm # initial normal stress
+ms = -mn*fric_rsf_r0 # initial mean shear stress for plotting.
+md = 0 # initial mean shear dip stress
+ninterval = 20 # plot results in every 20 steps.
+# Read in file name from terminal.
+# fname = input("Enter the file name : ")
+    
+def plot_stress_profile(mode, var, nwindow):
+    b =xr.open_dataset('fault.r.nc')
+    num_files = 1 # currently only process fault.r.nc
+    shear_strike = b.shear_strike
+    num_rows = shear_strike.shape[0]
+    num_cols = shear_strike.shape[1]
+    row_id = 161-40 # from the surface counting down 40 grids.
+    col_id = 161 # counting from left (-x) to (+x)
+    
+    print('Processing fault.r.nc ... ...')
+    print(num_files, num_rows, num_cols, row_id, col_id)
+   
+    if mode==1:
+        # plot vertical profile, count rows
+        data = np.zeros((num_rows, num_files))
+        # create data_ave for results after boxcar averaging 
+        data_ave = np.zeros((num_rows-nwindow+1, num_files))
+        out_file = 'cVerticalProfile.'+var+'.png'
+        xlabel = 'Depth to surface on-fault nodes'
+        title = 'Vertical profile for '+var
+    elif mode ==2:
+        # plot horizontal profile, count columns
+        data = np.zeros((num_cols, num_files))
+        data_ave = np.zeros((num_cols-nwindow+1, num_files))
+        out_file = 'cHorizontalProfile.'+var+'.png'
+        xlabel = 'Along strike on-fault nodes'
+        title = 'Horizontal profile for ' + var
+
+    if var    =='effective_normal':
+        res   = b.effective_normal
+        res   = res/1.e6
+        ylabel='Stress MPa'
+        
+    elif var  =='slip_rate':
+        res   = b.slip_rate
+        ylabel='Slip rate m/s'
+        
+    elif var  =='shear_strike':
+        res   = b.shear_strike
+        res   = res/1.e6
+        ylabel='Stress MPa'
+        
+    if mode == 1:
+        data[:,0] = res[:, col_id]
+    elif mode == 2:
+        for i in range(num_cols):
+            data[i,0] = res[row_id,i]
+
+    data_ave[:,0] = boxcar_average(data[:,0],nwindow)
+    
+    data0 = data_ave[:,0]
+    maxval = max(abs(data0))
+    ave = np.average(data0)
+    
+    return data0, maxval, ave
+    
+def plot_roughness_profile(mode,nwindow):
+    b =xr.open_dataset('../roughness.nc')
+    num_files = 1 # currently only process fault.r.nc
+    peak = b.peak
+    num_rows = peak.shape[0]
+    num_cols = peak.shape[1]
+    row_id = 101-40 # from the surface counting down 40 grids.
+    col_id = 101 # counting from left (-x) to (+x)
+    
+    print('Processing roughness.nc ... ...')
+    print(num_files, num_rows, num_cols, row_id, col_id)
+
+    if mode==1:
+        # plot vertical profile, count rows
+        data = np.zeros((num_rows, num_files))
+        # create data_ave for results after boxcar averaging 
+        data_ave = np.zeros((num_rows-nwindow+1, num_files))
+     
+    elif mode ==2:
+        # plot horizontal profile, count columns
+        data = np.zeros((num_cols, num_files))
+        data_ave = np.zeros((num_cols-nwindow+1, num_files))
+        
+    if mode == 1:
+        data[:,0] = peak[:, col_id]
+    elif mode == 2:
+        for i in range(num_cols):
+            data[i,0] = peak[row_id,i]
+
+    data_ave[:,0] = boxcar_average(data[:,0],nwindow)
+    data0 = data_ave[:,0]
+
+    maxval = max(abs(data0))
+    ave = np.average(data0)
+    
+    return data0, maxval, ave 
+    
+def _main_func(description):
+    nwindow = 10
+    
+    for i in range(2):
+        mode = i+1
+        ylabel = 'XX'
+        
+        if mode==1:
+        # plot vertical profile, count rows
+            out_file = 'cVerticalProfileStressRoughness.png'
+            xlabel = 'Depth to surface on-fault nodes'
+            title = 'Vertical profile'
+        elif mode ==2:
+        # plot horizontal profile, count columns
+            out_file = 'cHorizontalProfileStressRoughness.png'
+            xlabel = 'Along strike on-fault nodes'
+            title = 'Horizontal profile'
+        
+        d1,p1, ave1 = plot_stress_profile(mode, 'effective_normal',nwindow)
+        d2,p2, ave2 = plot_roughness_profile(mode, nwindow)
+        
+        print('max eff. normal stress is',p1,'MPa')
+        print('peak roughness is',p2,'m')
+        print(' ')
+        m1 = d1.shape[0]
+        m2 = d2.shape[0]
+        
+        g2 = np.gradient(d2) # calculate roughness gradient.
+        
+        if mode==1: # vert
+            res2 = np.zeros((m1))
+            res3 = np.zeros((m1))
+            mdiff = (m1-m2)
+            res2[mdiff:] = g2[:]
+            res3[mdiff:] = d2[:]
+            
+        elif mode == 2: # hori
+            res2 = np.zeros((m1))
+            res3 = np.zeros((m1))
+            mdiff = int((m1-m2)/2)
+            res2[mdiff:-mdiff] = g2[:]
+            res3[mdiff:-mdiff] = d2[:]
+        
+        corr_matrix1 = np.corrcoef(d1,res2)
+        print('correlation matrix between roughenss gradient and eff. norm. is', corr_matrix1)
+        print(' ')
+        corr_matrix2 = np.corrcoef(d1,res3)
+        print('correlation matrix between roughenss itself and eff. norm. is', corr_matrix2)
+        print(' ')
+        
+        fig, ax1 = plt.subplots()
+        fig.set_size_inches(10,5)
+        ax2 = ax1.twinx()
+        ax3 = ax1.twinx()
+        
+        ax1.plot(d1, color='g', label='Normal Stress')
+        ax2.plot(res2, color='r', label='Roughness Gradients')
+        ax3.plot(res3, color='b', label='Roughness')
+        
+        ax3.tick_params(axis='y', direction='in', pad=-30)
+        
+        ax1.set_xlabel(xlabel)
+        ax1.set_ylabel('Effective Normal Stress (MPa)', color='g')
+        ax2.set_ylabel('Roughness Gradients', color='r')
+        ax3.set_ylabel('Roughness (m)', color='b')
+        ax3.yaxis.set_label_coords(0.9,0.5)
+        
+        ax1.text(0.5, 0.02, ' RoughGra-NormStr coeff. '+"{:.2f}".format(corr_matrix1[0][1])+'; Smooth window '+str(nwindow)+' grids', horizontalalignment='center', verticalalignment='center', transform=ax1.transAxes)
+        fig.legend(['Normal Stress', 'Roughness Gradient','Roughness'])
+        plt.title(title)
+        plt.savefig(out_file, dpi=300)
+        
+if __name__ == "__main__":
+    _main_func(__doc__)
+
+

@@ -147,9 +147,9 @@ do ift = 1, ntotft
                     max_norm      = -40.0d6
                     min_norm      = -10.0d6
                 
-                    if (abs(tnrm0)<abs(min_norm)) then 
+                    if (tnrm0>=min_norm) then 
                         tnrm0 = min_norm
-                    elseif (abs(tnrm0)>abs(max_norm)) then
+                    elseif (tnrm0<=max_norm) then
                         tnrm0 = max_norm
                     endif
                 endif 

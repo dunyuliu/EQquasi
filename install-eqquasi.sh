@@ -50,7 +50,7 @@ if [ -n "$MACH" ]; then
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
         
         echo "Loading netcdf and mumps modules ... ..."
-        module load netcdf mumps
+        module load netcdf/4.6.2 mumps
         ml
         
         echo "NETCDF INC and LIB PATH"

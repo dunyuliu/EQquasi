@@ -1,4 +1,5 @@
 !/* Copyright (C) 2018-2023, Earthquake Modeling Lab @ Texas A&M University. 
+! * and Institute for Geophysics, University of Texas at Austin.
 ! * All Rights Reserved.
 ! * This code is part of software EQquasi, please see EQquasi License Agreement
 ! * attached before you copy, download, install or use EQquasi./

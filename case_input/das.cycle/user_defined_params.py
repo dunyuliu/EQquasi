@@ -110,8 +110,8 @@ for ix, xcoor in enumerate(fx):
 ####################################
 casename       = "das.cycle"
 HPC_nnode      = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
-HPC_ncpu       = 16 # Number of CPUs requested.
-HPC_queue      = "vm-small" # q status. Depending on systems, job WALLTIME and Node requested.
+HPC_ncpu       = 20 # Number of CPUs requested.
+HPC_queue      = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
 HPC_time       = "10:00:00" # WALLTIME, in hh:mm:ss format.
 HPC_account    = "EAR22012" # Project account to be charged SUs against.
 HPC_email      = "dliu@ig.utexas.edu" # Email to receive job status.
@@ -134,9 +134,9 @@ stZRange = [-500,-400,-300,-200,-150,-100,-50,-20,0,20,50,100,150,200,300,400,50
 numOffST = len(stXRange)*len(stYRange)*len(stZRange)
 st_coor_off_fault = np.zeros((numOffST,3))
 nTag = 0
-for ix in len(stXRange):
-    for iy in len(stYRange):
-        for iz in len(stZRange):
+for ix in range(len(stXRange)):
+    for iy in range(len(stYRange)):
+        for iz in range(len(stZRange)):
             st_coor_off_fault[nTag,0] = stXRange[ix]
             st_coor_off_fault[nTag,1] = stYRange[iy]
             st_coor_off_fault[nTag,2] = stZRange[iz]

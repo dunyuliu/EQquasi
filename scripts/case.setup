@@ -97,6 +97,7 @@ def create_batch_script():
         f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
         f.write("#SBATCH --mail-type=begin" + "\n")
         f.write("#SBATCH --mail-type=end" + "\n")
+        f.write("  module load mumps"     + "\n")
         # Executable part.
         f.write("for i in $(seq " + str(istart) + " " + str(iend) + ");" + "\n")
         f.write("do" + "\n")

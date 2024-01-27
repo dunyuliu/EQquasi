@@ -9,9 +9,24 @@
 # currently, it supports: 
 #     ls6
 #     ubuntu
+#     local (locally installed mumps) 
 SYSTEM = ${MACHINE}
 
-ifeq ($(SYSTEM), ubuntu)
+ifeq ($(SYSTEM), local)
+    FFLAGS     = -fopenmp -ffree-line-length-none
+    FC         = mpif90
+    # mumps is installed at the $EQQUASIROOT/mumps
+    MUMPS_LIB  = mumps/build
+    MUMPS_INC  = ${MUMPS_LIB}/include
+    NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
+    NETCDF_INC = -I${INC}
+    MUMPS_LIB  = -L${MUMPS_LIB} -lmumps_common -ldmumps
+    PORD_LIB   = -L${MUMPS_LIB} -lpord
+    BLAS_LIB   = -L${LIB} -lblas
+    SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
+    LAPACK_LIB = -L${LIB} -llapack
+
+else ifeq ($(SYSTEM), ubuntu)
     FFLAGS     = -fopenmp -ffree-line-length-none
     FC         = mpif90
     LIB        = /usr/lib/x86_64-linux-gnu
@@ -23,7 +38,7 @@ ifeq ($(SYSTEM), ubuntu)
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
     LAPACK_LIB = -L${LIB} -llapack
-
+    
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort

@@ -9,19 +9,21 @@
 # currently, it supports: 
 #     ls6
 #     ubuntu
-#     local (locally installed mumps) 
+#     utig (with locally installed mumps through scivision/mumps) 
 SYSTEM = ${MACHINE}
 
-ifeq ($(SYSTEM), local)
-    FFLAGS     = -fopenmp -ffree-line-length-none
-    FC         = mpif90
+ifeq ($(SYSTEM), utig)
+    FFLAGS     = -fopenmp -ffree-line-length-none -O3
+    FC         = mpif90.openmpi
     # mumps is installed at the $EQQUASIROOT/mumps
-    MUMPS_LIB  = mumps/build
-    MUMPS_INC  = ${MUMPS_LIB}/include
+    MUMPS_ROOT = ${EQQUASIROOT}/mumps/build
+    MUMPS_INC  = ${MUMPS_ROOT}/_deps/mumps-src/include
+    LIB        = /usr/lib/x86_64-linux-gnu
+    INC        = /usr/include
     NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
     NETCDF_INC = -I${INC}
-    MUMPS_LIB  = -L${MUMPS_LIB} -lmumps_common -ldmumps
-    PORD_LIB   = -L${MUMPS_LIB} -lpord
+    MUMPS_LIB  = -L${MUMPS_ROOT} -ldmumps -lmumps_common
+    PORD_LIB   = -L${MUMPS_ROOT} -lpord
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
     LAPACK_LIB = -L${LIB} -llapack
@@ -43,7 +45,7 @@ else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort
     LIB        = ${TACC_MKL_LIB}
-    INC        = ${TACC_MUMPS_INC}
+    MUMPS_INC  = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
     
@@ -71,10 +73,14 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         
 clean : eqquasi
 	rm -r *.o
-    
+
+# order: MUMPS, SCALAPACK, BLAS, LAPACK, NETCDF
 eqquasi: $(OBJ) 
-	$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
-            ${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
+        #$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
+        #${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
+        $(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
+        ${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
+
 eqquasi.o:   eqquasi.f90 main.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      library_bound.o \
              library_output.o        crs.o       elemcal.o   \
@@ -91,7 +97,7 @@ main.o:      main.f90    globalvar.o c8g2.o      shl.o       \
              faulting.o  fric.o      library_bound.o         \
              library_output.o        crs.o       elemcal.o   \
              netcdf_io.o
-	$(FC) $(OPT) main.f90 -I${INC}        
+	$(FC) $(OPT) main.f90 -I${MUMPS_INC}        
 #main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o msr.o elemcal_aztec.o 
 #    $(FC) $(OPT) main_aztec.f90 -I${inc_dir_aztec}        
 c8g2.o:      c8g2.f90    globalvar.o shl.o

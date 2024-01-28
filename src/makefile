@@ -33,6 +33,7 @@ else ifeq ($(SYSTEM), ubuntu)
     FC         = mpif90
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
+    MUMPS_INC  = ${INC}
     NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
     NETCDF_INC = -I${INC}
     MUMPS_LIB  = -L${LIB} -lmumps_common -L${LIB} -ldmumps

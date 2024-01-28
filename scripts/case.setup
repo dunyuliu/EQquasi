@@ -32,6 +32,7 @@ def create_model_input_file():
         f.write(str(az_tol) + "\n")
         f.write(str(nt_out) + "\n")
         f.write(str(mode) + "\n")
+        f.write(str(nstep) + "\n")
 
 def create_station_input_file():
     # Function to create model.txt used by EQquasi.
@@ -108,6 +109,21 @@ def create_batch_script():
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
         f.write("done" + "\n")
         # End excutable part.
+
+def create_run_sh():
+    # Function to create batch script used by HPC system.
+    with open("run.sh", "w") as f:
+        # Executable part.
+        f.write("for i in $(seq " + str(istart) + " " + str(iend) + ");" + "\n")
+        f.write("do" + "\n")
+        f.write("  echo $i > currentcycle.txt" + "\n")
+        f.write("  mpirun.openmpi -np " + str(HPC_ncpu) + " eqquasi" +"\n")
+        f.write("  mkdir \"./Q$((i-1))\"" + "\n")
+        f.write("  mv fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"./Q$((i-1))\"" + "\n")
+        f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
+        f.write("done" + "\n")
+        # End excutable part.
+
 def create_batch_script_cycle():
     # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.
     # Compared to batch.hpc, we don't do cycle id looping here. 
@@ -209,6 +225,7 @@ def _main_func(description):
   create_model_input_file()
   create_batch_script()
   create_batch_script_cycle()
+  create_run_sh()
   create_station_input_file()
   estimate_HPC_resource()
   netcdf_write_on_fault_vars()

@@ -76,10 +76,10 @@ clean : eqquasi
 
 # order: MUMPS, SCALAPACK, BLAS, LAPACK, NETCDF
 eqquasi: $(OBJ) 
-        #$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
-        #${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
-        $(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
-        ${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
+	#$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
+	#${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
+	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
+	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
 
 eqquasi.o:   eqquasi.f90 main.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      library_bound.o \

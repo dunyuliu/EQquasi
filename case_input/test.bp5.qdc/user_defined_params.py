@@ -19,7 +19,7 @@ zmin, zmax = -60.0e3, 0.0e3
 # the RSF controlled region and will slide at fixed loading slip rate.
 xminc, xmaxc, zminc = -50.0e3, 50.0e3, -40.0e3
 
-dx = 2000.0e0 # cell size, spatial resolution
+dx = 4000.0e0 # cell size, spatial resolution
 nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
 enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
@@ -34,7 +34,8 @@ rheology    = 1 # elastic(1).
 friclaw     = 3 # rsf_aging(3), rsf_slip(4).
 ntotft      = 1 # number of total faults.
 solver      = 1 # solver option. MUMPS(1, recommended). AZTEC(2).
-nt_out      = 2 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
+nstep       = 40 # total # time steps
+nt_out      = 20 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
 bp          = 5 
 # currently supported cases
 # 5 (SCEC-BP5)

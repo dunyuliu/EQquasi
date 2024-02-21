@@ -9,7 +9,7 @@ os.system('rm -rf test')
 os.system('rm -rf bin/eqquasi')
 os.system('mkdir test')
 
-os.system('./install-eqdyna.sh -m utig')
+os.system('./install-eqquasi.sh -m ubuntu')
 os.chdir('test')
 
 startTime = time.time()
@@ -18,7 +18,7 @@ def runTest(testDir, compSet, coreNum):
     os.system(cmd)
     os.chdir(testDir)
     os.system('./case.setup')
-    os.system('mpirun -np '+str(coreNum)+' eqdyna')
+    os.system('bash run.sh')
     #os.system('python3 plotRuptureDynamics')
     os.chdir('..')
     

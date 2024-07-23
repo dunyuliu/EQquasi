@@ -52,7 +52,7 @@ else ifeq ($(SYSTEM), local)
     NETCDF_LIB = -L${LIB} -lnetcdf -lnetcdff
     NETCDF_INC = -I${INC}
     
-    MUMPS_ROOT = ${EQQUASIROOT}/mumps/build/local
+    MUMPS_ROOT = ../mumps/build/local
     MUMPS_INC  = ${MUMPS_ROOT}/include
     MUMPS_LIB  = -L${MUMPS_ROOT}/lib -ldmumps -lmumps_common -lpord
     PORD_LIB   = 

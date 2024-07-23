@@ -67,9 +67,23 @@ if [ -n "$MACH" ]; then
         ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
         ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
     elif [ $MACHINE == "local"]; then 
-        echo "Installing a local copy of MUMPS ..."
-        chmod 755 install.mumps.sh
-        ./install.mumps.sh
+        MUMPS_LIB_DIR="./mumps/build/local/lib"
+        libNames=("libdmumps.a" "libmumps_common.a" "libpord.a" "libsmumps.a")
+        all_exist=TRUE
+        for file in "${libNames[@]}"; do
+            if [! -f "$MUMPS_LIB_DIR/$file" ]; then
+                all_exist=FALSE
+                break
+            fi 
+        done 
+        
+        if $all_exist; then 
+            echo "MUMPS have been installed under ./mumps/build/local ..."
+        else
+            echo "Installing a local copy of MUMPS ..."
+            chmod 755 install.mumps.sh
+            ./install.mumps.sh
+        fi
     fi 
     
     if [ -n "$CONFIG" ]; then 

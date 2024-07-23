@@ -9,7 +9,7 @@ os.system('rm -rf test')
 os.system('rm -rf bin/eqquasi')
 os.system('mkdir test')
 
-os.system('./install-eqquasi.sh -m ubuntu')
+os.system('./install.eqquasi.sh -m ubuntu')
 os.chdir('test')
 
 startTime = time.time()

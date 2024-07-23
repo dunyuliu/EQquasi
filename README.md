@@ -16,6 +16,11 @@ Setup of computing environment
   - netCDF <br/>
   - pip <br/>
     - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
+
+For post-processing, additional Python packages are needed:
+  - xarray
+  - imageio
+  - pdf2image
       
 ```ubuntu.env.setup.sh``` is a bash shell script to install necessary packages for Ubuntu system.
 

@@ -17,7 +17,7 @@ Setup of computing environment
   - pip <br/>
     - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
       
-```ubunyu.env.setup.sh``` is a bash shell script to install necessary packages for Ubuntu system.
+```ubuntu.env.setup.sh``` is a bash shell script to install necessary packages for Ubuntu system.
 
 Simply, 
 ```

@@ -2,55 +2,55 @@
 """
 Script to setup the case via user_defined_params.py.
 """
-from user_defined_params import *
+from user_defined_params import par
 import netCDF4 as nc
 
 def create_model_input_file():
     # Function to create model.txt used by EQquasi.
     with open('model.txt', 'w') as f:
-        f.write(str(xmin) + "  " + str(xmax) + "\n")
-        f.write(str(ymin) + "  " + str(ymax) + "\n")
-        f.write(str(zmin) + "  " + str(zmax) + "\n")
-        f.write(str(xminc) + "  " + str(xmaxc) + "  " + str(zminc) + "\n")
-        f.write(str(nuni_y_plus) + "  " + str(nuni_y_minus) + "\n")
-        f.write(str(enlarging_ratio) + "\n")
-        f.write(str(dx) + "\n")
-        f.write(str(vp) + "  " + str(vs) + "  " + str(rou) + "\n")
-        f.write(str(rough_fault) + "\n")
-        f.write(str(rheology) + "\n")
-        f.write(str(friclaw) + "\n")
-        f.write(str(ntotft) + "\n")
-        f.write(str(bp) + "\n")
-        f.write(str(xi) + "  " + str(minDc) + "\n")
-        f.write(str(exit_slip_rate) + "\n")
-        f.write(str(far_vel_load) + "\n")
-        f.write(str(creep_slip_rate) + "\n")
-        f.write(str(init_norm) + "\n")
-        f.write(str(solver) + "\n")
-        f.write(str(az_op) + "\n")
-        f.write(str(az_maxiter) + "\n")
-        f.write(str(az_tol) + "\n")
-        f.write(str(nt_out) + "\n")
-        f.write(str(mode) + "\n")
-        f.write(str(nstep) + "\n")
+        f.write(str(par.xmin) + "  " + str(par.xmax) + "\n")
+        f.write(str(par.ymin) + "  " + str(par.ymax) + "\n")
+        f.write(str(par.zmin) + "  " + str(par.zmax) + "\n")
+        f.write(str(par.xminc) + "  " + str(par.xmaxc) + "  " + str(par.zminc) + "\n")
+        f.write(str(par.nuni_y_plus) + "  " + str(par.nuni_y_minus) + "\n")
+        f.write(str(par.enlarging_ratio) + "\n")
+        f.write(str(par.dx) + "\n")
+        f.write(str(par.vp) + "  " + str(par.vs) + "  " + str(par.rou) + "\n")
+        f.write(str(par.rough_fault) + "\n")
+        f.write(str(par.rheology) + "\n")
+        f.write(str(par.friclaw) + "\n")
+        f.write(str(par.ntotft) + "\n")
+        f.write(str(par.bp) + "\n")
+        f.write(str(par.xi) + "  " + str(par.minDc) + "\n")
+        f.write(str(par.exit_slip_rate) + "\n")
+        f.write(str(par.far_vel_load) + "\n")
+        f.write(str(par.creep_slip_rate) + "\n")
+        f.write(str(par.init_norm) + "\n")
+        f.write(str(par.solver) + "\n")
+        f.write(str(par.az_op) + "\n")
+        f.write(str(par.az_maxiter) + "\n")
+        f.write(str(par.az_tol) + "\n")
+        f.write(str(par.nt_out) + "\n")
+        f.write(str(par.mode) + "\n")
+        f.write(str(par.nstep) + "\n")
 
 def create_station_input_file():
     # Function to create model.txt used by EQquasi.
     with open('stations.txt', 'w') as f:
-        f.write(str(n_off_fault) + "\n")
-        f.write(str(n_on_fault) + "\n")
+        f.write(str(par.n_off_fault) + "\n")
+        f.write(str(par.n_on_fault) + "\n")
         f.write(str(" ") + "\n")
-        for i in range(len(st_coor_on_fault)):
-            f.write(str(st_coor_on_fault[i][0]) + " " + str(st_coor_on_fault[i][1]) + "\n")
+        for i in range(len(par.st_coor_on_fault)):
+            f.write(str(par.st_coor_on_fault[i][0]) + " " + str(par.st_coor_on_fault[i][1]) + "\n")
         f.write(str(" ") + "\n")
-        for i in range(len(st_coor_off_fault)):
-            f.write(str(st_coor_off_fault[i][0]) + " " + str(st_coor_off_fault[i][1]) + " " + str(st_coor_off_fault[i][2]) + "\n")
+        for i in range(len(par.st_coor_off_fault)):
+            f.write(str(par.st_coor_off_fault[i][0]) + " " + str(par.st_coor_off_fault[i][1]) + " " + str(par.st_coor_off_fault[i][2]) + "\n")
 
 def netcdf_write_on_fault_vars():
   # Function to on_fault_vars input used by EQquasi.
   ds = nc.Dataset("on_fault_vars_input.nc", "w", format="NETCDF4")
-  dip = ds.createDimension('dip', nfz)
-  strike = ds.createDimension('strike', nfx)
+  dip = ds.createDimension('dip', par.nfz)
+  strike = ds.createDimension('strike', par.nfx)
   dip_var = ds.createVariable('dip', np.float64, ('dip',))
   strike_var = ds.createVariable('strike', np.float64, ('strike',))
   var0 = ds.createVariable('a', np.float64, ('dip','strike',))
@@ -71,36 +71,36 @@ def netcdf_write_on_fault_vars():
   var6.units = 'Pa'
   var7.units = 'Pa'
   var8.units = 'unit'
-  strike_var[:] = fx[:]
-  dip_var[:] = fz[:]
-  var0[:,:] = on_fault_vars[:,:,9]
-  var1[:,:] = on_fault_vars[:,:,10]
-  var2[:,:] = on_fault_vars[:,:,11]
-  var3[:,:] = on_fault_vars[:,:,12]
-  var4[:,:] = on_fault_vars[:,:,13]
-  var5[:,:] = on_fault_vars[:,:,46]
-  var6[:,:] = on_fault_vars[:,:,8]
-  var7[:,:] = on_fault_vars[:,:,7]
-  var8[:,:] = on_fault_vars[:,:,20]
+  strike_var[:] = par.fx[:]
+  dip_var[:] = par.fz[:]
+  var0[:,:] = par.on_fault_vars[:,:,9]
+  var1[:,:] = par.on_fault_vars[:,:,10]
+  var2[:,:] = par.on_fault_vars[:,:,11]
+  var3[:,:] = par.on_fault_vars[:,:,12]
+  var4[:,:] = par.on_fault_vars[:,:,13]
+  var5[:,:] = par.on_fault_vars[:,:,46]
+  var6[:,:] = par.on_fault_vars[:,:,8]
+  var7[:,:] = par.on_fault_vars[:,:,7]
+  var8[:,:] = par.on_fault_vars[:,:,20]
   ds.close()
   
 def create_batch_script():
     # Function to create batch script used by HPC system.
     with open("batch.hpc", "w") as f:
         f.write("#! /bin/bash" + "\n")
-        f.write("#SBATCH -J " + str(casename) + "\n")
+        f.write("#SBATCH -J " + str(par.casename) + "\n")
         f.write("#SBATCH -o a.eqquasi.log%j" + "\n")
-        f.write("#SBATCH -N " + str(HPC_nnode) + "\n")
-        f.write("#SBATCH -n " + str(HPC_ncpu) + "\n")
-        f.write("#SBATCH -p " + str(HPC_queue) + "\n")
-        f.write("#SBATCH -t " + str(HPC_time) + "\n")
-        f.write("#SBATCH -A " + str(HPC_account) + "\n")
-        f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
+        f.write("#SBATCH -N " + str(par.HPC_nnode) + "\n")
+        f.write("#SBATCH -n " + str(par.HPC_ncpu) + "\n")
+        f.write("#SBATCH -p " + str(par.HPC_queue) + "\n")
+        f.write("#SBATCH -t " + str(par.HPC_time) + "\n")
+        f.write("#SBATCH -A " + str(par.HPC_account) + "\n")
+        f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
         f.write("#SBATCH --mail-type=begin" + "\n")
         f.write("#SBATCH --mail-type=end" + "\n")
         f.write("  module load mumps"     + "\n")
         # Executable part.
-        f.write("for i in $(seq " + str(istart) + " " + str(iend) + ");" + "\n")
+        f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
         f.write("do" + "\n")
         f.write("  echo $i > currentcycle.txt" + "\n")
         f.write("  ibrun eqquasi" + "\n")
@@ -114,10 +114,10 @@ def create_run_sh():
     # Function to create batch script used by HPC system.
     with open("run.sh", "w") as f:
         # Executable part.
-        f.write("for i in $(seq " + str(istart) + " " + str(iend) + ");" + "\n")
+        f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
         f.write("do" + "\n")
         f.write("  echo $i > currentcycle.txt" + "\n")
-        f.write("  mpirun.openmpi -np " + str(HPC_ncpu) + " eqquasi" +"\n")
+        f.write("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " eqquasi" +"\n")
         f.write("  mkdir \"./Q$((i-1))\"" + "\n")
         f.write("  mv fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"./Q$((i-1))\"" + "\n")
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
@@ -129,14 +129,14 @@ def create_batch_script_cycle():
     # Compared to batch.hpc, we don't do cycle id looping here. 
     with open("batch.cycle.eqquasi.hpc", "w") as f:
         f.write("#! /bin/bash"                      + "\n")
-        f.write("#SBATCH -J " + str(casename)       + "\n")
+        f.write("#SBATCH -J " + str(par.casename)       + "\n")
         f.write("#SBATCH -o a.eqquasi.log%j"        + "\n")
-        f.write("#SBATCH -N " + str(HPC_nnode)      + "\n")
-        f.write("#SBATCH -n " + str(HPC_ncpu)       + "\n")
-        f.write("#SBATCH -p " + str(HPC_queue)      + "\n")
-        f.write("#SBATCH -t " + str(HPC_time)       + "\n")
-        f.write("#SBATCH -A " + str(HPC_account)    + "\n")
-        f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
+        f.write("#SBATCH -N " + str(par.HPC_nnode)      + "\n")
+        f.write("#SBATCH -n " + str(par.HPC_ncpu)       + "\n")
+        f.write("#SBATCH -p " + str(par.HPC_queue)      + "\n")
+        f.write("#SBATCH -t " + str(par.HPC_time)       + "\n")
+        f.write("#SBATCH -A " + str(par.HPC_account)    + "\n")
+        f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
         f.write("#SBATCH --mail-type=begin"         + "\n")
         f.write("#SBATCH --mail-type=end"           + "\n")
         # Executable part.
@@ -183,37 +183,9 @@ def create_batch_script_cycle():
         f.write("  cd .."                                              + "\n")
         # End excutable part.
 
-def create_batch_script_cycle_old():
-    # made obsolete on 20230228 but kept. 
-    # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.
-    # Compared to batch.hpc, we don't do cycle id looping here. 
-    with open("batch.cycle.hpc", "w") as f:
-        f.write("#! /bin/bash" + "\n")
-        f.write("#SBATCH -J " + str(casename) + "\n")
-        f.write("#SBATCH -o a.eqquasi.log%j" + "\n")
-        f.write("#SBATCH -N " + str(HPC_nnode) + "\n")
-        f.write("#SBATCH -n " + str(HPC_ncpu) + "\n")
-        f.write("#SBATCH -p " + str(HPC_queue) + "\n")
-        f.write("#SBATCH -t " + str(HPC_time) + "\n")
-        f.write("#SBATCH -A " + str(HPC_account) + "\n")
-        f.write("#SBATCH --mail-user=" + str(HPC_email) + "\n")
-        f.write("#SBATCH --mail-type=begin" + "\n")
-        f.write("#SBATCH --mail-type=end" + "\n")
-        # Executable part.
-        f.write("  read i < currentcycle.txt" + "\n")
-        f.write("  if ((i > 1))" + "\n")
-        f.write("  then" + "\n")
-        f.write("    echo 'Simulating cycle 1 ... ...'" + "\n")
-        f.write("    cp \"../D$((i-2))/\"fault.dyna.r.nc ./" + "\n")
-        f.write("    cp fault.dyna.r.nc fault.r.nc" + "\n")
-        f.write("  fi" + "\n")
-        f.write("  ibrun eqquasi" + "\n")
-        f.write("  mkdir \"../Q$((i-1))\"" + "\n")
-        f.write("  mv a.* fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"../Q$((i-1))\"" + "\n")
-        # End excutable part.
 def estimate_HPC_resource():
-    nx = int((xmax-xmin)/dx)
-    nz = int((zmax-zmin)/dx)
+    nx = round((par.xmax-par.xmin)/par.dx)
+    nz = round((par.zmax-par.zmin)/par.dx)
     ncell = nx*nz*(nuni_y_plus + nuni_y_minus)*2
     estimate_ncpu = int(ncell/10000)
     estimate_nnode = int(estimate_ncpu/128) + 1

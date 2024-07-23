@@ -66,6 +66,10 @@ if [ -n "$MACH" ]; then
         export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
         ln -sf /usr/lib/x86_64-linux-gnu/libblas.so.3 /usr/lib/x86_64-linux-gnu/libblas.so
         ln -sf /usr/lib/x86_64-linux-gnu/liblapack.so.3 /usr/lib/x86_64-linux-gnu/liblapack.so
+    elif [ $MACHINE == "local"]; then 
+        echo "Installing a local copy of MUMPS ..."
+        chmod 755 install.mumps.sh
+        ./install.mumps.sh
     fi 
     
     if [ -n "$CONFIG" ]; then 

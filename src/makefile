@@ -27,7 +27,7 @@ ifeq ($(SYSTEM), utig)
     LAPACK_LIB = -L${LIB} -llapack
 
 else ifeq ($(SYSTEM), ubuntu)
-    FFLAGS     = -fopenmp -ffree-line-length-none
+    FFLAGS     = -fopenmp -ffree-line-length-none -O3 
     FC         = mpif90.openmpi
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
@@ -38,6 +38,24 @@ else ifeq ($(SYSTEM), ubuntu)
     MUMPS_LIB  = -L${LIB} -ldmumps -lmumps_common 
     MUMPS_INC  = ${INC}
     PORD_LIB   = -L${LIB} -lpord
+    
+    BLAS_LIB   = -L${LIB} -lblas
+    SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
+    LAPACK_LIB = -L${LIB} -llapack
+
+else ifeq ($(SYSTEM), local)
+    FFLAGS     = -fopenmp -ffree-line-length-none -O3
+    FC         = mpif90.openmpi
+    
+    LIB        = /usr/lib/x86_64-linux-gnu
+    INC        = /usr/include
+    NETCDF_LIB = -L${LIB} -lnetcdf -lnetcdff
+    NETCDF_INC = -I${INC}
+    
+    MUMPS_ROOT = ${EQQUASIROOT}/mumps/build/local
+    MUMPS_INC  = ${MUMPS_ROOT}/include
+    MUMPS_LIB  = -L${MUMPS_ROOT}/lib -ldmumps -lmumps_common -lpord
+    PORD_LIB   = 
     
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 

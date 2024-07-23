@@ -1,43 +1,45 @@
 #!/bin/bash
 
-# This makefile file is part of software EQquasi.
-
-# This makefile is to compile EQquasi v1.3.0 with MUMPS, a high-performance, 
-# for Ubuntu.
-
-# machine is defined in install-eqquasi.shl
-# currently, it supports: 
+# This makefile file is part of EQquasi.
+# Machines supported include 
 #     ls6
 #     ubuntu
 #     utig (with locally installed mumps through scivision/mumps) 
+
 SYSTEM = ${MACHINE}
 
 ifeq ($(SYSTEM), utig)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
     FC         = mpif90.openmpi
-    # mumps is installed at the $EQQUASIROOT/mumps
-    MUMPS_ROOT = ${EQQUASIROOT}/mumps/build
-    MUMPS_INC  = ${MUMPS_ROOT}/_deps/mumps-src/include
+    
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
-    NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
+    NETCDF_LIB = -L${LIB} -lnetcdf -lnetcdff
     NETCDF_INC = -I${INC}
+    
+    MUMPS_ROOT = ${EQQUASIROOT}/mumps/build
+    MUMPS_INC  = ${MUMPS_ROOT}/_deps/mumps-src/include
     MUMPS_LIB  = -L${MUMPS_ROOT} -ldmumps -lmumps_common
     PORD_LIB   = -L${MUMPS_ROOT} -lpord
+    
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
     LAPACK_LIB = -L${LIB} -llapack
 
 else ifeq ($(SYSTEM), ubuntu)
     FFLAGS     = -fopenmp -ffree-line-length-none
-    FC         = mpif90
+    FC         = mpif90.openmpi
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
-    MUMPS_INC  = ${INC}
-    NETCDF_LIB = -L${LIB} -lnetcdf -L{LIB} -lnetcdff
+
+    
+    NETCDF_LIB = -L${LIB} -lnetcdf -lnetcdff
     NETCDF_INC = -I${INC}
-    MUMPS_LIB  = -L${LIB} -lmumps_common -L${LIB} -ldmumps
+    
+    MUMPS_LIB  = -L${LIB} -ldmumps -lmumps_common 
+    MUMPS_INC  = ${INC}
     PORD_LIB   = -L${LIB} -lpord
+    
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
     LAPACK_LIB = -L${LIB} -llapack
@@ -49,16 +51,9 @@ else ifeq ($(SYSTEM), ls6)
     MUMPS_INC  = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
     NETCDF_LIB = -L${TACC_NETCDF_LIB} -lnetcdf -L${TACC_NETCDF_LIB} -lnetcdff 
-    
-    # Good for precompiled libs on LS6 in 2021. The libs come along with the repo.
-    # MUMPS_LIB  = -L../lib/MUMPS/lib/ -ldmumps -lmumps_common -lpord 
-    
-    # Good for LS6 precompiled mumps module. The order of libs are important. 
-    # Used Bing AI search for the ordering.
     MUMPS_LIB  = -L${TACC_MUMPS_LIB} -ldmumps -lmumps_common -lpord -lptscotch \
                                     -lptscotcherr -lptesmumps -lesmumps -lscotch \
                                     -lscotcherr -lmetis -lparmetis
-    #PORD_LIB   = -L${TACC_MUMPS_LIB} -lpord
     BLAS_LIB   = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lpthread
     SCALAPACK_LIB = -L${LIB} -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64
     LAPACK_LIB = -L${LIB} -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core

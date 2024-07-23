@@ -66,13 +66,13 @@ par.fric_rsf_deltaa = 0.036
 par.fric_rsf_r0 = 0.6
 par.fric_rsf_v0 = 1e-6
 # Creating the fault interface
-par.nfx = round((par.xmax - par.xmin)/dx + 1)
-par.nfz = round((zmax - zmin)/dx + 1)
+par.nfx = round((par.xmax - par.xmin)/par.dx + 1)
+par.nfz = round((par.zmax - par.zmin)/par.dx + 1)
 par.fx = np.linspace(par.xmin,par.xmax,par.nfx) # coordinates of fault grids along strike.
 par.fz = np.linspace(par.zmin,par.zmax,par.nfz) # coordinates of fault grids along dip.
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
-def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
+def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
   # calculate shear stress at steady state
   res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
   return res
@@ -106,7 +106,9 @@ for ix, xcoor in enumerate(par.fx):
                                                 par.on_fault_vars[iz,ix,13],
                                                 par.creep_slip_rate,
                                                 par.on_fault_vars[iz,ix,7],
-                                                par.on_fault_vars[iz,ix,46])
+                                                par.on_fault_vars[iz,ix,46],
+                                                par.rou,
+                                                par.vs)
 ###############################################
 ##### Domain boundaries for transferring ######
 ###############################################

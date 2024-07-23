@@ -70,7 +70,7 @@ class parameters:
     fz = np.linspace(zmin,zmax,nfz) # coordinates of fault grids along dip.
     # Create on_fault_vars array for on_fault varialbes.
     on_fault_vars = np.zeros((nfz,nfx,100))
-    def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate):
+    def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
       # calculate shear stress at steady state
       res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
       return res
@@ -104,7 +104,9 @@ class parameters:
                                                     on_fault_vars[iz,ix,13],
                                                     creep_slip_rate,
                                                     on_fault_vars[iz,ix,7],
-                                                    on_fault_vars[iz,ix,46])
+                                                    on_fault_vars[iz,ix,46],
+                                                    rou,
+                                                    vs)
     ###############################################
     ##### Domain boundaries for transferring ######
     ###############################################

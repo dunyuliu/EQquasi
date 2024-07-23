@@ -4,6 +4,7 @@ Script to setup the case via user_defined_params.py.
 """
 from user_defined_params import par
 import netCDF4 as nc
+import numpy as np
 
 def create_model_input_file():
     # Function to create model.txt used by EQquasi.
@@ -186,7 +187,7 @@ def create_batch_script_cycle():
 def estimate_HPC_resource():
     nx = round((par.xmax-par.xmin)/par.dx)
     nz = round((par.zmax-par.zmin)/par.dx)
-    ncell = nx*nz*(nuni_y_plus + nuni_y_minus)*2
+    ncell = nx*nz*(par.nuni_y_plus + par.nuni_y_minus)*2
     estimate_ncpu = int(ncell/10000)
     estimate_nnode = int(estimate_ncpu/128) + 1
     print("Estimated total cells in the model is " + str(ncell))

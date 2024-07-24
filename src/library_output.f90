@@ -76,9 +76,6 @@ subroutine output_offfault_st
                           write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))/1000.d0)
                           write(dptmp,'(i4.3)')   int(x4nds(3,an4nds(1,i))/1000.d0)
                         endif
-            write(*,*) '=       xcoor',bodytmp,sttmp,dptmp,'                                ='
-            write(*,*) '=                                                                   ='
-            write(*,*) '====================================================================='        
             
             open(51,file='srfst_strk'//trim(adjustl(sttmp))//'st'//trim(adjustl(bodytmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
 

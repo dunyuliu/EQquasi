@@ -8,17 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os, glob, re, imageio
 from pdf2image import convert_from_path
-from user_defined_params import *
+from user_defined_params import par
 
 #
 SMALL_SIZE = 10
 r = 10e6 # half range to show stresses in Pa.
-mn = init_norm # initial normal stress
-ms = -mn*fric_rsf_r0 # initial mean shear stress for plotting.
+mn = par.init_norm # initial normal stress
+ms = -mn*par.fric_rsf_r0 # initial mean shear stress for plotting.
 md = 0 # initial mean shear dip stress
-# Read in file name from terminal.
-# fname = input("Enter the file name : ")
-
 
 def plot_fault(fname):
   a = xr.open_dataset(fname)
@@ -164,12 +161,5 @@ def _main_func(description):
 
 if __name__ == "__main__":
     _main_func(__doc__)
-
-#print(*dirFiles)
-#sorted_file_list = sorted(dirFiles, key=seek_numbers_filename)
-#print(sorted_file_list)
-
-#fig = plt.figure()
-#anim = animation.FuncAnimation(fig, plot_fault, frames = 1, interval = 1, blit=False)
 
 

@@ -13,9 +13,7 @@ from user_defined_params import *
 #
 SMALL_SIZE = 10
 r = 10e6 # half range to show stresses in Pa.
-mn = init_norm # initial normal stress
-ms = -mn*fric_rsf_r0 # initial mean shear stress for plotting.
-md = 0 # initial mean shear dip stress
+
 # Read in file name from terminal.
 # fname = input("Enter the file name : ")
 

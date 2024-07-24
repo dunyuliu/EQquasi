@@ -9,19 +9,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os, glob, re, imageio, sys
 from pdf2image import convert_from_path
-from user_defined_params import *
+from user_defined_params import par
 from lib import *
 
-#
-SMALL_SIZE = 10
-r = 10e6 # half range to show stresses in Pa.
-mn = init_norm # initial normal stress
-ms = -mn*fric_rsf_r0 # initial mean shear stress for plotting.
-md = 0 # initial mean shear dip stress
-# Read in file name from terminal.
-# fname = input("Enter the file name : ")
 ninterval = 20 # plot results in every 20 steps.
-
 
 def generate_timeseries_profile_all(model_path, mode, var, ninterval,nwindow):
     # extract time series information from all the model folders,
@@ -84,47 +75,8 @@ def generate_timeseries_profile_all(model_path, mode, var, ninterval,nwindow):
         data0 = data_ave[:,::ninterval]
     return data0 # [# of nodes, # of steps]
 
-def tryint(s):
-    try:
-        return int(s)
-    except:
-        return s
-
-def alphanum_key(s):
-    return [tryint(c) for c in re.split('([0-9]+)', s)]
-
-def sort_nicely(l):
-    l.sort(key=alphanum_key, reverse=False)
-    return l
-
-def generate_gif():
-  #images = []
-  #dirFiles = []
-  #for fname in os.listdir(os.getcwd()):
-  #  name, file_extension = os.path.splitext(fname)
-  #  if '.png' in file_extension:
-  #    dirFiles += fname
-  #print(dirFiles)
-  #for fname in sorted(dirFiles):
-  #  print(fname)
-  #  images.append(imageio.imread(fname))
-  #imageio.mimsave('on_fault_vars.gif',images)
-  filenames = glob.glob('.//*.png')
-  filenames = sort_nicely(filenames)
-  with imageio.get_writer('./on_fault_vars.gif', mode='I') as writer:
-      for filename in filenames:
-          image = imageio.v2.imread(filename)
-          #img = convert_from_path(filename)[0]
-          #image = np.array(img.getdata(), np.uint8).reshape(img.size[1], img.size[0], 3)
-          writer.append_data(image)
-
-def seek_numbers_filename(x):
-    return (x[6:10])
-
 #dirFiles = os.listdir(os.getcwd())
 def _main_func(description):
-    
-
     
     if len(sys.argv)==2 or len(sys.argv)==4:
 

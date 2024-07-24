@@ -2,18 +2,13 @@
 """
 Script to plot on fault initials like friction and stresses.
 """
-from user_defined_params import *
+from user_defined_params import par
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from matplotlib import animation, rc
 
-#
 SMALL_SIZE = 6
-
-# Read in file name from terminal.
-# fname = input("Enter the file name : ")
-
 
 def plot_initials():
   fig = plt.figure()
@@ -66,8 +61,6 @@ def plot_initials():
   
   return (fig,)
 
-
-#dirFiles = os.listdir(os.getcwd())
 def _main_func(description):
     plot_initials()
 

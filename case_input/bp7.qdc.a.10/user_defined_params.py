@@ -83,9 +83,9 @@ for ix, xcoor in enumerate(par.fx):
   # assign a in RSF. a is a 2D distribution.
     radii = sqrt(xcoor*xcoor + zcoor*zcoor)
     if radii <= rad:
-      par.on_fault_vars[iz,ix,9] = fric_rsf_a
+      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a
     else: 
-      par.on_fault_vars[iz,ix,9] = fric_rsf_a + fric_rsf_deltaa
+      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + par.fric_rsf_deltaa
       
     par.on_fault_vars[iz,ix,10] = par.fric_rsf_b # assign b in RSF 
     par.on_fault_vars[iz,ix,11] = par.fric_rsf_Dc # assign Dc in RSF.

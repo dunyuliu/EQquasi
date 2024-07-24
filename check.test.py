@@ -5,7 +5,7 @@ import xarray as xr
 #from netCDF4 import Dataset
 from testNameList import nameList
 
-fileNameList = ['fault.00001.nc','fault.00040.nc','global.dat', 'tdyna.txt']
+fileNameList = ['fault.00001.nc','fault.00101.nc','global.dat', 'tdyna.txt']
 refRoot  = 'test.reference.results'
 testRoot = 'test'
 

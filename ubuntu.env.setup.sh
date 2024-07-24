@@ -7,5 +7,6 @@ apt-get install git vim openmpi-bin make cmake
 apt-get install python3 python3-pip
 apt-get install libmumps-dev 
 apt-get install python3-numpy python3-matplotlib
-apt-get install python3-netcdf4 python3-xarray
+apt-get install python3-netcdf4 
 apt-get install libnetcdf-dev libnetcdff-dev
+pip install xarray imageio pdf2image numpy==1.26.4

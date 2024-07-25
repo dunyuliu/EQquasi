@@ -16,11 +16,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo bash ubuntu.env.setup.sh
+        sudo bash ubuntu.env.setup.sh > testRunLog.txt || true
 
     - name: Run tests
       run: |
-        bash make.scripts.executable.sh > testRunLog.txt || true
+        bash make.scripts.executable.sh >> testRunLog.txt || true
         source install.eqquasi.sh >> testRunLog.txt || true
         python3 testAll.py >> testRunLog.txt || true
     

@@ -21,7 +21,9 @@ jobs:
     - name: Run tests
       run: |
         bash make.scripts.executable.sh 
-        source install.eqquasi.sh 
+        export EQQUASIROOT=$(pwd)
+        export PATH=$(pwd)/bin:$PATH
+        export PATH=$(pwd)/scripts:$PATH 
         python3 testAll.py >> testRunLog.txt || true
         
     - name: Print log

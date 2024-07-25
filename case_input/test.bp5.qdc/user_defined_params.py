@@ -122,7 +122,7 @@ par.dx_trans = 50
 ####################################
 par.casename = "bp5-qd-2000"
 par.HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
-par.HPC_ncpu = 3 # Number of CPUs requested.
+par.HPC_ncpu = 2 # Number of CPUs requested.
 par.HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
 par.HPC_time = "00:30:00" # WALLTIME, in hh:mm:ss format.
 par.HPC_account = "EAR22013" # Project account to be charged SUs against.

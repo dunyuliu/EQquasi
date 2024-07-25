@@ -26,7 +26,7 @@ jobs:
     
     - name: Check errors in testRunLog.txt
       run: |
-        if grep -qiE 'error|exception|failed|fatal|abort' log.txt; then
+        if grep -qiE 'error|exception|failed|fatal|abort' testRunLog.txt; then
             exit 1
         fi
     

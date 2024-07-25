@@ -1,0 +1,25 @@
+name: Automatic Testing of EQquasi
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo bash ubuntu.env.setup.sh
+
+    - name: Run tests
+      run: |
+        bash make.scripts.executable.sh
+        source install.eqquasi.sh
+        python3 testAll.py

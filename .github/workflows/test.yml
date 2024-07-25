@@ -23,12 +23,13 @@ jobs:
         bash make.scripts.executable.sh 
         source install.eqquasi.sh 
         python3 testAll.py >> testRunLog.txt || true
-    
+        
+    - name: Print log
+      run: cat testRunLog.txt    
+      
     - name: Check errors in testRunLog.txt
       run: |
         if grep -qiE 'error|Error|ERROR|exception|failed|fatal|abort' testRunLog.txt; then
             exit 1
         fi
     
-    - name: Print log
-      run: cat testRunLog.txt

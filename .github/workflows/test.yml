@@ -20,8 +20,8 @@ jobs:
 
     - name: Run tests
       run: |
-        bash make.scripts.executable.sh >> testRunLog.txt || true
-        source install.eqquasi.sh >> testRunLog.txt || true
+        bash make.scripts.executable.sh 
+        source install.eqquasi.sh 
         python3 testAll.py >> testRunLog.txt || true
     
     - name: Check errors in testRunLog.txt

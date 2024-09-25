@@ -1,0 +1,42 @@
+name: Automatic Testing of EQquasi
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install git vim openmpi-bin make cmake
+        sudo apt-get install python3 python3-pip
+        sudo apt-get install libmumps-dev python3-matplotlib
+        sudo apt-get install libnetcdf-dev libnetcdff-dev
+        pip install xarray imageio pdf2image numpy==1.26.4 netCDF4
+
+    - name: Run tests
+      run: |
+        bash make.scripts.executable.sh 
+        export EQQUASIROOT=$(pwd)
+        export PATH=$(pwd)/bin:$PATH
+        export PATH=$(pwd)/scripts:$PATH 
+        python3 testAll.py >> testRunLog.txt || true
+        
+    - name: Print log
+      run: cat testRunLog.txt    
+      
+    - name: Check errors in testRunLog.txt
+      run: |
+        if grep -qiE 'error|Error|ERROR|exception|failed|fatal|abort' testRunLog.txt; then
+            exit 1
+        fi
+    

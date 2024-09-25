@@ -3,9 +3,7 @@ MODULE globalvar
     !save 
     integer, parameter   :: dp = selected_real_kind(15,307)
     character (len = 30) :: sttmp, dptmp, proc_str
-    real (kind = dp)::timebegin, timeover
-    !---------------------------------------------------------------!
-    !--------------------- system status variables -----------------!
+
     integer (kind = 4)   :: eqquasi_mode ! 1: quasi-dynamic/quasi-static; 2: fully-dynamic.
     integer (kind = 4)   :: status0, status1, stoptag, icstart
         ! status0/status1: inter-seismic (0) or co-seismic (1) for the last/current time step of the code.

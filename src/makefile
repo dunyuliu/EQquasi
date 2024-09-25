@@ -79,9 +79,9 @@ endif
 OPT  = -c ${FFLAGS} 
 OPT1 = ${FFLAGS}
 OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
-        main.o      c8g2.o      shl.o       faulting.o  \
-        fric.o      library_bound.o         library_output.o \
-        crs.o       elemcal.o   read_input.o            \
+        solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
+        fric.o               library_output.o \
+        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
         msr.o       func_lib.o  netcdf_io.o\
         
 clean : eqquasi
@@ -94,9 +94,9 @@ eqquasi: $(OBJ)
 	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
 	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
 
-eqquasi.o:   eqquasi.f90 main.o      globalvar.o mesh4num.o  \
-             meshgen.o   faulting.o  fric.o      library_bound.o \
-             library_output.o        crs.o       elemcal.o   \
+eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
+             meshgen.o   faulting.o  fric.o      \
+             library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              read_input.o            msr.o       func_lib.o  \
              netcdf_io.o
 	$(FC) $(OPT) eqquasi.f90 
@@ -106,12 +106,12 @@ mesh4num.o:  mesh4num.f90  globalvar.o
 	$(FC) $(OPT) mesh4num.f90
 meshgen.o:   meshgen.f90 globalvar.o func_lib.o
 	$(FC) $(OPT) meshgen.f90
-main.o:      main.f90    globalvar.o c8g2.o      shl.o       \
-             faulting.o  fric.o      library_bound.o         \
-             library_output.o        crs.o       elemcal.o   \
+solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o c8g2.o      shl.o       \
+             faulting.o  fric.o                \
+             library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
-	$(FC) $(OPT) main.f90 -I${MUMPS_INC}        
-#main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o library_bound.o library_output.o msr.o elemcal_aztec.o 
+	$(FC) $(OPT) solveTimeLoopMUMPS.f90 -I${MUMPS_INC}        
+#main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o   library_output.o msr.o elemcal_aztec.o 
 #    $(FC) $(OPT) main_aztec.f90 -I${inc_dir_aztec}        
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
@@ -121,14 +121,12 @@ faulting.o:  faulting.f90 fric.o globalvar.o library_output.o func_lib.o
 	$(FC) $(OPT) faulting.f90        
 fric.o:      fric.f90 globalvar.o
 	$(FC) $(OPT) fric.f90        
-library_bound.o: library_bound.f90  globalvar.o
-	$(FC) $(OPT) library_bound.f90
 library_output.o: library_output.f90  globalvar.o
 	$(FC) $(OPT) library_output.f90
-crs.o :      crs.f90  globalvar.o
-	$(FC) $(OPT) crs.f90
-elemcal.o :  elemcal.f90  globalvar.o
-	$(FC) $(OPT) elemcal.f90    
+createMatrixHolderInCRSFormat.o :      createMatrixHolderInCRSFormat.f90  globalvar.o
+	$(FC) $(OPT) createMatrixHolderInCRSFormat.f90
+elemAssembleInCRS.o :  elemAssembleInCRS.f90  globalvar.o
+	$(FC) $(OPT) elemAssembleInCRS.f90    
 #elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
 #    $(FC) $(OPT) elemcal_aztec.f90        
 msr.o :      msr.f90  globalvar.o

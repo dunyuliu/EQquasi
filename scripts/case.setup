@@ -5,13 +5,14 @@ Script to setup the case via user_defined_params.py.
 from user_defined_params import par
 import netCDF4 as nc
 import numpy as np
+import os
 
 def create_model_input_file():
     # Function to create model.txt used by EQquasi.
     with open('model.txt', 'w') as f:
-        f.write(str(par.xmin) + "  " + str(par.xmax) + "\n")
-        f.write(str(par.ymin) + "  " + str(par.ymax) + "\n")
-        f.write(str(par.zmin) + "  " + str(par.zmax) + "\n")
+        f.write(str(par.fxmin) + "  " + str(par.fxmax) + "\n")
+        f.write(str(par.fymin) + "  " + str(par.fymax) + "\n")
+        f.write(str(par.fzmin) + "  " + str(par.fzmax) + "\n")
         f.write(str(par.xminc) + "  " + str(par.xmaxc) + "  " + str(par.zminc) + "\n")
         f.write(str(par.nuni_y_plus) + "  " + str(par.nuni_y_minus) + "\n")
         f.write(str(par.enlarging_ratio) + "\n")
@@ -185,8 +186,8 @@ def create_batch_script_cycle():
         # End excutable part.
 
 def estimate_HPC_resource():
-    nx = round((par.xmax-par.xmin)/par.dx)
-    nz = round((par.zmax-par.zmin)/par.dx)
+    nx = round((par.fxmax-par.fxmin)/par.dx)
+    nz = round((par.fzmax-par.fzmin)/par.dz)
     ncell = nx*nz*(par.nuni_y_plus + par.nuni_y_minus)*2
     estimate_ncpu = int(ncell/10000)
     estimate_nnode = int(estimate_ncpu/128) + 1
@@ -202,6 +203,8 @@ def _main_func(description):
   create_station_input_file()
   estimate_HPC_resource()
   netcdf_write_on_fault_vars()
+  if par.insertFaultType>0:
+      os.system('./generateFaultInterface')
 
 if __name__ == "__main__":
     _main_func(__doc__)

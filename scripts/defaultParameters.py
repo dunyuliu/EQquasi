@@ -11,10 +11,12 @@ class parameters:
     # mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
     mode = 1
 
+    dip = 90.
+
     # model_domain (in meters)
-    xmin, xmax = -60.0e3, 60.0e3
-    ymin, ymax = -50.0e3, 50.0e3
-    zmin, zmax = -60.0e3, 0.0e3
+    fxmin, fxmax = -60.0e3, 60.0e3
+    fymin, fymax = -50.0e3, 50.0e3
+    fzmin, fzmax = -60.0e3, 0.0e3
 
     # creeping zone bounaries.
     # creeping zones are assinged on the lateral sides and bottom of 
@@ -22,6 +24,8 @@ class parameters:
     xminc, xmaxc, zminc = -50.0e3, 50.0e3, -40.0e3
 
     dx = 2000.0e0 # cell size, spatial resolution
+    dy = dx
+    dz = dx
     nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
     enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
@@ -32,6 +36,7 @@ class parameters:
 
     # Controlling switches for EQquasi system
     rough_fault = 0 # include rough fault yes(1) or not(0).
+    insertFaultType = 0
     rheology    = 1 # elastic(1). 
     friclaw     = 3 # rsf_aging(3), rsf_slip(4).
     ntotft      = 1 # number of total faults.
@@ -64,10 +69,10 @@ class parameters:
     fric_rsf_r0 = 0.6
     fric_rsf_v0 = 1e-6
     # Creating the fault interface
-    nfx = int((xmax - xmin)/dx + 1)
-    nfz = int((zmax - zmin)/dx + 1)
-    fx = np.linspace(xmin,xmax,nfx) # coordinates of fault grids along strike.
-    fz = np.linspace(zmin,zmax,nfz) # coordinates of fault grids along dip.
+    nfx = int((fxmax - fxmin)/dx + 1)
+    nfz = int((fzmax - fzmin)/dz + 1)
+    fx = np.linspace(fxmin,fxmax,nfx) # coordinates of fault grids along strike.
+    fz = np.linspace(fzmin,fzmax,nfz) # coordinates of fault grids along dip.
     # Create on_fault_vars array for on_fault varialbes.
     on_fault_vars = np.zeros((nfz,nfx,100))
     def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):

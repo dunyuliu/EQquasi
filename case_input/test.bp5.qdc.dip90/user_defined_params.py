@@ -7,6 +7,8 @@ from math import *
 par = parameters()
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
 
+par.dip = 90.
+
 par.istart = 1
 par.iend = 1
 # mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
@@ -34,7 +36,7 @@ par.vp, par.vs, par.rou = 6.0e3, 3.464e3, 2.67e3
 par.init_norm = -25.0e6 # initial normal stress in Pa. Negative compressive.
 
 # Controlling switches for EQquasi system
-par.insertFaultType = 0 
+par.insertFaultType = 1 #2:rough;1:planar;0:do nothing.
 par.rough_fault = par.insertFaultType
 par.rheology    = 1 # elastic(1). 
 par.friclaw     = 3 # rsf_aging(3), rsf_slip(4).

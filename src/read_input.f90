@@ -291,32 +291,28 @@ subroutine read_fault_rough_geometry
     logical :: file_exists
     integer (kind = 4) :: i, j, i1, j1, nnx1, nnz1, itmp
     real (kind = dp), allocatable, dimension(:,:) :: rough_geo_tmp
+    real (kind=dp)::n1Tmp,n2Tmp
     
     if (me == 0) then 
-        INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
-        !write(*,*) 'Checking rough_geo.txt by the master procs', me
+        INQUIRE(FILE="bFault_Rough_Geometry.txt", EXIST=file_exists)
         if (file_exists .eqv. .FALSE.) then
-            write(*,*) 'rough_geo.txt is required but missing ...'
-        endif 
-    endif 
-    if (me == 0) then 
-        INQUIRE(FILE="rough_geo_cycle.txt", EXIST=file_exists)
-        if (file_exists .eqv. .FALSE.) then
-            write(*,*) 'rough_geo.txt is still missing, so exiting EQquasi'
+            write(*,*) 'bFault_Rough_Geometry.txt is missing, so exiting EQquasi'
             stop
         endif 
     endif     
     
-    open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
-        read(1008,*) nnx, nnz ! nums of grids along strike by dip, and nums of grids to pick a data point.
+    open(unit = 1008, file = 'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
+        read(1008,*) n1Tmp, n2Tmp ! nums of grids along strike by dip, and nums of grids to pick a data point.
         read(1008,*) dxtmp, rough_fx_min, rough_fz_min 
     close(1008)
+    nnx = int(n1Tmp)
+    nnz = int(n2Tmp)
     rough_fx_max = (nnx - 1)*dxtmp + rough_fx_min
     
     write(*,*) 'nnx, nnz, rough_fx_max, rough_fx_min = ', nnx, nnz, rough_fx_max, rough_fx_min
     allocate(rough_geo(3,nnx*nnz))
     
-    open(unit = 1008, file = 'rough_geo_cycle.txt', form = 'formatted', status = 'old')
+    open(unit = 1008, file = 'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
         read(1008,*)
         read(1008,*)
         do i = 1, nnx*nnz 

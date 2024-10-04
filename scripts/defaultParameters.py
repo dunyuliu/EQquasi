@@ -35,8 +35,8 @@ class parameters:
     init_norm = -25.0e6 # initial normal stress in Pa. Negative compressive.
 
     # Controlling switches for EQquasi system
-    rough_fault = 0 # include rough fault yes(1) or not(0).
-    insertFaultType = 0
+    insertFaultType = 0 # 0: no fault, 1: planar 2: rough.
+    rough_fault = insertFaultType
     rheology    = 1 # elastic(1). 
     friclaw     = 3 # rsf_aging(3), rsf_slip(4).
     ntotft      = 1 # number of total faults.

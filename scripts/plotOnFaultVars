@@ -28,6 +28,10 @@ def plot_fault(fname):
   state2       = a.state_normal
 
   b = np.loadtxt('global.dat')
+  cumulativeTime = np.cumsum(b[:,0])
+  secondToDayConst = 24*60*60
+  secondToYearConst = 365*24*60*60
+  cumulativeTimeInDays = cumulativeTime/secondToDayConst
 
   #n1 = re.findall(r'\d+',fname)
   #nstep = int(n1[0])
@@ -71,8 +75,20 @@ def plot_fault(fname):
   ax31 = fig1.add_subplot(3,3,7)
   ax31.plot(b[:,1])
   ax31.plot(nstep-1,b[nstep-1,1],'ro',markersize=10)
-  ax31.set_xlabel('Steps')
+  ax31.set_xlabel('Time Steps')
   ax31.set_ylabel('Peak Slip Rate (m/s)')
+
+  ax31 = fig1.add_subplot(3,3,8)
+  ax31.plot(np.log10(b[:,1]))
+  ax31.plot(nstep-1,np.log10(b[nstep-1,1]),'ro',markersize=10)
+  ax31.set_xlabel('Time Steps')
+  ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
+
+  ax31 = fig1.add_subplot(3,3,9)
+  ax31.plot(cumulativeTimeInDays, np.log10(b[:,1]))
+  ax31.plot(cumulativeTimeInDays[nstep-1],np.log10(b[nstep-1,1]),'ro',markersize=10)
+  ax31.set_xlabel('Time in Days')
+  ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
 
   plt.savefig(fname + ".png", dpi = 600)
   plt.close()

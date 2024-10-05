@@ -109,6 +109,9 @@ def create_batch_script():
         f.write("  mkdir \"./Q$((i-1))\"" + "\n")
         f.write("  mv fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \"./Q$((i-1))\"" + "\n")
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
+        f.write("  cd \"./Q$((i-1))/\"" + "\n")
+        f.write("  ../plotOnFaultVars"+"\n")
+        f.write("  cd .."+"\n")
         f.write("done" + "\n")
         # End excutable part.
 

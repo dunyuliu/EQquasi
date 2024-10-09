@@ -22,7 +22,7 @@ par.fzmin, par.fzmax = -60.0e3, 0.0e3
 # creeping zone bounaries.
 # creeping zones are assinged on the lateral sides and bottom of 
 # the RSF controlled region and will slide at fixed loading slip rate.
-par.xminc, par.xmaxc, par.zminc = -50.0e3, 50.0e3, -40.0e3
+par.xminc, par.xmaxc, par.zminc = -50.0e3, 50.0e3, -40.0e3*sin(par.dip/180.*pi)
 
 par.dx = 4000.0e0 # cell size, spatial resolution
 par.dy = par.dx
@@ -43,7 +43,7 @@ par.friclaw     = 3 # rsf_aging(3), rsf_slip(4).
 par.ntotft      = 1 # number of total faults.
 par.solver      = 1 # solver option. MUMPS(1, recommended). AZTEC(2).
 par.nstep       = 101 # total num of time steps for exiting, if not exit via sliprate threshold
-par.nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
+par.nt_out      = 200 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
 par.bp          = 5 
 # currently supported cases
 # 5 (SCEC-BP5)
@@ -84,24 +84,25 @@ def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
   
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
-  # assign a in RSF. a is a 2D distribution.
-    if abs(zcoor)>=18e3 or abs(xcoor)>=32e3 or abs(zcoor)<=2e3: 
+    # assign a in RSF. a is a 2D distribution.
+    downDipDist = abs(zcoor)/sin(par.dip/180.*pi)
+    if downDipDist>=18e3 or abs(xcoor)>=32e3 or downDipDist<=2e3: 
       par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + par.fric_rsf_deltaa
-    elif abs(zcoor)<=16e3 and abs(zcoor)>=4e3 and abs(xcoor)<=30e3:
+    elif downDipDist<=16e3 and downDipDist>=4e3 and abs(xcoor)<=30e3:
       par.on_fault_vars[iz,ix,9] = par.fric_rsf_a
     else:
-      tmp1 = (abs(abs(zcoor)-10e3) - 6e3)/2e3
+      tmp1 = (abs(downDipDist-10e3) - 6e3)/2e3
       tmp2 = (abs(xcoor)-30e3)/2e3
       par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + max(tmp1,tmp2)*par.fric_rsf_deltaa
     par.on_fault_vars[iz,ix,10] = par.fric_rsf_b # assign b in RSF 
     par.on_fault_vars[iz,ix,11] = par.fric_rsf_Dc # assign Dc in RSF.
-    if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
+    if (xcoor<=-18e3 and xcoor>=-30e3 and downDipDist>=4e3 and downDipDist<=16e3):
       par.on_fault_vars[iz,ix,11] = par.minDc # a special Dc zone.
     par.on_fault_vars[iz,ix,12] = par.fric_rsf_v0 # initial reference slip rate.
     par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # initial reference friction.
     
     par.on_fault_vars[iz,ix,46] = par.creep_slip_rate # initial slip rates
-    if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
+    if (xcoor<=-18e3 and xcoor>=-30e3 and downDipDist>=4e3 and downDipDist<=16e3):
       par.on_fault_vars[iz,ix,46] = 0.03 # initial high slip rate patch.
     par.on_fault_vars[iz,ix,20] = par.on_fault_vars[iz,ix,11]/par.creep_slip_rate # initial state var.
     par.on_fault_vars[iz,ix,7] = par.init_norm # initial normal stress.
@@ -125,12 +126,12 @@ par.dx_trans = 50
 ####################################
 ##### HPC resource allocation ######
 ####################################
-par.casename = "bp5-qd-2000"
+par.casename = "bp5.qdc.4000.dip"
 par.HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
 par.HPC_ncpu = 2 # Number of CPUs requested.
 par.HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
 par.HPC_time = "00:30:00" # WALLTIME, in hh:mm:ss format.
-par.HPC_account = "EAR22013" # Project account to be charged SUs against.
+par.HPC_account = "EAR22012" # Project account to be charged SUs against.
 par.HPC_email = "dliu@ig.utexas.edu" # Email to receive job status.
 
 ##############################################

@@ -26,6 +26,7 @@ def create_model_input_file():
         f.write(str(par.xi) + "  " + str(par.minDc) + "\n")
         f.write(str(par.exit_slip_rate) + "\n")
         f.write(str(par.far_vel_load) + "\n")
+        f.write(str(par.far_norm_load_vel) + "\n")
         f.write(str(par.creep_slip_rate) + "\n")
         f.write(str(par.init_norm) + "\n")
         f.write(str(par.solver) + "\n")

@@ -51,6 +51,7 @@ subroutine readmodel
         read(1002,*) ksi, minDc
         read(1002,*) slipr_thres
         read(1002,*) far_load_rate
+        read(1002,*) far_norm_load_vel
         read(1002,*) load_slip_rate
         read(1002,*) init_norm
         read(1002,*) sol_op

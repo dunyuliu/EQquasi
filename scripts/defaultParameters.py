@@ -52,7 +52,8 @@ class parameters:
     minDc = 0.13 # meters
 
     # loading 
-    far_vel_load = 4e-10 # far field loading velocity on xz planes. A minus value is applied on the other side.
+    far_vel_load = 4e-10 # far field shear loading velocity (+x vel=far_vel_load on xz bound at y=ymax). A minus value is applied on the other side.
+    far_norm_load_vel = 0.0 # far field fault-normal extensional loading velocity (+y vel=far_norm_load_vel on xz bound at y=ymax). 
     creep_slip_rate = 1.0e-9 # creeping slip rate outside of RSF controlled region.
     exit_slip_rate = 1.0e-3 # exiting slip rate for EQquasi [m/s].
 

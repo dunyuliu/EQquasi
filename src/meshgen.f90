@@ -29,16 +29,7 @@ subroutine meshgen
     n4yn = 0
     
     ntmp = (int((xmax-xmin)/dx)+1)*(int((zmax-zmin)/dx)+1)                                        
-    ! allocate(initial(16,ntmp))
-    ! initial = 0.0d0 
-    
-    ! if (icstart > 1) then 
-        ! open(111,file = 'cplot_EQquasi.txt', form = 'formatted', status ='old')
-          ! do i = 1,ntmp 
-            ! read(111,*) (initial(j,i),j=1,16)
-          ! enddo
-        ! close(111)
-    ! endif 
+
     dy=dx
     dz=dx
     tol=dx/100.d0
@@ -171,34 +162,21 @@ subroutine meshgen
                     call insert_rough_fault(xcoor, ycoor, zcoor, ycoort, pfx, pfz, ymax1, ymin1)
                     x(2,nnode) = ycoort
                 endif 
-                            !The normal vector at x = 0 belongs to the left segment.
-                !if (xcoor>0.0d0) then 
-    !
-    !                tmp1 = (xcoor--0.0d3)*dtand(ttheta)
-    !                tmp2=ttheta
-    !                strtmp=(270.0d0-tmp2)/180.0d0*pi        
-    !                if (ycoor>=0.0d3) then     
-    !                    ycoort=(ylinet(nyt)-tmp1)*ycoor/ylinet(nyt) + tmp1
-    !                elseif (ycoor<0.0d0) then 
-    !                    ycoort=ylinet(1)+(ycoor-ylinet(1))/(-ylinet(1))*(tmp1-ylinet(1))
-    !                endif
-    !                x(2,nnode)=ycoort                            
-    !            endif
+
                 plane2(iy,iz) = nnode
                 if(iy==1.or.iy==nyt.or.ycoor==0.0d0) then 
-                !if(ycoor==0.0d0)then
                     if (ycoor>0.0d0) then 
-                        id(1,nnode)=-3!+x movement
-                        id(2,nnode)=-1!fixed
-                        id(3,nnode)=-1!fixed
+                        id(1,nnode)=-3  ! ymax, +x vel, right lateral
+                        id(2,nnode)=-31 ! ymax, +y vel, extensional
+                        id(3,nnode)=-1  ! fixed 
                     elseif (ycoor<0.0d0) then 
-                        id(1,nnode)=-2!-x movement
-                        id(2,nnode)=-1!fixed
-                        id(3,nnode)=-1!fixed
+                        id(1,nnode)=-2  ! ymin, -x vel
+                        id(2,nnode)=-21 ! ymin, -y vel
+                        id(3,nnode)=-1  ! fixed
                     elseif (ycoor==0.0d0) then 
-                        id(1,nnode)=-5!fault boundaries
-                        id(2,nnode)=-5!
-                        id(3,nnode)=-5!
+                        id(1,nnode)=-5  ! fault boundaries
+                        id(2,nnode)=-5  ! 
+                        id(3,nnode)=-5  !
                     endif 
                 else 
                     do i1=1,ndof

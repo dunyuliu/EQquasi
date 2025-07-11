@@ -54,7 +54,7 @@ MODULE globalvar
     real (kind=dp) :: xsource=-9.0d3,ysource=0.0d0,zsource=-6.0d3 ! hypocenter location for artificial nucleation.
     real (kind=dp) :: term=200.0d0
     real (kind=dp) :: time=0.0d0
-    real (kind=dp) :: mat0(1,3), ksi, minDc, slipr_thres, ttheta=10.0d0, far_load_rate, load_slip_rate, pma, sliprmax
+    real (kind=dp) :: mat0(1,3), ksi, minDc, slipr_thres, ttheta=10.0d0, far_load_rate, far_norm_load_vel, load_slip_rate, pma, sliprmax
     real (kind=dp) :: init_norm ! initial effective normal stress on the fault, MPa.
     real (kind=dp) :: critt0 ! critical time for the nucleation to occur.
     real (kind=dp) :: min_norm, max_norm ! minimum and maximum effective normal stress caps on the fault, MPa. 

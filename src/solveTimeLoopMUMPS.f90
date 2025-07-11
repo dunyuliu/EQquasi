@@ -300,34 +300,35 @@ subroutine bound_load
                 !-2->-x; -3->+x; -5->fault
                 if (elemvar(ntag)<0)then
                     if (itag == 0) then 
-                        if (elemvar(ntag)==-2) then
-                            consv(j,node_num)=-far_load_rate!-5.0d-10
-                            consvtmp(j,node_num) = consv(j,node_num)
-                            consa(j,node_num)=0.0d0
-                        elseif (elemvar(ntag)==-3) then
-                            consv(j,node_num)=far_load_rate!5.0d-10
-                            consvtmp(j,node_num) = consv(j,node_num)
-                            consa(j,node_num)=0.0d0                    
+                        if (elemvar(ntag)==-2) then ! ymin, x- vel
+                            consv(j,node_num) = -far_load_rate 
+                        elseif (elemvar(ntag)==-3) then ! ymax, x- vel
+                            consv(j,node_num) = far_load_rate 
+                        elseif (elemvar(ntag)==-21) then ! ymin, y- vel
+                            consv(j,node_num) = -far_norm_load_vel      
+                        elseif (elemvar(ntag)==-31) then ! ymax, y+ vel
+                            consv(j,node_num) = far_norm_load_vel         
                         elseif (elemvar(ntag)==-1) then
-                            consv(j,node_num)=0.0d0
-                            consvtmp(j,node_num) = consv(j,node_num)
-                            consa(j,node_num)=0.0d0
+                            consv(j,node_num) = 0.0d0
                         endif 
-
+                        consvtmp(j,node_num) = consv(j,node_num)
+                        consa(j,node_num) = 0.0d0    
                         !First predictions of U*(t+1)[CONSTRAINTMP]
                         constmp(j,node_num)=cons(j,node_num)+consv(j,node_num)*dtev1
                     elseif (itag == 1) then 
                         !-2->-x; -3->+x; -5->fault
                         if (elemvar(ntag)==-2) then
-                            consv(j,node_num)=-far_load_rate!-5.0d-10
-                            consa(j,node_num)=0.0d0
+                            consv(j,node_num) = -far_load_rate
                         elseif (elemvar(ntag)==-3) then
-                            consv(j,node_num)=far_load_rate!5.0d-10
-                            consa(j,node_num)=0.0d0                    
+                            consv(j,node_num) = far_load_rate   
+                        elseif (elemvar(ntag)==-21) then
+                            consv(j,node_num) = -far_norm_load_vel
+                        elseif (elemvar(ntag)==-31) then
+                            consv(j,node_num) = far_norm_load_vel         
                         elseif (elemvar(ntag)==-1) then
-                            consv(j,node_num)=0.0d0
-                            consa(j,node_num)=0.0d0
+                            consv(j,node_num) = 0.0d0
                         endif 
+                        consa(j,node_num) = 0.0d0
 !write(*,*) '!---3.5.5.1-FINALL UPDATION OF [CONSTRAIN].'
 !-----------NO NEED TO WORRY NON-BOUNDARY NODES, SINCE THEIR CONSTRAINV&VTMP ARE ZERO.
 !-----------ERROR, CANNOT UPDATE CONTRAIN ITSELF. EACH D.O.F HAS BEEN VISITIED SEVERAL TIMES FOR IN THE LOOP.

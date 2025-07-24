@@ -86,7 +86,7 @@ def generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
     # Index (i,j) are from fault corner(fxmin, fzmin), consistent with reading in EQdyna.
     for i in range(nx):
         for j in range(nz):
-            subSurface[j,i] = subSurface[j,i] + (nz-1-j)*dx*cos(dipAngle/180.*pi)
+            subSurface[j,i] = subSurface[j,i] + np.sign(dipAngle)*(nz-1-j)*dx*cos(dipAngle/180.*pi)
 
     # compute gradients for y=y(x,z), dy/dx, dy/dz
     # axis=(1,0), 1 along columns, 0 along rows.

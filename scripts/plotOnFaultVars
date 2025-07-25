@@ -28,7 +28,7 @@ def plot_fault(fname):
   state2       = a.state_normal
 
   b = np.loadtxt('global.dat')
-  cumulativeTime = np.cumsum(b[:,0])
+  cumulativeTime = b[:,0] 
   secondToDayConst = 24*60*60
   secondToYearConst = 365*24*60*60
   cumulativeTimeInDays = cumulativeTime/secondToDayConst

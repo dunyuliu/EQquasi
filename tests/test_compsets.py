@@ -19,23 +19,8 @@ DOMAIN_ATTRS = ["fxmin", "fxmax", "fymin", "fymax", "fzmin", "fzmax"]
 SHADOW_ATTRS = {"xmin", "xmax", "ymin", "ymax", "zmin", "zmax"}
 
 
-# Compsets known to carry the shadow-attribute / stale-dy-dz defect. These are
-# being repaired on branch bp7-domain-fix. The markers are strict, so once the
-# fix lands these turn into XPASS failures and must be deleted along with this
-# list -- the suite refuses to let a fixed bug keep a permanent excuse.
-KNOWN_BROKEN_DOMAIN = {"bp5.qdc.2000", "bp7.qdc.a.10", "das.cycle"}
-_REASON = "known defect, owned by branch bp7-domain-fix: compset sets par.xmin/... which case.setup never reads, and omits par.dy/par.dz"
-
-
 def compset_ids():
-    out = []
-    for d in compset_dirs():
-        if d.name in KNOWN_BROKEN_DOMAIN:
-            out.append(pytest.param(d.name, marks=pytest.mark.xfail(
-                strict=True, reason=_REASON)))
-        else:
-            out.append(d.name)
-    return out
+    return [d.name for d in compset_dirs()]
 
 
 @pytest.mark.parametrize("name", compset_ids())

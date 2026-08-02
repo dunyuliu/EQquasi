@@ -122,6 +122,24 @@ class parameters:
     ymin_trans, ymax_trans = -5e3, 5e3
     dx_trans = 50 
 
+    ###############################################################
+    ##### Along-fault pore fluid diffusion, used when bp == 8 ######
+    ###############################################################
+    # Off by default, so every other compset is unaffected.
+    fluid_src    = 0       # 0: off; 1: Gaussian source (GS); 2: Peaceman well (PW).
+    fluid_q0     = 0.0     # total volume injection rate, m^3/s.
+    fluid_toff   = 0.0     # injection turn-off time, s.
+    fluid_tend   = 0.0     # final simulation time, s. 0 disables the time-based exit.
+    fluid_Lgauss = 50.0    # characteristic size of the Gaussian source, m.
+    fluid_Lfwid  = 1.0     # fault zone thickness, m.
+    fluid_beta   = 1.0e-8  # pore and fluid compressibility, 1/Pa.
+    fluid_phi    = 0.1     # porosity.
+    fluid_perm   = 5.0e-14 # permeability, m^2.
+    fluid_eta    = 1.0e-3  # fluid viscosity, Pa s.
+    fluid_Swell  = 1.0e-7  # volumetric well storage, m^3/Pa.
+    fluid_rwell  = 0.0508  # well radius, m. 2 inches; not fixed by the BP8 table.
+    dtmax        = 0.0     # cap on the adaptive time step, s. 0 means no cap.
+
     ####################################
     ##### HPC resource allocation ######
     ####################################

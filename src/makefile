@@ -90,8 +90,8 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
         fric.o               library_output.o \
         createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
-        msr.o       func_lib.o  netcdf_io.o\
-        
+        msr.o       func_lib.o  netcdf_io.o porepressure.o\
+
 clean : eqquasi
 	rm -r *.o
 
@@ -143,5 +143,7 @@ read_input.o: read_input.f90 globalvar.o
 	$(FC) $(OPT) read_input.f90
 func_lib.o:  func_lib.f90
 	$(FC) $(OPT) func_lib.f90
-netcdf_io.o: netcdf_io.f90 
-	$(FC) $(OPT) netcdf_io.f90 ${NETCDF_INC}    
+netcdf_io.o: netcdf_io.f90
+	$(FC) $(OPT) netcdf_io.f90 ${NETCDF_INC}
+porepressure.o: porepressure.f90 globalvar.o
+	$(FC) $(OPT) porepressure.f90    

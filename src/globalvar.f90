@@ -74,8 +74,30 @@ MODULE globalvar
         fric_w,           fric_ini_sliprate, fric_tp_Tini, &
         fric_tp_pini
     
-    ! parameters for nucleation in bp7. 
-    real (kind=dp) :: nucx  = -50,      nucz = -50 ! hypocenter x and z coordinates in m. 
+    ! parameters for along-fault pore fluid diffusion in bp8 (SEAS BP8, fluid injection in 3D).
+    integer (kind=4) :: fluid_src = 0 ! 0: off, default; 1: Gaussian source (GS); 2: Peaceman well (PW).
+    character (len=2) :: bp8tag = 'GS' ! benchmark tag written into bp8 output headers.
+    integer (kind=4) :: pfWell = 0    ! fault node index of the well cell.
+    real (kind=dp) :: fluid_q0        ! total volume injection rate, m^3/s.
+    real (kind=dp) :: fluid_toff      ! injection turn-off time, s.
+    real (kind=dp) :: fluid_tend      ! final simulation time, s. bp8 exits when time >= fluid_tend.
+    real (kind=dp) :: fluid_Lgauss    ! characteristic size of the Gaussian source, m.
+    real (kind=dp) :: fluid_Lfwid     ! fault zone thickness, m.
+    real (kind=dp) :: fluid_beta      ! pore and fluid compressibility, 1/Pa.
+    real (kind=dp) :: fluid_phi       ! porosity.
+    real (kind=dp) :: fluid_perm      ! permeability, m^2.
+    real (kind=dp) :: fluid_eta       ! fluid viscosity, Pa s.
+    real (kind=dp) :: fluid_alpha     ! hydraulic diffusivity k/(phi*beta*eta), m^2/s.
+    real (kind=dp) :: fluid_Swell     ! volumetric well storage, m^3/Pa.
+    real (kind=dp) :: fluid_rwell     ! well radius, m.
+    real (kind=dp) :: fluid_WI        ! Peaceman well index, m^3/(Pa s).
+    real (kind=dp) :: fluid_pwell = 0.0d0 ! well pressure, Pa.
+    real (kind=dp) :: dtmax = 0.0d0   ! cap on the adaptive time step, s. 0 means no cap.
+    real (kind=dp), allocatable :: pf(:), pfWt(:) ! pore pressure change, Pa; source weights.
+    integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
+
+    ! parameters for nucleation in bp7.
+    real (kind=dp) :: nucx  = -50,      nucz = -50 ! hypocenter x and z coordinates in m.
     real (kind=dp) :: nucdtao0 = 1.75d6             ! max amplitude of nucleation stress perturbation in Pa. 
     real (kind=dp) :: nucr  = 150.0d0           ! radius of the nucleation stress perturbation 
     real (kind=dp) :: nuct  = 1.0d0             ! duration of the nucleation stress perturbation.

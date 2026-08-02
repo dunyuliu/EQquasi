@@ -18,7 +18,9 @@ subroutine solveTimeLoopMUMPS
     call DMUMPS(mumps_par)
  
     call getScalarOnFaultQuant
-    
+
+    if (bp == 8) call pore_pressure_init
+
     if (me.eq.0) then
         write(*,*) '= Building Stiffness Matrix in CRS format      ='
         call createMatrixHolderInCRSFormat
@@ -64,8 +66,14 @@ subroutine solveTimeLoopMUMPS
                 endif
             endif 
             
+            if (dtmax > 0.0d0) dtev1 = min(dtev1, dtmax)
+
             time = time + dtev1
-            
+
+            ! bp8: advance the along-fault pore pressure to t+dtev1 before
+            ! faulting consumes it through fric(6,:,:).
+            if (bp == 8) call pore_pressure_update(dtev1)
+
             if (mod(it,nhplt) == 1 .and. me ==0) then
                 write(*,*) '=                                                                   ='
                 write(*,*) '=     Current time =                                                ='
@@ -215,7 +223,14 @@ subroutine exitCriteria
     use globalvar
     implicit none
     real (kind = dp) :: hang_time = 1e5
-    
+
+    ! bp8 is aseismic by construction (velocity-strengthening everywhere), so it
+    ! runs to a prescribed final time instead of exiting on a slip rate criterion.
+    if (bp == 8) then
+        if (fluid_tend > 0.0d0 .and. time >= fluid_tend) stoptag = 1
+        return
+    endif
+
     if (eqquasi_mode == 1) then ! quasi-dynamic/quasi-static
         if (maxSlipRate>slipr_thres)then
         ! if maximum slip rate rises above the slipr_thres, entering/in the co-seismic phase.

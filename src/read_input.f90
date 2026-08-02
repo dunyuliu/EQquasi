@@ -18,7 +18,8 @@ subroutine readmodel
 
     character (len = 50) :: fileName
     logical::file_exists
-    
+    integer (kind = 4) :: ios
+
     if (me == 0) then 
         INQUIRE(FILE="model.txt", EXIST=file_exists)
         !write(*,*) 'Checking FE_Model_Geometry.txt by the master procs', me
@@ -61,6 +62,17 @@ subroutine readmodel
         read(1002,*) nt_output_stress
         read(1002,*) eqquasi_mode
         read(1002,*) nstep
+        ! Appended for bp8 (SEAS BP8, fluid injection in 3D). Read with iostat so
+        ! that a model.txt written by an older case.setup still loads; the
+        ! defaults in globalvar then leave fluid_src == 0, i.e. no fluid.
+        read(1002,*,iostat=ios) fluid_src
+        if (ios == 0) then
+            read(1002,*) fluid_q0, fluid_toff, fluid_tend
+            read(1002,*) fluid_Lgauss, fluid_Lfwid
+            read(1002,*) fluid_beta, fluid_phi, fluid_perm, fluid_eta
+            read(1002,*) fluid_Swell, fluid_rwell
+            read(1002,*) dtmax
+        endif
     close(1002)
     
     if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) stop ! Creeping zone bounds should be within model bounds. 

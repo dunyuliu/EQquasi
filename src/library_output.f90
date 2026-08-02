@@ -11,9 +11,14 @@ subroutine output_onfault_st
             if (j==1) then  !main fault stations
                 sttmp = '      '
                 dptmp = '      '
-                if (bp == 7) then 
-                    write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)) 
-                    write(dptmp,'(i4.3)') int(-xonfs(2,anonfs(2,i),j)) 
+                if (bp == 8) then
+                    ! SEAS BP8 names stations in metres with an explicit sign,
+                    ! e.g. fltst_strk+000dp-200.
+                    write(sttmp,'(SP,i4.3)') int(xonfs(1,anonfs(2,i),j))
+                    write(dptmp,'(SP,i4.3)') int(-xonfs(2,anonfs(2,i),j))
+                elseif (bp == 7) then
+                    write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j))
+                    write(dptmp,'(i4.3)') int(-xonfs(2,anonfs(2,i),j))
                 else
                     write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/1000.d0)
                     write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j))/1000.d0)
@@ -25,6 +30,46 @@ subroutine output_onfault_st
             !write(51,*) '# Author = Sophon'
             !write(51,*) '# code = EQquasi'
             !write(51,*) '# version = 1.x'   
+            if (bp == 8) then
+                ! SEAS BP8 time series: 11 fields, see section 4.1 of the
+                ! benchmark description.
+                write(51,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
+                write(51,'(A)') '# code=EQquasi'
+                write(51,'(A)') '# version=1.3.3'
+                write(51,'(A)') '# modeler=D.Liu'
+                write(51,'(A,E15.7,A)') '# element_size=', dx, ' m'
+                write(51,'(A)') '# location= on fault'
+                write(51,'(A)') '# Column #1 = Time (s)'
+                write(51,'(A)') '# Column #2 = Slip_2 (m)'
+                write(51,'(A)') '# Column #3 = Slip_3 (m)'
+                write(51,'(A)') '# Column #4 = Slip_rate_2 (log10 m/s)'
+                write(51,'(A)') '# Column #5 = Slip_rate_3 (log10 m/s)'
+                write(51,'(A)') '# Column #6 = Shear_stress_2 (MPa)'
+                write(51,'(A)') '# Column #7 = Shear_stress_3 (MPa)'
+                write(51,'(A)') '# Column #8 = Pore_pressure (MPa)'
+                write(51,'(A)') '# Column #9 = Darcy_velocity_2 (m/s)'
+                write(51,'(A)') '# Column #10 = Darcy_velocity_3 (m/s)'
+                write(51,'(A)') '# Column #11 = State (log10 s)'
+                write(51,'(A)') '# The line below lists the names of the data fields'
+                write(51,'(A)') 't slip_2 slip_3 slip_rate_2 slip_rate_3 shear_stress_2 '// &
+                                'shear_stress_3 pore_pressure darcy_vel_2 darcy_vel_3 state'
+                do j = 1,it-1
+                    write(51,'(E22.14,10E15.7)') fltsta(1,j,i),   & ! Time in sec
+                        fltsta(5,j,i),                            & ! slip_2, along strike
+                        -fltsta(6,j,i),                           & ! slip_3, positive downwards
+                        dlog10(max(abs(fltsta(14,j,i)), 1.0d-30)),& ! log10 |slip rate along strike|
+                        dlog10(max(abs(fltsta(3,j,i)),  1.0d-30)),& ! log10 |slip rate along dip|
+                        fltsta(8,j,i)/1.d6,                       & ! shear stress along strike, MPa
+                        -fltsta(9,j,i)/1.d6,                      & ! shear stress along dip, MPa
+                        fltsta(11,j,i)/1.d6,                      & ! pore pressure change, MPa
+                        fltsta(12,j,i),                           & ! Darcy velocity along strike, m/s
+                        -fltsta(13,j,i),                          & ! Darcy velocity along dip, m/s
+                        dlog10(max(fltsta(4,j,i), 1.0d-30))         ! log10 state variable
+                enddo
+                close(51)
+                cycle
+            endif
+
             do j = 1,it-1
                 write(51,'( 9e32.21e4)') fltsta(1,j,i), & ! Time in sec
                     fltsta(5,j,i), & ! slip_strike, along x;
@@ -137,6 +182,29 @@ subroutine output_globaldat
     implicit none
     integer (kind = 4) :: i 
     
+    if (bp == 8) then
+        ! SEAS BP8 source parameter time series, see section 4.2.
+        open(1113,file='global.dat',form='formatted',status='unknown')
+            write(1113,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
+            write(1113,'(A)') '# code=EQquasi'
+            write(1113,'(A)') '# version=1.3.3'
+            write(1113,'(A)') '# modeler=D.Liu'
+            write(1113,'(A,E15.7,A)') '# element_size=', dx, ' m'
+            write(1113,'(A)') '# location= frictional domain'
+            write(1113,'(A)') '# Column #1 = Time (s)'
+            write(1113,'(A)') '# Column #2 = Max_slip_rate (log10 m/s)'
+            write(1113,'(A)') '# Column #3 = Moment_density_rate (N/s)'
+            write(1113,'(A)') '# The line below lists the names of the data fields'
+            write(1113,'(A)') 't max_slip_rate moment_density_rate'
+            do i = 1, it-1
+                write(1113,'(E22.14,2E15.7)') globaldat(1,i), &
+                    dlog10(max(globaldat(2,i), 1.0d-30)), &
+                    globaldat(3,i)
+            enddo
+        close(1113)
+        return
+    endif
+
     open(1113,file='global.dat',form='formatted',status='unknown')
         write(1113,'(7e32.21e4)') (globaldat(1,i), &
             globaldat(2,i), &

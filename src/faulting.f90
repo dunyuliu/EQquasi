@@ -144,9 +144,14 @@ do ift = 1, ntotft
                 tstk0         = (mslav * fvd(5,2,1) - mmast * fvd(5,1,1)) / mtotl + fsfault
                 tdip0         = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault    
                 tnrm0         = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
-                
+
+                ! bp8: effective normal stress is reduced by the pore pressure change,
+                ! sigma_bar = sigma_bar_0 - p. tnrm0 is negative in compression and
+                ! fric(6,:,:) holds p >= 0, matching the creeping branch below.
+                if (bp == 8) tnrm0 = min(tnrm0 + fric(6,i,ift), 0.0d0)
+
                 ! Nucleation
-                if (bp == 7 .and. icstart == 1) then 
+                if (bp == 7 .and. icstart == 1) then
                     call nucleation1(x(1,isn), x(3,isn), dtao)
                     tstk0     = tstk0 + dtao
                 endif
@@ -454,6 +459,10 @@ do ift = 1, ntotft
                         fltsta(8,it,j)  = fric(28,i,ift)!tstk
                         fltsta(9,it,j)  = fric(29,i,ift)!tdip
                         fltsta(10,it,j) = tnrm0
+                        fltsta(11,it,j) = fric(6,i,ift)  ! pore pressure change, Pa
+                        fltsta(12,it,j) = fric(51,i,ift) ! Darcy velocity along strike, m/s
+                        fltsta(13,it,j) = fric(52,i,ift) ! Darcy velocity along dip, m/s
+                        fltsta(14,it,j) = sliprates      ! slip rate along strike, m/s
                     endif
                 enddo 
             endif   

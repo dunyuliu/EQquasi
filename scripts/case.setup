@@ -36,6 +36,14 @@ def create_model_input_file():
         f.write(str(par.nt_out) + "\n")
         f.write(str(par.mode) + "\n")
         f.write(str(par.nstep) + "\n")
+        # Appended for bp8 (SEAS BP8, fluid injection in 3D). read_input.f90 reads
+        # these with iostat, so appending here keeps older model.txt files loadable.
+        f.write(str(par.fluid_src) + "\n")
+        f.write(str(par.fluid_q0) + "  " + str(par.fluid_toff) + "  " + str(par.fluid_tend) + "\n")
+        f.write(str(par.fluid_Lgauss) + "  " + str(par.fluid_Lfwid) + "\n")
+        f.write(str(par.fluid_beta) + "  " + str(par.fluid_phi) + "  " + str(par.fluid_perm) + "  " + str(par.fluid_eta) + "\n")
+        f.write(str(par.fluid_Swell) + "  " + str(par.fluid_rwell) + "\n")
+        f.write(str(par.dtmax) + "\n")
 
 def create_station_input_file():
     # Function to create model.txt used by EQquasi.

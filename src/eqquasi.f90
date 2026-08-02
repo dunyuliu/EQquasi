@@ -162,7 +162,7 @@ subroutine allocAndInit
     allocate(nsmp(2,nftmx,ntotft),fnft(nftmx,ntotft),un(3,nftmx,ntotft),&
                 us(3,nftmx,ntotft),ud(3,nftmx,ntotft),fric(100,nftmx,ntotft),&
                 arn(nftmx,ntotft),r4nuc(nftmx,ntotft),anonfs(3,nonmx),&
-                slp4fri(nftmx,ntotft),fltslp(3,nftmx,ntotft), globaldat(10,nstep), fltsta(10,nstep,nonmx))
+                slp4fri(nftmx,ntotft),fltslp(3,nftmx,ntotft), globaldat(10,nstep), fltsta(14,nstep,nonmx))
 
     fnft    = -1000.d0!Should be initialized over 600.
     fric    = 0.0d0

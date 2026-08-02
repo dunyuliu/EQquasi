@@ -8,9 +8,14 @@
 
 SYSTEM = ${MACHINE}
 
+# Some hosts ship a broken mpif90.openmpi wrapper (missing wrapper-data file)
+# while plain mpif90 works. Prefer the .openmpi wrapper when it actually runs,
+# otherwise fall back. Override with `make FC=...` at any time.
+MPIFC := $(shell command -v mpif90.openmpi >/dev/null 2>&1 && mpif90.openmpi -show >/dev/null 2>&1 && echo mpif90.openmpi || echo mpif90)
+
 ifeq ($(SYSTEM), utig)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
-    FC         = mpif90.openmpi
+    FC         = ${MPIFC}
     
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
@@ -28,7 +33,7 @@ ifeq ($(SYSTEM), utig)
 
 else ifeq ($(SYSTEM), ubuntu)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3 
-    FC         = mpif90.openmpi
+    FC         = ${MPIFC}
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
     
@@ -45,7 +50,7 @@ else ifeq ($(SYSTEM), ubuntu)
 
 else ifeq ($(SYSTEM), local)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
-    FC         = mpif90.openmpi
+    FC         = ${MPIFC}
     
     LIB        = /usr/lib/x86_64-linux-gnu
     INC        = /usr/include
@@ -55,10 +60,13 @@ else ifeq ($(SYSTEM), local)
     MUMPS_ROOT = ../mumps/build/local
     MUMPS_INC  = ${MUMPS_ROOT}/include
     MUMPS_LIB  = -L${MUMPS_ROOT}/lib -ldmumps -lmumps_common -lpord
-    PORD_LIB   = 
-    
+    PORD_LIB   =
+
     BLAS_LIB   = -L${LIB} -lblas
-    SCALAPACK_LIB = -L${LIB} -lscalapack-openmpi 
+    # install.mumps.sh builds ScaLAPACK and BLACS alongside MUMPS, so take them
+    # from there. The system -lscalapack-openmpi is not present on hosts where
+    # MUMPS had to be built locally in the first place.
+    SCALAPACK_LIB = -L${MUMPS_ROOT}/lib -lscalapack -lblacs
     LAPACK_LIB = -L${LIB} -llapack
     
 else ifeq ($(SYSTEM), ls6)

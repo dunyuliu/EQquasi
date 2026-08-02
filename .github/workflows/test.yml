@@ -22,7 +22,10 @@ jobs:
         sudo apt-get install python3 python3-pip
         sudo apt-get install libmumps-dev python3-matplotlib
         sudo apt-get install libnetcdf-dev libnetcdff-dev
-        pip install xarray imageio pdf2image numpy==1.26.4 netCDF4
+        pip install xarray imageio pdf2image numpy==1.26.4 netCDF4 pytest
+
+    - name: Static regression suite
+      run: python3 -m pytest tests/ -v
 
     - name: Run tests
       run: |
@@ -30,14 +33,24 @@ jobs:
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$PATH
         export PATH=$(pwd)/scripts:$PATH 
-        python3 testAll.py >> testRunLog.txt || true
+        python3 testAll.py 2>&1 | tee testRunLog.txt
         
     - name: Print log
       run: cat testRunLog.txt    
       
     - name: Check errors in testRunLog.txt
       run: |
-        if grep -qiE 'error|Error|ERROR|exception|failed|fatal|abort' testRunLog.txt; then
+        # check.test.py prints the literal string 'FAIL ' on divergence. The
+        # old pattern did not match it, so a BP5 regression went green.
+        if grep -qE 'FAIL' testRunLog.txt; then
+            echo "Regression detected: check.test.py reported FAIL."
+            exit 1
+        fi
+        if grep -qiE 'error|exception|failed|fatal|abort' testRunLog.txt; then
+            exit 1
+        fi
+        if ! grep -q 'CHECK SUMMARY' testRunLog.txt; then
+            echo "check.test.py never ran to completion - refusing to pass."
             exit 1
         fi
     

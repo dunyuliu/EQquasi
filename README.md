@@ -16,6 +16,7 @@ Setup of computing environment
   - netCDF <br/>
   - pip <br/>
     - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
+    - netCDF4 (```scripts/case.setup``` imports it to write on_fault_vars_input.nc)
 
 For post-processing, additional Python packages are needed:
   - xarray
@@ -72,22 +73,32 @@ How-to-use
 ---------------------
 Only three steps are required to setup and run a new case <br/>
 ```
-create_newcase directoryForYourCase compset
+create.newcase directoryForYourCase compset
 cd directoryForYourCase
 # modify user_defined_params.py
 ./case.setup
 bash run.sh
 ```
 Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /case_input. <br/>
-Currently supported compset includes:
+Currently supported compsets are listed in ```case_input/compsets.txt```:
   - bp5.qdc.2000
+  - bp7.qdc.a.10
+  - bp1001.fdc.250
+  - bp1001.fdc.rough.250
+  - bp1001.qdc.rough.250
+  - liu2020.fdc.planar
+  - liu2020.fdc.rough.250
+
+In addition, ```test.bp5.qdc``` and ```test.bp5.qdc.dip90``` are small, fast
+compsets used by the regression suite; they are deliberately not listed in
+```compsets.txt```.
 
 Example
 ---------------------
 A good starting example would be compset==bp5.qdc.2000 (benchmark problem 5, quasi-dynamic, 2000 m on-fault resolution). <br/>
 The case can be created by the following command:
 ```
-create.newcase caseDir bp5.qd.2000
+create.newcase caseDir bp5.qdc.2000
 ```
 With the default user_defined_params.py, it should take about 27 minutes to finish the 1st earthquake cycle. For 1st + 2nd earthquake cycles, 1 hour 33 minutes will be expected on Lonestar6. <br/>
 

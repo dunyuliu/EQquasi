@@ -1,9 +1,7 @@
 #! /bin/bash 
-import os, time
+import os, sys, time
 from testNameList import nameList, coreNumList
 # This script will perform tests on default test cases, listed in testNameList.
-
-MPIRUN='mpirun.openmpi'
 
 os.system('rm -rf test')
 os.system('rm -rf bin/eqquasi')
@@ -26,8 +24,11 @@ for testName, coreNum in zip(nameList, coreNumList):
     runTest(testName, testName, coreNum)
 
 os.chdir('..')
-os.system('python3 check.test.py')
+rc = os.system('python3 check.test.py')
 
 endTime = time.time()
 
 print('Time consumed for all the tests are ', endTime-startTime, ' s')
+
+# Propagate check.test.py's verdict so CI can fail on a regression.
+sys.exit(1 if os.waitstatus_to_exitcode(rc) else 0)

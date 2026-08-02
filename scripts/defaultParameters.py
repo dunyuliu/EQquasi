@@ -41,6 +41,7 @@ class parameters:
     friclaw     = 3 # rsf_aging(3), rsf_slip(4).
     ntotft      = 1 # number of total faults.
     solver      = 1 # solver option. MUMPS(1, recommended). AZTEC(2).
+    nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold
     nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
     bp          = 5 
     # currently supported cases

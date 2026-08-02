@@ -64,18 +64,18 @@ if [ -n "$MACH" ]; then
     elif [ $MACHINE == "ubuntu" ]; then 
         echo "Installing EQquasi on Ubuntu 22.04 ... ..."
         export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-    elif [ $MACHINE == "local"]; then 
+    elif [ "$MACHINE" == "local" ]; then
         MUMPS_LIB_DIR="./mumps/build/local/lib"
         libNames=("libdmumps.a" "libmumps_common.a" "libpord.a" "libsmumps.a")
-        all_exist=TRUE
+        all_exist=true
         for file in "${libNames[@]}"; do
-            if [! -f "$MUMPS_LIB_DIR/$file" ]; then
-                all_exist=FALSE
+            if [ ! -f "$MUMPS_LIB_DIR/$file" ]; then
+                all_exist=false
                 break
-            fi 
-        done 
-        
-        if $all_exist; then 
+            fi
+        done
+
+        if $all_exist; then
             echo "MUMPS have been installed under ./mumps/build/local ..."
         else
             echo "Installing a local copy of MUMPS ..."
@@ -88,9 +88,9 @@ if [ -n "$MACH" ]; then
         echo "Simply configure EQquasi without installation ... ..."
     else
         cd src
-        make
+        make || { echo "EQquasi build FAILED."; exit 1; }
         cd ..
-        mkdir bin
+        mkdir -p bin
         mv src/eqquasi bin
     fi
 

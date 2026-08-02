@@ -1,5 +1,5 @@
 
-import os, time
+import os, sys, time
 import numpy as np
 import xarray as xr 
 #from netCDF4 import Dataset
@@ -65,17 +65,38 @@ def compare_txt_files(fn1,fn2,threshold=1e-3):
             isTheSame = 'FAIL '+fn1+' '+fn2
     print(isTheSame)
 
-    
+    return isTheSame
+
+
+results = []
+compared = 0
 
 for testid in nameList:
     for filename in fileNameList:
         refPath  = refRoot+'/'+testid+'/Q0/'+filename
         testPath = testRoot+'/'+testid+'/Q0/'+filename
-        if os.path.exists(refPath):
-            if 'nc' in filename:
-                compare_nc_files(refPath, testPath, 1e-3)
-            elif 'dat' in filename:
-                compare_txt_files(refPath, testPath, 1e-3)
-            elif 'txt' in filename:
-                compare_txt_files(refPath, testPath, 1e-3)    
+        if not os.path.exists(refPath):
+            # No reference for this file. That is allowed, but say so out loud
+            # rather than skipping silently.
+            print('SKIP  no reference '+refPath)
+            continue
+        if not os.path.exists(testPath):
+            # A reference exists but the run did not produce the file. That is
+            # always a failure, never a skip.
+            print('FAIL  missing output '+testPath)
+            results.append('FAIL')
+            continue
+        compared += 1
+        if 'nc' in filename:
+            results.append(compare_nc_files(refPath, testPath, 1e-3))
+        else:
+            results.append(compare_txt_files(refPath, testPath, 1e-3))
+
+nfail = sum(1 for r in results if r is not None and r.startswith('FAIL'))
+if compared == 0:
+    print('FAIL  no files were compared at all - the gate is vacuous')
+    nfail += 1
+
+print('CHECK SUMMARY: compared '+str(compared)+' file(s), '+str(nfail)+' failure(s)')
+sys.exit(1 if nfail else 0)
 

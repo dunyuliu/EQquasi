@@ -1,2 +1,10 @@
 
 .DS_Store
+bin/
+work/
+test/
+mumps
+*.o
+*.mod
+__pycache__/
+testRunLog.txt

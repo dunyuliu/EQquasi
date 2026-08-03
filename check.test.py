@@ -7,7 +7,7 @@ from testNameList import nameList
 
 fileNameList = ['fault.00001.nc','fault.00101.nc','global.dat', 'tdyna.txt']
 refRoot  = 'test.reference.results'
-testRoot = 'test'
+testRoot = 'work/test'  # all run artifacts live under work/, which is gitignored
 
 # def compare_nc_files(fn1, fn2, threshold=1e-3):
     # def compare_variables(var1, var2):

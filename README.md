@@ -89,9 +89,26 @@ Currently supported compsets are listed in ```case_input/compsets.txt```:
   - liu2020.fdc.planar
   - liu2020.fdc.rough.250
 
-In addition, ```test.bp5.qdc``` and ```test.bp5.qdc.dip90``` are small, fast
-compsets used by the regression suite; they are deliberately not listed in
-```compsets.txt```.
+In addition, ```test.bp5.qdc```, ```test.bp5.qdc.dip90``` and
+```test.bp7.qdc``` are small, fast compsets used by the regression suite; they
+are deliberately not listed in ```compsets.txt```.
+
+Where things run
+---------------------
+Every scratch artifact -- generated cases, simulation output, build products --
+belongs under ```work/``` at the repository root, which is gitignored. Nothing
+scratch is written to the repo root itself.
+
+```
+work/                    # gitignored; create your cases here
+work/test/               # created and wiped by testAll.py
+test.reference.results/  # committed oracles; NOT scratch, never wiped
+bin/                     # gitignored build product
+```
+
+```testAll.py``` begins by deleting its scratch directory, so keeping that
+directory under ```work/``` is what stops a stray path from removing tracked
+files, and it keeps ```git status``` clean after a run.
 
 Example
 ---------------------

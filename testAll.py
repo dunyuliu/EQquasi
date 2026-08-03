@@ -3,12 +3,14 @@ import os, sys, time
 from testNameList import nameList, coreNumList
 # This script will perform tests on default test cases, listed in testNameList.
 
-os.system('rm -rf test')
+# All run artifacts live under work/, which is gitignored. Nothing scratch
+# should be written to the repo root.
+os.system('rm -rf work/test')
 os.system('rm -rf bin/eqquasi')
-os.system('mkdir test')
+os.system('mkdir -p work/test')
 
 os.system('./install.eqquasi.sh -m ubuntu')
-os.chdir('test')
+os.chdir('work/test')
 
 startTime = time.time()
 def runTest(testDir, compSet, coreNum):
@@ -23,7 +25,7 @@ def runTest(testDir, compSet, coreNum):
 for testName, coreNum in zip(nameList, coreNumList):
     runTest(testName, testName, coreNum)
 
-os.chdir('..')
+os.chdir('../..')
 rc = os.system('python3 check.test.py')
 
 endTime = time.time()

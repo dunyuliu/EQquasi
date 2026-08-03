@@ -71,15 +71,27 @@ def panel(cases, labelfn, title, outfile):
     print(f"wrote {outfile}")
 
 
+DOM_RE = re.compile(r"dom(\d+)")
+XI_RE = re.compile(r"xi([\d.]+)")
+
+
+def dom_key(d):
+    return int(DOM_RE.search(d).group(1))
+
+
+def xi_key(d):
+    return float(XI_RE.search(d).group(1))
+
+
 def main():
-    dom = collect("camp.dom*", lambda d: int(re.findall(r"dom(\d+)", d)[0]))
-    panel(dom, lambda d: f"half-width {re.findall(r'dom(\\d+)', d)[0]} m",
+    dom = collect("c*.dom*", dom_key)
+    panel(dom, lambda d: f"half-width {dom_key(d)} m",
           "BP8-QD-GS, dx = 50 m: sensitivity to elastic domain size",
           os.path.join(R, "work", "campaign_domain.png"))
 
-    xi = collect("camp.xi*", lambda d: float(re.findall(r"xi([\d.]+)", d)[0]))
-    panel(xi, lambda d: f"xi = {re.findall(r'xi([\\d.]+)', d)[0]}",
-          "BP8-QD-GS, 1000 m box: sensitivity to the time-step factor xi",
+    xi = collect("c*.xi*", xi_key)
+    panel(xi, lambda d: f"xi = {xi_key(d)}",
+          "BP8-QD-GS, 500 m box: sensitivity to the time-step factor xi",
           os.path.join(R, "work", "campaign_xi.png"))
 
 

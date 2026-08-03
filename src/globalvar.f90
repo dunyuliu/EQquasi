@@ -6,7 +6,7 @@ MODULE globalvar
     ! Single source of truth for the version. It is stamped into output headers
     ! and is the provenance for any published comparison, so it must match a tag
     ! that exists.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.3.3'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.3.4'
 
     integer, parameter :: dp = selected_real_kind(15,307) ! precision of double precision
     real (kind=dp) :: pi = 3.14159265358979323846d0

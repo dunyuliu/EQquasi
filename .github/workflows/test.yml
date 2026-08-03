@@ -7,7 +7,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0   # tags are needed by the version-provenance guard
 
     - name: Set up Python
       uses: actions/setup-python@v2

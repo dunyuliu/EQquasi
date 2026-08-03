@@ -113,6 +113,11 @@ def test_declared_version_matches_a_git_tag():
         return
     r = subprocess.run(["git", "tag"], cwd=str(ROOT), capture_output=True, text=True)
     tags = {t.strip().lstrip("v").replace("_", ".") for t in r.stdout.splitlines()}
+    if not tags:
+        # A shallow clone (actions/checkout without fetch-depth: 0) has no tags,
+        # so there is nothing to check against. Skip rather than claim a defect.
+        import pytest
+        pytest.skip("no git tags available; shallow clone?")
     assert v in tags, (
         f"EQQUASI_VERSION is {v!r} but no matching git tag exists (tags: "
         f"{sorted(tags)}). Either tag this release, bump the declared version, "

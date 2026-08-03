@@ -451,12 +451,16 @@ subroutine output_run_metadata(solverTime, factorTime)
         close(9303)
     endif
 
-    nThreads = 1
+    ! 0 means OMP_NUM_THREADS was not set, i.e. each rank may spawn as many
+    ! threads as it likes. That is not the same as 1, and on a shared node it is
+    ! how a run ends up oversubscribed -- worth recording as its own value
+    ! rather than silently reporting 1.
+    nThreads = 0
     ompStr = ' '
     call get_environment_variable('OMP_NUM_THREADS', ompStr)
     if (len_trim(ompStr) > 0) then
         read(ompStr,*,iostat = ios) nThreads
-        if (ios /= 0) nThreads = 1
+        if (ios /= 0) nThreads = 0
     endif
 
     open(9302, file = 'runInfo.json', form = 'formatted', status = 'unknown')

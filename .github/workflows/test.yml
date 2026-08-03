@@ -1,6 +1,13 @@
 name: Automatic Testing of EQquasi
 
-on: [push, pull_request]
+# Run on master and on pull requests only. Every push to a work-in-progress
+# branch previously fired a full run, and every tag fired a second one, so a
+# day of ordinary development produced dozens of notification emails. Feature
+# branches are covered when they open a PR.
+on:
+  push:
+    branches: [master]
+  pull_request:
 
 jobs:
   build:
@@ -39,7 +46,20 @@ jobs:
         python3 testAll.py 2>&1 | tee testRunLog.txt
         
     - name: Print log
-      run: cat testRunLog.txt    
+      if: always()   # otherwise a failing test step hides the very log needed to debug it
+      run: cat testRunLog.txt
+
+    # Step logs need authentication to download, but annotations do not. On
+    # failure, re-emit the tail of the log as annotations so the cause is
+    # visible without a token.
+    - name: Surface failure detail as annotations
+      if: failure()
+      run: |
+        echo "::error::===== testRunLog.txt (tail) ====="
+        tail -n 40 testRunLog.txt 2>/dev/null | while IFS= read -r line; do
+          [ -n "$line" ] && echo "::error::$line"
+        done
+        echo "::error::===== end ====="
       
     - name: Check errors in testRunLog.txt
       run: |

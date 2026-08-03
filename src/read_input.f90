@@ -72,6 +72,7 @@ subroutine readmodel
             read(1002,*) fluid_beta, fluid_phi, fluid_perm, fluid_eta
             read(1002,*) fluid_Swell, fluid_rwell
             read(1002,*) dtmax
+            read(1002,*,iostat=ios) fric_pc_L
         endif
     close(1002)
     

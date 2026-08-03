@@ -1,0 +1,126 @@
+#! /usr/bin/env python3
+"""Plot a BP8 result in the style of the CRESCENT DET comparison pages.
+
+Two figures:
+  <out>_spacetime.png  x-t heatmaps of shear stress 2, slip 2 and pore pressure
+                       along the strike section, matching the platform's
+                       "Heatmap of x (m) vs t (s)" panels.
+  <out>_global.png     max slip rate and moment density rate against time,
+                       matching the platform's global source-parameter panel.
+
+Usage:
+    plotBP8Comparison <result_dir> [-o <prefix>]
+"""
+
+import argparse
+import os
+import sys
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+def read_profile(path):
+    """Return (x, t, field) from a section-4.3 profile file."""
+    rows = []
+    for line in open(path):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tok = line.split()
+        try:
+            float(tok[0])
+        except ValueError:
+            continue          # field-name line
+        rows.append([float(v) for v in tok])
+    d = np.array(rows)
+    return d[0, 2:], d[1:, 0], d[1:, 2:]
+
+
+def read_global(path):
+    rows = []
+    for line in open(path):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tok = line.split()
+        try:
+            float(tok[0])
+        except ValueError:
+            continue
+        rows.append([float(v) for v in tok])
+    return np.array(rows)
+
+
+def spacetime(ax, x, t, f, title, label, cmap="RdBu_r", vmin=None, vmax=None):
+    m = ax.pcolormesh(x, t, f, cmap=cmap, vmin=vmin, vmax=vmax, shading="nearest")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("t (s)")
+    ax.set_title(title, fontsize=10)
+    cb = plt.colorbar(m, ax=ax)
+    cb.set_label(label, fontsize=9)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("result_dir")
+    ap.add_argument("-o", "--out", default="bp8")
+    args = ap.parse_args()
+    d = args.result_dir
+
+    need = ["shear_stress_2_strike.dat", "slip_2_strike.dat",
+            "pore_pressure_strike.dat", "global.dat"]
+    missing = [f for f in need if not os.path.exists(os.path.join(d, f))]
+    if missing:
+        print(f"missing required files in {d}: {missing}")
+        return 1
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.6))
+
+    x, t, tau = read_profile(os.path.join(d, "shear_stress_2_strike.dat"))
+    # Match the platform's colour range so the panels are directly comparable.
+    spacetime(axes[0], x, t, tau, "shear_stress_2_strike", "shear 2 (MPa)",
+              vmin=7.0, vmax=17.5)
+
+    x, t, s2 = read_profile(os.path.join(d, "slip_2_strike.dat"))
+    spacetime(axes[1], x, t, s2, "slip_2_strike", "slip (m)",
+              vmin=0.0, vmax=0.04)
+
+    x, t, p = read_profile(os.path.join(d, "pore_pressure_strike.dat"))
+    spacetime(axes[2], x, t, p, "pore_pressure_strike", "pore pressure (MPa)",
+              vmin=0.0, vmax=13.0)
+
+    fig.suptitle("SEAS BP8-QD-GS, EQquasi", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(f"{args.out}_spacetime.png", dpi=110)
+    print(f"wrote {args.out}_spacetime.png")
+
+    g = read_global(os.path.join(d, "global.dat"))
+    fig2, ax2 = plt.subplots(1, 2, figsize=(11, 4))
+    ax2[0].plot(g[:, 0], g[:, 1])
+    ax2[0].set_xlabel("time (s)")
+    ax2[0].set_ylabel("Maximum slip rate (log10 m/s)")
+    ax2[0].set_title("Maximum slip rate (log10 m/s)", fontsize=10)
+    ax2[0].grid(alpha=0.3)
+    ax2[1].plot(g[:, 0], g[:, 2])
+    ax2[1].set_xlabel("time (s)")
+    ax2[1].set_ylabel("Moment density rate (N/s)")
+    ax2[1].set_title("Moment density rate (N/s)", fontsize=10)
+    ax2[1].grid(alpha=0.3)
+    fig2.tight_layout()
+    fig2.savefig(f"{args.out}_global.png", dpi=110)
+    print(f"wrote {args.out}_global.png")
+
+    print()
+    print(f"peak log10 Vmax  = {g[:,1].max():.3f} at t = {g[g[:,1].argmax(),0]/86400:.2f} d")
+    print(f"peak moment rate = {g[:,2].max():.4e} N/s")
+    print(f"peak |tau| drop  = {14.6 - tau.min():.3f} MPa (min tau = {tau.min():.3f})")
+    print(f"max slip         = {s2.max()*1000:.2f} mm")
+    print(f"max pore press.  = {p.max():.3f} MPa")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -97,6 +97,9 @@ par.fluid_rwell  = 0.0508   # r_well, well radius, m. Not fixed by Table 1; 2 in
 # Cap the adaptive time step. Without a cap, xi*Dc/V is ~1e7 s at V_init.
 # 500 s also satisfies the explicit diffusion limit dx^2/(4*alpha) at dx = 10 m.
 par.dtmax        = 500.0
+# BP8 eq. (10) builds strength from the instantaneous effective normal stress;
+# there is no normal-stress state variable. 0 selects that limit.
+par.fric_pc_L    = 0.0
 
 # Creating the fault interface
 par.nfx = round((par.fxmax - par.fxmin)/par.dx + 1)

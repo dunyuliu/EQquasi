@@ -139,6 +139,10 @@ class parameters:
     fluid_Swell  = 1.0e-7  # volumetric well storage, m^3/Pa.
     fluid_rwell  = 0.0508  # well radius, m. 2 inches; not fixed by the BP8 table.
     dtmax        = 0.0     # cap on the adaptive time step, s. 0 means no cap.
+    # Prakash-Clifton relaxation distance for the normal-stress state variable, m.
+    #   0.0 : default. No state; use the instantaneous effective normal stress.
+    #  > 0  : relax the normal-stress state over this slip distance.
+    fric_pc_L    = 0.0
 
     ####################################
     ##### HPC resource allocation ######

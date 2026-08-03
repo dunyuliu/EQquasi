@@ -95,6 +95,12 @@ MODULE globalvar
     real (kind=dp) :: fluid_WI        ! Peaceman well index, m^3/(Pa s).
     real (kind=dp) :: fluid_pwell = 0.0d0 ! well pressure, Pa.
     real (kind=dp) :: dtmax = 0.0d0   ! cap on the adaptive time step, s. 0 means no cap.
+    ! Prakash-Clifton relaxation distance for the normal-stress state variable, m.
+    !   0.0 : default. No state; strength uses the instantaneous effective
+    !         normal stress. This is the zero-relaxation-distance limit and what
+    !         SEAS BP8 eq. (10) requires.
+    !  > 0  : relax the normal-stress state over this slip distance.
+    real (kind=dp) :: fric_pc_L = 0.0d0
     real (kind=dp), allocatable :: pf(:), pfWt(:) ! pore pressure change, Pa; source weights.
     integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
 

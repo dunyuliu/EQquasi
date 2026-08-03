@@ -223,9 +223,9 @@ def main():
         return 1
 
     if args.zipname:
-        if not re.match(r"^[\w.-]+_[\w.]+\.zip$", os.path.basename(args.zipname)):
-            print(f"zip name should follow nameOfModeler_version.zip, "
-                  f"got {args.zipname}")
+        if not re.match(r"^[\w.-]+_[\w.-]+\.zip$", os.path.basename(args.zipname)):
+            print(f"zip name should follow nameOfModeler_version.zip "
+                  f"(letters, digits, dots, hyphens), got {args.zipname}")
             return 1
         with zipfile.ZipFile(args.zipname, "w", zipfile.ZIP_DEFLATED) as z:
             for fname in STATIONS + ["global.dat"] + PROFILES:

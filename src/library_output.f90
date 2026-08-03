@@ -3,7 +3,7 @@ subroutine output_onfault_st
     use globalvar
     implicit none
     
-    integer (kind = 4) :: i, j 
+    integer (kind = 4) :: i, j, k
 
     if(n4onf > 0) then
         do i = 1,n4onf
@@ -54,6 +54,18 @@ subroutine output_onfault_st
                 write(51,'(A)') '# The line below lists the names of the data fields'
                 write(51,'(A)') 't slip_2 slip_3 slip_rate_2 slip_rate_3 shear_stress_2 '// &
                                 'shear_stress_3 pore_pressure darcy_vel_2 darcy_vel_3 state'
+                write(51,'(A)') '# Here is the time-series data.'
+                ! Report the prescribed initial condition at t = 0. fltsta only
+                ! holds computed steps, so the series would otherwise begin at
+                ! the first step and carry no t = 0 record at all.
+                k = anonfs(1,i)
+                write(51,'(E22.14,10E15.7)') 0.0d0,        & ! t
+                    0.0d0, 0.0d0,                          & ! slip_2, slip_3
+                    dlog10(max(fric(46,k,1), 1.0d-30)),    & ! log10 V_init
+                    dlog10(1.0d-20),                       & ! log10 V_zero
+                    fric(8,k,1)/1.d6, 0.0d0,               & ! tau^0, tau_3
+                    0.0d0, 0.0d0, 0.0d0,                   & ! p, q_2, q_3
+                    dlog10(max(fric(11,k,1)/max(fric(46,k,1),1.0d-30), 1.0d-30))
                 do j = 1,it-1
                     write(51,'(E22.14,10E15.7)') fltsta(1,j,i),   & ! Time in sec
                         fltsta(5,j,i),                            & ! slip_2, along strike
@@ -200,6 +212,10 @@ subroutine output_globaldat
             write(1113,'(A)') '# Column #3 = Moment_density_rate (N/s)'
             write(1113,'(A)') '# The line below lists the names of the data fields'
             write(1113,'(A)') 't max_slip_rate moment_density_rate'
+            write(1113,'(A)') '# Here is the time-series data.'
+            ! Initial condition at t = 0, as for the station files.
+            write(1113,'(E22.14,2E15.7)') 0.0d0, &
+                dlog10(max(maxval(fric(46,1:nftnd(1),1)), 1.0d-30)), 0.0d0
             do i = 1, it-1
                 write(1113,'(E22.14,2E15.7)') globaldat(1,i), &
                     dlog10(max(globaldat(2,i), 1.0d-30)), &

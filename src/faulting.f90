@@ -502,12 +502,23 @@ subroutine rate_state_normal_stress(V2, theta_pc, theta_pc_dot, tnrm, fricsgl)
     real (kind = dp) :: V2, theta_pc, theta_pc_dot, tnrm, L_pc
     real (kind = dp),dimension(100) :: fricsgl
     
-    L_pc  = fricsgl(11) ! Use Dc as L_pc
-    
-    !theta_pc_dot = - V2/L_pc*(theta_pc - abs(tnrm))
-    !theta_pc = theta_pc + theta_pc_dot*dt
-    !theta_pc = abs(tnrm) + (theta_pc - abs(tnrm))*dexp(-V2*dtev1/L_pc)
-    theta_pc = theta_pc - V2*dtev1/L_pc*(theta_pc - abs(tnrm))
+    L_pc = fric_pc_L
+
+    if (L_pc <= 0.0d0) then
+        ! Default. No normal-stress state variable: strength is built from the
+        ! instantaneous effective normal stress. Required by SEAS BP8 eq. (10),
+        ! where pore pressure changes sigma_bar with essentially no slip -- the
+        ! relaxation below is driven by slip, so it would otherwise stay pinned
+        ! at its initial value and the fault would never feel the injection.
+        theta_pc = abs(tnrm)
+        return
+    endif
+
+    ! Exponential form: exact for constant V2 and tnrm over the step, and
+    ! bounded for any dtev1. The linearised update it replaces overshoots once
+    ! V2*dtev1/L_pc > 1, which became reachable once dtev1 could be capped and
+    ! so no longer satisfied V2*dtev1/L_pc == xi identically.
+    theta_pc = abs(tnrm) + (theta_pc - abs(tnrm))*dexp(-V2*dtev1/L_pc)
 
 end subroutine rate_state_normal_stress
 

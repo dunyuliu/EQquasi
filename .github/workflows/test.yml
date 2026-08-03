@@ -55,11 +55,14 @@ jobs:
     - name: Surface failure detail as annotations
       if: failure()
       run: |
-        echo "::error::===== testRunLog.txt (tail) ====="
-        tail -n 40 testRunLog.txt 2>/dev/null | while IFS= read -r line; do
-          [ -n "$line" ] && echo "::error::$line"
-        done
-        echo "::error::===== end ====="
+        # GitHub caps annotations at 10 per step, so emit only decision-relevant
+        # lines rather than a raw tail. Step logs need auth to download;
+        # annotations do not.
+        echo "::error::exit=$? lastStep; free=$(free -m | awk '/Mem:/{print $2"MB total,"$7"MB avail"}')"
+        grep -nE 'FAIL|CHECK SUMMARY|STOP [0-9]|Killed|OOM|not enough slots|error while loading|Error [0-9]|cannot open|No such file' testRunLog.txt 2>/dev/null \
+          | tail -n 6 | while IFS= read -r line; do echo "::error::$line"; done
+        echo "::error::LASTLINE: $(tail -n 1 testRunLog.txt 2>/dev/null)"
+        echo "::error::LINECOUNT: $(wc -l < testRunLog.txt 2>/dev/null)"
       
     - name: Check errors in testRunLog.txt
       run: |

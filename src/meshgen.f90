@@ -497,8 +497,12 @@ subroutine meshgen
                     endif    
                     !if((center(2)<(ylinet(1)+30.0d3)).or.(center(2)>(ylinet(nyt)-30.0d3))) then
                     ! Locate far field elements by ycoor. Assign et = 3. 
-                    if (ycoor < ymin1 + 2.0d0*dymax .or. ycoor > ymax1 - 2.0d0*dymax) then  
-                        et(nelement)=3!Regular boundaries, essential boundary treatment.
+                    if (ycoor < ymin1 + 2.0d0*dymax .or. ycoor > ymax1 - 2.0d0*dymax) then
+                        ! Never overwrite a fault element. When the model is thin
+                        ! in y relative to 2*dymax the far-field band can cover the
+                        ! whole mesh; without this guard every fault element would
+                        ! be retagged, leaving all fault nodes with zero mass.
+                        if (et(nelement) /= 2) et(nelement)=3!Regular boundaries, essential boundary treatment.
                         ! open(1003,file='boundelem.txt',form='formatted',status='unknown',position='append')
                             ! write(1003,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)                        
                     endif
@@ -510,7 +514,9 @@ subroutine meshgen
 
     !Checking phase
     !write(*,*) 'C2'
-    if (nnode/=numnp.or.nelement/=numel.or.nftnd0(1)/=nftnd(1).or.neq0/=neq) then 
+    call report_element_types
+
+    if (nnode/=numnp.or.nelement/=numel.or.nftnd0(1)/=nftnd(1).or.neq0/=neq) then
         write(*,*) 'Consistancy check'
         write(*,*) 'mesh4:meshgen(nnode)',numnp,nnode
         write(*,*) 'mesh4:meshgen(nelem)',numel,nelement
@@ -571,3 +577,66 @@ subroutine meshgen
         endif!end if nftnd0=0/ not    
     enddo!ift
 end subroutine meshgen
+
+! report_element_types summarizes the element-type tagging and refuses to
+! continue on a mesh that cannot support fault dynamics.
+!
+! et == 1 regular interior, et == 2 fault-adjacent, et == 3 far-field boundary.
+! Only et == 2 elements contribute nodal mass to fault nodes (see
+! bound_ft_ku in solveTimeLoopMUMPS.f90), so a mesh with no et == 2 elements
+! leaves every fault node massless and aborts later in faulting with a
+! ZERO MASS message that says nothing about the cause.
+!
+! The usual cause is a model that is thin along y relative to dymax: the
+! far-field band spans 2*dymax inward from each of ymin/ymax, and
+! dymax = min(12*dx, 3 km), so a large dx in a small domain makes that band
+! cover the whole mesh.
+subroutine report_element_types
+
+    use globalvar
+    implicit none
+
+    integer (kind = 4) :: i, n1, n2, n3
+    real (kind = dp)   :: yhalf
+
+    n1 = count(et(1:numel) == 1)
+    n2 = count(et(1:numel) == 2)
+    n3 = count(et(1:numel) == 3)
+
+    if (me == 0) then
+        write(*,'(X,A,40X,i7,4X,A)') '= Interior elements (et=1)  = ', n1, '='
+        write(*,'(X,A,40X,i7,4X,A)') '= Fault elements    (et=2)  = ', n2, '='
+        write(*,'(X,A,40X,i7,4X,A)') '= Far-field elements(et=3)  = ', n3, '='
+    endif
+
+    yhalf = 0.5d0 * (ymax - ymin)
+
+    if (2.0d0*dymax >= yhalf .and. me == 0) then
+        write(*,*) '========================= MESH WARNING ============================='
+        write(*,*) '= The far-field band is comparable to the model half-width in y.   ='
+        write(*,'(X,A,E15.7,A)') '=   dymax = min(12*dx, 3 km) = ', dymax, ' m'
+        write(*,'(X,A,E15.7,A)') '=   2*dymax                  = ', 2.0d0*dymax, ' m'
+        write(*,'(X,A,E15.7,A)') '=   model half-width in y    = ', yhalf, ' m'
+        write(*,*) '= Reduce dx, or widen ymin/ymax, so that 2*dymax < half-width.     ='
+        write(*,*) '==================================================================='
+    endif
+
+    if (n2 == 0 .and. nftnd(1) > 0) then
+        if (me == 0) then
+            write(*,*) '========================== MESH ERROR =============================='
+            write(*,*) '= No fault-adjacent elements (et=2) were tagged, but the fault has ='
+            write(*,'(X,A,i7,A)') '= ', nftnd(1), ' nodes. Every fault node would carry zero mass.'
+            write(*,*) '=                                                                  ='
+            write(*,*) '= Fault elements are tagged where abs(ycoor) < 2*dy, then far-field ='
+            write(*,*) '= elements are tagged where ycoor is within 2*dymax of ymin/ymax.   ='
+            write(*,'(X,A,3(E13.5,A))') '=   dx = ', dx, ' m, dymax = ', dymax, ' m, y half-width = ', yhalf, ' m'
+            write(*,*) '=                                                                  ='
+            write(*,*) '= Fix: reduce dx, or widen the model along y (fymin/fymax), so that ='
+            write(*,*) '=      2*dymax < half-width. With dymax = min(12*dx, 3 km) this     ='
+            write(*,*) '=      needs roughly dx < half-width/24 whenever 12*dx < 3 km.      ='
+            write(*,*) '==================================================================='
+        endif
+        stop 3
+    endif
+
+end subroutine report_element_types

@@ -19,7 +19,7 @@ par.mode = 1
 
 # model_domain (in meters)
 par.fxmin, par.fxmax = -500.0, 500.0
-par.fymin, par.fymax = -500.0, 500.0
+par.fymin, par.fymax = -2000.0, 2000.0
 par.fzmin, par.fzmax = -500.0, 500.0
 
 # Frictional / fluid domain Omega_f. Half-length l_f = 400 m. Outside of it the
@@ -31,7 +31,7 @@ par.dx = 10.0e0 # cell size, spatial resolution
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
-par.enlarging_ratio = 1.03e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
+par.enlarging_ratio = 1.15e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
 # Isotropic material propterty.
 # Vp, Vs, Rou. mu = rou*vs^2 = 32.04 GPa, matching Table 1.

@@ -16,7 +16,7 @@ program eqquasi3d
     
     if (me == 0) then 
     write(*,*) '====================================================================='
-    write(*,*) '==================  Welcome to EQquasi 1.3.3  ======================='
+    write(*,*) '==================  Welcome to EQquasi '//EQQUASI_VERSION//'  ======================='
     write(*,*) '=====   Product of UTIG & Earthquake Modeling Lab@TAMU          ====='
     write(*,*) '========== GitHub: https://github.com/dunyuliu/EQquasi  ============='
     write(*,*) '=========== Contacts: dliu@ig.utexas.edu                ============='

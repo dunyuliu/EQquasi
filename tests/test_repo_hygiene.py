@@ -64,3 +64,57 @@ def test_no_tracked_files_under_the_scratch_root():
         f"these files are tracked under {SCRATCH_ROOT}/ and would be deleted by "
         f"the next run: {tracked}"
     )
+
+
+# --- version provenance ---------------------------------------------------
+
+def declared_version():
+    m = re.search(r"EQQUASI_VERSION\s*=\s*'([^']+)'", read("src/globalvar.f90"))
+    assert m, "src/globalvar.f90 must declare EQQUASI_VERSION"
+    return m.group(1)
+
+
+def test_version_has_a_single_source_of_truth():
+    """The version was hardcoded in five places and stamped into submissions."""
+    import glob
+    from conftest import ROOT, strip_fortran_comments
+
+    v = declared_version()
+    offenders = []
+    for path in glob.glob(str(ROOT / "src" / "*.f90")):
+        rel = "src/" + path.rsplit("/", 1)[1]
+        src = strip_fortran_comments(read(rel))
+        for n, line in enumerate(src.splitlines(), 1):
+            if "EQQUASI_VERSION" in line:
+                continue
+            if re.search(r"['\"][^'\"]*" + re.escape(v) + r"[^'\"]*['\"]", line):
+                offenders.append(f"{rel}:{n}")
+    assert not offenders, (
+        f"version {v!r} is hardcoded at {offenders}; use EQQUASI_VERSION so the "
+        "string stamped into benchmark submissions cannot drift"
+    )
+
+
+def test_declared_version_matches_a_git_tag():
+    """The code claimed 1.3.3 while the newest tag was v1.3.2.
+
+    That version is written into every benchmark output header and into
+    runInfo.json, so it is the provenance for a published comparison. A version
+    that names no reachable commit cannot be checked out by a reviewer.
+    """
+    import subprocess
+    from conftest import ROOT
+
+    v = declared_version()
+    if v.endswith("-dev"):
+        # Unreleased work in progress. The '-dev' suffix is deliberate: it is
+        # written into benchmark submission headers, where it truthfully signals
+        # to a reviewer that the producing code is not a tagged release.
+        return
+    r = subprocess.run(["git", "tag"], cwd=str(ROOT), capture_output=True, text=True)
+    tags = {t.strip().lstrip("v").replace("_", ".") for t in r.stdout.splitlines()}
+    assert v in tags, (
+        f"EQQUASI_VERSION is {v!r} but no matching git tag exists (tags: "
+        f"{sorted(tags)}). Either tag this release, bump the declared version, "
+        f"or mark it {v}-dev while it is unreleased."
+    )

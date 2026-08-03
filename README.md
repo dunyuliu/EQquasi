@@ -187,6 +187,53 @@ The friction solve was checked independently of the fluid: with
 regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports
 `6.55e-11 m/s` at the first output step.
 
+Computational performance
+---------------------
+
+All numbers below were measured on a single shared workstation, **not** on HPC:
+
+  - 2 x AMD EPYC 7532, 32 cores each (64 cores total), 2.4 GHz, 512 MiB L3
+  - 1 TB RAM
+  - Ubuntu 22.04.5, kernel 6.8.0
+  - gfortran 11.4.0, Open MPI 4.1.1, netCDF 4.8.1, MUMPS 5.8.2 built locally
+    via [scivision/mumps](https://github.com/scivision/mumps)
+  - built with `-O3 -fopenmp`, run on **2 MPI ranks**
+
+| compset            | `dx`   | elements | steps | solver time | wall  | peak RSS |
+|--------------------|--------|----------|-------|-------------|-------|----------|
+| `test.bp5.qdc`     | 4000 m | 13 500   | 102   | 15.2 s      | 16.8 s| 217 MB   |
+| `test.bp7.qdc`     | 50 m   | 12 800   | 102   | 20.0 s      | 21.7 s| 233 MB   |
+| `test.bp8.qdc`     | 50 m   | 12 800   | 201   | 39.5 s      | 41.2 s| 234 MB   |
+| `test.bp8.qdc`     | 25 m   | 64 000   | 201   | 1549 s      |       |          |
+
+Peak RSS is the maximum resident set size reported by `/usr/bin/time -v` for
+the `mpirun` process tree, so it is roughly the per-rank peak rather than the
+total across ranks.
+
+### Cost does not scale linearly with mesh size
+
+The last two rows are the ones to plan against. Going from `dx = 50 m` to
+`dx = 25 m` multiplies the element count by 5 but the time per step by **46**
+(0.20 s to 7.7 s). *```EQquasi```* solves with a direct sparse factorization
+(*MUMPS*), whose cost grows far faster than the number of unknowns, so
+extrapolating linearly from a smoke case will understate a production run by
+orders of magnitude.
+
+Concretely: `bp8.qdc.gs.10` at `dx = 10 m` is roughly 640 000 elements, i.e.
+about 50x the smoke case. Budget it like `bp7.qdc.a.10` -- tens of CPUs and
+tens of hours -- not like a few minutes on a laptop. Use more MPI ranks and,
+if memory becomes the binding constraint rather than time, more nodes.
+
+### Reading the numbers
+
+  - "solver time" is *```EQquasi```*'s own reported time for the time loop;
+    "wall" additionally includes mesh generation, matrix assembly, the initial
+    *MUMPS* analysis and factorization, and netCDF output.
+  - `test.bp8.qdc` runs 201 steps against the others' 102, so compare the
+    per-step cost (0.15, 0.20, 0.20 s respectively), not the totals.
+  - BP7 and BP8 cost slightly more per step than BP5 at a comparable element
+    count because their meshes are more strongly graded along `y`.
+
 Note
 ----
 *```EQquasi```* is still under development and comes without any guaranteed functionality.

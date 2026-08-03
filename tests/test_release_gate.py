@@ -81,14 +81,29 @@ def test_testall_has_no_dead_mpirun_variable():
     assert "MPIRUN" not in src
 
 
-def test_check_test_gate_is_self_consistent_end_to_end():
-    """Run check.test.py against a deliberately empty tree: it must fail."""
+def test_check_test_gate_is_self_consistent_end_to_end(tmp_path):
+    """Run check.test.py where every output is missing: it must fail.
+
+    Done in an isolated tree, not in ROOT, so the verdict does not depend on
+    whether a previous run happened to leave a populated test/ directory
+    behind. An earlier version of this test read ROOT directly and silently
+    flipped to passing once the physics suite had been run.
+    """
+    import shutil
+
+    for name in ("check.test.py", "testNameList.py"):
+        shutil.copy(ROOT / name, tmp_path / name)
+    shutil.copytree(ROOT / "test.reference.results",
+                    tmp_path / "test.reference.results")
+    # Deliberately do NOT create test/ -- references exist, outputs do not.
+
     r = subprocess.run(
         [sys.executable, "check.test.py"],
-        cwd=str(ROOT), capture_output=True, text=True,
+        cwd=str(tmp_path), capture_output=True, text=True,
     )
-    # With no test/ directory produced, every reference is present but every
-    # output is missing, so the gate must be red rather than green.
     assert r.returncode != 0, (
         "check.test.py passed with no simulation output present:\n" + r.stdout
+    )
+    assert "missing output" in r.stdout, (
+        "a missing output should be reported as FAIL, not skipped:\n" + r.stdout
     )

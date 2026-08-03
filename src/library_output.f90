@@ -362,3 +362,115 @@ subroutine write_one_profile(fname, colDesc, fieldName, axisName, iline, n, dat)
     deallocate(coord)
 
 end subroutine write_one_profile
+
+! output_run_metadata writes runInfo.json next to the results: what was run,
+! on what hardware, with how many ranks, and how long it took.
+!
+! The point is postmortem traceability. A timing quoted without its core count
+! and machine load is not reproducible, and a result found on disk months later
+! is worth little if nobody can say what produced it.
+subroutine output_run_metadata(solverTime, factorTime)
+
+    use globalvar
+    implicit none
+
+    real (kind = dp), intent(in) :: solverTime, factorTime
+    character (len = 256) :: hostName, cpuModel, cpuLine
+    character (len = 64)  :: timeStamp, ompStr
+    integer (kind = 4)    :: dtv(8)
+    integer (kind = 4)    :: nThreads
+    integer (kind = 4)    :: ios
+    integer (kind = 4)    :: nCores
+
+    if (me /= 0) return
+
+    call date_and_time(values = dtv)
+    write(timeStamp,'(i4.4,A,i2.2,A,i2.2,A,i2.2,A,i2.2,A,i2.2)') &
+        dtv(1),'-',dtv(2),'-',dtv(3),'T',dtv(5),':',dtv(6),':',dtv(7)
+
+    hostName = ' '
+    cpuModel = ' '
+    ! HOSTNAME is not exported to non-interactive shells, so fall back to procfs.
+    call get_environment_variable('HOSTNAME', hostName)
+    if (len_trim(hostName) == 0) then
+        open(unit = 9300, file = '/proc/sys/kernel/hostname', status = 'old', &
+             action = 'read', iostat = ios)
+        if (ios == 0) then
+            read(9300,'(A)',iostat = ios) hostName
+            close(9300)
+        endif
+        if (ios /= 0 .or. len_trim(hostName) == 0) hostName = 'unknown'
+    endif
+
+    ! Read the CPU model from /proc/cpuinfo where it exists; leave it unknown
+    ! rather than guessing on platforms that have no such file.
+    open(unit = 9301, file = '/proc/cpuinfo', status = 'old', action = 'read', iostat = ios)
+    if (ios == 0) then
+        do
+            read(9301,'(A)',iostat = ios) cpuModel
+            if (ios /= 0) then
+                cpuModel = 'unknown'
+                exit
+            endif
+            if (index(cpuModel, 'model name') > 0) then
+                cpuModel = adjustl(cpuModel(index(cpuModel,':')+1:))
+                exit
+            endif
+        enddo
+        close(9301)
+    else
+        cpuModel = 'unknown'
+    endif
+
+    ! Report the requested OpenMP thread count rather than linking against the
+    ! runtime, so this stays correct whether or not the build enabled OpenMP.
+    nCores = 0
+    open(unit = 9303, file = '/proc/cpuinfo', status = 'old', action = 'read', iostat = ios)
+    if (ios == 0) then
+        do
+            read(9303,'(A)',iostat = ios) cpuLine
+            if (ios /= 0) exit
+            if (index(cpuLine, 'processor') == 1) nCores = nCores + 1
+        enddo
+        close(9303)
+    endif
+
+    nThreads = 1
+    ompStr = ' '
+    call get_environment_variable('OMP_NUM_THREADS', ompStr)
+    if (len_trim(ompStr) > 0) then
+        read(ompStr,*,iostat = ios) nThreads
+        if (ios /= 0) nThreads = 1
+    endif
+
+    open(9302, file = 'runInfo.json', form = 'formatted', status = 'unknown')
+        write(9302,'(A)') '{'
+        write(9302,'(A)')      '  "code": "EQquasi",'
+        write(9302,'(A)')      '  "version": "1.3.3",'
+        write(9302,'(A,I0,A)') '  "benchmark_id": ', bp, ','
+        write(9302,'(A)')      '  "run_timestamp": "'//trim(timeStamp)//'",'
+        write(9302,'(A)')      '  "host": "'//trim(hostName)//'",'
+        write(9302,'(A)')      '  "cpu_model": "'//trim(adjustl(cpuModel))//'",'
+        write(9302,'(A,I0,A)') '  "host_logical_cores": ', nCores, ','
+        write(9302,'(A,I0,A)') '  "mpi_ranks": ', nprocs, ','
+        write(9302,'(A,I0,A)') '  "omp_threads_per_rank": ', nThreads, ','
+        write(9302,'(A,I0,A)') '  "num_nodes": ', numnp, ','
+        write(9302,'(A,I0,A)') '  "num_elements": ', numel, ','
+        write(9302,'(A,I0,A)') '  "num_fault_nodes": ', nftnd(1), ','
+        write(9302,'(A,I0,A)') '  "num_equations": ', neq, ','
+        write(9302,'(A,E15.7,A)') '  "element_size_m": ', dx, ','
+        write(9302,'(A,I0,A)') '  "steps_completed": ', it-1, ','
+        write(9302,'(A,E15.7,A)') '  "simulated_time_s": ', time, ','
+        write(9302,'(A,E15.7,A)') '  "time_loop_seconds": ', solverTime, ','
+        write(9302,'(A,E15.7,A)') '  "factorization_seconds": ', factorTime, ','
+        write(9302,'(A,E15.7,A)') '  "seconds_per_step": ', solverTime/max(1,it-1), ','
+        write(9302,'(A,E15.7,A)') '  "max_slip_rate_final_m_s": ', maxSlipRate, ','
+        write(9302,'(A,I0,A)') '  "solver": ', sol_op, ','
+        write(9302,'(A,I0,A)') '  "friclaw": ', friclaw, ','
+        write(9302,'(A,I0)')   '  "fluid_source_model": ', fluid_src
+        write(9302,'(A)') '}'
+    close(9302)
+
+    write(*,*) '=     Run metadata written to runInfo.json                          ='
+
+end subroutine output_run_metadata

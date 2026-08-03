@@ -1,0 +1,243 @@
+#! /usr/bin/env python3
+"""Validate a BP8 result directory against the benchmark description.
+
+The CRESCENT DET uploader organises a zip by filename, so a misnamed or
+malformed file is silently not visualised rather than rejected with a useful
+message. This checks before upload instead of after.
+
+Usage:
+    checkBP8Submission <result_dir> [--zip <modeler>_<version>.zip]
+
+Exits non-zero if anything required is missing or malformed.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import zipfile
+
+# Section 4.1: nine on-fault stations, x2 and x3 in {-200, 0, 200} m.
+STATIONS = [
+    f"fltst_strk{s:+04d}dp{d:+04d}.txt"
+    for s in (-200, 0, 200) for d in (-200, 0, 200)
+]
+
+STATION_FIELDS = [
+    "t", "slip_2", "slip_3", "slip_rate_2", "slip_rate_3", "shear_stress_2",
+    "shear_stress_3", "pore_pressure", "darcy_vel_2", "darcy_vel_3", "state",
+]
+
+GLOBAL_FIELDS = ["t", "max_slip_rate", "moment_density_rate"]
+
+# Section 4.3: ten profile files.
+PROFILES = [
+    f"{q}_{line}.dat"
+    for q in ("slip_2", "slip_3", "shear_stress_2", "shear_stress_3", "pore_pressure")
+    for line in ("strike", "depth")
+]
+
+REQUIRED_HEADER_KEYS = ["problem", "code", "date"]
+
+
+class Report:
+    def __init__(self):
+        self.errors = []
+        self.warnings = []
+        self.ok = []
+
+    def err(self, m):
+        self.errors.append(m)
+
+    def warn(self, m):
+        self.warnings.append(m)
+
+    def good(self, m):
+        self.ok.append(m)
+
+
+def parse_file(path):
+    """Split a benchmark output file into (# header, field-name lines, data rows)."""
+    header, names, rows, bad = [], [], [], []
+    for n, line in enumerate(open(path), 1):
+        line = line.rstrip("\n")
+        if not line.strip():
+            continue
+        if line.lstrip().startswith("#"):
+            header.append(line.strip())
+            continue
+        tok = line.split()
+        # A data row is one whose FIRST token is a number. Testing for the mere
+        # presence of a digit misclassifies field names like 'slip_2' and 'x2'.
+        try:
+            float(tok[0])
+        except ValueError:
+            names.append(line.strip())
+            continue
+        try:
+            rows.append([float(v) for v in tok])
+        except ValueError:
+            bad.append((n, line[:70]))
+    return header, names, rows, bad
+
+
+def check_header(rep, fname, header):
+    joined = " ".join(header).lower()
+    for key in REQUIRED_HEADER_KEYS:
+        if f"{key}=" not in joined:
+            rep.err(f"{fname}: header missing required '{key}='")
+
+
+def check_no_malformed_numbers(rep, fname, bad):
+    if bad:
+        n, sample = bad[0]
+        rep.err(
+            f"{fname}: {len(bad)} unparseable numeric row(s), first at line {n}: "
+            f"{sample!r}. A Fortran E15.7 field cannot hold a three-digit "
+            f"exponent, so an overflowing value loses its 'E'."
+        )
+
+
+def check_stations(rep, d):
+    for fname in STATIONS:
+        path = os.path.join(d, fname)
+        if not os.path.exists(path):
+            rep.err(f"missing required station file {fname} (section 4.1)")
+            continue
+        header, names, rows, bad = parse_file(path)
+        check_header(rep, fname, header)
+        check_no_malformed_numbers(rep, fname, bad)
+        if not names:
+            rep.err(f"{fname}: missing the field-name line")
+        elif names[-1].split() != STATION_FIELDS:
+            rep.err(f"{fname}: field list is {names[-1].split()}, expected {STATION_FIELDS}")
+        if not rows:
+            rep.err(f"{fname}: no data rows")
+        elif len(rows[0]) != 11:
+            rep.err(f"{fname}: {len(rows[0])} columns, expected 11")
+        else:
+            rep.good(f"{fname}: {len(rows)} rows x 11 fields")
+
+
+def check_global(rep, d):
+    path = os.path.join(d, "global.dat")
+    if not os.path.exists(path):
+        rep.err("missing required global.dat (section 4.2)")
+        return
+    header, names, rows, bad = parse_file(path)
+    check_header(rep, "global.dat", header)
+    check_no_malformed_numbers(rep, "global.dat", bad)
+    if not names or names[-1].split() != GLOBAL_FIELDS:
+        rep.err(f"global.dat: field list is {names[-1].split() if names else None}, "
+                f"expected {GLOBAL_FIELDS}")
+    if not rows:
+        rep.err("global.dat: no data rows")
+    elif len(rows[0]) != 3:
+        rep.err(f"global.dat: {len(rows[0])} columns, expected 3")
+    else:
+        rep.good(f"global.dat: {len(rows)} rows x 3 fields")
+
+
+def check_profiles(rep, d):
+    for fname in PROFILES:
+        path = os.path.join(d, fname)
+        if not os.path.exists(path):
+            rep.err(f"missing required profile file {fname} (section 4.3)")
+            continue
+        header, names, rows, bad = parse_file(path)
+        check_header(rep, fname, header)
+        check_no_malformed_numbers(rep, fname, bad)
+        if len(names) != 4:
+            rep.err(f"{fname}: expected 4 field-name lines, found {len(names)}")
+        if len(rows) < 2:
+            rep.err(f"{fname}: needs a coordinate row plus at least one time row")
+            continue
+        ncol = len(rows[0])
+        if any(len(r) != ncol for r in rows):
+            rep.err(f"{fname}: ragged matrix, rows do not all have {ncol} columns")
+        if rows[0][0] != 0.0 or rows[0][1] != 0.0:
+            rep.err(f"{fname}: first row must begin with two zeros, got "
+                    f"{rows[0][:2]}")
+        coords = rows[0][2:]
+        if len(coords) < 2:
+            rep.err(f"{fname}: fewer than two spatial nodes")
+            continue
+        spacing = coords[1] - coords[0]
+        if abs(spacing - 10.0) > 1e-6:
+            rep.warn(f"{fname}: node spacing is {spacing:g} m; the description "
+                     f"asks for exactly 10 m ({len(coords)} columns, expected 81)")
+        times = [r[0] for r in rows[1:]]
+        if any(b <= a for a, b in zip(times, times[1:])):
+            rep.err(f"{fname}: time column is not strictly increasing")
+        rep.good(f"{fname}: {len(rows)-1} time rows x {len(coords)} nodes")
+
+
+def check_runinfo(rep, d):
+    path = os.path.join(d, "runInfo.json")
+    if not os.path.exists(path):
+        rep.warn("runInfo.json absent; run provenance will not be traceable")
+        return
+    try:
+        info = json.load(open(path))
+    except json.JSONDecodeError as e:
+        rep.err(f"runInfo.json is not valid JSON: {e}")
+        return
+    if info.get("benchmark_id") != 8:
+        rep.warn(f"runInfo.json benchmark_id is {info.get('benchmark_id')}, not 8")
+    rep.good(f"runInfo.json: {info.get('num_elements')} elements on "
+             f"{info.get('mpi_ranks')} rank(s), "
+             f"{info.get('seconds_per_step')} s/step")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("result_dir")
+    ap.add_argument("--zip", dest="zipname", default=None,
+                    help="also build an upload zip, e.g. Liu_1.0.zip")
+    args = ap.parse_args()
+
+    d = args.result_dir
+    if not os.path.isdir(d):
+        print(f"not a directory: {d}")
+        return 2
+
+    rep = Report()
+    check_stations(rep, d)
+    check_global(rep, d)
+    check_profiles(rep, d)
+    check_runinfo(rep, d)
+
+    for m in rep.ok:
+        print(f"  OK    {m}")
+    for m in rep.warnings:
+        print(f"  WARN  {m}")
+    for m in rep.errors:
+        print(f"  ERROR {m}")
+
+    print()
+    print(f"{len(rep.ok)} ok, {len(rep.warnings)} warning(s), {len(rep.errors)} error(s)")
+
+    if rep.errors:
+        print("NOT ready to upload.")
+        return 1
+
+    if args.zipname:
+        if not re.match(r"^[\w.-]+_[\w.]+\.zip$", os.path.basename(args.zipname)):
+            print(f"zip name should follow nameOfModeler_version.zip, "
+                  f"got {args.zipname}")
+            return 1
+        with zipfile.ZipFile(args.zipname, "w", zipfile.ZIP_DEFLATED) as z:
+            for fname in STATIONS + ["global.dat"] + PROFILES:
+                z.write(os.path.join(d, fname), fname)
+        size = os.path.getsize(args.zipname) / 1e6
+        print(f"wrote {args.zipname} ({size:.1f} MB, "
+              f"{len(STATIONS) + 1 + len(PROFILES)} files)")
+
+    print("Ready to upload." if not rep.warnings else
+          "Ready to upload, but read the warnings above first.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

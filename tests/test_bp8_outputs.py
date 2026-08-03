@@ -96,3 +96,37 @@ def test_profile_time_rows_carry_log10_max_slip_rate():
     body = src.split("subroutine write_one_profile")[1].split("end subroutine")[0]
     assert "dlog10" in body and "profVmax" in body, \
         "each profile row must carry log10 of the max slip rate as column 2"
+
+
+# --- run provenance -------------------------------------------------------
+
+REQUIRED_RUNINFO_KEYS = [
+    "code", "version", "benchmark_id", "run_timestamp", "host",
+    "host_logical_cores", "cpu_model", "mpi_ranks", "omp_threads_per_rank",
+    "num_nodes", "num_elements", "num_fault_nodes", "num_equations",
+    "element_size_m", "steps_completed", "simulated_time_s",
+    "time_loop_seconds", "factorization_seconds", "seconds_per_step",
+]
+
+
+@pytest.mark.parametrize("key", REQUIRED_RUNINFO_KEYS)
+def test_runinfo_json_records_key(key):
+    """A timing without its core count and machine is not reproducible."""
+    src = strip_fortran_comments(read(LIBOUT))
+    body = src.split("subroutine output_run_metadata")[1].split("end subroutine")[0]
+    assert f'"{key}"' in body, f"runInfo.json must record {key}"
+
+
+def test_runinfo_hostname_does_not_rely_on_the_environment_alone():
+    """HOSTNAME is not exported to non-interactive shells; it read 'unknown'."""
+    src = strip_fortran_comments(read(LIBOUT))
+    body = src.split("subroutine output_run_metadata")[1].split("end subroutine")[0]
+    assert "/proc/sys/kernel/hostname" in body, \
+        "fall back to procfs when HOSTNAME is unset, or the host records as unknown"
+
+
+def test_run_summary_is_printed_to_the_log():
+    src = strip_fortran_comments(read("src/solveTimeLoopMUMPS.f90"))
+    assert "RUN SUMMARY" in src, "the run should print a summary block to stdout"
+    for token in ("MPI ranks", "Elements", "Seconds per step", "Time steps completed"):
+        assert token in src, f"run summary should report {token}"

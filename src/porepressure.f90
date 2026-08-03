@@ -252,6 +252,11 @@ subroutine bp8_profile_init
         endif
     enddo
 
+    ! x3 = -z, so walking nodes in increasing z built the depth line in
+    ! DECREASING x3. The benchmark expects the coordinate row to ascend, like
+    ! the strike line. Reverse it.
+    call reverse_profile_line(idProfDepth, xProfDepth, nProfDepth)
+
     if (me == 0) then
         write(*,'(X,A,40X,i7,4X,A)') '= BP8 profile nodes along strike = ', nProfStrike, '='
         write(*,'(X,A,40X,i7,4X,A)') '= BP8 profile nodes along dip    = ', nProfDepth, '='
@@ -293,3 +298,27 @@ subroutine bp8_profile_record
     enddo
 
 end subroutine bp8_profile_record
+
+! reverse_profile_line flips a profile line so its coordinates ascend.
+subroutine reverse_profile_line(ids, coords, n)
+
+    use globalvar, only : dp
+    implicit none
+
+    integer (kind = 4), intent(in)    :: n
+    integer (kind = 4), intent(inout) :: ids(n)
+    real (kind = dp),   intent(inout) :: coords(n)
+
+    integer (kind = 4) :: i, itmp
+    real (kind = dp)   :: rtmp
+
+    do i = 1, n/2
+        itmp        = ids(i)
+        ids(i)      = ids(n+1-i)
+        ids(n+1-i)  = itmp
+        rtmp          = coords(i)
+        coords(i)     = coords(n+1-i)
+        coords(n+1-i) = rtmp
+    enddo
+
+end subroutine reverse_profile_line

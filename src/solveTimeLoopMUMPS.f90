@@ -205,9 +205,22 @@ subroutine solveTimeLoopMUMPS
     call cpu_time(endTime)
     timeUsedInComputing = endTime-startTime
     
-    if (me == 0) then 
-        write(*,*) it, ' steps use ', timeUsedInComputing, ' seconds ...'
-        write(*,*) 'Factorization uses ', timeUsedInFactorization, ' seconds ...'
+    if (me == 0) then
+        write(*,*) '====================================================================='
+        write(*,*) '=                        RUN SUMMARY                                ='
+        write(*,'(X,A,40X,i7,4X,A)')     '= MPI ranks                = ', nprocs, '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Nodes                    = ', numnp, '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Elements                 = ', numel, '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Equations                = ', neq, '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Fault nodes              = ', nftnd(1), '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Time steps completed     = ', it-1, '='
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Simulated time           = ', time/86400.0d0, 'days'
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Time loop                = ', timeUsedInComputing, 'seconds'
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Factorization            = ', timeUsedInFactorization, 'seconds'
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Seconds per step         = ', timeUsedInComputing/max(1,it-1), 'seconds'
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Final max slip rate      = ', maxSlipRate, 'm/s'
+        write(*,*) '====================================================================='
+        call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
     endif
     
 end subroutine solveTimeLoopMUMPS

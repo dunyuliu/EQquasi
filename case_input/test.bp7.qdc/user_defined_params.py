@@ -4,14 +4,12 @@ from defaultParameters import parameters
 import numpy as np
 from math import *
 
-# modified from user_defined_params.py of bp7.qdc.a.10 with additional off STs. 
-
 par = parameters()
 # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
 
 par.istart = 1
-par.iend = 3
-# mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
+par.iend = 1
+# mode of the code - quasi-dynamic (1) or fully-dynamic (2).
 par.mode = 1
 
 # model_domain (in meters)
@@ -24,7 +22,7 @@ par.fzmin, par.fzmax = -500, 500
 # the RSF controlled region and will slide at fixed loading slip rate.
 par.xminc, par.xmaxc, par.zminc = -400, 400, -400
 
-par.dx = 10.0e0 # cell size, spatial resolution
+par.dx = 50.0e0 # cell size, spatial resolution (coarsened from bp7.qdc.a.10's 10 m for a fast CI smoke test)
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
@@ -41,7 +39,7 @@ par.rheology    = 1 # elastic(1).
 par.friclaw     = 3 # rsf_aging(3), rsf_slip(4).
 par.ntotft      = 1 # number of total faults.
 par.solver      = 1 # solver option. MUMPS(1, recommended). AZTEC(2).
-par.nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold
+par.nstep       = 101 # total num of time steps for exiting, if not exit via sliprate threshold
 par.nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
 par.bp          = 7 
 # currently supported cases
@@ -87,9 +85,9 @@ for ix, xcoor in enumerate(par.fx):
   # assign a in RSF. a is a 2D distribution.
     radii = sqrt(xcoor*xcoor + zcoor*zcoor)
     if radii <= rad:
-      par.on_fault_vars[iz,ix,9] = fric_rsf_a
+      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a
     else: 
-      par.on_fault_vars[iz,ix,9] = fric_rsf_a + fric_rsf_deltaa
+      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + par.fric_rsf_deltaa
       
     par.on_fault_vars[iz,ix,10] = par.fric_rsf_b # assign b in RSF 
     par.on_fault_vars[iz,ix,11] = par.fric_rsf_Dc # assign Dc in RSF.
@@ -112,11 +110,11 @@ for ix, xcoor in enumerate(par.fx):
 ####################################
 ##### HPC resource allocation ######
 ####################################
-par.casename  = "das.cycle"
+par.casename  = "test.bp7.qdc"
 par.HPC_nnode = 1 # Number of computing nodes. On LS6, one node has 128 CPUs.
-par.HPC_ncpu  = 20 # Number of CPUs requested.
+par.HPC_ncpu  = 2 # Number of CPUs requested.
 par.HPC_queue = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
-par.HPC_time  = "10:00:00" # WALLTIME, in hh:mm:ss format.
+par.HPC_time  = "35:00:00" # WALLTIME, in hh:mm:ss format.
 par.HPC_account = "EAR22012" # Project account to be charged SUs against.
 par.HPC_email = "dliu@ig.utexas.edu" # Email to receive job status.
 
@@ -129,22 +127,9 @@ par.st_coor_on_fault  = [[0, 0], [-100,0], [0,100], [100,0], \
                     [-300,0], [0, 300], [300,0], [0,-300]]
 par.st_coor_on_fault  = np.asarray(par.st_coor_on_fault)/1000.0
 # (x,y,z) coordinates for off-fault stations (in km).
-stXRange = [-500,-400,-300,-200,-150,-100,-50,-20,0,20,50,100,150,200,300,400,500]
-stYRange = [5,10,20,30,40,50,60,70,80,90,100,150,200,300,400,500]
-stZRange = [-500,-400,-300,-200,-150,-100,-50,-20,0,20,50,100,150,200,300,400,500]
-
-numOffST = len(stXRange)*len(stYRange)*len(stZRange)
-par.st_coor_off_fault = np.zeros((numOffST,3))
-nTag = 0
-for ix in range(len(stXRange)):
-    for iy in range(len(stYRange)):
-        for iz in range(len(stZRange)):
-            par.st_coor_off_fault[nTag,0] = stXRange[ix]
-            par.st_coor_off_fault[nTag,1] = stYRange[iy]
-            par.st_coor_off_fault[nTag,2] = stZRange[iz]
-            nTag = nTag + 1
-par.st_coor_off_fault = par.st_coor_off_fault/1.e3
-
+par.st_coor_off_fault = [[0,200,0], [0,400,0], [-300,400,0], [0,400,-300], [300,400,0], \
+                     [0,400,300]]
+par.st_coor_off_fault = np.asarray(par.st_coor_off_fault)/1000.0
 par.n_on_fault = len(par.st_coor_on_fault)
 par.n_off_fault = len(par.st_coor_off_fault)
 

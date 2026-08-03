@@ -13,9 +13,9 @@ par.iend = 1
 par.mode = 1
 
 # model_domain (in meters)
-par.xmin, par.xmax = -60.0e3, 60.0e3
-par.ymin, par.ymax = -50.0e3, 50.0e3
-par.zmin, par.zmax = -60.0e3, 0.0e3
+par.fxmin, par.fxmax = -60.0e3, 60.0e3
+par.fymin, par.fymax = -50.0e3, 50.0e3
+par.fzmin, par.fzmax = -60.0e3, 0.0e3
 
 # creeping zone bounaries.
 # creeping zones are assinged on the lateral sides and bottom of 
@@ -23,6 +23,8 @@ par.zmin, par.zmax = -60.0e3, 0.0e3
 par.xminc, par.xmaxc, par.zminc = -50.0e3, 50.0e3, -40.0e3
 
 par.dx = 2000.0e0 # cell size, spatial resolution
+par.dy = par.dx
+par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
 par.enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
@@ -66,10 +68,10 @@ par.fric_rsf_deltaa = 0.036
 par.fric_rsf_r0 = 0.6
 par.fric_rsf_v0 = 1e-6
 # Creating the fault interface
-par.nfx = round((par.xmax - par.xmin)/par.dx + 1)
-par.nfz = round((par.zmax - par.zmin)/par.dx + 1)
-par.fx = np.linspace(par.xmin,par.xmax,par.nfx) # coordinates of fault grids along strike.
-par.fz = np.linspace(par.zmin,par.zmax,par.nfz) # coordinates of fault grids along dip.
+par.nfx = round((par.fxmax - par.fxmin)/par.dx + 1)
+par.nfz = round((par.fzmax - par.fzmin)/par.dx + 1)
+par.fx = np.linspace(par.fxmin,par.fxmax,par.nfx) # coordinates of fault grids along strike.
+par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids along dip.
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):

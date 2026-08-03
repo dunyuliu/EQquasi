@@ -20,6 +20,7 @@ subroutine solveTimeLoopMUMPS
     call getScalarOnFaultQuant
 
     if (bp == 8) call pore_pressure_init
+    if (bp == 8) call bp8_profile_init
 
     if (me.eq.0) then
         write(*,*) '= Building Stiffness Matrix in CRS format      ='
@@ -161,6 +162,8 @@ subroutine solveTimeLoopMUMPS
         enddo 
         
         if (me == 0) then 
+            if (bp == 8) call bp8_profile_record
+
             status0 = status1
             dtev1 = max(dt,int8(dtev/dt)*dt)    
 

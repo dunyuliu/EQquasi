@@ -32,6 +32,7 @@ program eqquasi3d
     write(*,*) '====================================================================='
     endif 
     
+    call setRunDate
     call readcurrentcycle 
     call readmodel
     call readstations1
@@ -76,6 +77,15 @@ program eqquasi3d
     call MPI_FINALIZE(IERR)
     
 end program eqquasi3d
+
+subroutine setRunDate
+! Stamp the run date into runDate, for the benchmark output headers.
+    use globalvar
+    implicit none
+    integer (kind = 4) :: dtvals(8)
+    call date_and_time(values = dtvals)
+    write(runDate,'(i4.4,A,i2.2,A,i2.2)') dtvals(1), '/', dtvals(2), '/', dtvals(3)
+end subroutine setRunDate
 
 subroutine checkAndReport(currentProcID)
     use globalvar
@@ -196,6 +206,7 @@ subroutine writeResults(currentProcID)
         call output_onfault_transfer 
         call output_timedy
         call output_globaldat
+        call output_bp8_profiles
         call output_ruptarea_trac_slip
         write(*,*) 'Done.'
     endif 

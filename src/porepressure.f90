@@ -180,3 +180,116 @@ subroutine pore_pressure_update(dtstep)
     enddo
 
 end subroutine pore_pressure_update
+
+! Subroutine #3.
+! bp8_profile_init locates the fault nodes lying on the two cross-section lines
+! through the injection point -- along strike (x3 = 0) and along dip (x2 = 0) --
+! and allocates storage for the section 4.3 output of SEAS BP8.
+!
+! The benchmark asks for nodes at exactly 10 m spacing over [-400, 400], i.e. 81
+! columns. That is what the production compset at dx = 10 m provides; a coarser
+! dx yields correspondingly fewer columns, and the header records the actual
+! spacing so the file stays self-describing rather than silently wrong.
+subroutine bp8_profile_init
+
+    use globalvar
+    implicit none
+
+    integer (kind = 4) :: i, isn, is, idp
+    real (kind = dp)   :: xtmp, ztmp, tol
+
+    tol = 0.01d0 * dx
+
+    nProfStrike = 0
+    nProfDepth  = 0
+    do i = 1, nftnd(1)
+        if (pfActive(i) == 0) cycle
+        isn  = nsmp(1,i,1)
+        xtmp = x(1,isn)
+        ztmp = x(3,isn)
+        if (abs(ztmp) < tol) nProfStrike = nProfStrike + 1
+        if (abs(xtmp) < tol) nProfDepth  = nProfDepth  + 1
+    enddo
+
+    if (nProfStrike == 0 .or. nProfDepth == 0) return
+
+    ! Subsample in time so the files stay near 1000 rows, as the description asks.
+    nProfSkip = max(1, nstep/1000)
+    nProfMax  = nstep/nProfSkip + 2
+
+    allocate(idProfStrike(nProfStrike), xProfStrike(nProfStrike))
+    allocate(idProfDepth(nProfDepth),   xProfDepth(nProfDepth))
+    allocate(profTime(nProfMax), profVmax(nProfMax))
+    allocate(profS2s(nProfMax,nProfStrike), profS3s(nProfMax,nProfStrike), &
+             profT2s(nProfMax,nProfStrike), profT3s(nProfMax,nProfStrike), &
+             profPs (nProfMax,nProfStrike))
+    allocate(profS2d(nProfMax,nProfDepth),  profS3d(nProfMax,nProfDepth),  &
+             profT2d(nProfMax,nProfDepth),  profT3d(nProfMax,nProfDepth),  &
+             profPd (nProfMax,nProfDepth))
+
+    profTime = 0.0d0; profVmax = 0.0d0
+    profS2s = 0.0d0; profS3s = 0.0d0; profT2s = 0.0d0; profT3s = 0.0d0; profPs = 0.0d0
+    profS2d = 0.0d0; profS3d = 0.0d0; profT2d = 0.0d0; profT3d = 0.0d0; profPd = 0.0d0
+
+    ! Fault nodes are ordered n = (ix-1)*nzt + iz, so walking i in order gives
+    ! increasing x3 along the dip line and increasing x2 along the strike line.
+    is = 0; idp = 0
+    do i = 1, nftnd(1)
+        if (pfActive(i) == 0) cycle
+        isn  = nsmp(1,i,1)
+        xtmp = x(1,isn)
+        ztmp = x(3,isn)
+        if (abs(ztmp) < tol) then
+            is = is + 1
+            idProfStrike(is) = i
+            xProfStrike(is)  = xtmp
+        endif
+        if (abs(xtmp) < tol) then
+            idp = idp + 1
+            idProfDepth(idp) = i
+            ! BP8 measures x3 positive downward; EQquasi's z is positive up.
+            xProfDepth(idp)  = -ztmp
+        endif
+    enddo
+
+    if (me == 0) then
+        write(*,'(X,A,40X,i7,4X,A)') '= BP8 profile nodes along strike = ', nProfStrike, '='
+        write(*,'(X,A,40X,i7,4X,A)') '= BP8 profile nodes along dip    = ', nProfDepth, '='
+    endif
+
+end subroutine bp8_profile_init
+
+! Subroutine #4.
+! bp8_profile_record stores one time slice along both cross-section lines.
+subroutine bp8_profile_record
+
+    use globalvar
+    implicit none
+
+    integer (kind = 4) :: k, i
+
+    if (nProfStrike == 0 .or. nProfDepth == 0) return
+    if (nProfRec >= nProfMax) return
+    if (mod(it, nProfSkip) /= 0 .and. it /= 1) return
+
+    nProfRec = nProfRec + 1
+    k = nProfRec
+    profTime(k) = time
+    profVmax(k) = maxSlipRate
+
+    do i = 1, nProfStrike
+        profS2s(k,i) =  fric(71, idProfStrike(i), 1)          ! slip along strike, m
+        profS3s(k,i) = -fric(72, idProfStrike(i), 1)          ! slip, positive down
+        profT2s(k,i) =  fric(28, idProfStrike(i), 1)/1.0d6    ! shear stress, MPa
+        profT3s(k,i) = -fric(29, idProfStrike(i), 1)/1.0d6
+        profPs (k,i) =  fric(6,  idProfStrike(i), 1)/1.0d6    ! pore pressure, MPa
+    enddo
+    do i = 1, nProfDepth
+        profS2d(k,i) =  fric(71, idProfDepth(i), 1)
+        profS3d(k,i) = -fric(72, idProfDepth(i), 1)
+        profT2d(k,i) =  fric(28, idProfDepth(i), 1)/1.0d6
+        profT3d(k,i) = -fric(29, idProfDepth(i), 1)/1.0d6
+        profPd (k,i) =  fric(6,  idProfDepth(i), 1)/1.0d6
+    enddo
+
+end subroutine bp8_profile_record

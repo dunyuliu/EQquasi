@@ -77,6 +77,7 @@ MODULE globalvar
     ! parameters for along-fault pore fluid diffusion in bp8 (SEAS BP8, fluid injection in 3D).
     integer (kind=4) :: fluid_src = 0 ! 0: off, default; 1: Gaussian source (GS); 2: Peaceman well (PW).
     character (len=2) :: bp8tag = 'GS' ! benchmark tag written into bp8 output headers.
+    character (len=10) :: runDate = '0000/00/00' ! run date, written into output headers.
     integer (kind=4) :: pfWell = 0    ! fault node index of the well cell.
     real (kind=dp) :: fluid_q0        ! total volume injection rate, m^3/s.
     real (kind=dp) :: fluid_toff      ! injection turn-off time, s.
@@ -95,6 +96,20 @@ MODULE globalvar
     real (kind=dp) :: dtmax = 0.0d0   ! cap on the adaptive time step, s. 0 means no cap.
     real (kind=dp), allocatable :: pf(:), pfWt(:) ! pore pressure change, Pa; source weights.
     integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
+
+    ! Section 4.3 of SEAS BP8: slip, shear stress and pore pressure recorded
+    ! along the two cross-section lines through the injection point, at a
+    ! subsampled set of time steps.
+    integer (kind=4) :: nProfStrike = 0, nProfDepth = 0 ! nodes on each line.
+    integer (kind=4) :: nProfRec = 0     ! records written so far.
+    integer (kind=4) :: nProfMax = 0     ! capacity.
+    integer (kind=4) :: nProfSkip = 1    ! record every nProfSkip-th step.
+    integer (kind=4), allocatable :: idProfStrike(:), idProfDepth(:) ! fault node ids.
+    real (kind=dp), allocatable :: xProfStrike(:), xProfDepth(:)     ! coordinates, m.
+    real (kind=dp), allocatable :: profTime(:), profVmax(:)
+    ! (record, node) for each quantity on each line.
+    real (kind=dp), allocatable :: profS2s(:,:), profS3s(:,:), profT2s(:,:), profT3s(:,:), profPs(:,:)
+    real (kind=dp), allocatable :: profS2d(:,:), profS3d(:,:), profT2d(:,:), profT3d(:,:), profPd(:,:)
 
     ! parameters for nucleation in bp7.
     real (kind=dp) :: nucx  = -50,      nucz = -50 ! hypocenter x and z coordinates in m.

@@ -37,6 +37,7 @@ subroutine output_onfault_st
                 write(51,'(A)') '# code=EQquasi'
                 write(51,'(A)') '# version=1.3.3'
                 write(51,'(A)') '# modeler=D.Liu'
+                write(51,'(A)') '# date='//trim(adjustl(runDate))
                 write(51,'(A,E15.7,A)') '# element_size=', dx, ' m'
                 write(51,'(A)') '# location= on fault'
                 write(51,'(A)') '# Column #1 = Time (s)'
@@ -99,10 +100,12 @@ subroutine output_offfault_st
             bodytmp = '      '
             sttmp = '      '
             dptmp = '      '
-            if (bp == 7) then
-                write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))) 
-                write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))) 
-                write(dptmp,'(i4.3)')   int(abs(x4nds(3,an4nds(1,i)))) 
+            if (bp == 7 .or. bp == 8) then
+                ! Metre-scale models: dividing by 1000 collapses distinct
+                ! stations onto the same filename and silently overwrites them.
+                write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i)))
+                write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i)))
+                write(dptmp,'(i4.3)')   int(abs(x4nds(3,an4nds(1,i))))
             else
                 write(bodytmp,'(i4.3)') int(x4nds(2,an4nds(1,i))/1000.d0)
                 write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))/1000.d0)
@@ -189,6 +192,7 @@ subroutine output_globaldat
             write(1113,'(A)') '# code=EQquasi'
             write(1113,'(A)') '# version=1.3.3'
             write(1113,'(A)') '# modeler=D.Liu'
+            write(1113,'(A)') '# date='//trim(adjustl(runDate))
             write(1113,'(A,E15.7,A)') '# element_size=', dx, ' m'
             write(1113,'(A)') '# location= frictional domain'
             write(1113,'(A)') '# Column #1 = Time (s)'
@@ -278,3 +282,83 @@ subroutine output_ruptarea_trac_slip
     endif
     
 end subroutine output_ruptarea_trac_slip
+
+! output_bp8_profiles writes the ten section-4.3 files of SEAS BP8: slip,
+! shear stress (both components) and pore pressure along the two cross-section
+! lines through the injection point.
+!
+! Layout, per the benchmark description:
+!   row 1        :  0   0   x2(1) x2(2) ... x2(n)
+!   rows 2..Nt+1 :  t   log10(max slip rate)   value(1) ... value(n)
+subroutine output_bp8_profiles
+
+    use globalvar
+    implicit none
+
+    if (bp /= 8) return
+    if (nProfRec == 0) return
+
+    call write_one_profile('slip_2_strike.dat',         'Slip_2 (m)',           'slip_2',         'x2', 1, nProfStrike, profS2s)
+    call write_one_profile('slip_3_strike.dat',         'Slip_3 (m)',           'slip_3',         'x2', 1, nProfStrike, profS3s)
+    call write_one_profile('shear_stress_2_strike.dat', 'Shear_stress_2 (MPa)', 'shear_stress_2', 'x2', 1, nProfStrike, profT2s)
+    call write_one_profile('shear_stress_3_strike.dat', 'Shear_stress_3 (MPa)', 'shear_stress_3', 'x2', 1, nProfStrike, profT3s)
+    call write_one_profile('pore_pressure_strike.dat',  'Pore_pressure (MPa)',  'pore_pressure',  'x2', 1, nProfStrike, profPs)
+
+    call write_one_profile('slip_2_depth.dat',          'Slip_2 (m)',           'slip_2',         'x3', 2, nProfDepth, profS2d)
+    call write_one_profile('slip_3_depth.dat',          'Slip_3 (m)',           'slip_3',         'x3', 2, nProfDepth, profS3d)
+    call write_one_profile('shear_stress_2_depth.dat',  'Shear_stress_2 (MPa)', 'shear_stress_2', 'x3', 2, nProfDepth, profT2d)
+    call write_one_profile('shear_stress_3_depth.dat',  'Shear_stress_3 (MPa)', 'shear_stress_3', 'x3', 2, nProfDepth, profT3d)
+    call write_one_profile('pore_pressure_depth.dat',   'Pore_pressure (MPa)',  'pore_pressure',  'x3', 2, nProfDepth, profPd)
+
+end subroutine output_bp8_profiles
+
+subroutine write_one_profile(fname, colDesc, fieldName, axisName, iline, n, dat)
+
+    use globalvar
+    implicit none
+
+    character (len = *), intent(in) :: fname, colDesc, fieldName, axisName
+    integer (kind = 4),  intent(in) :: iline           ! 1 = strike line, 2 = dip line
+    integer (kind = 4),  intent(in) :: n               ! nodes on that line
+    real (kind = dp),    intent(in) :: dat(nProfMax, n)
+
+    integer (kind = 4) :: k, i
+    real (kind = dp), allocatable :: coord(:)
+
+    if (iline == 1) then
+        allocate(coord(n)); coord = xProfStrike
+    else
+        allocate(coord(n)); coord = xProfDepth
+    endif
+
+    open(9101, file = trim(fname), form = 'formatted', status = 'unknown')
+        write(9101,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
+        write(9101,'(A)') '# author=D.Liu'
+        write(9101,'(A)') '# date='//trim(adjustl(runDate))
+        write(9101,'(A)') '# code=EQquasi'
+        write(9101,'(A)') '# code_version=1.3.3'
+        write(9101,'(A,E15.7,A)') '# element_size=', dx, ' m'
+        write(9101,'(A)') '# Row #1 = '//trim(axisName)//' (m) with two zeros first'
+        write(9101,'(A)') '# Column #1 = Time (s)'
+        write(9101,'(A)') '# Column #2 = Max slip rate (log10 m/s)'
+        write(9101,'(A,i4,A)') '# Columns #3-', n+2, ' = '//trim(colDesc)
+        write(9101,'(A,2(E13.5,A))') '# Computational domain: ', xminc, ' < x2 < ', xmaxc, ' m'
+        write(9101,'(A)') '# The line below lists the names of the data fields'
+        write(9101,'(A)') trim(axisName)
+        write(9101,'(A)') 't'
+        write(9101,'(A)') 'max_slip_rate'
+        write(9101,'(A)') trim(fieldName)
+        write(9101,'(A)') '# Here are the data'
+
+        ! Row 1: two zeros, then the node coordinates.
+        write(9101,'(2E22.14,1000E15.7)') 0.0d0, 0.0d0, (coord(i), i = 1, n)
+        ! Rows 2..: time, log10 max slip rate, then the field at each node.
+        do k = 1, nProfRec
+            write(9101,'(E22.14,1000E15.7)') profTime(k), &
+                dlog10(max(profVmax(k), 1.0d-30)), (dat(k,i), i = 1, n)
+        enddo
+    close(9101)
+
+    deallocate(coord)
+
+end subroutine write_one_profile

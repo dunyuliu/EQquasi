@@ -123,6 +123,70 @@ Key progress
 ---------------------
 *v1.2.1* with *MUMPS* is benchmarked in [SEAS BP5](https://strike.scec.org/cvws/seas/benchmark_descriptions.html) and results are published in [*Jiang et al. (2022, JGR)*](https://doi.org/10.1029/2021JB023519).
 
+Verification
+---------------------
+
+### Regression suite
+
+```
+python3 -m pytest tests/   # static/structural guards, ~1 s, no MPI or MUMPS
+python3 testAll.py         # physics regression: builds, runs, compares to references
+```
+
+`testAll.py` runs `test.bp5.qdc`, `test.bp5.qdc.dip90` and `test.bp7.qdc` and
+compares `fault.00101.nc` against `test.reference.results/`. Both BP5 cases
+reproduce their references with **max absolute difference 0.0** across all 17
+variables.
+
+The committed references are *regression locks*, not physics validations. The
+test compsets are deliberately coarse (`test.bp5.qdc` uses `dx = 4000 m` against
+BP5's 2000 m; `test.bp7.qdc` uses `dx = 50 m`, which spans BP7's
+velocity-weakening disc with only about four cells). They catch unintended
+changes; they do not establish that a benchmark is reproduced correctly. That
+requires the production compset at its native resolution.
+
+### BP8 pore fluid diffusion
+
+The along-fault pore pressure solver used by `bp == 8` is verified against the
+closed-form solution in eq. (22) of the SEAS BP8 benchmark description, which
+gives `p(x2, x3, t)` for a Gaussian injection source in an unbounded domain.
+
+Relative error in pore pressure at the injection point, `BP8-QD-GS`:
+
+| t (s)   | `dx` = 50 m | `dx` = 25 m |
+|---------|-------------|-------------|
+| 25 000  | 5.11 %      | 1.51 %      |
+| 50 000  | 5.75 %      | 1.50 %      |
+| 75 000  | 5.74 %      | 1.44 %      |
+| 100 000 | 5.60 %      | 1.37 %      |
+
+Halving `dx` reduces the error by a factor of about 3.9, i.e. **second-order
+convergence**, as expected for the FTCS Laplacian combined with a discretely
+normalized Gaussian source. Extrapolating to the production resolution
+`dx = 10 m` gives roughly 0.2 %.
+
+The remaining error is source under-resolution, not a modelling error: the
+Gaussian has a characteristic size `L_gauss = 50 m`, so at `dx = 50 m` it is
+resolved by a single cell and at `dx = 25 m` by two.
+
+Two caveats on the comparison itself:
+
+  - The analytic solution assumes an unbounded fault, whereas the solver imposes
+    zero fluid flux on the boundary of the frictional domain at +/-400 m. The
+    two only agree while the diffusion length `sqrt(4*alpha*t)` stays well
+    inside that boundary; it reaches 400 m at around `t = 8e5 s`, i.e. roughly
+    9 days into the 30-day benchmark.
+  - Eq. (20) of the benchmark description writes the Gaussian source as
+    `(1/L^2) exp(-r^2 / 2L^2)`, which integrates to `2*pi` rather than 1, and is
+    therefore inconsistent with the closed form in eq. (22) by that factor. The
+    implementation follows eq. (22)/(25) and normalizes the source weights
+    discretely so that they sum to exactly 1.
+
+The friction solve was checked independently of the fluid: with
+`tau0 = 14.6 MPa` on `sigma_bar = 25 MPa` and `theta = Dc/V_init`, the
+regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports
+`6.55e-11 m/s` at the first output step.
+
 Note
 ----
 *```EQquasi```* is still under development and comes without any guaranteed functionality.

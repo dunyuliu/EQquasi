@@ -204,25 +204,37 @@ All numbers below were measured on a single shared workstation, **not** on HPC:
 | `test.bp5.qdc`     | 4000 m | 13 500   | 102   | 15.2 s      | 16.8 s| 217 MB   |
 | `test.bp7.qdc`     | 50 m   | 12 800   | 102   | 20.0 s      | 21.7 s| 233 MB   |
 | `test.bp8.qdc`     | 50 m   | 12 800   | 201   | 39.5 s      | 41.2 s| 234 MB   |
-| `test.bp8.qdc`     | 25 m   | 64 000   | 201   | 1549 s      |       |          |
+| `test.bp8.qdc`     | 25 m   | 64 000   | 201   | 162.8 s     | 4m56s | 1.23 GB  |
 
 Peak RSS is the maximum resident set size reported by `/usr/bin/time -v` for
 the `mpirun` process tree, so it is roughly the per-rank peak rather than the
 total across ranks.
 
-### Cost does not scale linearly with mesh size
+### Scaling with mesh size
 
-The last two rows are the ones to plan against. Going from `dx = 50 m` to
-`dx = 25 m` multiplies the element count by 5 but the time per step by **46**
-(0.20 s to 7.7 s). *```EQquasi```* solves with a direct sparse factorization
-(*MUMPS*), whose cost grows far faster than the number of unknowns, so
-extrapolating linearly from a smoke case will understate a production run by
-orders of magnitude.
+Comparing the two `test.bp8.qdc` rows, which differ only in resolution:
 
-Concretely: `bp8.qdc.gs.10` at `dx = 10 m` is roughly 640 000 elements, i.e.
-about 50x the smoke case. Budget it like `bp7.qdc.a.10` -- tens of CPUs and
-tens of hours -- not like a few minutes on a laptop. Use more MPI ranks and,
-if memory becomes the binding constraint rather than time, more nodes.
+| `dx`   | elements | s / step | peak RSS |
+|--------|----------|----------|----------|
+| 50 m   | 12 800   | 0.196    | 234 MB   |
+| 25 m   | 64 000   | 0.810    | 1.23 GB  |
+
+5x the elements costs about 4.1x the time per step and 5.2x the memory, so over
+this range both are close to linear in element count.
+
+Extrapolating to `bp8.qdc.gs.10` at `dx = 10 m` -- roughly 640 000 elements,
+10x the `dx = 25 m` case -- suggests order 8 s per step and order 12 GB on 2
+ranks, i.e. something like 12 hours for the ~5200 steps of the 30-day
+benchmark. Treat that as an order-of-magnitude estimate from two data points,
+not a measurement: *```EQquasi```* solves with a direct sparse factorization
+(*MUMPS*), whose cost does eventually grow faster than the number of unknowns,
+and the trend above may not hold another decade out. Use more MPI ranks, and
+more nodes if memory rather than time becomes the binding constraint.
+
+**Measure on an idle machine.** An earlier timing of the `dx = 25 m` case on
+this same hardware gave 1549 s instead of 162.8 s -- a 10x error -- purely
+because the node was under load average ~33 at the time. Check `uptime` before
+trusting any number here.
 
 ### Reading the numbers
 

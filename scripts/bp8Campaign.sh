@@ -16,7 +16,11 @@ LOG=$R/work/campaign.log
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
 # ranks: 1 unless the mesh is large enough that a direct factorisation needs help
-ranks_for() { [ "$1" -gt 150000 ] && echo 4 || echo 1; }
+# case.setup's "estimated total cells" is nx*nz*(nuni_y_plus+nuni_y_minus)*2,
+# which undercounts a cube badly: a 2000 m box at dx = 50 m estimates 128k and
+# builds 512k. Scale is poor anyway (24 % for 8x ranks), so ranks buy little --
+# use them only to keep the biggest cases inside a sensible wall time.
+ranks_for() { [ "$1" -gt 60000 ] && echo 8 || echo 1; }
 
 summarise() {  # $1 = case dir, $2 = label
   python3 - "$1" "$2" <<'PY' | tee -a "$LOG"
@@ -78,7 +82,7 @@ sed -i "s/^par.nstep       = .*/par.nstep       = 200/" user_defined_params.py
 for NP in 1 2 4 8; do
   echo 1 > currentcycle.txt
   /usr/bin/time -f "%e" mpirun -np $NP "$EX" > r.log 2> tt.log
-  SPS=$(grep -oE "[0-9]+ +steps use +[0-9.]+" r.log | awk '{printf "%.4f", $3/$1}')
+  SPS=$(awk '/steps use/{printf "%.4f", $4/$1}' r.log)
   say "SCALING np=$NP OMP=1  s/step=${SPS:-NA}  wall=$(tail -1 tt.log)"
 done
 

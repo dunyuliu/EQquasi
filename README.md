@@ -182,6 +182,58 @@ Two caveats on the comparison itself:
     implementation follows eq. (22)/(25) and normalizes the source weights
     discretely so that they sum to exactly 1.
 
+### Full 30-day run and discrete mass conservation
+
+`test.bp8.qdc` run to the benchmark's full `t_f = 30 days` (5185 steps at
+`dx = 50 m`, 17 min on 2 ranks) exits on the time criterion as intended and
+gives an independent check that does not rely on the Green's function at all.
+
+After injection stops at `t_off = 100 h`, the zero-flux condition on the
+boundary of `Omega_f` traps every injected drop inside the frictional domain,
+so the pore pressure must relax towards a uniform value fixed only by the total
+volume injected, `V = Q0 * t_off = 1080 m^3`:
+
+```
+p_uniform = V / (beta * phi * A * L_fwid)
+```
+
+| quantity                                | value       |
+|-----------------------------------------|-------------|
+| predicted, discrete area (17x17 nodes)  | 1.4948 MPa  |
+| **code, centre station at t = 30 d**    | **1.5013 MPa** |
+| error                                   | **+0.43 %** |
+
+This exercises the diffusion operator, the source normalization and the
+boundary condition together.
+
+**A discretization detail this exposes.** The agreement holds against the
+*discrete* area, `(17 * 50)^2 = 722 500 m^2`, not the continuum area of
+`Omega_f`, `800^2 = 640 000 m^2`. Pore pressure lives at nodes and every node
+carries a full `dx^2` cell, including those on the boundary, so the effective
+storage area overshoots by one cell width on each side. At `dx = 50 m` that is
+a 13 % area overestimate and therefore an 11 % *underestimate* of the
+long-time uniform pressure. The error is first order in `dx` and shrinks to
+about 2.5 % at the production `dx = 10 m`, but it is a real bias in late-time,
+boundary-influenced results and is not removed by the second-order convergence
+reported above, which is measured while the pressure front is still far from
+the boundary.
+
+Physical behaviour over the full run, at the centre station:
+
+| quantity                        | value                              |
+|---------------------------------|------------------------------------|
+| pore pressure at shutoff        | 13.54 MPa (`sigma_bar` 25 -> 11.5) |
+| peak pore pressure              | 13.63 MPa at 4.16 d, i.e. at `t_off` |
+| peak slip rate                  | 6.5e-9 m/s at 8.6 d                |
+| total slip at 30 d              | 5.58 mm                            |
+
+Effective normal stress is reduced by 54 % at its lowest but never reaches
+zero. Note the slip rate peaks about 4.5 days *after* injection stops. That is
+the expected signature of a slip front that keeps propagating once injection
+ends, with the growing slipping patch loading the centre elastically, but it
+has **not** been verified against independent results -- BP8 was released in
+July 2026 and no community comparison exists yet.
+
 The friction solve was checked independently of the fluid: with
 `tau0 = 14.6 MPa` on `sigma_bar = 25 MPa` and `theta = Dc/V_init`, the
 regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports

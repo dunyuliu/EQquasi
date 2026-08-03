@@ -262,9 +262,31 @@ Peak RSS is the maximum resident set size reported by `/usr/bin/time -v` for
 the `mpirun` process tree, so it is roughly the per-rank peak rather than the
 total across ranks.
 
+### Parallel scaling
+
+Measured on the 8000-element `test.bp8.qdc` case, 200 steps, `OMP_NUM_THREADS=1`,
+otherwise idle machine:
+
+| MPI ranks | wall  | s / step | speedup |
+|-----------|-------|----------|---------|
+| 1         | 29.4 s| 0.147    | 1.00x   |
+| 2         | 25.6 s| 0.128    | 1.15x   |
+| 4         | 24.1 s| 0.121    | 1.22x   |
+| 8         | 23.8 s| 0.119    | 1.24x   |
+
+Eight times the ranks buys 24 %, i.e. about 15 % parallel efficiency. At this
+problem size the direct solve is dominated by work that does not distribute, so
+**one rank is the sensible default**; add ranks only when the mesh is large
+enough that memory, not time, is the constraint.
+
+**Always set `OMP_NUM_THREADS`.** The build uses `-fopenmp`, so if it is unset
+each MPI rank may spawn as many threads as it likes; several ranks on one node
+then oversubscribe badly. `runInfo.json` records `omp_threads_per_rank = 0` when
+it was unset, precisely so this is visible after the fact.
+
 ### Scaling with mesh size
 
-Comparing the two `test.bp8.qdc` rows, which differ only in resolution:
+Comparing two `test.bp8.qdc` runs that differ only in resolution:
 
 | `dx`   | elements | s / step | peak RSS |
 |--------|----------|----------|----------|
@@ -272,21 +294,14 @@ Comparing the two `test.bp8.qdc` rows, which differ only in resolution:
 | 25 m   | 64 000   | 0.810    | 1.23 GB  |
 
 5x the elements costs about 4.1x the time per step and 5.2x the memory, so over
-this range both are close to linear in element count.
-
-Extrapolating to `bp8.qdc.gs.10` at `dx = 10 m` -- roughly 640 000 elements,
-10x the `dx = 25 m` case -- suggests order 8 s per step and order 12 GB on 2
-ranks, i.e. something like 12 hours for the ~5200 steps of the 30-day
-benchmark. Treat that as an order-of-magnitude estimate from two data points,
-not a measurement: *```EQquasi```* solves with a direct sparse factorization
-(*MUMPS*), whose cost does eventually grow faster than the number of unknowns,
-and the trend above may not hold another decade out. Use more MPI ranks, and
-more nodes if memory rather than time becomes the binding constraint.
+this range both are close to linear in element count. Treat any extrapolation
+beyond it as an order-of-magnitude estimate only: *```EQquasi```* solves with a
+direct sparse factorization (*MUMPS*), whose cost eventually grows faster than
+the number of unknowns.
 
 **Measure on an idle machine.** An earlier timing of the `dx = 25 m` case on
 this same hardware gave 1549 s instead of 162.8 s -- a 10x error -- purely
-because the node was under load average ~33 at the time. Check `uptime` before
-trusting any number here.
+because the node was under load average ~33. Check `uptime` first.
 
 ### Reading the numbers
 

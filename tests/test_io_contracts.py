@@ -109,3 +109,33 @@ def test_globaldat_indices_are_within_the_allocated_array():
     over = sorted(i for i in used if i > n)
     assert not over, \
         f"globaldat() indices {over} exceed the allocated first dimension {n}"
+
+
+def test_all_faulting_accumulators_are_initialised():
+    """Uninitialised stack memory leaked into global.dat and the pma printout.
+
+    faulting declares seven automatic accumulator arrays but originally zeroed
+    only three. momrate_arr, momRateVW and ma_bar_ku_arr are written only inside
+    the frictional branch, so every fault node in the creeping / no-slip region
+    contributed whatever was on the stack to sum(momrate_arr) and
+    maxval(ma_bar_ku_arr). The symptom was a constant ~-3.1e304 in global.dat
+    column 3, printed as '-0.3145234+305' because E15.7 cannot hold a three
+    digit exponent.
+
+    The regression oracle cannot catch this: it only compares fault.*.nc.
+    """
+    src = strip_fortran_comments(read("src/faulting.f90"))
+    decl = re.search(r"real \(kind = dp\) :: (ma_bar_ku_arr.*?)\n\n", src, re.S)
+    assert decl, "could not find the accumulator declaration block"
+    declared = set(re.findall(r"(\w+)\(nftnd\(1\)\)", decl.group(1)))
+    assert declared, "no accumulator arrays parsed"
+
+    body = src.split("real (kind = dp) :: ma_bar_ku_arr")[1]
+    initialised = set(re.findall(r"^\s*(\w+)\s*=\s*0\.0d0\s*$", body, re.M))
+
+    missing = declared - initialised
+    assert not missing, (
+        f"these faulting accumulators are never zeroed: {sorted(missing)}. "
+        "Any fault node that skips the frictional branch will contribute "
+        "uninitialised memory to the totals."
+    )

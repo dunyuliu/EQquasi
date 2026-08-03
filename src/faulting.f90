@@ -30,8 +30,18 @@ real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),    momrate_
                     momRateVW(nftnd(1)),     ruptarea_arr(nftnd(1)),    taoruptarea_arr(nftnd(1)),  &
                     slipruptarea_arr(nftnd(1))
 
+! All seven accumulators must be zeroed, not just three. momrate_arr,
+! momRateVW and ma_bar_ku_arr are assigned only inside the frictional branch
+! below, so every fault node in the creeping / no-slip region would otherwise
+! contribute uninitialised stack memory to sum(momrate_arr) and
+! maxval(ma_bar_ku_arr) -- i.e. to global.dat and the pma printout. That is not
+! caught by the regression oracle, which only compares fault.*.nc.
+ma_bar_ku_arr = 0.0d0
+sliprate_arr = 0.0d0
+momrate_arr = 0.0d0
+momRateVW = 0.0d0
 ruptarea_arr = 0.0d0
-taoruptarea_arr = 0.0d0 
+taoruptarea_arr = 0.0d0
 slipruptarea_arr = 0.0d0
 do ift = 1, ntotft
     do i=1,nftnd(ift)    !just fault nodes

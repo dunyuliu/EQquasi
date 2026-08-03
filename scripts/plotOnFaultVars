@@ -7,7 +7,12 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
 import os, glob, re, imageio
-from pdf2image import convert_from_path
+try:
+    from pdf2image import convert_from_path
+except ImportError:
+    # Only referenced by a commented-out branch of generate_gif(); a hard import
+    # made the entire post-processing workflow fail where it is not installed.
+    convert_from_path = None
 from user_defined_params import par
 
 #
@@ -16,6 +21,26 @@ r = 10e6 # half range to show stresses in Pa.
 mn = par.init_norm # initial normal stress
 ms = -mn*par.fric_rsf_r0 # initial mean shear stress for plotting.
 md = 0 # initial mean shear dip stress
+
+def read_global_dat(fname):
+  # Skip '#' headers and any non-numeric field-name lines. bp == 8 writes both.
+  rows = []
+  for line in open(fname):
+    line = line.strip()
+    if not line or line.startswith('#'):
+      continue
+    try:
+      rows.append([float(v) for v in line.split()])
+    except ValueError:
+      continue
+  return np.array(rows)
+
+def peak_slip_rate(b):
+  # bp == 8 writes log10(max slip rate) in column 2, as the benchmark asks.
+  # Every other bp writes it linearly. Return (linear, log10) for both.
+  if getattr(par, 'bp', 0) == 8:
+    return 10.0**b[:,1], b[:,1]
+  return b[:,1], np.log10(b[:,1])
 
 def plot_fault(fname):
   a = xr.open_dataset(fname)
@@ -27,7 +52,7 @@ def plot_fault(fname):
   state        = a.state_variable 
   state2       = a.state_normal
 
-  b = np.loadtxt('global.dat')
+  b = read_global_dat('global.dat')
   cumulativeTime = b[:,0] 
   secondToDayConst = 24*60*60
   secondToYearConst = 365*24*60*60
@@ -73,20 +98,21 @@ def plot_fault(fname):
   ax23.set_ylabel('')
 
   ax31 = fig1.add_subplot(3,3,7)
-  ax31.plot(b[:,1])
-  ax31.plot(nstep-1,b[nstep-1,1],'ro',markersize=10)
+  vlin, vlog = peak_slip_rate(b)
+  ax31.plot(vlin)
+  ax31.plot(nstep-1,vlin[nstep-1],'ro',markersize=10)
   ax31.set_xlabel('Time Steps')
   ax31.set_ylabel('Peak Slip Rate (m/s)')
 
   ax31 = fig1.add_subplot(3,3,8)
-  ax31.plot(np.log10(b[:,1]))
-  ax31.plot(nstep-1,np.log10(b[nstep-1,1]),'ro',markersize=10)
+  ax31.plot(vlog)
+  ax31.plot(nstep-1,vlog[nstep-1],'ro',markersize=10)
   ax31.set_xlabel('Time Steps')
   ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
 
   ax31 = fig1.add_subplot(3,3,9)
-  ax31.plot(cumulativeTimeInDays, np.log10(b[:,1]))
-  ax31.plot(cumulativeTimeInDays[nstep-1],np.log10(b[nstep-1,1]),'ro',markersize=10)
+  ax31.plot(cumulativeTimeInDays, vlog)
+  ax31.plot(cumulativeTimeInDays[nstep-1],vlog[nstep-1],'ro',markersize=10)
   ax31.set_xlabel('Time in Days')
   ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
 

@@ -14,7 +14,7 @@ par.mode = 1
 
 # model_domain (in meters)
 par.fxmin, par.fxmax = -500, 500
-par.fymin, par.fymax = -500, 500
+par.fymin, par.fymax = -2000, 2000 # wide enough that the 2*dymax far-field band does not reach the fault at dx = 50 m
 par.fzmin, par.fzmax = -500, 500
 
 # creeping zone bounaries.
@@ -26,7 +26,7 @@ par.dx = 50.0e0 # cell size, spatial resolution (coarsened from bp7.qdc.a.10's 1
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
-par.enlarging_ratio = 1.0e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
+par.enlarging_ratio = 1.2e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
 # Isotropic material propterty.
 # Vp, Vs, Rou

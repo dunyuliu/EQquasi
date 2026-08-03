@@ -33,6 +33,7 @@ jobs:
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$PATH
         export PATH=$(pwd)/scripts:$PATH 
+        set -o pipefail   # otherwise tee's exit status masks testAll.py's
         python3 testAll.py 2>&1 | tee testRunLog.txt
         
     - name: Print log

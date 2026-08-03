@@ -2,12 +2,10 @@
 
 # SCEC SEAS benchmark BP8-QD-GS (aging law), 50 m, +/-500 m cube.
 #
-# THIS IS A REGRESSION SMOKE TEST, NOT A PHYSICS RESULT. At dx = 50 m the
-# far-field band is 2*dymax = 2*min(12*dx, 3 km) = 1200 m, wider than the 500 m
-# half-width, so every element outside the fault band is tagged as boundary and
-# the mesh has effectively no interior. It runs fast and deterministically,
-# which is what a regression case needs. For BP8 physics use bp8.qdc.gs.10,
-# where dx = 10 m gives 2*dymax = 240 m and the cube is well posed.
+# Regression smoke test: fast and deterministic, 8000 elements. Not a physics
+# result -- 50 m cells put the Gaussian source L_inj = 50 m on a single cell,
+# and the section 4.3 profiles carry 17 columns where the description asks for
+# 81 at 10 m spacing. For BP8 physics use bp8.qdc.gs.10.
 # Quasi-dynamic fluid injection in 3D: a planar fault in a homogeneous whole
 # space, velocity-strengthening rate-and-state friction everywhere, driven
 # purely by the pore pressure change from an injection at the fault centre.

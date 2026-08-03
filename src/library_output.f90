@@ -35,7 +35,7 @@ subroutine output_onfault_st
                 ! benchmark description.
                 write(51,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
                 write(51,'(A)') '# code=EQquasi'
-                write(51,'(A)') '# version=1.3.3'
+                write(51,'(A)') '# version='//EQQUASI_VERSION
                 write(51,'(A)') '# modeler=D.Liu'
                 write(51,'(A)') '# date='//trim(adjustl(runDate))
                 write(51,'(A,E15.7,A)') '# element_size=', dx, ' m'
@@ -190,7 +190,7 @@ subroutine output_globaldat
         open(1113,file='global.dat',form='formatted',status='unknown')
             write(1113,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
             write(1113,'(A)') '# code=EQquasi'
-            write(1113,'(A)') '# version=1.3.3'
+            write(1113,'(A)') '# version='//EQQUASI_VERSION
             write(1113,'(A)') '# modeler=D.Liu'
             write(1113,'(A)') '# date='//trim(adjustl(runDate))
             write(1113,'(A,E15.7,A)') '# element_size=', dx, ' m'
@@ -336,7 +336,7 @@ subroutine write_one_profile(fname, colDesc, fieldName, axisName, iline, n, dat)
         write(9101,'(A)') '# author=D.Liu'
         write(9101,'(A)') '# date='//trim(adjustl(runDate))
         write(9101,'(A)') '# code=EQquasi'
-        write(9101,'(A)') '# code_version=1.3.3'
+        write(9101,'(A)') '# code_version='//EQQUASI_VERSION
         write(9101,'(A,E15.7,A)') '# element_size=', dx, ' m'
         write(9101,'(A)') '# Row #1 = '//trim(axisName)//' (m) with two zeros first'
         write(9101,'(A)') '# Column #1 = Time (s)'
@@ -446,7 +446,7 @@ subroutine output_run_metadata(solverTime, factorTime)
     open(9302, file = 'runInfo.json', form = 'formatted', status = 'unknown')
         write(9302,'(A)') '{'
         write(9302,'(A)')      '  "code": "EQquasi",'
-        write(9302,'(A)')      '  "version": "1.3.3",'
+        write(9302,'(A)')      '  "version": "'//EQQUASI_VERSION//'",'
         write(9302,'(A,I0,A)') '  "benchmark_id": ', bp, ','
         write(9302,'(A)')      '  "run_timestamp": "'//trim(timeStamp)//'",'
         write(9302,'(A)')      '  "host": "'//trim(hostName)//'",'

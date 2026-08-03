@@ -122,3 +122,34 @@ def test_readme_lists_netcdf4_dependency():
     """case.setup imports netCDF4 on line 6; the dependency list omitted it."""
     assert "netCDF4" in read("README.md"), \
         "scripts/case.setup imports netCDF4, so the README must list it"
+
+
+def test_case_setup_checks_the_fault_interface_helper_exit_status():
+    """os.system's return code was ignored, so a crashed helper looked like success.
+
+    case_input/test.bp5.qdc.dip90 sets par.insertFaultType = 1, which makes
+    case.setup shell out to generateFaultInterface. That script imports
+    matplotlib. On CI the apt-installed matplotlib went to the system Python
+    while actions/setup-python provided a different interpreter, so the import
+    failed, the helper died, case.setup reported success anyway, and the run
+    produced no output at all -- surfacing much later as a missing
+    fault.00101.nc rather than as a setup error.
+    """
+    src = strip_python_comments(read("scripts/case.setup"))
+    assert "generateFaultInterface" in src
+    assert "waitstatus_to_exitcode" in src or "check_call" in src or "check_output" in src, (
+        "case.setup must check generateFaultInterface's exit status; ignoring it "
+        "turns a hard failure into a case that looks set up and then runs with "
+        "no fault geometry"
+    )
+
+
+def test_ci_installs_matplotlib_into_the_pip_environment():
+    """apt's python3-matplotlib is invisible to the setup-python interpreter."""
+    wf = read(".github/workflows/test.yml")
+    pip_lines = [l for l in wf.splitlines() if "pip install" in l]
+    assert pip_lines, "no pip install line in the workflow"
+    assert any("matplotlib" in l for l in pip_lines), (
+        "generateFaultInterface imports matplotlib, so it must be pip-installed "
+        "into the interpreter actions/setup-python provides, not only apt-installed"
+    )

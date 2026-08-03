@@ -208,7 +208,17 @@ def _main_func(description):
   estimate_HPC_resource()
   netcdf_write_on_fault_vars()
   if par.insertFaultType>0:
-      os.system('./generateFaultInterface')
+      # Check the exit status. This used to be ignored, so when
+      # generateFaultInterface failed -- e.g. matplotlib missing from the
+      # active interpreter -- case.setup reported success, the case looked
+      # complete, and the run silently produced no output at all.
+      rc = os.system('./generateFaultInterface')
+      if os.waitstatus_to_exitcode(rc) != 0:
+          raise SystemExit(
+              'case.setup: generateFaultInterface failed (exit '
+              f'{os.waitstatus_to_exitcode(rc)}). par.insertFaultType='
+              f'{par.insertFaultType} requires it to produce the fault '
+              'interface; without it the simulation has no geometry to run.')
 
 if __name__ == "__main__":
     _main_func(__doc__)

@@ -182,6 +182,42 @@ Two caveats on the comparison itself:
     implementation follows eq. (22)/(25) and normalizes the source weights
     discretely so that they sum to exactly 1.
 
+### Elastic domain size does not matter here
+
+The whole space is truncated by a finite box, so the obvious worry is that the
+box is too small. Measured, at `dx = 50 m`, extending the half-width equally in
+x, y and z:
+
+| half-width | elements | peak log10 V     | peak moment rate | slip     |
+|------------|----------|------------------|------------------|----------|
+| 500 m      |    8 000 | -6.377 @ 0.84 d  | 1.03e9 N/s       | 42.76 mm |
+| 1000 m     |   64 000 | -6.377 @ 0.84 d  | 9.32e8 N/s       | 42.33 mm |
+
+Eight times the elements leaves peak slip rate unchanged to three decimals and
+slip within 1 %. The fault is locked outside `Omega_f` at +/-400 m anyway, so
+the locked collar -- not the mesh boundary -- sets the compliance, and there is
+no benefit in paying for a larger box at this resolution.
+
+### The time-step factor xi can be loosened
+
+`xi` is the Lapusta et al. (2009) safety factor in `dtev = xi * Dc / V_max`
+(`par.xi`). BP5 uses 0.015; BP7 and BP8 use 0.05. At `dx = 50 m`, 4000 steps
+each:
+
+| xi   | wall   | simulated time reached | peak log10 V | peak moment rate | slip     |
+|------|--------|------------------------|--------------|------------------|----------|
+| 0.05 | 9m22s  |  6.03 d                | -6.377       | 1.029e9          | 42.76 mm |
+| 0.1  | 9m22s  | 17.00 d                | -6.376       | 1.032e9          | 42.74 mm |
+| 0.2  | 9m27s  | 22.33 d                | -6.374       | 1.032e9          | 42.74 mm |
+
+Same wall clock, 3.7x more simulated time, and the answers agree to 0.003 log
+units in peak slip rate, 0.3 % in moment rate and 0.05 % in slip. For BP8 at
+this resolution `xi = 0.2` is essentially free, cutting a 30-day run from about
+20 000 steps to about 5 500.
+
+Note this was measured at `dx = 50 m`. A finer mesh resolves faster transients,
+so re-check before assuming it carries to `dx = 10 m`.
+
 ### Full 30-day run and discrete mass conservation
 
 `test.bp8.qdc` run to the benchmark's full `t_f = 30 days` (5185 steps at

@@ -1,6 +1,13 @@
 #! /usr/bin/env python3
 
-# SCEC SEAS benchmark BP8-QD-GS (aging law), 50 m on-fault resolution (smoke test).
+# SCEC SEAS benchmark BP8-QD-GS (aging law), 50 m, +/-500 m cube.
+#
+# THIS IS A REGRESSION SMOKE TEST, NOT A PHYSICS RESULT. At dx = 50 m the
+# far-field band is 2*dymax = 2*min(12*dx, 3 km) = 1200 m, wider than the 500 m
+# half-width, so every element outside the fault band is tagged as boundary and
+# the mesh has effectively no interior. It runs fast and deterministically,
+# which is what a regression case needs. For BP8 physics use bp8.qdc.gs.10,
+# where dx = 10 m gives 2*dymax = 240 m and the cube is well posed.
 # Quasi-dynamic fluid injection in 3D: a planar fault in a homogeneous whole
 # space, velocity-strengthening rate-and-state friction everywhere, driven
 # purely by the pore pressure change from an injection at the fault centre.
@@ -19,7 +26,7 @@ par.mode = 1
 
 # model_domain (in meters)
 par.fxmin, par.fxmax = -500.0, 500.0
-par.fymin, par.fymax = -2000.0, 2000.0
+par.fymin, par.fymax = -500.0, 500.0
 par.fzmin, par.fzmax = -500.0, 500.0
 
 # Frictional / fluid domain Omega_f. Half-length l_f = 400 m. Outside of it the
@@ -31,7 +38,7 @@ par.dx = 50.0e0 # cell size, spatial resolution. Coarse, for a fast smoke test.
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
-par.enlarging_ratio = 1.2e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
+par.enlarging_ratio = 1.0e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
 
 # Isotropic material propterty.
 # Vp, Vs, Rou. mu = rou*vs^2 = 32.04 GPa, matching Table 1.

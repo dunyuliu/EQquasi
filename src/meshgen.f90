@@ -11,7 +11,7 @@ subroutine meshgen
     real(kind=dp)::tmp1,tmp2
     integer (kind=4)::nxuni,nyuni,nzuni    
     real(kind=dp)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
-            xmin1,xmax1,ymin1,ymax1,zmin1
+            xmin1,xmax1,ymin1,ymax1,zmin1,yfar_lo,yfar_hi
     real (kind = dp), allocatable, dimension(:) :: xlinet,ylinet,zlinet,xline,yline,zline
     integer (kind = 4), allocatable, dimension(:,:) :: plane1,plane2
     integer (kind = 4), allocatable, dimension(:,:,:,:) :: fltrc    
@@ -110,6 +110,9 @@ subroutine meshgen
         ylinet(iy)=ylinet(iy-1)+ystep
     enddo
     ymax1=ylinet(nyt)
+    ! Outer two element layers in y, used below to tag far-field elements.
+    yfar_lo = ylinet(min(3, nyt))
+    yfar_hi = ylinet(max(nyt-1, 1))
     !Z
     zstep=dz
     zcoor=fltxyz(1,3,1)+dx
@@ -497,11 +500,17 @@ subroutine meshgen
                     endif    
                     !if((center(2)<(ylinet(1)+30.0d3)).or.(center(2)>(ylinet(nyt)-30.0d3))) then
                     ! Locate far field elements by ycoor. Assign et = 3. 
-                    if (ycoor < ymin1 + 2.0d0*dymax .or. ycoor > ymax1 - 2.0d0*dymax) then
-                        ! Never overwrite a fault element. When the model is thin
-                        ! in y relative to 2*dymax the far-field band can cover the
-                        ! whole mesh; without this guard every fault element would
-                        ! be retagged, leaving all fault nodes with zero mass.
+                    ! Far-field band = the outer two element layers, taken from
+                    ! the actual mesh. It used to be 2*dymax, but dymax is a
+                    ! CELL SIZE cap, min(12*dx, 3 km), not a distance. Using it
+                    ! as one assumes the mesh actually contains cells that
+                    ! coarse; where it does -- BP5 at dx = 4 km reaches the 3 km
+                    ! cap -- the two forms agree exactly. Where it does not, the
+                    ! band is meaningless: at dx = 50 m in a +/-500 m box it
+                    ! spanned 1200 m against a 500 m half-width and tagged the
+                    ! entire mesh as boundary.
+                    if (ycoor <= yfar_lo + tol .or. ycoor >= yfar_hi - tol) then
+                        ! Never overwrite a fault element.
                         if (et(nelement) /= 2) et(nelement)=3!Regular boundaries, essential boundary treatment.
                         ! open(1003,file='boundelem.txt',form='formatted',status='unknown',position='append')
                             ! write(1003,'(1x,i10,3e18.7e4)') nelement,center(1),center(2),center(3)                        
@@ -611,13 +620,16 @@ subroutine report_element_types
 
     yhalf = 0.5d0 * (ymax - ymin)
 
-    if (2.0d0*dymax >= yhalf .and. me == 0) then
+    ! The far-field band is now the outer two element layers, so the meaningful
+    ! check is whether anything is left between it and the fault.
+    if (n1 == 0 .and. me == 0) then
         write(*,*) '========================= MESH WARNING ============================='
-        write(*,*) '= The far-field band is comparable to the model half-width in y.   ='
-        write(*,'(X,A,E15.7,A)') '=   dymax = min(12*dx, 3 km) = ', dymax, ' m'
-        write(*,'(X,A,E15.7,A)') '=   2*dymax                  = ', 2.0d0*dymax, ' m'
-        write(*,'(X,A,E15.7,A)') '=   model half-width in y    = ', yhalf, ' m'
-        write(*,*) '= Reduce dx, or widen ymin/ymax, so that 2*dymax < half-width.     ='
+        write(*,*) '= No interior elements: every element is either fault-adjacent or  ='
+        write(*,*) '= far-field boundary. The model is too thin in y to have an        ='
+        write(*,*) '= interior, so its elastic response is not meaningful.             ='
+        write(*,'(X,A,E15.7,A)') '=   model half-width in y = ', yhalf, ' m'
+        write(*,'(X,A,E15.7,A)') '=   cell size dx          = ', dx, ' m'
+        write(*,*) '= Widen ymin/ymax, or reduce dx.                                   ='
         write(*,*) '==================================================================='
     endif
 

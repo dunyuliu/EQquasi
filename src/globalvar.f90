@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.4.2'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.4.3'
 
     integer, parameter :: dp = selected_real_kind(15,307) ! precision of double precision
     real (kind=dp) :: pi = 3.14159265358979323846d0

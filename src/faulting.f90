@@ -145,10 +145,9 @@ do ift = 1, ntotft
                 tdip0         = (mslav * fvd(6,2,1) - mmast * fvd(6,1,1)) / mtotl + fdfault    
                 tnrm0         = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
 
-                ! bp8: effective normal stress is reduced by the pore pressure change,
-                ! sigma_bar = sigma_bar_0 - p. tnrm0 is negative in compression and
-                ! fric(6,:,:) holds p >= 0, matching the creeping branch below.
-                if (bp == 8) tnrm0 = min(tnrm0 + fric(6,i,ift), 0.0d0)
+                ! sigma_bar = sigma_bar_0 - p. tnrm0 is negative in compression
+                ! and fric(6,:,:) holds p >= 0.
+                if (bp == 8) tnrm0 = tnrm0 + fric(6,i,ift)
 
                 ! Nucleation
                 if (bp == 7 .and. icstart == 1) then
@@ -168,6 +167,16 @@ do ift = 1, ntotft
                         tnrm0 = max_norm
                     endif
                 endif 
+                ! Effective normal stress must stay compressive. Applies to every
+                ! benchmark, not just bp == 8: whatever drives it -- pore pressure,
+                ! normal-stress changes on a non-planar fault, anything added later
+                ! -- a non-compressive sigma_bar means the fault is fully unclamped
+                ! and the rate-and-state balance tau = f*sigma_bar has no solution.
+                ! Clamping it to zero instead, as this used to do, hands the Newton
+                ! solve a vanishing normal stress; it returns NaN and then silently
+                ! corrupts every subsequent station, profile and global.dat row.
+                call check_effective_normal(tnrm0, i, ift, isn)
+
                 ! fric(41,i,ift) is abs(KU)
                 fric(41,i,ift)= sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
                 ttao0         = sqrt(tstk0 * tstk0 + tdip0 * tdip0)        
@@ -373,12 +382,9 @@ do ift = 1, ntotft
         ! !---3.4.2: LOADING BOTTOM & SIDES AT A FIXED SLIDING RATE    
                 !tstk0 = 2.585534683723515d7/2.0d0
                 tdip0 = 0.0d6
-                tnrm = init_norm ! -25.0d6 for bp5. No change for creeping region. 
-                if((tnrm+fric(6,i,ift))>0) then
-                    tnrm0 = 0.0d0
-                else
-                    tnrm0 = tnrm+fric(6,i,ift)
-                endif
+                tnrm = init_norm ! -25.0d6 for bp5. No change for creeping region.
+                tnrm0 = tnrm + fric(6,i,ift)
+                call check_effective_normal(tnrm0, i, ift, isn)
                 ! shear stress tstk0 at steady state.
                 call rsf_rd(tstk0, tnrm0, fric(9,i,ift), fric(10,i,ift), fric(13,i,ift), fric(12,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
                 
@@ -554,3 +560,40 @@ subroutine nucleation1(xtmp, ztmp, dtao)
     dtao       = nucdtao0*G1*G2
 
 end subroutine
+
+! check_effective_normal stops the run if the effective normal stress is no
+! longer compressive.
+!
+! Zero effective normal stress means the pore pressure has met the ambient
+! effective normal stress and the fault is fully unclamped. The quasi-dynamic
+! rate-and-state balance tau = f(V,theta)*sigma_bar has no solution there, so
+! there is nothing meaningful to continue with. This is reachable with the
+! literal SEAS BP8 parameters under the Peaceman well source: eq. (25) of the
+! benchmark description gives 25.3 MPa at the equivalent radius by day 2 at
+! dx = 50 m, and 44 MPa by t_off at dx = 10 m, against sigma_bar_0 = 25 MPa.
+! A point source in 2D is logarithmically singular, so this gets worse, not
+! better, as the mesh is refined.
+subroutine check_effective_normal(tnrm0, i, ift, isn)
+
+    use globalvar
+    implicit none
+
+    real (kind = dp), intent(in) :: tnrm0
+    integer (kind = 4), intent(in) :: i, ift, isn
+
+    if (tnrm0 < 0.0d0) return
+
+    write(*,*) '===================================================================='
+    write(*,*) '= EFFECTIVE NORMAL STRESS IS NO LONGER COMPRESSIVE                 ='
+    write(*,*) '= The fault is fully unclamped and rate-and-state has no solution. ='
+    write(*,'(X,A,E15.7,A)')  '=   time              = ', time, ' s'
+    write(*,'(X,A,2E15.7,A)') '=   node x, z         = ', x(1,isn), x(3,isn), ' m'
+    write(*,'(X,A,E15.7,A)')  '=   sigma_bar         = ', tnrm0/1.0d6, ' MPa'
+    write(*,'(X,A,E15.7,A)')  '=   pore pressure p   = ', fric(6,i,ift)/1.0d6, ' MPa'
+    write(*,'(X,A,E15.7,A)')  '=   sigma_bar_0       = ', fric(7,i,ift)/1.0d6, ' MPa'
+    write(*,*) '= Clamping this to zero would return NaN from the Newton solve and  ='
+    write(*,*) '= silently corrupt every later output row, so the run stops here.   ='
+    write(*,*) '===================================================================='
+    stop 508
+
+end subroutine check_effective_normal

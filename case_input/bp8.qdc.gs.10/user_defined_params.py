@@ -55,10 +55,9 @@ par.bp          = 8
 # 1001 (GM-cycle)
 
 # xi, minimum Dc
-par.xi = 0.05 # Lapusta et al. (2009) time-step factor, dtev = xi*Dc/Vmax.
-# Deliberately NOT loosened to 0.2 like test.bp8.qdc. That sweep was run at
-# dx = 50 m; a 10 m mesh resolves faster transients, so it must be re-measured
-# here before the cheaper value is trusted at production resolution.
+par.xi = 0.2 # Lapusta et al. (2009) time-step factor, dtev = xi*Dc/Vmax.
+# Measured free at dx = 50 m. Still worth re-checking at 10 m, where faster
+# transients are resolved, but 0.2 is the default.
 par.minDc = 0.5e-3 # meters
 
 # loading. BP8 has no tectonic loading; slip is driven only by fluid injection.

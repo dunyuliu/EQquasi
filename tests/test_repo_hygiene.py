@@ -123,3 +123,22 @@ def test_declared_version_matches_a_git_tag():
         f"{sorted(tags)}). Either tag this release, bump the declared version, "
         f"or mark it {v}-dev while it is unreleased."
     )
+
+
+def test_generated_launchers_pin_openmp_threads():
+    """Unset OMP_NUM_THREADS lets each rank spawn unbounded threads.
+
+    The build uses -fopenmp. With the variable unset, several MPI ranks on one
+    node oversubscribe it badly -- a load average of 62 on 64 cores was observed
+    from eight ranks. Measured MPI scaling is only 1.24x for 8 ranks, so threads
+    buy nothing at this problem size and the launcher should pin them.
+    """
+    src = read("scripts/case.setup")
+    launchers = [b for b in src.split("def create_") if "f.write" in b]
+    pinning = [b for b in launchers if "OMP_NUM_THREADS" in b]
+    assert len(pinning) >= 3, (
+        "run.sh and the batch scripts should all export OMP_NUM_THREADS; "
+        f"only {len(pinning)} launcher(s) do"
+    )
+    assert "${OMP_NUM_THREADS:-1}" in src, \
+        "pin to 1 by default but let the caller override"

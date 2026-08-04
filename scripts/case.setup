@@ -110,6 +110,7 @@ def create_batch_script():
         f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
         f.write("#SBATCH --mail-type=begin" + "\n")
         f.write("#SBATCH --mail-type=end" + "\n")
+        f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
         f.write("  module load mumps"     + "\n")
         # Executable part.
         f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
@@ -135,6 +136,10 @@ def create_batch_script():
 def create_run_sh():
     # Function to create batch script used by HPC system.
     with open("run.sh", "w") as f:
+        # Pin OpenMP threads. Left unset, each MPI rank spawns as many threads
+        # as it likes and several ranks oversubscribe a node badly; measured
+        # scaling is only 1.24x for 8 ranks, so threads buy nothing here.
+        f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
         # Executable part.
         f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
         f.write("do" + "\n")
@@ -169,6 +174,7 @@ def create_batch_script_cycle():
         f.write("#SBATCH --mail-type=begin"         + "\n")
         f.write("#SBATCH --mail-type=end"           + "\n")
         # Executable part.
+        f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
         f.write("  module load mumps"               + "\n")
         f.write("  read i < currentcycle.txt"       + "\n")
         f.write("# fetch input files from /eqquasi" + "\n")

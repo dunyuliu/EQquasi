@@ -55,7 +55,10 @@ par.bp          = 8
 # 1001 (GM-cycle)
 
 # xi, minimum Dc
-par.xi = 0.05 # xi used to limit variable time step size. See Lapusta et al. (2009).
+par.xi = 0.05 # Lapusta et al. (2009) time-step factor, dtev = xi*Dc/Vmax.
+# Deliberately NOT loosened to 0.2 like test.bp8.qdc. That sweep was run at
+# dx = 50 m; a 10 m mesh resolves faster transients, so it must be re-measured
+# here before the cheaper value is trusted at production resolution.
 par.minDc = 0.5e-3 # meters
 
 # loading. BP8 has no tectonic loading; slip is driven only by fluid injection.

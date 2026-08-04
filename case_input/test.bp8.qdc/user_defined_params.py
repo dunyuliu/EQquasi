@@ -60,7 +60,10 @@ par.bp          = 8
 # 1001 (GM-cycle)
 
 # xi, minimum Dc
-par.xi = 0.05 # xi used to limit variable time step size. See Lapusta et al. (2009).
+par.xi = 0.2 # Lapusta et al. (2009) time-step factor, dtev = xi*Dc/Vmax.
+# Measured at dx = 50 m: xi = 0.05, 0.1 and 0.2 cost the same wall clock for
+# 4000 steps but reach 6.0, 17.0 and 22.3 days of simulated time, and agree to
+# 0.003 log units in peak slip rate, 0.3% in moment rate and 0.05% in slip.
 par.minDc = 0.5e-3 # meters
 
 # loading. BP8 has no tectonic loading; slip is driven only by fluid injection.

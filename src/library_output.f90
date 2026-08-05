@@ -73,7 +73,14 @@ subroutine output_onfault_st
                     dlog10(1.0d-20),                       & ! log10 V_zero
                     fric(8,k,1)/1.d6, 0.0d0,               & ! tau^0, tau_3
                     0.0d0, 0.0d0, 0.0d0,                   & ! p, q_2, q_3
-                    dlog10(max(fric(11,k,1)/max(fric(46,k,1),1.0d-30), 1.0d-30))
+                    ! Read the state the solver actually starts from, fric(20),
+                    ! rather than recomputing Dc/V_init. Those agree only when
+                    ! tau^0 is the steady-state stress at V_init; when it is not,
+                    ! recomputing here prints a t = 0 state inconsistent with the
+                    ! rest of the series and hides an over-determined initial
+                    ! condition. Matches fltsta(4), set from fric(20) in
+                    ! faulting.f90.
+                    dlog10(max(fric(20,k,1), 1.0d-30))
                 do j = 1,it-1
                     write(51,'(E22.14,10E15.7)') fltsta(1,j,i),   & ! Time in sec
                         fltsta(5,j,i),                            & ! slip_2, along strike

@@ -56,6 +56,36 @@ To install *```EQquasi```* with local installation of *MUMPS* on Ubuntu, try
 ./install.eqquasi.sh -m local
 ```
 
+### Rebuilding just the Fortran
+
+`cd src && make` on its own does **not** work: the makefile selects all of its
+flags from `MACHINE`, so with it unset `FFLAGS` is empty, gfortran applies its
+default 132-column limit and the build fails with `Line truncated` errors in
+`globalvar.f90` that look like corrupted source. Both variables are required:
+
+```
+EQQUASIROOT=/path/to/EQquasi MACHINE=utig make -C src
+mv src/eqquasi bin/
+```
+
+The makefile now stops with an explicit message when `MACHINE` is unset.
+
+Two host-specific traps on the utig workstation, both handled automatically but
+worth knowing when a build breaks:
+
+  - **`dmumps_struc.h` not found.** The `utig` target takes MUMPS headers from
+    `${EQQUASIROOT}/mumps/build/_deps/mumps-src/include`. That directory holds
+    fetched *source*, and pruning it leaves the built `.a` libraries in place
+    while making the tree unbuildable. The header must match the libraries: check
+    the version in `mumps/build/CMakeCache.txt` against the `MUMPS x.y.z` string
+    in the header, since a mismatched `DMUMPS_STRUC` layout corrupts memory
+    silently rather than failing to link.
+  - **`cannot find -lscalapack-openmpi`.** This MUMPS is built with parallel-root
+    support and needs ScaLAPACK/BLACS, but the Debian package is not installed on
+    every host. The makefile falls back to AMD AOCL with an embedded rpath. Link
+    the AOCL *shared* library; its `libscalapack.a` is not built `-fPIC` and
+    cannot go into a PIE executable.
+
 To activate bash environment variables $EQQUASIROOT and add executable scripts to $PATH,
 ```
 source install.eqquasi.sh

@@ -190,11 +190,43 @@ def check_runinfo(rep, d):
              f"{info.get('seconds_per_step')} s/step")
 
 
+# Zip naming convention for BP8 submissions:
+#
+#     <modeler>_<code>-<version>-<resolution>.zip
+#     e.g. dliu_eqquasi-1-4-3-10m.zip
+#
+# Version dots become dashes so everything after the underscore is one
+# dash-separated token, which is what the DET platform shows as the dataset
+# name. Resolution is the on-fault cell size in metres. Both are read from
+# runInfo.json, so the label always matches the binary and mesh that produced
+# the data rather than whatever was typed on the command line.
+ZIP_RE = re.compile(r"^[\w.]+_[\w]+-[\w-]+-\d+m\.zip$")
+
+
+def auto_zip_name(d, modeler):
+    path = os.path.join(d, "runInfo.json")
+    if not os.path.exists(path):
+        raise SystemExit("--zip auto needs runInfo.json in the result directory")
+    info = json.load(open(path))
+    ver = str(info.get("version", "unknown")).replace(".", "-")
+    dx = info.get("element_size_m")
+    if dx is None:
+        raise SystemExit("runInfo.json has no element_size_m")
+    code = str(info.get("code", "eqquasi")).lower()
+    return f"{modeler}_{code}-{ver}-{int(round(dx))}m.zip"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("result_dir")
     ap.add_argument("--zip", dest="zipname", default=None,
-                    help="also build an upload zip, e.g. Liu_1.0.zip")
+                    help="build an upload zip. Pass 'auto' to derive the name "
+                         "from runInfo.json using the project convention.")
+    ap.add_argument("--modeler", default="dliu",
+                    help="modeler tag used by --zip auto (default dliu)")
+    ap.add_argument("--both-station-names", action="store_true",
+                    help="also write each station file without its .txt "
+                         "extension, as section 4.1 lists them")
     args = ap.parse_args()
 
     d = args.result_dir
@@ -223,16 +255,28 @@ def main():
         return 1
 
     if args.zipname:
-        if not re.match(r"^[\w.-]+_[\w.-]+\.zip$", os.path.basename(args.zipname)):
-            print(f"zip name should follow nameOfModeler_version.zip "
-                  f"(letters, digits, dots, hyphens), got {args.zipname}")
+        name = args.zipname
+        if name == "auto":
+            name = os.path.join(os.path.dirname(os.path.abspath(d)),
+                                auto_zip_name(d, args.modeler))
+        if not ZIP_RE.match(os.path.basename(name)):
+            print("zip name must follow <modeler>_<code>-<version>-<res>m.zip, "
+                  "e.g. dliu_eqquasi-1-4-3-10m.zip; got "
+                  f"{os.path.basename(name)}")
             return 1
-        with zipfile.ZipFile(args.zipname, "w", zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(name, "w", zipfile.ZIP_DEFLATED) as z:
             for fname in STATIONS + ["global.dat"] + PROFILES:
                 z.write(os.path.join(d, fname), fname)
+                # Section 4.1 lists station names without an extension while
+                # section 4.3 lists profiles with one. Shipping both spellings
+                # costs nothing and removes the ambiguity.
+                if args.both_station_names and fname in STATIONS:
+                    z.write(os.path.join(d, fname), fname[:-4])
+        args.zipname = name
         size = os.path.getsize(args.zipname) / 1e6
-        print(f"wrote {args.zipname} ({size:.1f} MB, "
-              f"{len(STATIONS) + 1 + len(PROFILES)} files)")
+        with zipfile.ZipFile(args.zipname) as z:
+            nfiles = len(z.namelist())
+        print(f"wrote {args.zipname} ({size:.1f} MB, {nfiles} files)")
 
     print("Ready to upload." if not rep.warnings else
           "Ready to upload, but read the warnings above first.")

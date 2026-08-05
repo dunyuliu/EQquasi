@@ -130,3 +130,31 @@ def test_run_summary_is_printed_to_the_log():
     assert "RUN SUMMARY" in src, "the run should print a summary block to stdout"
     for token in ("MPI ranks", "Elements", "Seconds per step", "Time steps completed"):
         assert token in src, f"run summary should report {token}"
+
+
+# --- submission zip naming ------------------------------------------------
+
+def test_zip_naming_convention_is_enforced_and_derived():
+    """<modeler>_<code>-<version>-<resolution>m.zip, e.g. dliu_eqquasi-1-4-3-10m.zip
+
+    Derived from runInfo.json rather than typed, so the label always matches the
+    binary and mesh that produced the data. An earlier hand-typed name silently
+    disagreed with the code version that ran.
+    """
+    src = read("scripts/checkBP8Submission")
+    assert "def auto_zip_name" in src, "the name should be derivable, not only typed"
+    assert "ZIP_RE" in src, "the convention should be enforced by a pattern"
+    import re as _re
+    m = _re.search(r'ZIP_RE = re\.compile\(r"([^"]+)"\)', src)
+    assert m, "could not find the zip name pattern"
+    pat = _re.compile(m.group(1))
+    assert pat.match("dliu_eqquasi-1-4-3-10m.zip")
+    assert pat.match("dliu_eqquasi-1-4-0-dev-50m.zip")
+    assert not pat.match("Liu_1.0.zip"), "the old loose form should no longer pass"
+    assert not pat.match("dliu_eqquasi-1-4-3.zip"), "resolution is required"
+
+
+def test_station_files_can_ship_both_spellings():
+    """Section 4.1 lists stations without an extension; 4.3 lists profiles with one."""
+    src = read("scripts/checkBP8Submission")
+    assert "--both-station-names" in src

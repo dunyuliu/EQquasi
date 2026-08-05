@@ -218,6 +218,31 @@ this resolution `xi = 0.2` is essentially free, cutting a 30-day run from about
 Note this was measured at `dx = 50 m`. A finer mesh resolves faster transients,
 so re-check before assuming it carries to `dx = 10 m`.
 
+### Submitting to the CRESCENT DET platform
+
+```
+checkBP8Submission <result_dir> --zip auto --both-station-names
+```
+
+validates a result directory against the benchmark description and writes the
+upload zip. Naming convention:
+
+```
+<modeler>_<code>-<version>-<resolution>m.zip
+e.g. dliu_eqquasi-1-4-3-10m.zip
+```
+
+Version and resolution are read from `runInfo.json`, not typed, so the dataset
+label on the platform always matches the binary and mesh that produced the data.
+Version dots become dashes so everything after the underscore is one
+dash-separated token, which is what the platform displays.
+
+`--both-station-names` writes each station file twice, with and without the
+`.txt` extension. Section 4.1 of the description lists station names without an
+extension (`fltst_strk+000dp+000`) while section 4.3 lists profiles with one
+(`slip_2_depth.dat`); the platform routes purely on filename, so shipping both
+removes the ambiguity at no cost.
+
 ### Full 30-day run and discrete mass conservation
 
 `test.bp8.qdc` run to the benchmark's full `t_f = 30 days` (5185 steps at

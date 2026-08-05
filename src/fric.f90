@@ -123,7 +123,13 @@ SUBROUTINE rate_state_slip_law(V2,psi,fricsgl,xmu,dxmudv)
   fss   = fLV
   !fss = fw + (fLV - fw) / ((1.0d0 + (V2/Vw)**8)**0.125d0)
   psiss = A * dlog(2.0d0 * V0 / V2 * dsinh(fss/A))
-  psi   = psiss + (sta - psiss) * dexp(-V2*dt/L) 
+  ! Advance over dtev1, the adaptive step actually taken, not dt. dt is the
+  ! fixed CFL minimum from read_input.f90 (~4e-3 s at dx = 50 m) while dtev1 is
+  ! the quasi-dynamic step (500 s here), so using dt advanced the state some
+  ! 10^5 times too slowly: psi stayed pinned at its initial value for the whole
+  ! run and the fault locked at V ~ 1e-18 m/s. rate_state_ageing_law above
+  ! already uses dtev1; this is the same integration over the same step.
+  psi   = psiss + (sta - psiss) * dexp(-V2*dtev1/L)
 
 end SUBROUTINE rate_state_slip_law
 

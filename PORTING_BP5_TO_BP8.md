@@ -172,6 +172,19 @@ normalisation and the boundary condition together.
 `σ̄ = 25 MPa`, `θ = Dc/V_init`, the regularised law gives `V = 6.54e-11 m/s`;
 the code reports **6.55e-11**.
 
+> **This check was hollow — the trap to avoid when porting a case file.** It
+> verified the solver against an input that was itself wrong. `τ⁰`, `V_init`
+> and `θ⁰` are not independent; eq. (9) ties them together, so a case may
+> prescribe **two**. The BP5 case sets `θ⁰ = Dc/V_init` and *computes* `τ⁰`
+> from it (`shear_steady_state()`, `case_input/bp5.qdc.2000/
+> user_defined_params.py:103-108`). Porting to BP8 we kept BP5's `θ⁰` line and
+> swapped its computed `τ⁰` for Table 1's 14.6 MPa. Each line looks right in
+> isolation; together they over-determine the state and the solver silently
+> started at `V = 6.5e-11 m/s`, 65× `V_init`, on a fault 1.67 MPa weaker than
+> specified. Reproducing a number you derived from the same wrong inputs proves
+> only that the arithmetic is consistent. Fixed in v1.4.6; guarded by
+> `tests/test_initial_conditions.py`.
+
 **Known bias, first order in `dx`.** Check 2 matches the *discrete* area
 `(17·50)² = 722 500 m²`, not the continuum `800² = 640 000 m²`. Pressure lives
 at nodes and every node carries a full `dx²` cell including boundary nodes, so

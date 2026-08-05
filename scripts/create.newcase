@@ -4,10 +4,14 @@ import xml.etree.ElementTree as ET
 import shutil, sys, os
 
 def case_copy(src, dst):
-    # copy files from src to dst
+    # copy files from src to dst. Skip directories: shutil.copy raises on them,
+    # and a stray __pycache__/ in case_input or scripts is enough to abort case
+    # creation entirely.
     filenames = os.listdir(src)
     for f in filenames:
         srcf = src + '/' + f
+        if os.path.isdir(srcf):
+            continue
         shutil.copy(srcf, dst)
 
 def _main_func(description):

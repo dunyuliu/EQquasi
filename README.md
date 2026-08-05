@@ -305,6 +305,18 @@ The friction solve was checked independently of the fluid: with
 regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports
 `6.55e-11 m/s` at the first output step.
 
+**That check was hollow, and results before v1.4.6 are affected.** It confirmed
+that the solver inverts the friction law correctly, but never asked whether
+`6.54e-11 m/s` was the value the benchmark asks for. It is not: BP8 prescribes
+`V_init = 1e-12 m/s`. `tau0`, `V_init` and `theta0` are linked by eq. (9), so
+only two may be prescribed. The cases prescribed all three -- `theta0 =
+Dc/V_init` was carried over from the BP5 case, which *derives* `tau0` from it --
+and the pair that actually reached the solver implied a start 65x faster than
+`V_init`, on a fault 1.67 MPa weaker than specified. From v1.4.6 `theta0` is
+derived from `tau0` and `V_init` (4.02e11 s, not 5.00e8 s); `tests/
+test_initial_conditions.py` fails if any BP8 case over-determines the three
+again.
+
 Computational performance
 ---------------------
 

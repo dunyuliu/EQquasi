@@ -369,6 +369,18 @@ subroutine netcdf_read_on_fault(infile)
             fric(8,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,7)! shear
             fric(7,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,8)! norm
             fric(20, (i-1)*nzt+j, 1) = on_fault_vars(i,j,9)! state variable
+            ! The aging law (friclaw 3) carries theta, a time in seconds. The
+            ! slip law (friclaw 4) carries psi = f* + b*ln(V* theta / Dc), which
+            ! is dimensionless and of order f*. Compsets specify the initial
+            ! state as theta, following SEAS BP8 eq. (30), so convert it here
+            ! rather than handing the slip law a number 10^9 times too large:
+            ! exp(psi/a) then overflows and the Newton solve returns NaN on the
+            ! very first step.
+            if (friclaw == 4) then
+                fric(20, (i-1)*nzt+j, 1) = fric(13, (i-1)*nzt+j, 1) &
+                    + fric(10, (i-1)*nzt+j, 1) * dlog(fric(12, (i-1)*nzt+j, 1) &
+                    * on_fault_vars(i,j,9) / fric(11, (i-1)*nzt+j, 1))
+            endif
             fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
             fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
         enddo 

@@ -237,11 +237,16 @@ label on the platform always matches the binary and mesh that produced the data.
 Version dots become dashes so everything after the underscore is one
 dash-separated token, which is what the platform displays.
 
-`--both-station-names` writes each station file twice, with and without the
-`.txt` extension. Section 4.1 of the description lists station names without an
-extension (`fltst_strk+000dp+000`) while section 4.3 lists profiles with one
-(`slip_2_depth.dat`); the platform routes purely on filename, so shipping both
-removes the ambiguity at no cost.
+All BP8 output files use the `.dat` extension, **including the station time
+series** (`fltst_strk+000dp+000.dat`). The platform routes purely on filename
+and processes `.dat` for every file type; a station file written as `.txt` is
+silently ignored, so the section 4.3 profiles render and the section 4.1 time
+series do not, with no error reported anywhere. Section 4.1 of the description
+lists station names bare, without any extension, which is what led us to `.txt`
+in the first place -- the platform's own `processed_files` listing is the
+authority.
+
+BP5 and BP7 keep `.txt`, which is their existing convention.
 
 ### Full 30-day run and discrete mass conservation
 

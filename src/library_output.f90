@@ -23,7 +23,15 @@ subroutine output_onfault_st
                     write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/1000.d0)
                     write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j))/1000.d0)
                 endif
-                open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')     
+                ! The CRESCENT DET platform routes on filename and processes
+                ! .dat for every file type, station time series included --
+                ! confirmed against its processed_files listing. .txt is
+                ! silently ignored.
+                if (bp == 8) then
+                    open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.dat',status='unknown')
+                else
+                    open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
+                endif
             endif
             !write(51,*) '# This is the file header'
             !write(51,*) '# problem = San-Ti'

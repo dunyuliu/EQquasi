@@ -19,8 +19,9 @@ import sys
 import zipfile
 
 # Section 4.1: nine on-fault stations, x2 and x3 in {-200, 0, 200} m.
+# The DET platform processes .dat for every file type, stations included.
 STATIONS = [
-    f"fltst_strk{s:+04d}dp{d:+04d}.txt"
+    f"fltst_strk{s:+04d}dp{d:+04d}.dat"
     for s in (-200, 0, 200) for d in (-200, 0, 200)
 ]
 
@@ -225,8 +226,7 @@ def main():
     ap.add_argument("--modeler", default="dliu",
                     help="modeler tag used by --zip auto (default dliu)")
     ap.add_argument("--both-station-names", action="store_true",
-                    help="also write each station file without its .txt "
-                         "extension, as section 4.1 lists them")
+                    help=argparse.SUPPRESS)  # kept so old commands do not break
     args = ap.parse_args()
 
     d = args.result_dir
@@ -267,11 +267,8 @@ def main():
         with zipfile.ZipFile(name, "w", zipfile.ZIP_DEFLATED) as z:
             for fname in STATIONS + ["global.dat"] + PROFILES:
                 z.write(os.path.join(d, fname), fname)
-                # Section 4.1 lists station names without an extension while
-                # section 4.3 lists profiles with one. Shipping both spellings
-                # costs nothing and removes the ambiguity.
-                if args.both_station_names and fname in STATIONS:
-                    z.write(os.path.join(d, fname), fname[:-4])
+                # Station files are .dat like everything else; no alternate
+                # spelling is needed. The flag is accepted and ignored.
         args.zipname = name
         size = os.path.getsize(args.zipname) / 1e6
         with zipfile.ZipFile(args.zipname) as z:

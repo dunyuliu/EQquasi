@@ -158,3 +158,18 @@ def test_station_files_can_ship_both_spellings():
     """Section 4.1 lists stations without an extension; 4.3 lists profiles with one."""
     src = read("scripts/checkBP8Submission")
     assert "--both-station-names" in src
+
+
+def test_bp8_station_files_use_the_dat_extension():
+    """The DET platform routes on filename and processes .dat for every type.
+
+    Station files were written as .txt, matching BP5/BP7 convention, and the
+    platform silently ignored them: profiles rendered, time series did not, with
+    no error anywhere. Confirmed against the platform's own processed_files
+    listing, which shows fltst_strk+000dp+000.dat alongside global.dat and the
+    section 4.3 profiles.
+    """
+    src = strip_fortran_comments(read(LIBOUT))
+    body = src.split("subroutine output_onfault_st")[1].split("end subroutine")[0]
+    assert "'.dat'" in body, "bp == 8 station files must be written as .dat"
+    assert "bp == 8" in body

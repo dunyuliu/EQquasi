@@ -378,6 +378,7 @@ Measured in EQquasi, dx = 50 m, `xi` = 0.2, 4000 steps:
 |---------|----------------|-------------------|--------------------------|
 | A (`work/c3.xi0.2`)     | 42.74 mm at 22.3 d | -6.374 @ 0.85 d | 6.542e-11 m/s |
 | B (`work/bp8.equil50`)  | 23.97 mm at 23.2 d | -6.748 @ 1.64 d | 1.000e-12 m/s |
+| C (`work/bp8.icfix50`)  | 37.30 mm at 22.5 d | -6.395 @ 2.37 d | 1.000e-12 m/s |
 
 The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
 23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (28)

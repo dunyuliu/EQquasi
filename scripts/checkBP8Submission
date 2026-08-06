@@ -118,6 +118,15 @@ def check_stations(rep, d):
         elif len(rows[0]) != 11:
             rep.err(f"{fname}: {len(rows[0])} columns, expected 11")
         else:
+            # Section 4.1: "The lines must appear in order of increasing time."
+            times = [r[0] for r in rows]
+            if any(b <= a for a, b in zip(times, times[1:])):
+                rep.err(f"{fname}: time column is not strictly increasing")
+            # "keep the total number of time steps in the data file on the
+            # order of 10^4-10^5". Advisory, so warn rather than fail.
+            if not (5.0e3 <= len(rows) <= 2.0e5):
+                rep.warn(f"{fname}: {len(rows)} rows; section 4.1 asks for the "
+                         f"order of 1e4-1e5 time steps")
             rep.good(f"{fname}: {len(rows)} rows x 11 fields")
 
 
@@ -164,13 +173,31 @@ def check_profiles(rep, d):
         if len(coords) < 2:
             rep.err(f"{fname}: fewer than two spatial nodes")
             continue
+        # Section 4.3 is explicit: "nodes with a spacing of 10 m (exactly)
+        # along depth (x2 = 0, -400m <= x3 <= 400m) or along strike
+        # (-400m <= x2 <= 400m, x3 = 0)". That is 81 nodes, and the platform
+        # matches profiles by shape, so treat deviations as errors.
         spacing = coords[1] - coords[0]
         if abs(spacing - 10.0) > 1e-6:
-            rep.warn(f"{fname}: node spacing is {spacing:g} m; the description "
-                     f"asks for exactly 10 m ({len(coords)} columns, expected 81)")
+            rep.err(f"{fname}: node spacing is {spacing:g} m; section 4.3 "
+                    f"requires exactly 10 m")
+        if len(coords) != 81:
+            rep.err(f"{fname}: {len(coords)} spatial nodes, expected 81 "
+                    f"(-400 to 400 m at 10 m)")
+        if abs(coords[0] + 400.0) > 1e-6 or abs(coords[-1] - 400.0) > 1e-6:
+            rep.err(f"{fname}: spatial extent is {coords[0]:g} to {coords[-1]:g} m, "
+                    f"expected -400 to 400 m")
+        if ncol != len(coords) + 2:
+            rep.err(f"{fname}: {ncol} columns, expected {len(coords)+2} "
+                    f"(t, max_slip_rate, then {len(coords)} nodes)")
         times = [r[0] for r in rows[1:]]
         if any(b <= a for a, b in zip(times, times[1:])):
             rep.err(f"{fname}: time column is not strictly increasing")
+        # "To keep the file on the order of 10s of MB, Nt should be on the
+        # order of 1,000."
+        if not (2.0e2 <= len(times) <= 1.0e4):
+            rep.warn(f"{fname}: {len(times)} time rows; section 4.3 suggests "
+                     f"Nt on the order of 1,000")
         rep.good(f"{fname}: {len(rows)-1} time rows x {len(coords)} nodes")
 
 

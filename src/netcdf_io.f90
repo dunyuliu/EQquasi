@@ -381,6 +381,11 @@ subroutine netcdf_read_on_fault(infile)
                     + fric(10, (i-1)*nzt+j, 1) * dlog(fric(12, (i-1)*nzt+j, 1) &
                     * on_fault_vars(i,j,9) / fric(11, (i-1)*nzt+j, 1))
             endif
+            ! Snapshot the initial state. The t = 0 row of the station files is
+            ! written when the file is created, which happens at the end of the
+            ! run, so reading fric(20) there reports the *final* state under the
+            ! label t = 0. Keep the initial value so that row is honest.
+            fric(48, (i-1)*nzt+j, 1) = fric(20, (i-1)*nzt+j, 1)! initial state
             fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
             fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
         enddo 
@@ -484,6 +489,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
             fric(34, (i-1)*nzt+j, 1) = on_fault_vars(i,j,10)! vxs
             fric(35, (i-1)*nzt+j, 1) = on_fault_vars(i,j,11)! vys
             fric(36, (i-1)*nzt+j, 1) = on_fault_vars(i,j,12)! vzs
+            fric(48, (i-1)*nzt+j, 1) = fric(20, (i-1)*nzt+j, 1)! state at cycle start
             fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
             !fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
         enddo 

@@ -386,6 +386,15 @@ do ift = 1, ntotft
                 tnrm0 = tnrm + fric(6,i,ift)
                 call check_effective_normal(tnrm0, i, ift, isn)
                 ! shear stress tstk0 at steady state.
+                ! NOTE: outside the frictional region this is the steady-state
+                ! stress for load_slip_rate, NOT the traction the elastic solve
+                ! produced. For bp8 load_slip_rate is V_zero = 1e-20, so it
+                ! evaluates to a constant far below tau^0 and shows up in
+                ! diagnostic output as an apparent uniform stress drop at
+                ! |x| > l_f. It is a placeholder for a locked region, not a
+                ! boundary artefact -- do not read it as one. Section 4.3
+                ! profiles span exactly +-400 m, and the branch above takes
+                ! x = +-l_f inclusive, so submitted output never contains it.
                 call rsf_rd(tstk0, tnrm0, fric(9,i,ift), fric(10,i,ift), fric(13,i,ift), fric(12,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
                 
                 v_trial = load_slip_rate

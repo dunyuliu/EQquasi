@@ -316,36 +316,85 @@ the boundary.
 
 Physical behaviour over the full run, at the centre station:
 
+From `work/bp8.prod10`, dx = 10 m, `xi` = 0.2, literal specification initial
+condition (see "The initial condition is over-determined" below):
+
 | quantity                        | value                              |
 |---------------------------------|------------------------------------|
-| pore pressure at shutoff        | 13.54 MPa (`sigma_bar` 25 -> 11.5) |
-| peak pore pressure              | 13.63 MPa at 4.16 d, i.e. at `t_off` |
-| peak slip rate                  | 6.5e-9 m/s at 8.6 d                |
-| total slip at 30 d              | 5.58 mm                            |
+| peak pore pressure              | 13.051 MPa at `t_off` = 4.17 d     |
+| minimum effective normal stress | 11.949 MPa (52 % reduction)        |
+| peak slip rate                  | 3.2e-7 m/s (log10 -6.489) at 0.80 d |
+| secondary slip-rate peak        | log10 -6.804 at 4.37 d             |
+| total slip at 30 d              | 45.04 mm                           |
 
-Effective normal stress is reduced by 54 % at its lowest but never reaches
-zero. Note the slip rate peaks about 4.5 days *after* injection stops. That is
-the expected signature of a slip front that keeps propagating once injection
-ends, with the growing slipping patch loading the centre elastically, but it
-has **not** been verified against independent results -- BP8 was released in
-July 2026 and no community comparison exists yet.
+Effective normal stress never reaches zero.
+
+An earlier revision of this section reported a peak at 8.6 d and read it as "the
+expected signature of a slip front that keeps propagating once injection ends".
+That reading was wrong. The dominant peak is at **0.80 d**, well *before*
+shutoff, and it is an artefact of the over-determined initial condition: the
+patch starts 1.67 MPa overstressed and sheds that stress as an early aseismic
+transient. The physical response to shutoff is the *secondary* peak at 4.37 d.
+Removing the overstress removes the early peak entirely and leaves a maximum of
+about log10 -6.80, which is close to the amplitude of the secondary peak here.
 
 The friction solve was checked independently of the fluid: with
 `tau0 = 14.6 MPa` on `sigma_bar = 25 MPa` and `theta = Dc/V_init`, the
 regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports
 `6.55e-11 m/s` at the first output step.
 
-**That check was hollow, and results before v1.4.6 are affected.** It confirmed
-that the solver inverts the friction law correctly, but never asked whether
-`6.54e-11 m/s` was the value the benchmark asks for. It is not: BP8 prescribes
-`V_init = 1e-12 m/s`. `tau0`, `V_init` and `theta0` are linked by eq. (9), so
-only two may be prescribed. The cases prescribed all three -- `theta0 =
-Dc/V_init` was carried over from the BP5 case, which *derives* `tau0` from it --
-and the pair that actually reached the solver implied a start 65x faster than
-`V_init`, on a fault 1.67 MPa weaker than specified. From v1.4.6 `theta0` is
-derived from `tau0` and `V_init` (4.02e11 s, not 5.00e8 s); `tests/
-test_initial_conditions.py` fails if any BP8 case over-determines the three
-again.
+That check was narrower than it looked: it confirms the solver inverts the
+friction law correctly, but not that `6.54e-11 m/s` is the value the benchmark
+wants. It is not what eq. (28) asks for, and that leads to the following.
+
+### The initial condition is over-determined
+
+BP8 specifies three quantities that one equation already ties together. Eq. (13)
+relates `tau`, `V` and `theta`, so a case may prescribe **two** of them. The
+benchmark gives all three:
+
+| source    | quantity                                    |
+|-----------|---------------------------------------------|
+| Table 1   | `tau_init` = 14.6 MPa, `sigma_bar_0` = 25 MPa |
+| eq. (28)  | `V(t=0)` = `V_init` = 1e-12 m/s             |
+| eq. (30)  | `theta_0` = `D_RS/V_init` = 5.0e8 s         |
+
+They are mutually inconsistent. With eq. (30)'s `theta_0`, eq. (13) gives
+`f = 0.51707`, hence `tau = 12.93 MPa`, not the 14.6 MPa of Table 1. Equivalently,
+holding Table 1's `tau_init` and eq. (30)'s `theta_0` forces `V(0) = 6.54e-11 m/s`,
+65x the `V_init` that eq. (28) prescribes.
+
+Three readings are possible, each sacrificing exactly one constraint:
+
+| reading | keeps | sacrifices | slip @ 30 d |
+|---------|-------|------------|-------------|
+| **A** literal | Table 1 `tau`, eq. (30) `theta` | eq. (28) `V` | ~45 mm |
+| **B** equilibrated | eq. (28) `V`, eq. (30) `theta`; `tau_0` -> 12.93 MPa | Table 1 `tau_init` | ~24 mm |
+| **C** derived state | eq. (28) `V`, Table 1 `tau`; `theta_0` -> 4.02e11 s | eq. (30) `theta` | ~37 mm |
+
+The choice changes the answer by **1.8x**, so it is not a detail. Reading A is
+what the cases ship, because it takes Table 1 and section 3's eq. (30) at face
+value. Reading B satisfies both equations of section 3 and adjusts only a Table 1
+number, and it is the one that matches the `taehoKim_ref` comparison (~21 mm,
+with the slip-rate maximum near `t_off` rather than at 0.8 d). This has been
+raised with the benchmark authors; until they resolve it, `tests/
+test_initial_conditions.py` pins reading A and records the size of the
+inconsistency so it cannot drift unnoticed.
+
+Note also that **Table 1 omits Poisson's ratio**, which the whole-space elastic
+kernel depends on. That is a second specification gap worth raising.
+
+### What the discrepancy is *not*
+
+An independent whole-space spectral boundary-integral solver, written from the
+PDF and carrying no boundaries at all, reproduces the FEM under the identical
+initial condition: **43.7 mm against 45.0 mm**, peak `log10 Vmax` -6.450 against
+-6.489. Domain truncation therefore does **not** explain the gap, despite
+section 6 of the description warning that it might. Also excluded, with
+measurements: the radiation damping term (`faulting.f90:242` gives
+`vs*rho/2 = 4.6244e6 Pa s/m` = `mu/(2 cs)`, applied per eq. 8), slip-magnitude
+versus `slip_2` confusion, and spatial resolution (the BEM is converged to 0.5 %
+across dx = 50/25/10 m).
 
 Computational performance
 ---------------------

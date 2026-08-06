@@ -193,10 +193,20 @@ on the asymptotic pressure at `dx = 50 m`, ~2.5 % at `dx = 10 m`. Not covered by
 the second-order result above, which is measured before the front reaches the
 boundary.
 
-**Not verified.** Slip rate peaks ~4.5 days *after* injection stops. That is the
-expected signature of a slip front that keeps propagating while the growing
-slipping patch loads the centre elastically — but BP8 was released in July 2026
-and no community comparison exists. Expected is not verified.
+**Wrong, and instructive.** An earlier revision said: "Slip rate peaks ~4.5 days
+*after* injection stops. That is the expected signature of a slip front that
+keeps propagating while the growing slipping patch loads the centre elastically."
+
+The dominant peak is at **0.80 d**, *before* shutoff, and it is not physical: the
+over-determined initial condition starts the whole patch 1.67 MPa overstressed
+and it sheds that as an early aseismic transient. The genuine shutoff response is
+a secondary peak at 4.37 d. See "The initial condition is over-determined" in
+`README.md`.
+
+The lesson is the sentence that ended the old text — "Expected is not verified."
+Having written that, I then let a plausible narrative stand in for a check for
+several days. A result that agrees with a story you already believe is the one
+that most needs an independent measurement, not the one that needs it least.
 
 ## 7. What the port exposed in existing code
 

@@ -411,6 +411,33 @@ inconsistency so it cannot drift unnoticed.
 Note also that **Table 1 omits Poisson's ratio**, which the whole-space elastic
 kernel depends on. That is a second specification gap worth raising.
 
+### BP8-QD-S (slip law, `friclaw = 4`) is partially working
+
+Two defects have been fixed: the initial state is converted from `theta` to
+`psi` on read (`netcdf_io.f90`), without which `exp(psi/a)` overflowed and the
+first Newton solve returned NaN; and the state was being advanced over `dt`, the
+fixed CFL minimum, instead of `dtev1`, the adaptive step -- about 1e5 too slow,
+which froze `psi` completely.
+
+What now works: the slip field is smooth and symmetric, and at the centre
+station `psi` freezes at ~0.629 once slip decays, i.e. `theta = (Dc/V*) *
+exp((psi - f*)/b)` ~ 9.1e3 s, `log10 theta` ~ 3.96. That frozen state is the
+signature of the slip law and it is close to what `taehoKim_ref` reports
+(flat at `log10 theta` ~ 3), which is the main evidence that the reference is
+**QD-S rather than QD-A**. Under the literal initial condition the slip law gives
+42.78 mm at the centre against the aging law's 42.74 mm, so the evolution law
+barely changes total slip -- it changes the late-time state and creep.
+
+What does not work: `global.dat`'s `Vmax` column shows erratic excursions to
+`log10 V` ~ -3.7 that are absent under the aging law. They are not Newton
+failures (zero non-convergence warnings) and they leave no trace in the slip
+field. `sliprate_arr` is filled at `faulting.f90:93` from the kinematic nodal
+velocity difference *before* the friction solve, rather than from the solved
+`v_trial` used for the moment rate, and the slip law does not damp those
+transients the way the aging law does. **So for `friclaw = 4`, station and
+profile output are usable and `global.dat` is not.** Not chased further because
+our submission is QD-A; it must be fixed before submitting a QD-S result.
+
 ### What the discrepancy is *not*
 
 An independent whole-space spectral boundary-integral solver, written from the

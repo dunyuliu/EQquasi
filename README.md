@@ -384,6 +384,21 @@ The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
 23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (28)
 requires -- A begins 65x faster.
 
+`scripts/plotICReadings.py` overlays the three (`work/ic_readings.png`). Two
+things are visible there that the endpoint numbers hide:
+
+  - **The readings differ only in the first ~4 days.** Shear stress and state at
+    the centre station converge onto a common curve shortly after `t_off`; all
+    the divergence is the early transient. That is consistent with the
+    over-determination being the whole story for the spread between A, B and C.
+  - **Our slip arrests at `t_off`; the reference's does not.** All three readings
+    plateau once injection stops -- pressure diffuses away, `sigma_bar` recovers,
+    the fault re-locks -- whereas `taehoKim_ref` keeps accruing slip gradually
+    out to 30 d. So reading B matching ~21-24 mm is a match in *amplitude*, not
+    in time history, even though the two pore pressure curves agree closely.
+    That residual is **not** explained yet and should not be presented as
+    agreement.
+
 The choice changes the answer by **1.8x**, so it is not a detail. Reading A is
 what the cases ship, because it takes Table 1 and section 3's eq. (30) at face
 value. Reading B satisfies both equations of section 3 and adjusts only a Table 1

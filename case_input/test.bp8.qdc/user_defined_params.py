@@ -117,13 +117,6 @@ par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids a
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 
-def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
-  # tau^0 and V_init are both prescribed, so the initial state is not free: it
-  # is whatever makes the regularized law return V_init at tau^0. See the
-  # production case bp8.qdc.gs.10 for the full note.
-  psi = a*log(2.0*v0/slip_rate*sinh(tau/(abs(norm)*a)))
-  return (Dc/v0)*exp((psi - r0)/b)
-
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
     par.on_fault_vars[iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
@@ -133,10 +126,10 @@ for ix, xcoor in enumerate(par.fx):
     par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # reference friction f*.
 
     par.on_fault_vars[iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
-    # Initial state consistent with the prescribed tau^0 and V_init.
-    par.on_fault_vars[iz,ix,20] = state_from_stress_and_rate(
-        par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc, par.fric_rsf_v0,
-        par.fric_rsf_r0, par.init_norm, par.init_shear, par.init_slip_rate)
+    # BP8 eq. (30): initial state at steady state with V_init. Prescribed by
+    # the benchmark. See bp8.qdc.gs.10 for a note on the over-determination
+    # between eq. (30) and Table 1's tau_init.
+    par.on_fault_vars[iz,ix,20] = par.fric_rsf_Dc/par.init_slip_rate
     par.on_fault_vars[iz,ix,7]  = par.init_norm  # initial effective normal stress.
     par.on_fault_vars[iz,ix,8]  = par.init_shear # tau^0, prescribed uniformly.
 

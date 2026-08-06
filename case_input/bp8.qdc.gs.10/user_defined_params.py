@@ -111,17 +111,6 @@ par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids a
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 
-def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
-  # tau^0 and V_init are both prescribed by Table 1, so the initial state is
-  # NOT free: it is whatever makes the regularized law (eq. 9) return V_init at
-  # tau^0. Setting theta = Dc/V_init instead -- steady state -- is only correct
-  # when tau^0 happens to be the steady-state stress, which here it is not
-  # (steady state at V_init is 12.93 MPa, Table 1 gives 14.6 MPa). Prescribing
-  # theta independently leaves the fault 1.67 MPa weaker than specified and
-  # starts it at V = 6.5e-11 m/s, 65x V_init.
-  psi = a*log(2.0*v0/slip_rate*sinh(tau/(abs(norm)*a)))
-  return (Dc/v0)*exp((psi - r0)/b)
-
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
     par.on_fault_vars[iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
@@ -131,10 +120,17 @@ for ix, xcoor in enumerate(par.fx):
     par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # reference friction f*.
 
     par.on_fault_vars[iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
-    # Initial state consistent with the prescribed tau^0 and V_init.
-    par.on_fault_vars[iz,ix,20] = state_from_stress_and_rate(
-        par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc, par.fric_rsf_v0,
-        par.fric_rsf_r0, par.init_norm, par.init_shear, par.init_slip_rate)
+    # BP8 eq. (30): the initial state is at steady state with V_init over the
+    # entire fault. This is prescribed by the benchmark, not derived.
+    #
+    # Note that eq. (30) and Table 1 over-determine the initial condition. With
+    # theta = Dc/V_init the regularized law (eq. 13) gives tau = 12.93 MPa,
+    # while Table 1 prescribes tau_init = 14.6 MPa. Both cannot hold. Following
+    # eq. (30) as written means the fault does not start in equilibrium: the
+    # solver's first step is V = 6.54e-11 m/s rather than V_init = 1e-12 m/s.
+    # That is a property of the benchmark specification and is left in place
+    # deliberately -- conformance beats local repair. Raised with the authors.
+    par.on_fault_vars[iz,ix,20] = par.fric_rsf_Dc/par.init_slip_rate
     par.on_fault_vars[iz,ix,7]  = par.init_norm  # initial effective normal stress.
     par.on_fault_vars[iz,ix,8]  = par.init_shear # tau^0, prescribed uniformly.
 

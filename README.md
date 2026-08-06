@@ -366,11 +366,22 @@ holding Table 1's `tau_init` and eq. (30)'s `theta_0` forces `V(0) = 6.54e-11 m/
 
 Three readings are possible, each sacrificing exactly one constraint:
 
-| reading | keeps | sacrifices | slip @ 30 d |
-|---------|-------|------------|-------------|
-| **A** literal | Table 1 `tau`, eq. (30) `theta` | eq. (28) `V` | ~45 mm |
-| **B** equilibrated | eq. (28) `V`, eq. (30) `theta`; `tau_0` -> 12.93 MPa | Table 1 `tau_init` | ~24 mm |
-| **C** derived state | eq. (28) `V`, Table 1 `tau`; `theta_0` -> 4.02e11 s | eq. (30) `theta` | ~37 mm |
+| reading | keeps | sacrifices |
+|---------|-------|------------|
+| **A** literal | Table 1 `tau`, eq. (30) `theta` | eq. (28) `V` |
+| **B** equilibrated | eq. (28) `V`, eq. (30) `theta`; `tau_0` -> 12.9277 MPa | Table 1 `tau_init` |
+| **C** derived state | eq. (28) `V`, Table 1 `tau`; `theta_0` -> 4.02e11 s | eq. (30) `theta` |
+
+Measured in EQquasi, dx = 50 m, `xi` = 0.2, 4000 steps:
+
+| reading | slip at centre | peak `log10 Vmax` | `V` at first solved step |
+|---------|----------------|-------------------|--------------------------|
+| A (`work/c3.xi0.2`)     | 42.74 mm at 22.3 d | -6.374 @ 0.85 d | 6.542e-11 m/s |
+| B (`work/bp8.equil50`)  | 23.97 mm at 23.2 d | -6.748 @ 1.64 d | 1.000e-12 m/s |
+
+The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
+23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (28)
+requires -- A begins 65x faster.
 
 The choice changes the answer by **1.8x**, so it is not a detail. Reading A is
 what the cases ship, because it takes Table 1 and section 3's eq. (30) at face

@@ -79,7 +79,11 @@ par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc = 0.016, 0.010, 0.5e-3
 par.fric_rsf_r0 = 0.6
 par.fric_rsf_v0 = 1e-6
 par.init_slip_rate = 1e-12 # V_init
-par.init_shear = 14.6e6 # tau_init, Pa
+# Table 1 gives tau_init = 14.6 MPa, but section 3 says the reference shear
+# traction is *chosen* so the model starts at a uniform V_init, and eq. (29)
+# fixes theta_0. Those cannot both hold; the prose wins and tau^0 is derived
+# below (12.9277 MPa). Kept only so the discrepancy stays visible and testable.
+par.init_shear_table1 = 14.6e6 # Table 1 tau_init, NOT used. See above.
 
 #####################################
 ##### Fluid injection (bp == 8) #####
@@ -111,6 +115,25 @@ par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids a
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 
+def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
+  # tau^0 at steady state, identical to the BP5 and BP7 compsets. BP8 section 3
+  # says "The initial state AND REFERENCE SHEAR TRACTION on the fault is chosen
+  # so that the model can start with a uniform fault slip rate", so tau^0 is
+  # derived here rather than transcribed from Table 1. eq. (28) only fixes its
+  # direction, tau^0 = tau^0 * V/|V|.
+  #
+  # With eq. (29)'s theta_0 = D_RS/V_init this returns 12.9277 MPa, not the
+  # 14.6 MPa of Table 1. Those two cannot both hold -- see README, "The initial
+  # condition is over-determined". The prose is taken as authoritative and
+  # Table 1's tau_init as stale; the description is visibly derived from BP6 and
+  # still carries BP6 text elsewhere. Raised with the authors.
+  #
+  # rou*vs/2 is eta = mu/(2 cs) = 4.6247e6 Pa s/m, the radiation damping of
+  # eq. (8). At V_init it contributes 4.6e-6 Pa, i.e. nothing, but it is kept so
+  # the expression matches BP5/BP7 exactly.
+  res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
+  return res
+
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
     par.on_fault_vars[iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
@@ -120,19 +143,19 @@ for ix, xcoor in enumerate(par.fx):
     par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # reference friction f*.
 
     par.on_fault_vars[iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
-    # BP8 eq. (30): the initial state is at steady state with V_init over the
-    # entire fault. This is prescribed by the benchmark, not derived.
-    #
-    # Note that eq. (30) and Table 1 over-determine the initial condition. With
-    # theta = Dc/V_init the regularized law (eq. 13) gives tau = 12.93 MPa,
-    # while Table 1 prescribes tau_init = 14.6 MPa. Both cannot hold. Following
-    # eq. (30) as written means the fault does not start in equilibrium: the
-    # solver's first step is V = 6.54e-11 m/s rather than V_init = 1e-12 m/s.
-    # That is a property of the benchmark specification and is left in place
-    # deliberately -- conformance beats local repair. Raised with the authors.
+    # BP8 eq. (29): the initial state is at steady state with V_init over the
+    # entire fault. Prescribed by the benchmark.
     par.on_fault_vars[iz,ix,20] = par.fric_rsf_Dc/par.init_slip_rate
     par.on_fault_vars[iz,ix,7]  = par.init_norm  # initial effective normal stress.
-    par.on_fault_vars[iz,ix,8]  = par.init_shear # tau^0, prescribed uniformly.
+    par.on_fault_vars[iz,ix,8]  = shear_steady_state(par.on_fault_vars[iz,ix,9],
+                                                par.on_fault_vars[iz,ix,10],
+                                                par.on_fault_vars[iz,ix,12],
+                                                par.on_fault_vars[iz,ix,13],
+                                                par.init_slip_rate,
+                                                par.on_fault_vars[iz,ix,7],
+                                                par.on_fault_vars[iz,ix,46],
+                                                par.rou,
+                                                par.vs) # tau^0, derived. See above.
 
 ####################################
 ##### HPC resource allocation ######

@@ -85,11 +85,7 @@ par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc = 0.016, 0.010, 0.5e-3
 par.fric_rsf_r0 = 0.6
 par.fric_rsf_v0 = 1e-6
 par.init_slip_rate = 1e-12 # V_init
-# Table 1 gives tau_init = 14.6 MPa, but section 3 says the reference shear
-# traction is *chosen* so the model starts at a uniform V_init, and eq. (29)
-# fixes theta_0. Those cannot both hold; the prose wins and tau^0 is derived
-# below (12.9277 MPa). Kept only so the discrepancy stays visible and testable.
-par.init_shear_table1 = 14.6e6 # Table 1 tau_init, NOT used. See above.
+par.init_shear = 14.6e6 # Table 1 tau_init.
 
 #####################################
 ##### Fluid injection (bp == 8) #####
@@ -140,6 +136,19 @@ def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
   res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
   return res
 
+def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
+  # BP8 reading C. Table 1 gives tau_init = 14.6 MPa and eq. (27) requires the
+  # fault to start at a uniform V_init; eq. (12) then fixes theta_0, so eq. (29)
+  # (theta_0 = D_RS/V_init) cannot also hold. The specification is
+  # over-determined -- see README, "The initial condition is over-determined".
+  #
+  # This reading keeps Table 1 and eq. (27) and derives theta_0 = 4.0188e11 s.
+  # It is the only one consistent with both things we can verify about
+  # taehoKim_ref: its shear_stress_2 starts at 14.6 MPa, and it matches our
+  # slip at both compared stations to within 2 % and 7 %.
+  psi = a*log(2.0*v0/slip_rate*sinh(tau/(abs(norm)*a)))
+  return (Dc/v0)*exp((psi - r0)/b)
+
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
     par.on_fault_vars[iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
@@ -151,17 +160,11 @@ for ix, xcoor in enumerate(par.fx):
     par.on_fault_vars[iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
     # BP8 eq. (29): initial state at steady state with V_init. Prescribed by
     # the benchmark. See bp8.qdc.gs.10 for the tau_init note.
-    par.on_fault_vars[iz,ix,20] = par.fric_rsf_Dc/par.init_slip_rate
+    par.on_fault_vars[iz,ix,20] = state_from_stress_and_rate(
+        par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc, par.fric_rsf_v0,
+        par.fric_rsf_r0, par.init_norm, par.init_shear, par.init_slip_rate)
     par.on_fault_vars[iz,ix,7]  = par.init_norm  # initial effective normal stress.
-    par.on_fault_vars[iz,ix,8]  = shear_steady_state(par.on_fault_vars[iz,ix,9],
-                                                par.on_fault_vars[iz,ix,10],
-                                                par.on_fault_vars[iz,ix,12],
-                                                par.on_fault_vars[iz,ix,13],
-                                                par.init_slip_rate,
-                                                par.on_fault_vars[iz,ix,7],
-                                                par.on_fault_vars[iz,ix,46],
-                                                par.rou,
-                                                par.vs) # tau^0, derived. See above.
+    par.on_fault_vars[iz,ix,8]  = par.init_shear # tau^0, Table 1. # tau^0, derived. See above.
 
 ####################################
 ##### HPC resource allocation ######

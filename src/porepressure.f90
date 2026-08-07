@@ -27,13 +27,16 @@ subroutine pore_pressure_init
     use globalvar
     implicit none
 
-    integer (kind = 4) :: i, isn
+    integer (kind = 4) :: i, isn, iz
     real (kind = dp)   :: xtmp, ztmp, wsum, re
 
     allocate(pf(nftnd(1)), pfActive(nftnd(1)), pfWt(nftnd(1)))
+    allocate(pfFx(nftnd(1)), pfFz(nftnd(1)))
 
     pf       = 0.0d0
     pfWt     = 0.0d0
+    pfFx     = 1.0d0
+    pfFz     = 1.0d0
     pfActive = 0
     pfWell   = 0
     fluid_pwell = 0.0d0
@@ -57,6 +60,30 @@ subroutine pore_pressure_init
             pfWt(i)     = dexp(-(xtmp*xtmp + ztmp*ztmp) / (2.0d0*fluid_Lgauss**2))
             ! well cell: the fault cell containing the injection point (0,0).
             if (abs(xtmp) < 0.5d0*dx .and. abs(ztmp) < 0.5d0*dx) pfWell = i
+        endif
+    enddo
+
+    ! Mark the boundary of Omega_f and give those nodes half a cell in the
+    ! direction normal to it, a quarter at a corner. Omega_f is the closed
+    ! square [-l_f, l_f]^2, so with N nodes per side the storage area must be
+    ! ((N-1)*dx)^2 = (2*l_f)^2, not (N*dx)^2. Treating every node as a full cell
+    ! stretches Omega_f by dx/2 on each side: 850 m instead of 800 m at
+    ! dx = 50 m, which traps the injected fluid in 12.9 % too much rock and
+    ! leaves the late-time uniform pressure 11.4 % low.
+    do i = 1, nftnd(1)
+        if (pfActive(i) == 0) cycle
+        iz = mod(i-1, nzt) + 1
+        ! neighbour along dip (z) missing or outside Omega_f -> z boundary
+        if (iz == 1 .or. iz == nzt) then
+            pfFz(i) = 0.5d0
+        else
+            if (pfActive(i-1) == 0 .or. pfActive(i+1) == 0) pfFz(i) = 0.5d0
+        endif
+        ! neighbour along strike (x) missing or outside Omega_f -> x boundary
+        if (i <= nzt .or. i + nzt > nftnd(1)) then
+            pfFx(i) = 0.5d0
+        else
+            if (pfActive(i-nzt) == 0 .or. pfActive(i+nzt) == 0) pfFx(i) = 0.5d0
         endif
     enddo
 
@@ -89,7 +116,7 @@ subroutine pore_pressure_update(dtstep)
     implicit none
 
     real (kind = dp), intent(in) :: dtstep
-    real (kind = dp) :: dsub, lap, qinj, src, area, dpw, pe
+    real (kind = dp) :: dsub, lap, lapx, lapz, qinj, src, area, acell, dpw, pe
     real (kind = dp), allocatable :: pnew(:)
     integer (kind = 4) :: i, isub, nsub, iz
 
@@ -116,32 +143,41 @@ subroutine pore_pressure_update(dtstep)
 
             iz = mod(i-1, nzt) + 1
 
-            ! 5-point Laplacian. A neighbour outside Omega_f carries no flux,
-            ! so it simply contributes nothing to the sum.
-            lap = 0.0d0
+            ! Finite-volume 5-point Laplacian on cells of area
+            ! dx^2 * pfFx(i) * pfFz(i). A face on the boundary of Omega_f
+            ! carries no flux and is simply absent; the remaining faces are
+            ! divided by the cell fraction in their own direction. On an edge
+            ! that doubles the single normal-direction term, which is exactly
+            ! the mirrored-ghost-node form of a zero-flux condition. Dropping
+            ! the absent neighbour without rescaling -- what this did before --
+            ! instead models a full cell hanging outside Omega_f.
+            lapz = 0.0d0
+            lapx = 0.0d0
             if (iz > 1) then
-                if (pfActive(i-1) == 1) lap = lap + (pf(i-1) - pf(i))
+                if (pfActive(i-1) == 1) lapz = lapz + (pf(i-1) - pf(i))
             endif
             if (iz < nzt) then
-                if (pfActive(i+1) == 1) lap = lap + (pf(i+1) - pf(i))
+                if (pfActive(i+1) == 1) lapz = lapz + (pf(i+1) - pf(i))
             endif
             if (i > nzt) then
-                if (pfActive(i-nzt) == 1) lap = lap + (pf(i-nzt) - pf(i))
+                if (pfActive(i-nzt) == 1) lapx = lapx + (pf(i-nzt) - pf(i))
             endif
             if (i + nzt <= nftnd(1)) then
-                if (pfActive(i+nzt) == 1) lap = lap + (pf(i+nzt) - pf(i))
+                if (pfActive(i+nzt) == 1) lapx = lapx + (pf(i+nzt) - pf(i))
             endif
-            lap = lap / (dx*dx)
+            lap = (lapx/pfFx(i) + lapz/pfFz(i)) / (dx*dx)
 
-            ! source, Pa/s.
+            ! source, Pa/s, over this node's own cell area so that
+            ! sum_i src_i * A_i is exactly q_inj/(beta*phi*L_fwid).
+            acell = area * pfFx(i) * pfFz(i)
             src = 0.0d0
             if (fluid_src == 1) then
                 ! Gaussian source (GS).
-                src = qinj * pfWt(i) / (fluid_beta * fluid_phi * area * fluid_Lfwid)
+                src = qinj * pfWt(i) / (fluid_beta * fluid_phi * acell * fluid_Lfwid)
             elseif (fluid_src == 2 .and. i == pfWell) then
                 ! Peaceman well (PW): flow from the well into the well cell.
                 src = fluid_WI * (fluid_pwell - pf(i)) &
-                    / (fluid_beta * fluid_phi * area * fluid_Lfwid)
+                    / (fluid_beta * fluid_phi * acell * fluid_Lfwid)
             endif
 
             pnew(i) = pf(i) + dsub * (fluid_alpha * lap + src)

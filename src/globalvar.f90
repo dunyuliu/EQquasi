@@ -102,6 +102,11 @@ MODULE globalvar
     !  > 0  : relax the normal-stress state over this slip distance.
     real (kind=dp) :: fric_pc_L = 0.0d0
     real (kind=dp), allocatable :: pf(:), pfWt(:) ! pore pressure change, Pa; source weights.
+    ! Finite-volume cell fractions for nodes on the boundary of Omega_f: 1/2 on
+    ! an edge, so a corner node carries pfFx*pfFz = 1/4 of a dx^2 cell. Without
+    ! them every node carries a full cell and Omega_f is effectively (N*dx)^2
+    ! rather than (2*l_f)^2 -- 850 m instead of 800 m at dx = 50.
+    real (kind=dp), allocatable :: pfFx(:), pfFz(:)
     integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
 
     ! Section 4.3 of SEAS BP8: slip, shear stress and pore pressure recorded

@@ -25,10 +25,16 @@ which are the ones actually comparable to the reference -- see below.
 **Reading A is much the closer of the two**, at both stations. Reading B, which
 the compsets currently ship, is the worse match -- see "What went wrong" below.
 
-Our slip profile is also more *peaked* than the reference: our A/reference ratio
-grows from 1.18 at the centre to 1.52 at 200 m out, so we concentrate slip near
-the injection point more than the reference does. That shape difference is
-unexplained and is the substantive open question.
+Our slip profile is also **broader** than the reference. Edge/centre ratio,
+`slip(-200,0) / slip(0,0)`:
+
+    taehoKim_ref     0.553
+    ours reading A   0.709
+
+We put relatively more slip out at 200 m than the reference does. That shape
+difference, not the amplitude, is the substantive discrepancy -- and see
+"Elastic domain truncation" in README: it shrinks as the computational box
+grows, so it is at least partly the truncation that section 6 warns about.
 
 ## Station (0, 0)
 
@@ -111,9 +117,16 @@ disagreement that did not exist. The real figure at matched `tau^0` is +18 %.
 
 The invented gap drove an investigation into domain truncation, radiation
 damping, the state evolution law and a rewrite of the initial condition. None
-was the cause. Worse, it led to switching the shipped default from reading A to
-reading B, which made our submission *less* comparable to the reference at both
-stations, not more.
+explained a 1.8x that was never there, and it led to switching the shipped
+default from reading A to reading B, which made our submission *less* comparable
+at both stations, not more.
+
+The irony is that domain truncation was dismissed too early and *is* a genuine
+contributor -- just to the shape, not the amplitude. It was ruled out on the
+centre-station slip and the peak slip rate, which are precisely the quantities
+least sensitive to it. Doubling the box moves the centre by 2.6 % and the edge by
+10.8 %. Ruling a cause out requires measuring the quantity it would actually
+affect.
 
 Two things would have prevented it. Record the station alongside any number read
 off someone else's plot -- a value without its coordinates is not a measurement.

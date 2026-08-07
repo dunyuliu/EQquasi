@@ -390,6 +390,28 @@ The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
 23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (27)
 requires -- A begins 65x faster.
 
+**Reading B is what the compsets ship**, with `tau^0` derived by
+`shear_steady_state()` exactly as in the BP5 and BP7 compsets. Full 30-day
+production test, `work/bp8.test50`, dx = 50 m, aging law, 5184 steps:
+
+| quantity | value |
+|----------|-------|
+| `tau^0` at t = 0 | 12.9277 MPa |
+| `V` at first solved step | 1.0000e-12 m/s, i.e. exactly `V_init` |
+| slip at centre, 30 d | 23.97 mm (reference ~21 mm) |
+| peak `log10 Vmax` | -6.748 at 1.64 d |
+| peak pore pressure | 13.625 MPa, `sigma_bar` minimum 11.375 MPa |
+| final state | `log10 theta` = 6.350 |
+
+Slip is unchanged between 23 d and 30 d, confirming that it arrests shortly
+after `t_off` rather than continuing to accrue.
+
+**A dx = 50 m run is a physics test, never a submission.** Section 4.3 requires
+profile nodes "with a spacing of 10 m (exactly)" from -400 to 400 m, i.e. 81
+nodes; at dx = 50 m there are 17. `checkBP8Submission` rejects it with 20 errors
+for that reason, which is correct -- Table 1 specifies `Delta z` = 10 m and only
+the dx = 10 m run can be uploaded.
+
 `scripts/plotICReadings.py` overlays the three (`work/ic_readings.png`). Two
 things are visible there that the endpoint numbers hide:
 

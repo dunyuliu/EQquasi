@@ -1,0 +1,53 @@
+{
+  "+000dp+000": {
+    "tau0_MPa": 14.6,
+    "V_step1": 1e-12,
+    "slip_mm": 37.308,
+    "p_peak_MPa": 13.6276,
+    "p_late_MPa": 1.6901,
+    "state_t0": 11.604,
+    "state_end": 6.349,
+    "V_peak_log10": -6.576,
+    "V_peak_day": 1.201
+  },
+  "-200dp+000": {
+    "tau0_MPa": 14.6,
+    "V_step1": 1e-12,
+    "slip_mm": 21.992,
+    "p_peak_MPa": 2.8706,
+    "p_late_MPa": 1.688,
+    "state_t0": 11.604,
+    "state_end": 5.431,
+    "V_peak_log10": -6.896,
+    "V_peak_day": 3.193
+  },
+  "+200dp+000": {
+    "tau0_MPa": 14.6,
+    "V_step1": 1e-12,
+    "slip_mm": 21.992,
+    "p_peak_MPa": 2.8706,
+    "p_late_MPa": 1.688,
+    "state_t0": 11.604,
+    "state_end": 5.431,
+    "V_peak_log10": -6.896,
+    "V_peak_day": 3.193
+  },
+  "+000dp+200": {
+    "tau0_MPa": 14.6,
+    "V_step1": 1e-12,
+    "slip_mm": 17.387,
+    "p_peak_MPa": 2.8706,
+    "p_late_MPa": 1.688,
+    "state_t0": 11.604,
+    "state_end": 5.246,
+    "V_peak_log10": -6.912,
+    "V_peak_day": 5.511
+  },
+  "global": {
+    "t_end_d": 30.002,
+    "nsteps": 5301,
+    "peak_Vmax_log10": -6.395,
+    "peak_Vmax_day": 2.373,
+    "peak_moment": 632930000.0
+  }
+}

@@ -100,3 +100,12 @@ def load_case_params(case):
         for p in added:
             if p in sys.path:
                 sys.path.remove(p)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Tag each test with the tier it lives in, so -m unit/contract/... works."""
+    import pathlib as _pl
+    for item in items:
+        tier = _pl.Path(str(item.fspath)).parent.name
+        if tier in ("unit", "contract", "regression", "e2e"):
+            item.add_marker(tier)

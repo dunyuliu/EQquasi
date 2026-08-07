@@ -345,9 +345,15 @@ regularized rate-and-state law gives `V = 6.54e-11 m/s`, and the code reports
 
 That check was narrower than it looked: it confirms the solver inverts the
 friction law correctly, but not that `6.54e-11 m/s` is the value the benchmark
-wants. It is not what eq. (28) asks for, and that leads to the following.
+wants. It is not what eq. (27) asks for, and that leads to the following.
 
 ### The initial condition is over-determined
+
+Equation numbers below follow the **2026-08-06 revision** of the description,
+which dropped the slip law and renumbered accordingly: the regularized friction
+law is now eq. (12) (was 13), `V(0)` is eq. (27) (was 28), and `theta_0` is
+eq. (29) (was 30). That revision did **not** change Table 1 and did **not**
+resolve any of what follows.
 
 BP8 specifies three quantities that one equation already ties together. Eq. (13)
 relates `tau`, `V` and `theta`, so a case may prescribe **two** of them. The
@@ -356,21 +362,21 @@ benchmark gives all three:
 | source    | quantity                                    |
 |-----------|---------------------------------------------|
 | Table 1   | `tau_init` = 14.6 MPa, `sigma_bar_0` = 25 MPa |
-| eq. (28)  | `V(t=0)` = `V_init` = 1e-12 m/s             |
-| eq. (30)  | `theta_0` = `D_RS/V_init` = 5.0e8 s         |
+| eq. (27)  | `V(t=0)` = `V_init` = 1e-12 m/s             |
+| eq. (29)  | `theta_0` = `D_RS/V_init` = 5.0e8 s         |
 
-They are mutually inconsistent. With eq. (30)'s `theta_0`, eq. (13) gives
+They are mutually inconsistent. With eq. (29)'s `theta_0`, eq. (12) gives
 `f = 0.51707`, hence `tau = 12.93 MPa`, not the 14.6 MPa of Table 1. Equivalently,
-holding Table 1's `tau_init` and eq. (30)'s `theta_0` forces `V(0) = 6.54e-11 m/s`,
-65x the `V_init` that eq. (28) prescribes.
+holding Table 1's `tau_init` and eq. (29)'s `theta_0` forces `V(0) = 6.54e-11 m/s`,
+65x the `V_init` that eq. (27) prescribes.
 
 Three readings are possible, each sacrificing exactly one constraint:
 
 | reading | keeps | sacrifices |
 |---------|-------|------------|
-| **A** literal | Table 1 `tau`, eq. (30) `theta` | eq. (28) `V` |
-| **B** equilibrated | eq. (28) `V`, eq. (30) `theta`; `tau_0` -> 12.9277 MPa | Table 1 `tau_init` |
-| **C** derived state | eq. (28) `V`, Table 1 `tau`; `theta_0` -> 4.02e11 s | eq. (30) `theta` |
+| **A** literal | Table 1 `tau`, eq. (29) `theta` | eq. (27) `V` |
+| **B** equilibrated | eq. (27) `V`, eq. (29) `theta`; `tau_0` -> 12.9277 MPa | Table 1 `tau_init` |
+| **C** derived state | eq. (27) `V`, Table 1 `tau`; `theta_0` -> 4.02e11 s | eq. (29) `theta` |
 
 Measured in EQquasi, dx = 50 m, `xi` = 0.2, 4000 steps:
 
@@ -381,7 +387,7 @@ Measured in EQquasi, dx = 50 m, `xi` = 0.2, 4000 steps:
 | C (`work/bp8.icfix50`)  | 37.30 mm at 22.5 d | -6.395 @ 2.37 d | 1.000e-12 m/s |
 
 The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
-23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (28)
+23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (27)
 requires -- A begins 65x faster.
 
 `scripts/plotICReadings.py` overlays the three (`work/ic_readings.png`). Two
@@ -400,7 +406,7 @@ things are visible there that the endpoint numbers hide:
     agreement.
 
 The choice changes the answer by **1.8x**, so it is not a detail. Reading A is
-what the cases ship, because it takes Table 1 and section 3's eq. (30) at face
+what the cases ship, because it takes Table 1 and section 3's eq. (29) at face
 value. Reading B satisfies both equations of section 3 and adjusts only a Table 1
 number, and it is the one that matches the `taehoKim_ref` comparison (~21 mm,
 with the slip-rate maximum near `t_off` rather than at 0.8 d). This has been
@@ -415,8 +421,11 @@ kernel depends on. That is a second specification gap worth raising.
 
 Taeho Kim notified the SEAS community that the slip law has been dropped from
 BP8: "In BP8, only the aging law will be used. This is to reduce the number of
-simulations since we already have two variations of the fluid injection." An
-updated description was circulated. Everything below about `friclaw = 4` is
+simulations since we already have two variations of the fluid injection." The
+updated description has been read. It removes the slip law and renumbers the
+equations after it; Table 1 is unchanged, the over-determined initial condition
+is unchanged, and Poisson's ratio is still absent. Both open specification
+questions therefore still stand. Everything below about `friclaw = 4` is
 therefore **not needed for submission**; it is kept because the two bugs it
 uncovered are real, and because it bears on the open question of what the
 reference actually is.

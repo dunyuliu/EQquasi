@@ -15,6 +15,35 @@ so they can live in git).
 `data/` also carries our **reading A** (`tau^0` = 14.6 MPa, dx = 10 m) curves,
 which are the ones actually comparable to the reference -- see below.
 
+## FROZEN: what `taehoKim_ref` is, and how the three readings compare
+
+Read directly off the DET plots, station (0,0) and (-200,0), 2026-08-07:
+
+| reference quantity | value | read from |
+|---|---|---|
+| `tau^0` at t = 0 | **14.6 MPa** | `shear_stress_2` panel, both stations |
+| `V` at t = 0 | **1e-12 m/s** (log10 = -12) | `slip_rate_2` panel, both stations |
+| `slip_2` at 30 d, (0,0) | **~38 mm** | `slip_2` panel |
+| `slip_2` at 30 d, (-200,0) | **~21 mm** | `slip_2` panel |
+| edge/centre ratio | **0.553** | derived |
+| `state` | **flat ~2.8** for 30 d | `state` panel, both stations |
+| pore pressure peak, (0,0) | ~13.4 MPa | `pore_pressure` panel |
+| late-time uniform pressure | **~1.7 MPa** | `pore_pressure` panel, (-200,0) |
+
+`tau^0` = 14.6 MPa **and** `V(0)` = `V_init` together force
+`theta_0` = 4.0188e11 s, i.e. Table 1 + eq. (27), with eq. (29) given up. That is
+**reading C**, and it is what the compsets now ship.
+
+| reading | `tau^0` | `V`(step 1) | slip(0,0) | slip(-200,0) | ratio |
+|---|---|---|---|---|---|
+| A  Table 1 + eq. (29) | 14.6000 | 6.54e-11 | 42.74 mm | 27.65 mm | 0.647 |
+| **C  Table 1 + eq. (27)** | **14.6000** | **1.00e-12** | **37.30 mm** | **19.56 mm** | **0.524** |
+| B  eq. (27) + eq. (29) | 12.9277 | 1.00e-12 | 23.97 mm | 5.29 mm | 0.221 |
+| **`taehoKim_ref`** | **14.6000** | **1.0e-12** | **~38 mm** | **~21 mm** | **0.553** |
+
+Ours at dx = 50 m, old fluid scheme, ~22 d; the reference at 30 d. C is within
+2 % at the centre and 7 % at 200 m.
+
 ## Slip at 30 d, the headline comparison
 
 | station | `taehoKim_ref` | ours reading A, dx = 10 | ours reading B, dx = 50 |

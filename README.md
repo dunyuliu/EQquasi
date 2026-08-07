@@ -411,6 +411,27 @@ inconsistency so it cannot drift unnoticed.
 Note also that **Table 1 omits Poisson's ratio**, which the whole-space elastic
 kernel depends on. That is a second specification gap worth raising.
 
+### BP8-QD-S is out of scope as of 2026-08-06
+
+Taeho Kim notified the SEAS community that the slip law has been dropped from
+BP8: "In BP8, only the aging law will be used. This is to reduce the number of
+simulations since we already have two variations of the fluid injection." An
+updated description was circulated. Everything below about `friclaw = 4` is
+therefore **not needed for submission**; it is kept because the two bugs it
+uncovered are real, and because it bears on the open question of what the
+reference actually is.
+
+**It also undermines the conclusion recorded below.** The argument that
+`taehoKim_ref` is a slip-law run rested on its state variable sitting flat at
+`log10 theta` ~ 3, which the aging law cannot produce -- under the aging law
+`d(theta)/dt -> 1` once slip decays and `theta` grows to ~1e6 s over 30 days, as
+ours does. If the reference is an aging-law run, that flat state needs a
+different explanation, and the candidates are: its state column is not `theta`
+in seconds; the reference predates the scope change and was run with the slip
+law; or something is wrong in that output. **This is unresolved.** Getting
+Taeho's actual data files, rather than reading his curves off a comparison plot,
+is the way to settle it and is the single most useful next step.
+
 ### BP8-QD-S (slip law, `friclaw = 4`) is partially working
 
 Two defects have been fixed: the initial state is converted from `theta` to
@@ -422,9 +443,10 @@ which froze `psi` completely.
 What now works: the slip field is smooth and symmetric, and at the centre
 station `psi` freezes at ~0.629 once slip decays, i.e. `theta = (Dc/V*) *
 exp((psi - f*)/b)` ~ 9.1e3 s, `log10 theta` ~ 3.96. That frozen state is the
-signature of the slip law and it is close to what `taehoKim_ref` reports
-(flat at `log10 theta` ~ 3), which is the main evidence that the reference is
-**QD-S rather than QD-A**. Under the literal initial condition the slip law gives
+signature of the slip law, and it is close to what `taehoKim_ref` reports (flat
+at `log10 theta` ~ 3) -- which was the basis for thinking the reference was QD-S.
+See the scope note above: with the slip law removed from the benchmark, that
+inference is no longer safe. Under the literal initial condition the slip law gives
 42.78 mm at the centre against the aging law's 42.74 mm, so the evolution law
 barely changes total slip -- it changes the late-time state and creep.
 

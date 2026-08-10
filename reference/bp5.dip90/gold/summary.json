@@ -3,10 +3,10 @@
   "compset": "test.bp5.qdc.dip90",
   "oracle_kind": "exact field snapshot at step 101",
   "comparison": "max absolute difference must be 0.0 across all variables",
-  "element_size_m": 4000.0,
+  "element_size_m": 2000.0,
   "grid": {
-    "nid_dip": 16,
-    "nid_strike": 31
+    "nid_dip": 31,
+    "nid_strike": 61
   },
   "variables": [
     "nid_dip",
@@ -28,7 +28,9 @@
     "slipn"
   ],
   "provenance": {
-    "note": "inherited reference, predates runInfo.json; producing version, host and core count are unrecorded"
+    "note": "regenerated 2026-08-10 at higher resolution",
+    "run_dir": "work/res.bp5dip90",
+    "wall_seconds_101_steps": "~490 (1 core, shared host)"
   },
   "caveat": "regression lock on a deliberately coarse compset, never compared against an independent code -- it detects change, it does not establish that the benchmark is reproduced correctly"
 }

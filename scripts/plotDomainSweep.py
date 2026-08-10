@@ -14,25 +14,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seasio import read_rows, read_array
 
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def rd(p):
-    r = []
-    for line in open(p):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        tok = line.split()
-        try:
-            float(tok[0])
-        except ValueError:
-            continue
-        r.append([float(v) for v in tok])
-    return np.array(r)
-
-
+def rd(path):
+    """Numeric rows of a benchmark output file. See scripts/seasio.py."""
+    return read_array(path)
 def collect(pattern, keyfn):
     out = []
     for d in sorted(glob.glob(os.path.join(R, "work", pattern)), key=keyfn):

@@ -17,6 +17,9 @@ import os
 import re
 import sys
 import zipfile
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seasio import read_table
 
 # Section 4.1: nine on-fault stations, x2 and x3 in {-200, 0, 200} m.
 # The DET platform processes .dat for every file type, stations included.
@@ -59,28 +62,12 @@ class Report:
 
 
 def parse_file(path):
-    """Split a benchmark output file into (# header, field-name lines, data rows)."""
-    header, names, rows, bad = [], [], [], []
-    for n, line in enumerate(open(path), 1):
-        line = line.rstrip("\n")
-        if not line.strip():
-            continue
-        if line.lstrip().startswith("#"):
-            header.append(line.strip())
-            continue
-        tok = line.split()
-        # A data row is one whose FIRST token is a number. Testing for the mere
-        # presence of a digit misclassifies field names like 'slip_2' and 'x2'.
-        try:
-            float(tok[0])
-        except ValueError:
-            names.append(line.strip())
-            continue
-        try:
-            rows.append([float(v) for v in tok])
-        except ValueError:
-            bad.append((n, line[:70]))
-    return header, names, rows, bad
+    """Split a benchmark output file into (# header, field-name lines, data rows).
+
+    Malformed numeric rows are collected rather than raised: this script's job is
+    to explain why a submission is unacceptable, not to fall over on it.
+    """
+    return read_table(path, strip=True, collect_bad=True)
 
 
 def check_header(rep, fname, header):

@@ -20,6 +20,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seasio import read_rows, read_array
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,20 +37,8 @@ REFERENCE_SLIP_MM = 21.0   # taehoKim_ref, read from a plot -- indicative only
 
 
 def read(path):
-    rows = []
-    for line in open(path):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        tok = line.split()
-        try:
-            float(tok[0])
-        except ValueError:
-            continue
-        rows.append([float(v) for v in tok])
-    return np.array(rows)
-
-
+    """Numeric rows of a benchmark output file. See scripts/seasio.py."""
+    return read_array(path)
 def load(d):
     g = os.path.join(ROOT, d, "global.dat")
     hits = glob.glob(os.path.join(ROOT, d, "fltst_strk+000dp+000.*"))

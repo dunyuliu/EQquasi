@@ -26,6 +26,8 @@ import shutil
 import sys
 
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seasio import read_table
 
 PROFILES = [
     "slip_2_strike.dat", "slip_2_depth.dat",
@@ -39,23 +41,12 @@ TARGET = np.arange(-400.0, 400.0 + 1e-9, 10.0)   # 81 nodes, exactly
 
 
 def split_file(path):
-    """Return (header_lines, fieldname_lines, numeric_rows)."""
-    header, names, rows = [], [], []
-    for line in open(path):
-        s = line.rstrip("\n")
-        t = s.strip()
-        if not t:
-            continue
-        if t.startswith("#"):
-            header.append(s)
-            continue
-        try:
-            float(t.split()[0])
-        except ValueError:
-            names.append(s)
-            continue
-        rows.append([float(v) for v in t.split()])
-    return header, names, rows
+    """Header, field-name lines and rows, headers kept verbatim.
+
+    strip=False matters here: these header lines are rewritten into a new file,
+    so any leading whitespace has to survive the round trip.
+    """
+    return read_table(path, strip=False)
 
 
 def resample(path, out_path):

@@ -139,3 +139,33 @@ def test_all_faulting_accumulators_are_initialised():
         "Any fault node that skips the frictional branch will contribute "
         "uninitialised memory to the totals."
     )
+
+
+def test_benchmark_file_parsing_is_not_reimplemented_per_script():
+    """One parser for benchmark output files, in scripts/seasio.py.
+
+    Six scripts had each grown their own "strip, skip #, try float(tok[0])" loop.
+    They agreed on the load-bearing subtlety -- a data row is one whose FIRST
+    token parses as a number, because field names like slip_2 and x2 contain
+    digits -- but six copies is six chances to get it wrong, and one of them
+    (plotDomainSweep.py) had already drifted to globbing the wrong extension.
+    """
+    import glob
+    import os
+    import re
+    from conftest import ROOT
+
+    offenders = []
+    for path in glob.glob(os.path.join(str(ROOT), "scripts", "*")):
+        if os.path.isdir(path) or os.path.basename(path) == "seasio.py":
+            continue
+        try:
+            src = open(path).read()
+        except (UnicodeDecodeError, IsADirectoryError):
+            continue
+        if "float(tok[0])" in src or re.search(r"float\([a-z]+\.split\(\)\[0\]\)", src):
+            offenders.append(os.path.basename(path))
+    assert not offenders, (
+        f"{offenders} reimplement benchmark-file parsing; import read_table, "
+        f"read_rows, read_array or read_profile from seasio instead."
+    )

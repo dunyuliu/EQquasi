@@ -14,6 +14,9 @@ except ImportError:
     # made the entire post-processing workflow fail where it is not installed.
     convert_from_path = None
 from user_defined_params import par
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from seasio import read_rows, read_array
 
 #
 SMALL_SIZE = 10
@@ -22,31 +25,9 @@ mn = par.init_norm # initial normal stress
 ms = -mn*par.fric_rsf_r0 # initial mean shear stress for plotting.
 md = 0 # initial mean shear dip stress
 
-def read_global_dat(fname):
-  # Skip '#' headers and the field-name line that bp == 8 writes. Anything else
-  # that fails to parse is a corrupt record and must be reported, not dropped:
-  # silently skipping malformed rows is how a run with a garbage moment rate
-  # still produced a plot that looked fine.
-  rows, bad = [], []
-  for n, line in enumerate(open(fname), 1):
-    line = line.strip()
-    if not line or line.startswith('#'):
-      continue
-    if not any(c.isdigit() for c in line):
-      continue   # field-name line, e.g. 't max_slip_rate moment_density_rate'
-    try:
-      rows.append([float(v) for v in line.split()])
-    except ValueError:
-      bad.append((n, line[:60]))
-  if bad:
-    raise ValueError(
-      '%s: %d unparseable numeric row(s), first at line %d: %r\n'
-      'A Fortran E15.7 field cannot hold a three-digit exponent, so an '
-      'overflowing value is written without its E and cannot be read back. '
-      'This usually means the quantity itself is wrong.'
-      % (fname, len(bad), bad[0][0], bad[0][1]))
-  return np.array(rows)
-
+def read_global_dat(path):
+    """Numeric rows of a benchmark output file. See scripts/seasio.py."""
+    return read_array(path)
 def peak_slip_rate(b):
   # bp == 8 writes log10(max slip rate) in column 2, as the benchmark asks.
   # Every other bp writes it linearly. Return (linear, log10) for both.

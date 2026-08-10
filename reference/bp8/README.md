@@ -165,11 +165,22 @@ immediately.
 
 ## Files
 
-    README.md   this record
-    data/readingA-dx10_fltst_strk+000dp+000.csv
+    README.md          this record
+    gold/summary.json  the numbers a rerun must reproduce, plus provenance
+    gold/runInfo.json  the run's own performance log, verbatim
+    gold/*.csv         four stations and global.dat, 500 rows each
+    archive/data/readingA-dx10_fltst_strk+000dp+000.csv
     data/readingA-dx10_fltst_strk-200dp+000.csv
     data/readingB-dx50_fltst_strk+000dp+000.csv
     data/readingB-dx50_fltst_strk-200dp+000.csv
 
-400 rows each, subsampled from the full time series, 11 columns in the section
-4.1 field order. Reading A is `work/bp8.prod10`; reading B is `work/bp8.test50`.
+Subsampled from the full time series, 11 columns in the section 4.1 field order.
+
+The gold was produced by EQquasi v1.4.7 in `work/bp8.sub147` on `cotopaxi`
+(2 x AMD EPYC 7532, 64 logical cores) using **1 MPI rank and 1 OpenMP thread** --
+8000 elements, 23814 equations, dx = 50 m, 5301 steps at 0.151 s/step. Single
+core is deliberate: 8 ranks measured only 1.24x, and running one core per job
+lets several sweeps proceed at once. `gold/runInfo.json` is the run's own log,
+copied verbatim, and the same fields are mirrored under `provenance` in
+`summary.json` so a future comparison can tell what produced these numbers
+without opening a second file.

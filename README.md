@@ -347,6 +347,74 @@ That check was narrower than it looked: it confirms the solver inverts the
 friction law correctly, but not that `6.54e-11 m/s` is the value the benchmark
 wants. It is not what eq. (27) asks for, and that leads to the following.
 
+### Running BP8-QD-GS: the recipe
+
+```
+export EQQUASIROOT=$PWD PATH=$PWD/bin:$PWD/scripts:$PATH OMP_NUM_THREADS=1
+EQQUASIROOT=$PWD MACHINE=utig make -C src && mv src/eqquasi bin/
+
+create.newcase work/mycase bp8.qdc.gs.10     # dx = 10 m production
+#              work/mycase test.bp8.qdc      # dx = 50 m test
+cd work/mycase && ./case.setup && echo 1 > currentcycle.txt
+setsid nohup mpirun -np 1 $EQQUASIROOT/bin/eqquasi > r.log 2> t.log < /dev/null &
+```
+
+Then package for the CRESCENT DET platform:
+
+```
+python3 scripts/resampleBP8Profiles.py work/mycase work/mysub   # only needed if dx > 10 m
+python3 scripts/checkBP8Submission work/mysub --zip auto
+```
+
+Points that are easy to get wrong, each of which cost real time here:
+
+  - **`np = 1`, `OMP_NUM_THREADS = 1`.** The problem is small; extra ranks and
+    threads do not pay for themselves.
+  - **`nstep` must be large enough to reach `fluid_tend`.** The run exits on
+    `t_f` = 30 days, but only if `nstep` allows it -- at `xi` = 0.2 and
+    `dtmax` = 500 s that needs about 5300 steps. Capping `nstep` at 4000 stops
+    the run at ~23 d and quietly produces a short, non-comparable result.
+  - **Only dx = 10 m is directly submittable.** Section 4.3 wants profile nodes
+    at exactly 10 m over [-400, 400]; a coarser run must go through
+    `resampleBP8Profiles.py`, which interpolates onto that grid and says so in
+    the headers.
+  - **Never `pkill -f <pattern>`** to stop a run. The pattern matches the shell
+    issuing it, so it kills itself; that destroyed two long runs here. Kill by
+    PID, found via `readlink /proc/<pid>/cwd`.
+
+### Elastic domain truncation
+
+Section 6 of the description warns that truncating the whole-space "will most
+likely change results at least quantitatively, or even qualitatively" and asks
+that boundaries be extended until results stop moving. That warning is
+justified: `meshgen.f90` constrains only the two fault-normal faces, so the `x`
+and `z` faces are traction-free, and at the default `+-500 m` they sit just
+100 m outside `Omega_f`.
+
+Measured at dx = 50 m, 30 days, both initial-condition readings:
+
+| run | box half-width | slip `(0,0)` | slip `(-200,0)` | edge/centre |
+|-----|----------------|--------------|-----------------|-------------|
+| reading A | 500 m  | 42.78 mm | 28.79 mm | 0.673 |
+| reading A | 2000 m | 41.63 mm | 25.47 mm | 0.612 |
+| reading C | 500 m  | 37.31 mm | 21.99 mm | 0.589 |
+| reading C | 2000 m | 36.90 mm | 19.52 mm | 0.529 |
+| `taehoKim_ref` | (BEM, none) | ~38 mm | ~21 mm | 0.553 |
+
+Two things follow. Enlarging the box barely moves the amplitude at the injection
+point (-1 to -3 %) but moves the slip at 200 m substantially (-11 %), so
+truncation controls the *shape* of the slip profile rather than its size. And
+the reference's 0.553 falls **between** our 500 m and 2000 m results, so we now
+bracket it rather than sitting on one side; the 500 m box happens to match the
+two amplitudes best (-2 % and +5 %) while the 2000 m box matches the shape
+better. Neither is converged, and that is worth stating rather than presenting
+the closer one as agreement.
+
+An earlier sweep in this project concluded the results were domain-independent.
+It compared only centre-station slip and peak `Vmax` -- the two quantities least
+sensitive to truncation -- and so measured the wrong thing. A cause is not
+excluded until the quantity it would actually affect has been measured.
+
 ### The initial condition is over-determined
 
 Equation numbers below follow the **2026-08-06 revision** of the description,

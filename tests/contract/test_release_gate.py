@@ -25,7 +25,7 @@ def test_ci_pattern_matches_the_failure_string_check_test_actually_prints():
     patterns = re.findall(r"grep -q(?:i)?E ['\"]([^'\"]+)['\"]", wf)
     assert patterns, "no grep pattern found in the workflow"
 
-    sample = "FAIL test.reference.results/x/Q0/fault.00101.nc test/x/Q0/fault.00101.nc"
+    sample = "FAIL reference/bp5/gold/fault.00101.nc test/x/Q0/fault.00101.nc"
     matched = any(
         subprocess.run(["grep", "-qE", p], input=sample, text=True).returncode == 0
         or subprocess.run(["grep", "-qiE", p], input=sample, text=True).returncode == 0
@@ -93,8 +93,9 @@ def test_check_test_gate_is_self_consistent_end_to_end(tmp_path):
 
     for name in ("check.test.py", "testNameList.py"):
         shutil.copy(ROOT / name, tmp_path / name)
-    shutil.copytree(ROOT / "test.reference.results",
-                    tmp_path / "test.reference.results")
+    # References moved to reference/<benchmark>/gold/ when the BP5/BP7 and BP8
+    # oracles were unified; check.test.py reads them from there.
+    shutil.copytree(ROOT / "reference", tmp_path / "reference")
     # Deliberately do NOT create test/ -- references exist, outputs do not.
 
     r = subprocess.run(

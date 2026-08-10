@@ -22,7 +22,7 @@ par.fzmin, par.fzmax = -60.0e3, 0.0e3
 # the RSF controlled region and will slide at fixed loading slip rate.
 par.xminc, par.xmaxc, par.zminc = -50.0e3, 50.0e3, -40.0e3
 
-par.dx = 4000.0e0 # cell size, spatial resolution
+par.dx = 2000.0e0 # cell size; BP5's production resolution
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.

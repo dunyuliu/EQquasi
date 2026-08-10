@@ -22,7 +22,7 @@ par.fzmin, par.fzmax = -500, 500
 # the RSF controlled region and will slide at fixed loading slip rate.
 par.xminc, par.xmaxc, par.zminc = -400, 400, -400
 
-par.dx = 50.0e0 # cell size, spatial resolution (coarsened from bp7.qdc.a.10's 10 m for a fast CI smoke test)
+par.dx = 25.0e0 # cell size; halfway to bp7.qdc.a.10's production 10 m
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.

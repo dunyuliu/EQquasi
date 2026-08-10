@@ -6,7 +6,11 @@ import xarray as xr
 from testNameList import nameList
 
 fileNameList = ['fault.00001.nc','fault.00101.nc','global.dat', 'tdyna.txt']
-refRoot  = 'test.reference.results'
+refRoot  = 'reference'
+# Benchmark references live under reference/<benchmark>/gold/, the same shape as
+# the BP8 gold, so both oracles are found the same way.
+REF_DIR  = {'test.bp5.qdc': 'bp5', 'test.bp5.qdc.dip90': 'bp5.dip90',
+            'test.bp7.qdc': 'bp7'}
 testRoot = 'work/test'  # all run artifacts live under work/, which is gitignored
 
 # def compare_nc_files(fn1, fn2, threshold=1e-3):
@@ -73,7 +77,7 @@ compared = 0
 
 for testid in nameList:
     for filename in fileNameList:
-        refPath  = refRoot+'/'+testid+'/Q0/'+filename
+        refPath  = refRoot+'/'+REF_DIR[testid]+'/gold/'+filename
         testPath = testRoot+'/'+testid+'/Q0/'+filename
         if not os.path.exists(refPath):
             # No reference for this file. That is allowed, but say so out loud

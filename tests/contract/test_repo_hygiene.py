@@ -142,3 +142,35 @@ def test_generated_launchers_pin_openmp_threads():
     )
     assert "${OMP_NUM_THREADS:-1}" in src, \
         "pin to 1 by default but let the caller override"
+
+
+def test_no_dead_aztec_sources_in_src():
+    """The Aztec solver path is unreachable; its sources belong in archive/.
+
+    src/eqquasi.f90 prints "aztec is temporarily disabled" for sol_op==2 and the
+    call is commented out. The makefile's build rules for main_aztec.o and
+    elemcal_aztec.o were commented out too, so those files were never compiled --
+    but msr.f90 stayed in OBJ and was compiled and linked on every build despite
+    its only caller being main_aztec.f90. All three now live under archive/aztec/.
+
+    AZTEC_OPTIONS is deliberately NOT removed: read_input.f90 still reads it from
+    model.txt, which is a positional contract with scripts/case.setup. Dropping
+    the field would shift every value after it.
+    """
+    import os
+    from conftest import ROOT
+
+    for name in ("main_aztec.f90", "elemcal_aztec.f90", "msr.f90"):
+        assert not os.path.exists(os.path.join(str(ROOT), "src", name)), (
+            f"src/{name} is dead code; it belongs in archive/aztec/"
+        )
+
+    mk = read("src/makefile")
+    for obj in ("msr.o", "main_aztec.o", "elemcal_aztec.o"):
+        assert obj not in strip_makefile_comments(mk), (
+            f"{obj} is still built, but its source is archived"
+        )
+
+
+def strip_makefile_comments(text):
+    return "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))

@@ -111,7 +111,7 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
         fric.o               library_output.o \
         createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
-        msr.o       func_lib.o  netcdf_io.o porepressure.o\
+        func_lib.o  netcdf_io.o porepressure.o\
 
 clean : eqquasi
 	rm -r *.o
@@ -126,7 +126,7 @@ eqquasi: $(OBJ)
 eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
-             read_input.o            msr.o       func_lib.o  \
+             read_input.o            func_lib.o  \
              netcdf_io.o
 	$(FC) $(OPT) eqquasi.f90 
 globalvar.o: globalvar.f90
@@ -140,8 +140,6 @@ solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o c8g2.o      shl
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) solveTimeLoopMUMPS.f90 -I${MUMPS_INC}        
-#main_aztec.o: main_aztec.f90 globalvar.o c8g2.o shl.o faulting.o fric.o   library_output.o msr.o elemcal_aztec.o 
-#    $(FC) $(OPT) main_aztec.f90 -I${inc_dir_aztec}        
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o
@@ -156,10 +154,6 @@ createMatrixHolderInCRSFormat.o :      createMatrixHolderInCRSFormat.f90  global
 	$(FC) $(OPT) createMatrixHolderInCRSFormat.f90
 elemAssembleInCRS.o :  elemAssembleInCRS.f90  globalvar.o
 	$(FC) $(OPT) elemAssembleInCRS.f90    
-#elemcal_aztec.o : elemcal_aztec.f90  globalvar.o
-#    $(FC) $(OPT) elemcal_aztec.f90        
-msr.o :      msr.f90  globalvar.o
-	$(FC) $(OPT) msr.f90        
 read_input.o: read_input.f90 globalvar.o
 	$(FC) $(OPT) read_input.f90
 func_lib.o:  func_lib.f90

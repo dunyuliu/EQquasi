@@ -117,25 +117,6 @@ par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids a
 # Create on_fault_vars array for on_fault varialbes.
 par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 
-def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
-  # tau^0 at steady state, identical to the BP5 and BP7 compsets. BP8 section 3
-  # says "The initial state AND REFERENCE SHEAR TRACTION on the fault is chosen
-  # so that the model can start with a uniform fault slip rate", so tau^0 is
-  # derived here rather than transcribed from Table 1. eq. (28) only fixes its
-  # direction, tau^0 = tau^0 * V/|V|.
-  #
-  # With eq. (29)'s theta_0 = D_RS/V_init this returns 12.9277 MPa, not the
-  # 14.6 MPa of Table 1. Those two cannot both hold -- see README, "The initial
-  # condition is over-determined". The prose is taken as authoritative and
-  # Table 1's tau_init as stale; the description is visibly derived from BP6 and
-  # still carries BP6 text elsewhere. Raised with the authors.
-  #
-  # rou*vs/2 is eta = mu/(2 cs) = 4.6247e6 Pa s/m, the radiation damping of
-  # eq. (8). At V_init it contributes 4.6e-6 Pa, i.e. nothing, but it is kept so
-  # the expression matches BP5/BP7 exactly.
-  res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
-  return res
-
 def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
   # BP8 reading C. Table 1 gives tau_init = 14.6 MPa and eq. (27) requires the
   # fault to start at a uniform V_init; eq. (12) then fixes theta_0, so eq. (29)

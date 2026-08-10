@@ -75,3 +75,27 @@ def test_both_laws_use_the_same_step_symbol():
         f"the aging and slip laws integrate over different time steps: {sorted(steps)}. "
         f"They advance the same state over the same interval and must match."
     )
+
+
+def test_plot_scripts_do_not_hardcode_the_txt_station_extension():
+    """BP8 station files are .dat; a .txt-only glob silently matches nothing.
+
+    scripts/plotDomainSweep.py looked for fltst_strk+000dp+000.txt, which no
+    BP8 run produces, so it reported "no cases" for every BP8 sweep -- a result
+    indistinguishable from having no runs at all. Nothing failed; the sweep just
+    quietly produced an empty plot.
+    """
+    import glob as _glob
+    import os
+    import re as _re
+    from conftest import ROOT, read
+
+    bad = []
+    for path in _glob.glob(os.path.join(str(ROOT), "scripts", "*.py")):
+        src = read(os.path.join("scripts", os.path.basename(path)))
+        if _re.search(r'fltst_strk[^"\']*\.txt', src):
+            bad.append(os.path.basename(path))
+    assert not bad, (
+        f"{bad} look for BP8 station files with a .txt extension. BP8 writes "
+        f".dat; match on 'fltst_strk...*' so both are accepted."
+    )

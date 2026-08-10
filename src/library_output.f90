@@ -59,7 +59,7 @@ subroutine output_onfault_st
                 ! Optional per section 4.1, but present in its example, so the
                 ! platform may parse them. Derived from the recorded times
                 ! rather than from dtmax, so they describe the run as it ran.
-                call fltsta_step_range(i, dtStaMin, dtStaMax)
+                call step_range(fltsta(1,1:it-1,i), it-1, dtStaMin, dtStaMax)
                 write(51,'(A,E12.4)') '# minimum_time_step=', dtStaMin
                 write(51,'(A,E12.4)') '# maximum_time_step=', dtStaMax
                 write(51,'(A,I0)')    '# num_time_steps=', it
@@ -130,52 +130,30 @@ subroutine output_onfault_st
     endif
 end subroutine output_onfault_st
 
-subroutine fltsta_step_range(ista, dtmin, dtmax_out)
-! Smallest and largest interval between recorded samples for station ista.
-! Reported in the section 4.1 header. Taken from the recorded times rather
-! than from the dtmax parameter so the header describes the run as it actually
-! ran, adaptive stepping included.
-    use globalvar
+subroutine step_range(t, n, dtmin, dtmax_out)
+! Smallest and largest interval between successive samples in t(1:n).
+! Reported in the section 4.1 (fltst_*) and 4.2 (global.dat) headers. Taken
+! from the recorded times rather than from the dtmax parameter so the header
+! describes the run as it actually ran, adaptive stepping included.
+! fltsta_step_range and globaldat_step_range used to be separate, near-
+! identical copies of this loop, one over fltsta(1,:,ista) and one over
+! globaldat(1,:); they differed only in which time column they walked.
+    use globalvar, only : dp
     implicit none
 
-    integer (kind = 4), intent(in)  :: ista
+    integer (kind = 4), intent(in)  :: n
+    real (kind = dp),   intent(in)  :: t(n)
     real (kind = dp),   intent(out) :: dtmin, dtmax_out
-    integer (kind = 4) :: j
-    real (kind = dp)   :: dstep
-
-    dtmin    = 0.0d0
-    dtmax_out = 0.0d0
-    if (it <= 2) return
-
-    dtmin     = huge(1.0d0)
-    do j = 1, it-2
-        dstep = fltsta(1,j+1,ista) - fltsta(1,j,ista)
-        if (dstep > 0.0d0) then
-            if (dstep < dtmin)     dtmin     = dstep
-            if (dstep > dtmax_out) dtmax_out = dstep
-        endif
-    enddo
-    if (dtmin > huge(1.0d0)*0.5d0) dtmin = 0.0d0
-
-end subroutine fltsta_step_range
-
-subroutine globaldat_step_range(dtmin, dtmax_out)
-! Smallest and largest interval between rows of global.dat, for the section 4.2
-! header. Same reasoning as fltsta_step_range: report the run as it ran.
-    use globalvar
-    implicit none
-
-    real (kind = dp), intent(out) :: dtmin, dtmax_out
     integer (kind = 4) :: j
     real (kind = dp)   :: dstep
 
     dtmin     = 0.0d0
     dtmax_out = 0.0d0
-    if (it <= 2) return
+    if (n <= 1) return
 
     dtmin = huge(1.0d0)
-    do j = 1, it-2
-        dstep = globaldat(1,j+1) - globaldat(1,j)
+    do j = 1, n-1
+        dstep = t(j+1) - t(j)
         if (dstep > 0.0d0) then
             if (dstep < dtmin)     dtmin     = dstep
             if (dstep > dtmax_out) dtmax_out = dstep
@@ -183,7 +161,7 @@ subroutine globaldat_step_range(dtmin, dtmax_out)
     enddo
     if (dtmin > huge(1.0d0)*0.5d0) dtmin = 0.0d0
 
-end subroutine globaldat_step_range
+end subroutine step_range
 
 subroutine output_offfault_st
     
@@ -296,7 +274,7 @@ subroutine output_globaldat
             write(1113,'(A)') '# location= frictional domain'
             ! Optional per section 4.2, but present in its example. Taken from
             ! globaldat's own time column so it describes this file.
-            call globaldat_step_range(dtGlbMin, dtGlbMax)
+            call step_range(globaldat(1,1:it-1), it-1, dtGlbMin, dtGlbMax)
             write(1113,'(A,E12.4)') '# minimum_time_step=', dtGlbMin
             write(1113,'(A,E12.4)') '# maximum_time_step=', dtGlbMax
             write(1113,'(A,I0)')    '# num_time_steps=', it

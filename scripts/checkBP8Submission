@@ -100,15 +100,31 @@ def check_no_malformed_numbers(rep, fname, bad):
         )
 
 
+def load_checked(rep, d, fname):
+    """Parse fname from d, checking its header and numeric formatting.
+
+    check_stations, check_global and check_profiles all used to repeat this
+    same load-then-validate sequence before going on to their own file-
+    specific checks. Returns (names, rows), or None if fname does not exist --
+    the caller reports the missing-file error itself since its wording
+    differs per section.
+    """
+    path = os.path.join(d, fname)
+    if not os.path.exists(path):
+        return None
+    header, names, rows, bad = parse_file(path)
+    check_header(rep, fname, header)
+    check_no_malformed_numbers(rep, fname, bad)
+    return names, rows
+
+
 def check_stations(rep, d):
     for fname in STATIONS:
-        path = os.path.join(d, fname)
-        if not os.path.exists(path):
+        loaded = load_checked(rep, d, fname)
+        if loaded is None:
             rep.err(f"missing required station file {fname} (section 4.1)")
             continue
-        header, names, rows, bad = parse_file(path)
-        check_header(rep, fname, header)
-        check_no_malformed_numbers(rep, fname, bad)
+        names, rows = loaded
         if not names:
             rep.err(f"{fname}: missing the field-name line")
         elif names[-1].split() != STATION_FIELDS:
@@ -131,13 +147,11 @@ def check_stations(rep, d):
 
 
 def check_global(rep, d):
-    path = os.path.join(d, "global.dat")
-    if not os.path.exists(path):
+    loaded = load_checked(rep, d, "global.dat")
+    if loaded is None:
         rep.err("missing required global.dat (section 4.2)")
         return
-    header, names, rows, bad = parse_file(path)
-    check_header(rep, "global.dat", header)
-    check_no_malformed_numbers(rep, "global.dat", bad)
+    names, rows = loaded
     if not names or names[-1].split() != GLOBAL_FIELDS:
         rep.err(f"global.dat: field list is {names[-1].split() if names else None}, "
                 f"expected {GLOBAL_FIELDS}")
@@ -151,13 +165,11 @@ def check_global(rep, d):
 
 def check_profiles(rep, d):
     for fname in PROFILES:
-        path = os.path.join(d, fname)
-        if not os.path.exists(path):
+        loaded = load_checked(rep, d, fname)
+        if loaded is None:
             rep.err(f"missing required profile file {fname} (section 4.3)")
             continue
-        header, names, rows, bad = parse_file(path)
-        check_header(rep, fname, header)
-        check_no_malformed_numbers(rep, fname, bad)
+        names, rows = loaded
         if len(names) != 4:
             rep.err(f"{fname}: expected 4 field-name lines, found {len(names)}")
         if len(rows) < 2:

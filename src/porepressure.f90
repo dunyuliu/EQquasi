@@ -27,7 +27,7 @@ subroutine pore_pressure_init
     use globalvar
     implicit none
 
-    integer (kind = 4) :: i, isn, iz
+    integer (kind = 4) :: i, isn, jm, jp
     real (kind = dp)   :: xtmp, ztmp, wsum, re
 
     allocate(pf(nftnd(1)), pfActive(nftnd(1)), pfWt(nftnd(1)))
@@ -72,19 +72,12 @@ subroutine pore_pressure_init
     ! leaves the late-time uniform pressure 11.4 % low.
     do i = 1, nftnd(1)
         if (pfActive(i) == 0) cycle
-        iz = mod(i-1, nzt) + 1
         ! neighbour along dip (z) missing or outside Omega_f -> z boundary
-        if (iz == 1 .or. iz == nzt) then
-            pfFz(i) = 0.5d0
-        else
-            if (pfActive(i-1) == 0 .or. pfActive(i+1) == 0) pfFz(i) = 0.5d0
-        endif
+        call pf_neighbor(i, 1, jm); call pf_neighbor(i, 2, jp)
+        if (jm == 0 .or. jp == 0) pfFz(i) = 0.5d0
         ! neighbour along strike (x) missing or outside Omega_f -> x boundary
-        if (i <= nzt .or. i + nzt > nftnd(1)) then
-            pfFx(i) = 0.5d0
-        else
-            if (pfActive(i-nzt) == 0 .or. pfActive(i+nzt) == 0) pfFx(i) = 0.5d0
-        endif
+        call pf_neighbor(i, 3, jm); call pf_neighbor(i, 4, jp)
+        if (jm == 0 .or. jp == 0) pfFx(i) = 0.5d0
     enddo
 
     ! Normalize the Gaussian weights discretely so that sum(w) == 1 exactly.
@@ -118,7 +111,7 @@ subroutine pore_pressure_update(dtstep)
     real (kind = dp), intent(in) :: dtstep
     real (kind = dp) :: dsub, lap, lapx, lapz, qinj, src, area, acell, dpw, pe
     real (kind = dp), allocatable :: pnew(:)
-    integer (kind = 4) :: i, isub, nsub, iz
+    integer (kind = 4) :: i, isub, nsub, jm, jp
 
     if (bp /= 8 .or. fluid_src == 0) return
 
@@ -141,8 +134,6 @@ subroutine pore_pressure_update(dtstep)
         do i = 1, nftnd(1)
             if (pfActive(i) == 0) cycle
 
-            iz = mod(i-1, nzt) + 1
-
             ! Finite-volume 5-point Laplacian on cells of area
             ! dx^2 * pfFx(i) * pfFz(i). A face on the boundary of Omega_f
             ! carries no flux and is simply absent; the remaining faces are
@@ -151,20 +142,14 @@ subroutine pore_pressure_update(dtstep)
             ! the mirrored-ghost-node form of a zero-flux condition. Dropping
             ! the absent neighbour without rescaling -- what this did before --
             ! instead models a full cell hanging outside Omega_f.
+            call pf_neighbor(i, 1, jm); call pf_neighbor(i, 2, jp)
             lapz = 0.0d0
+            if (jm > 0) lapz = lapz + (pf(jm) - pf(i))
+            if (jp > 0) lapz = lapz + (pf(jp) - pf(i))
+            call pf_neighbor(i, 3, jm); call pf_neighbor(i, 4, jp)
             lapx = 0.0d0
-            if (iz > 1) then
-                if (pfActive(i-1) == 1) lapz = lapz + (pf(i-1) - pf(i))
-            endif
-            if (iz < nzt) then
-                if (pfActive(i+1) == 1) lapz = lapz + (pf(i+1) - pf(i))
-            endif
-            if (i > nzt) then
-                if (pfActive(i-nzt) == 1) lapx = lapx + (pf(i-nzt) - pf(i))
-            endif
-            if (i + nzt <= nftnd(1)) then
-                if (pfActive(i+nzt) == 1) lapx = lapx + (pf(i+nzt) - pf(i))
-            endif
+            if (jm > 0) lapx = lapx + (pf(jm) - pf(i))
+            if (jp > 0) lapx = lapx + (pf(jp) - pf(i))
             lap = (lapx/pfFx(i) + lapz/pfFz(i)) / (dx*dx)
 
             ! source, Pa/s, over this node's own cell area so that
@@ -200,18 +185,15 @@ subroutine pore_pressure_update(dtstep)
     do i = 1, nftnd(1)
         fric(6,i,1) = pf(i)
 
-        iz = mod(i-1, nzt) + 1
         fric(51,i,1) = 0.0d0
         fric(52,i,1) = 0.0d0
         if (pfActive(i) == 1) then
-            if (i > nzt .and. i + nzt <= nftnd(1)) then
-                if (pfActive(i-nzt) == 1 .and. pfActive(i+nzt) == 1) &
-                    fric(51,i,1) = -fluid_perm/fluid_eta * (pf(i+nzt)-pf(i-nzt))/(2.0d0*dx)
-            endif
-            if (iz > 1 .and. iz < nzt) then
-                if (pfActive(i-1) == 1 .and. pfActive(i+1) == 1) &
-                    fric(52,i,1) = -fluid_perm/fluid_eta * (pf(i+1)-pf(i-1))/(2.0d0*dx)
-            endif
+            call pf_neighbor(i, 3, jm); call pf_neighbor(i, 4, jp)
+            if (jm > 0 .and. jp > 0) &
+                fric(51,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
+            call pf_neighbor(i, 1, jm); call pf_neighbor(i, 2, jp)
+            if (jm > 0 .and. jp > 0) &
+                fric(52,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
         endif
     enddo
 
@@ -358,3 +340,39 @@ subroutine reverse_profile_line(ids, coords, n)
     enddo
 
 end subroutine reverse_profile_line
+
+! pf_neighbor returns the fault-node index of the Omega_f neighbour of node i
+! in the requested stencil direction, or 0 if there is none -- either the grid
+! edge or a neighbour that lies outside Omega_f (pfActive == 0). This is the
+! single place that turns the n = (ix-1)*nzt + iz node ordering into a 4-point
+! stencil; pore_pressure_init (boundary cell fractions) and pore_pressure_update
+! (the Laplacian and the Darcy velocity) all call it instead of repeating the
+! bounds-and-active checks inline.
+! dir: 1 = -dip (iz-1), 2 = +dip (iz+1), 3 = -strike (i-nzt), 4 = +strike (i+nzt)
+subroutine pf_neighbor(i, dir, j)
+
+    use globalvar
+    implicit none
+
+    integer (kind = 4), intent(in)  :: i, dir
+    integer (kind = 4), intent(out) :: j
+
+    integer (kind = 4) :: iz
+
+    iz = mod(i-1, nzt) + 1
+    j = 0
+    select case (dir)
+    case (1)
+        if (iz > 1) j = i - 1
+    case (2)
+        if (iz < nzt) j = i + 1
+    case (3)
+        if (i > nzt) j = i - nzt
+    case (4)
+        if (i + nzt <= nftnd(1)) j = i + nzt
+    end select
+    if (j > 0) then
+        if (pfActive(j) == 0) j = 0
+    endif
+
+end subroutine pf_neighbor

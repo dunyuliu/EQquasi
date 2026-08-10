@@ -390,21 +390,33 @@ The independent whole-space BEM predicted 24.0 mm for reading B; the FEM gives
 23.97 mm, agreeing to 0.1 %. Only reading B starts at `V_init` as eq. (27)
 requires -- A begins 65x faster.
 
-**Reading B is what the compsets ship**, with `tau^0` derived by
-`shear_steady_state()` exactly as in the BP5 and BP7 compsets. Full 30-day
-production test, `work/bp8.test50`, dx = 50 m, aging law, 5184 steps:
+**Reading C is what the compsets ship**: Table 1's `tau^0` = 14.6 MPa with
+`theta_0` = 4.0188e11 s derived so the fault starts at `V_init`. That is what
+`taehoKim_ref` does -- its `shear_stress_2` starts at 14.6 MPa and its
+`slip_rate_2` at `log10` = -12 -- and it is the closest of the three readings at
+both compared stations.
 
-| quantity | value |
-|----------|-------|
-| `tau^0` at t = 0 | 12.9277 MPa |
-| `V` at first solved step | 1.0000e-12 m/s, i.e. exactly `V_init` |
-| slip at centre, 30 d | 23.97 mm (reference ~21 mm) |
-| peak `log10 Vmax` | -6.748 at 1.64 d |
-| peak pore pressure | 13.625 MPa, `sigma_bar` minimum 11.375 MPa |
-| final state | `log10 theta` = 6.350 |
+The gold result is frozen in `reference/bp8/gold/` (v1.4.7, `work/bp8.sub147`,
+dx = 50 m, aging law, 30 days) and is the oracle for
+`tests/e2e/test_bp8_against_gold.py`:
+
+| quantity | ours | `taehoKim_ref` |
+|----------|------|----------------|
+| `tau^0` at t = 0 | 14.6000 MPa | 14.6 MPa |
+| `V` at first solved step | 1.0000e-12 m/s | 1e-12 m/s |
+| slip at `(0,0)`, 30 d | 37.31 mm | ~38 mm |
+| slip at `(-200,0)`, 30 d | 21.99 mm | ~21 mm |
+| edge/centre ratio | 0.589 | 0.553 |
+| late-time pore pressure | 1.6880 MPa | ~1.70 MPa |
+| peak `log10 Vmax` | -6.395 at 2.37 d | ~-6.4 |
 
 Slip is unchanged between 23 d and 30 d, confirming that it arrests shortly
 after `t_off` rather than continuing to accrue.
+
+`shear_steady_state()` -- the BP5/BP7 helper that derives `tau^0` -- was used
+briefly for reading B and has been removed from the BP8 compsets, since reading B
+prescribed the one quantity Table 1 fixes. It remains in the BP5 and BP7
+compsets, where it is correct.
 
 **A dx = 50 m run is a physics test, never a submission.** Section 4.3 requires
 profile nodes "with a spacing of 10 m (exactly)" from -400 to 400 m, i.e. 81

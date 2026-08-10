@@ -37,9 +37,13 @@ def collect(pattern, keyfn):
     out = []
     for d in sorted(glob.glob(os.path.join(R, "work", pattern)), key=keyfn):
         g = os.path.join(d, "global.dat")
-        s = os.path.join(d, "fltst_strk+000dp+000.txt")
-        if os.path.exists(g) and os.path.exists(s):
-            out.append((d, rd(g), rd(s)))
+        # BP8 station files are .dat, not .txt -- the platform routes on the
+        # extension and ignores .txt. This looked for .txt only, so it silently
+        # matched nothing and reported "no cases" for every BP8 sweep, which is
+        # indistinguishable from having no runs. Accept either.
+        hits = glob.glob(os.path.join(d, "fltst_strk+000dp+000.*"))
+        if os.path.exists(g) and hits:
+            out.append((d, rd(g), rd(hits[0])))
     return out
 
 

@@ -96,19 +96,19 @@ subroutine checkAndReport(currentProcID)
     integer (kind = 4) :: currentProcID
     if (icstart == 1) then
     INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
-        if (file_exists .eqv. .FALSE.) then
+        if (.not. file_exists) then
             write(*,*) 'on_fault_vars_input.nc is required but missing ...'
         endif 
     
         call netcdf_read_on_fault("on_fault_vars_input.nc")
     else
         INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
-            if (file_exists .eqv. .FALSE.) then
+            if (.not. file_exists) then
                 write(*,*) 'on_fault_vars_input.nc is required but missing ...'
             endif 
         
         INQUIRE(FILE="fault.r.nc", EXIST=file_exists)
-            if (file_exists .eqv. .FALSE.) then
+            if (.not. file_exists) then
                 write(*,*) 'icstart>1, fault.r.nc is required but missing ...'
             endif
         

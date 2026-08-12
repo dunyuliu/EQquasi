@@ -66,13 +66,32 @@ def gold_dir(bench):
 
 
 def load_field(path):
-    """Fault-plane snapshot as {variable: 2-D array}, from netCDF."""
+    """Fault-plane snapshot as {variable: 2-D array}, from netCDF.
+
+    netcdf_write_on_fault (src/netcdf_io.f90) always carries a leading
+    nid_fault dimension, size ntotft, so single- and multi-fault runs write
+    the same shape of variable. These single-fault gold/reference cases have
+    ntotft == 1: squeeze that dimension away here rather than in the writer,
+    so the comparison stays a plain 2-D map per fault.
+    """
     try:
         import netCDF4 as nc
     except ImportError:
         raise SystemExit("netCDF4 is needed to compare field snapshots")
     d = nc.Dataset(path)
-    return {v: d.variables[v][:] for v in d.variables if not v.startswith("nid_")}
+    out = {}
+    for v in d.variables:
+        if v.startswith("nid_"):
+            continue
+        arr = d.variables[v][:]
+        if arr.ndim == 3:
+            if arr.shape[0] != 1:
+                raise SystemExit(
+                    f"{path}: variable '{v}' has {arr.shape[0]} faults; "
+                    "this comparison only supports single-fault snapshots")
+            arr = arr[0]
+        out[v] = arr
+    return out
 
 
 def compare_field(bench, run_dir, out, only=None):

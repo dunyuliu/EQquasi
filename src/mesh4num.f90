@@ -16,15 +16,25 @@ subroutine mesh4num
 			xmin1,xmax1,ymin1,ymax1,zmin1
 	real(kind=8),allocatable,dimension(:)::xlinet,ylinet,zlinet,xline,yline,zline
 	integer(kind=4)::i1
+	real(kind=8)::fltx1,fltx2,fltz1,fltz2
 
 
 	dy=dx
 	dz=dx
 	tol=dx/100.d0
 
-	nxuni=(fltxyz(2,1,1)-fltxyz(1,1,1)-2.0d0*dx)/dx+1
+	! Uniform-grid region must span the union of every fault's x/z extent, not
+	! just fault 1's, so ntotft > 1 exercises the same statements ntotft == 1
+	! does (fltx1/fltx2/fltz1/fltz2 collapse to fault 1's own box when
+	! ntotft == 1).
+	fltx1=minval(fltxyz(1,1,:))
+	fltx2=maxval(fltxyz(2,1,:))
+	fltz1=minval(fltxyz(1,3,:))
+	fltz2=maxval(fltxyz(2,3,:))
+
+	nxuni=(fltx2-fltx1-2.0d0*dx)/dx+1
 	xstep=dx
-	xcoor=fltxyz(1,1,1)+dx
+	xcoor=fltx1+dx
 	do ix=1,np
 		xstep=xstep*1.0d0
 		xcoor=xcoor-xstep
@@ -32,7 +42,7 @@ subroutine mesh4num
 	enddo
 	edgex1=ix
 	xstep=dx
-	xcoor=fltxyz(2,1,1)-dx
+	xcoor=fltx2-dx
 	do ix=1,np
 		xstep=xstep*1.0d0
 		xcoor=xcoor+xstep
@@ -41,7 +51,7 @@ subroutine mesh4num
 	nxt=nxuni+edgex1+ix
 	allocate(xlinet(nxt))
 	!predetermine x-coor
-	xlinet(edgex1+1)=fltxyz(1,1,1)+dx
+	xlinet(edgex1+1)=fltx1+dx
 	xstep=dx
 	do ix=edgex1,1,-1
 		xstep=xstep*1.0d0
@@ -100,14 +110,14 @@ subroutine mesh4num
 	ymax1=ylinet(nyt)
 	!Z
 	zstep=dz
-	zcoor=fltxyz(1,3,1)+dx
+	zcoor=fltz1+dx
 	do iz=1,np
 		zstep=zstep
 		zcoor=zcoor-zstep
 		if(zcoor<=zmin) exit
 	enddo
 	edgezn=iz
-	nzuni=(fltxyz(2,3,1)-fltxyz(1,3,1)-dx)/dx+1 
+	nzuni=(fltz2-fltz1-dx)/dx+1
 	nzt=edgezn+nzuni
 	!...predetermine z-coor
 	allocate(zlinet(nzt))

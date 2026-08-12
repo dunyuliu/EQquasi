@@ -127,7 +127,11 @@ def test_all_faulting_accumulators_are_initialised():
     src = strip_fortran_comments(read("src/faulting.f90"))
     decl = re.search(r"real \(kind = dp\) :: (ma_bar_ku_arr.*?)\n\n", src, re.S)
     assert decl, "could not find the accumulator declaration block"
-    declared = set(re.findall(r"(\w+)\(nftnd\(1\)\)", decl.group(1)))
+    declared = {
+        m.group(0).split("(", 1)[0]
+        for m in re.finditer(r"\w+\((?:[^()]|\([^()]*\))*\)", decl.group(1))
+        if "nftnd" in m.group(0)
+    }
     assert declared, "no accumulator arrays parsed"
 
     body = src.split("real (kind = dp) :: ma_bar_ku_arr")[1]

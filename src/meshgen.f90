@@ -24,19 +24,28 @@ subroutine meshgen
     real(kind=dp)::center(3),ycoort,strtmp,kinkx, pfx, pfz
     integer(kind=4)::kkk,nfx,nfz,ntmp     
     real(kind=dp),allocatable::initial(:,:)
-    
+    real(kind=dp)::fltx1,fltx2,fltz1,fltz2
+
     allocate(n4yn(n4nds))
     n4yn = 0
-    
-    ntmp = (int((xmax-xmin)/dx)+1)*(int((zmax-zmin)/dx)+1)                                        
+
+    ntmp = (int((xmax-xmin)/dx)+1)*(int((zmax-zmin)/dx)+1)
 
     dy=dx
     dz=dx
     tol=dx/100.d0
-        
-    nxuni=(fltxyz(2,1,1)-fltxyz(1,1,1)-2.0d0*dx)/dx+1
+
+    ! Uniform-grid region must span the union of every fault's x/z extent, not
+    ! just fault 1's -- see mesh4num.f90, which this mirrors and must stay
+    ! consistent with (numnp/numel/neq/nftnd are cross-checked below).
+    fltx1=minval(fltxyz(1,1,:))
+    fltx2=maxval(fltxyz(2,1,:))
+    fltz1=minval(fltxyz(1,3,:))
+    fltz2=maxval(fltxyz(2,3,:))
+
+    nxuni=(fltx2-fltx1-2.0d0*dx)/dx+1
     xstep=dx
-    xcoor=fltxyz(1,1,1)+dx
+    xcoor=fltx1+dx
     do ix=1,np
         xstep=xstep
         xcoor=xcoor-xstep
@@ -44,7 +53,7 @@ subroutine meshgen
     enddo
     edgex1=ix
     xstep=dx
-    xcoor=fltxyz(2,1,1)-dx
+    xcoor=fltx2-dx
     do ix=1,np
         xstep=xstep
         xcoor=xcoor+xstep
@@ -53,7 +62,7 @@ subroutine meshgen
     nxt=nxuni+edgex1+ix
     allocate(xlinet(nxt))
     !predetermine x-coor
-    xlinet(edgex1+1)=fltxyz(1,1,1)+dx
+    xlinet(edgex1+1)=fltx1+dx
     xstep=dx
     do ix=edgex1,1,-1
         xstep=xstep
@@ -115,14 +124,14 @@ subroutine meshgen
     yfar_hi = ylinet(max(nyt-1, 1))
     !Z
     zstep=dz
-    zcoor=fltxyz(1,3,1)+dx
+    zcoor=fltz1+dx
     do iz=1,np
         zstep=zstep
         zcoor=zcoor-zstep
         if(zcoor<=zmin) exit
     enddo
     edgezn=iz
-    nzuni=(fltxyz(2,3,1)-fltxyz(1,3,1)-dx)/dx+1 
+    nzuni=(fltz2-fltz1-dx)/dx+1
     nzt=edgezn+nzuni
     !...predetermine z-coor
     allocate(zlinet(nzt))
@@ -475,11 +484,13 @@ subroutine meshgen
                     ! The fault resides on x-z plane and penetrates the whole model.
                     ! Use undistorted mesh ycoor to locate elements on the y+ side of the fault.
                     if (ycoor>0 .and. abs(ycoor-dy)<tol) then
-                        do i=1,nftnd0(1)
-                            do k=1,8
-                                if(ien(k,nelement)==nsmp(1,i,1)) then
-                                    ien(k,nelement) = nsmp(2,i,1)  !use master node for the node!
-                                endif
+                        do ift=1,ntotft
+                            do i=1,nftnd0(ift)
+                                do k=1,8
+                                    if(ien(k,nelement)==nsmp(1,i,ift)) then
+                                        ien(k,nelement) = nsmp(2,i,ift)  !use master node for the node!
+                                    endif
+                                enddo
                             enddo
                         enddo
                     endif
@@ -525,14 +536,14 @@ subroutine meshgen
     !write(*,*) 'C2'
     call report_element_types
 
-    if (nnode/=numnp.or.nelement/=numel.or.nftnd0(1)/=nftnd(1).or.neq0/=neq) then
+    if (nnode/=numnp.or.nelement/=numel.or.any(nftnd0(1:ntotft)/=nftnd(1:ntotft)).or.neq0/=neq) then
         write(*,*) 'Consistancy check'
         write(*,*) 'mesh4:meshgen(nnode)',numnp,nnode
         write(*,*) 'mesh4:meshgen(nelem)',numel,nelement
-        write(*,*) 'mesh4:meshgen(nnode)',nftnd0(1),nftnd(1)
-        write(*,*) 'mesh4:meshgen(nnode)',neq0,neq
+        write(*,*) 'mesh4:meshgen(nftnd)',nftnd0(1:ntotft),nftnd(1:ntotft)
+        write(*,*) 'mesh4:meshgen(neq)',neq0,neq
         stop 2
-    endif 
+    endif
     !for multiple faults. B.D. 1/7/12
     do ift=1,ntotft
         if(nftnd0(ift)>0) then
@@ -633,11 +644,11 @@ subroutine report_element_types
         write(*,*) '==================================================================='
     endif
 
-    if (n2 == 0 .and. nftnd(1) > 0) then
+    if (n2 == 0 .and. any(nftnd(1:ntotft) > 0)) then
         if (me == 0) then
             write(*,*) '========================== MESH ERROR =============================='
             write(*,*) '= No fault-adjacent elements (et=2) were tagged, but the fault has ='
-            write(*,'(X,A,i7,A)') '= ', nftnd(1), ' nodes. Every fault node would carry zero mass.'
+            write(*,'(X,A,i7,A)') '= ', sum(nftnd(1:ntotft)), ' nodes. Every fault node would carry zero mass.'
             write(*,*) '=                                                                  ='
             write(*,*) '= Fault elements are tagged where abs(ycoor) < 2*dy, then far-field ='
             write(*,*) '= elements are tagged where ycoor is within 2*dymax of ymin/ymax.   ='

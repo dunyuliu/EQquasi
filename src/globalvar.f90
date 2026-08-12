@@ -48,7 +48,11 @@ MODULE globalvar
     real (kind=dp) :: totMomRate, totMomRateVW, totRuptArea, totTaoRuptArea, &
         totSlipRuptArea, maxSlipRate, &
         tdynastart, tdynaend, tcheck, t_end_status, t_start_status, &
-        srcrad0=3.0d3, rdalfa=0.0d0, rdbeta=0.0d0, fltxyz(2,4,1)
+        srcrad0=3.0d3, rdalfa=0.0d0, rdbeta=0.0d0
+    ! fltxyz(lo/hi, x/y/z/dip, ift): per-fault bounding box + dip, ift = 1..ntotft.
+    ! Allocated in readmodel once ntotft is known (was a hardcoded single-fault
+    ! fltxyz(2,4,1)).
+    real (kind=dp), allocatable :: fltxyz(:,:,:)
     real (kind=dp) :: xmin, xmax, ymin, ymax, zmin, zmax ! left/right/front/back/top/bot domain boundaries.
     real (kind=dp) :: dx ! grid cell sizes.
     real (kind=dp) :: rat ! geometrical enlarging ratio of cell size outside of uniform grid domain.

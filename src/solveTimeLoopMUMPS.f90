@@ -212,7 +212,14 @@ subroutine solveTimeLoopMUMPS
         write(*,'(X,A,40X,i7,4X,A)')     '= Nodes                    = ', numnp, '='
         write(*,'(X,A,40X,i7,4X,A)')     '= Elements                 = ', numel, '='
         write(*,'(X,A,40X,i7,4X,A)')     '= Equations                = ', neq, '='
-        write(*,'(X,A,40X,i7,4X,A)')     '= Fault nodes              = ', nftnd(1), '='
+        ! Per fault, with its y, not just "nftnd(1)" -- that alone hid the
+        ! belt bug: a second fault with zero nodes went unreported here
+        ! while fault 1's count printed a perfectly plausible number and
+        ! the run continued for 4240 steps regardless.
+        do i = 1, ntotft
+            write(*,'(X,A,I3,A,E13.5,A,I7,4X,A)') '= Fault ', i, ' (y = ', fltxyz(1,2,i), &
+                ' m) nodes = ', nftnd(i), '='
+        enddo
         write(*,'(X,A,40X,i7,4X,A)')     '= Time steps completed     = ', it-1, '='
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Simulated time           = ', time/86400.0d0, 'days'
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Time loop                = ', timeUsedInComputing, 'seconds'

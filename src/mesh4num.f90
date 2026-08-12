@@ -4,6 +4,21 @@ subroutine mesh4num
 	implicit none
 	include 'mpif.h'
 
+	! Explicit interface: build_yline_belt's ylinet is intent(out),
+	! allocatable. func_lib.f90 has no module wrapper (matches this file's
+	! own external-subroutine style), so without this block the call below
+	! has an IMPLICIT interface and gfortran does not pass the allocatable
+	! descriptor correctly -- it silently corrupts memory instead of
+	! erroring, and the crash surfaces as a segfault inside
+	! build_yline_belt itself.
+	interface
+		subroutine build_yline_belt(ylinet, nyt)
+			use globalvar, only: dp
+			real (kind = dp), allocatable, intent(out) :: ylinet(:)
+			integer (kind = 4), intent(out) :: nyt
+		end subroutine build_yline_belt
+	end interface
+
 	integer(kind=4)::nnode0,nelement0,neq0,ix,iy,iz,&
 		edgex1,edgey1,edgez1,edgezn,&
 		i,j,k,ift
@@ -68,51 +83,16 @@ subroutine mesh4num
 	enddo
 	xmax1=xlinet(nxt)
 	!Y
-	! Uniform-dy belt spans the union of every fault's y position, not just
-	! fault 1's -- mirrors the x/z generalization above and must stay
-	! consistent with meshgen.f90, which this mirrors. ntotft==1 collapses
-	! yflt_lo==yflt_hi==0 and this reduces to the original single-fault belt.
-	yflt_lo=minval(fltxyz(1,2,:))
-	yflt_hi=maxval(fltxyz(2,2,:))
-	nyuni=int((yflt_hi-yflt_lo)/dy+0.5d0)+dis4uniF+dis4uniB+1
-	ystep=dy
-	ycoor=yflt_lo-dy*(dis4uniF)
-	do iy=1,np
-		ystep=ystep*rat
-		if (ystep>=dymax) ystep = dymax
-		ycoor=ycoor-ystep
-		if(ycoor<=ymin) exit
-	enddo
-	edgey1=iy
-	ystep=dy
-	ycoor=yflt_hi+dy*(dis4uniB)
-	do iy=1,np
-		ystep=ystep*rat
-		if (ystep>=dymax) ystep = dymax
-		ycoor=ycoor+ystep
-		if(ycoor>=ymax) exit
-	enddo
-	nyt=nyuni+edgey1+iy
-	!...pre-determine y-coor
-	allocate(ylinet(nyt))
-	!...predetermine y-coor
-	ylinet(edgey1+1)=yflt_lo-dy*(dis4uniF)
-	ystep=dy
-	do iy=edgey1,1,-1
-		ystep=ystep*rat
-		if (ystep>=dymax) ystep = dymax
-		ylinet(iy)=ylinet(iy+1)-ystep
-	enddo
+	! Uniform-dy belt spans [min fault y, max fault y], unchanged from
+	! v1.5.0. build_yline_belt (func_lib.f90) additionally REFUSES at setup
+	! if any declared fault's y-offset from the belt origin is not an
+	! integer multiple of dy, rather than silently meshing that fault with
+	! zero nodes. Shared with meshgen.f90 so the two stay consistent by
+	! construction rather than by two hand-kept copies. ntotft==1 has one
+	! fault, trivially an integer (zero) multiple of dy from itself, and
+	! reduces to the original single-fault belt exactly.
+	call build_yline_belt(ylinet, nyt)
 	ymin1=ylinet(1)
-	do iy=edgey1+2,edgey1+nyuni
-		ylinet(iy)=ylinet(iy-1)+dy
-	enddo
-	ystep=dy
-	do iy=edgey1+nyuni+1,nyt
-		ystep=ystep*rat
-		if (ystep>=dymax) ystep = dymax
-		ylinet(iy)=ylinet(iy-1)+ystep
-	enddo
 	ymax1=ylinet(nyt)
 	!Z
 	zstep=dz
@@ -181,7 +161,39 @@ subroutine mesh4num
 
 	numnp = nnode0
 	numel = nelement0
-	neq   = neq0 
+	neq   = neq0
 	nftnd = nftnd0
+
+	! Backstop: a declared fault with zero nodes is never valid. This is
+	! belt-and-braces with build_yline_belt's up-front commensurability
+	! refusal (func_lib.f90) -- that check should make nftnd(ift)==0
+	! impossible by construction, but this one does not trust that and
+	! catches ANY route to a zero-node fault, not only a non-commensurate
+	! y-offset. It silently ran to completion once (v1.5.0's belt bug: fault
+	! A landed off the mesh line, meshed with nftnd(1)==0, wrote an
+	! all-zero slab to fault.*.nc, and ran 4240 steps to 11 m of slip on a
+	! single fault with no partner -- the only hint was "Fault nodes = 0"
+	! in the run summary, which read as cosmetic). Stop here, at the
+	! earliest point nftnd is known, naming the fault, its y, and dy.
+	do ift = 1, ntotft
+		if (nftnd(ift) == 0) then
+			if (me == 0) then
+				write(*,*) '====================================================================='
+				write(*,*) '=                          MESH ERROR                               ='
+				write(*,*) '= Declared fault has zero fault nodes.                              ='
+				write(*,*) '= A declared fault with no nodes is never valid -- refusing to run   ='
+				write(*,*) '= rather than silently producing an unpartnered fault.               ='
+				write(*,*) '=                                                                    ='
+				write(*,'(X,A,I4,4X,A)')      '=   fault index = ', ift, '='
+				write(*,'(X,A,E16.8,A,4X,A)') '=   fault y     = ', fltxyz(1,2,ift), ' m', '='
+				write(*,'(X,A,E16.8,A,4X,A)') '=   dx = dy     = ', dx, ' m', '='
+				write(*,*) '=                                                                    ='
+				write(*,*) '= Check fltxyz (case_input compset faultgeom) against dx/dy and the  ='
+				write(*,*) '= model domain (fymin/fymax).                                        ='
+				write(*,*) '====================================================================='
+			endif
+			stop 6
+		endif
+	enddo
 
 end subroutine mesh4num

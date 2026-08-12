@@ -2,8 +2,18 @@ subroutine meshgen
 
     use globalvar
     implicit none
-    include 'mpif.h'    
-        
+    include 'mpif.h'
+
+    ! Explicit interface: see mesh4num.f90 for why this is required for an
+    ! intent(out), allocatable dummy passed to an external subroutine.
+    interface
+        subroutine build_yline_belt(ylinet, nyt)
+            use globalvar, only: dp
+            real (kind = dp), allocatable, intent(out) :: ylinet(:)
+            integer (kind = 4), intent(out) :: nyt
+        end subroutine build_yline_belt
+    end interface
+
     integer(kind=4)::nnode,nelement,neq0,ix,iy,iz,&
         edgex1,edgey1,edgez1,edgezn,&
         i,j,k,i1,j1,ift
@@ -79,51 +89,17 @@ subroutine meshgen
     enddo
     xmax1=xlinet(nxt)
     !Y
-    ! Uniform-dy belt spans the union of every fault's y position, not just
-    ! fault 1's -- mirrors the x/z generalization above and must stay
-    ! consistent with mesh4num.f90, which this mirrors. ntotft==1 collapses
-    ! yflt_lo==yflt_hi==0 and this reduces to the original single-fault belt.
-    yflt_lo=minval(fltxyz(1,2,:))
-    yflt_hi=maxval(fltxyz(2,2,:))
-    nyuni=int((yflt_hi-yflt_lo)/dy+0.5d0)+dis4uniF+dis4uniB+1
-    ystep=dy
-    ycoor=yflt_lo-dy*(dis4uniF)
-    do iy=1,np
-        ystep=ystep*rat
-        if (ystep>=dymax) ystep = dymax
-        ycoor=ycoor-ystep
-        if(ycoor<=ymin) exit
-    enddo
-    edgey1=iy
-    ystep=dy
-    ycoor=yflt_hi+dy*(dis4uniB)
-    do iy=1,np
-        ystep=ystep*rat
-        if (ystep>=dymax) ystep = dymax
-        ycoor=ycoor+ystep
-        if(ycoor>=ymax) exit
-    enddo
-    nyt=nyuni+edgey1+iy
-    !...pre-determine y-coor
-    allocate(ylinet(nyt))
-    !...predetermine y-coor
-    ylinet(edgey1+1)=yflt_lo-dy*(dis4uniF)
-    ystep=dy
-    do iy=edgey1,1,-1
-        ystep=ystep*rat
-        if (ystep>=dymax) ystep = dymax
-        ylinet(iy)=ylinet(iy+1)-ystep
-    enddo
+    ! Uniform-dy belt spans [min fault y, max fault y], unchanged from
+    ! v1.5.0. build_yline_belt (func_lib.f90) additionally REFUSES at setup
+    ! if any declared fault's y-offset from the belt origin is not an
+    ! integer multiple of dy, rather than silently meshing that fault with
+    ! zero nodes -- see its header comment for why. Shared with
+    ! mesh4num.f90 so the two stay consistent by construction rather than
+    ! by two hand-kept copies. ntotft==1 has one fault, trivially an
+    ! integer (zero) multiple of dy from itself, and reduces to the
+    ! original single-fault belt exactly.
+    call build_yline_belt(ylinet, nyt)
     ymin1=ylinet(1)
-    do iy=edgey1+2,edgey1+nyuni
-        ylinet(iy)=ylinet(iy-1)+dy
-    enddo
-    ystep=dy
-    do iy=edgey1+nyuni+1,nyt
-        ystep=ystep*rat
-        if (ystep>=dymax) ystep = dymax
-        ylinet(iy)=ylinet(iy-1)+ystep
-    enddo
     ymax1=ylinet(nyt)
     ! Outer two element layers in y, used below to tag far-field elements.
     yfar_lo = ylinet(min(3, nyt))

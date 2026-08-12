@@ -202,10 +202,21 @@ def compare_bp8(run_dir, out):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("benchmark", choices=list(FIELD_BENCHMARKS) + ["bp8"])
-    ap.add_argument("run_dir")
-    ap.add_argument("-o", "--out", default=None)
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="examples:\n"
+               "  cd <case> && plotAgainstGold.py bp5      compare this case\n"
+               "  plotAgainstGold.py bp5 work/mycase       from anywhere\n"
+               "The field snapshot (fault.00101.nc) is searched recursively, "
+               "so Q* cycle folders are found automatically.")
+    ap.add_argument("benchmark", choices=list(FIELD_BENCHMARKS) + ["bp8"],
+                    help="which frozen gold under reference/ to compare "
+                         "against")
+    ap.add_argument("run_dir", nargs="?", default=".",
+                    help="run/case directory (default: current directory)")
+    ap.add_argument("-o", "--out", default=None,
+                    help="output figure prefix (default: <run_dir>/vs_gold)")
     ap.add_argument("-v", "--variable", default=None,
                     help="field benchmarks only: plot just this variable")
     args = ap.parse_args()

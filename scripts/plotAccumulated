@@ -1,135 +1,99 @@
 #! /usr/bin/env python3
-"""
-Script to plot temporal evolutions of on-fault variables
-    on a vertical and a horizontal profiles.
+"""Accumulated slip profiles across earthquake cycles, in one figure.
+
+Walks the selected cycles in order, extracts the slip profile from every
+fault.NNNNN.nc snapshot (mode 1: vertical at mid-strike; mode 2: horizontal at
+3/4 of the model depth), offsets each cycle by the final slip of the previous
+one, and draws them all on one axes -- the classic stacked-slip-history plot.
+Lines are boxcar-smoothed over --nwindow nodes; every --ninterval-th snapshot
+is drawn.
+
+Multi-fault runs: --fault selects the fault whose plane is profiled
+(default 0).
+
+Reads:  fault.NNNNN.nc from every selected cycle
+Writes: accumulatedSlip.{vertical,horizontal}.png into the case directory
+        (cwd for a flat run)
 """
 
-import xarray as xr
+import glob
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plotutils as pu
+from lib import boxcar_average
+
+pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
-import os, glob, re, imageio, sys
-from pdf2image import convert_from_path
-from user_defined_params import par
-from lib import *
+import netCDF4 as nc
 
-ninterval = 20 # plot results in every 20 steps.
+PATTERNS = ["fault.[0-9]*.nc"]
 
-def generate_timeseries_profile_all(model_path, mode, var, ninterval,nwindow):
-    # extract time series information from all the model folders,
-    # and return them in the array data.
-    filenames = glob.glob(model_path+'/fault.?????.nc')
-    filenames = sort_nicely(filenames)
-    num_files = len(filenames)
 
-    # fault.r.nc must exist
-    # extract dimension information from restart file.
-    a =xr.open_dataset(model_path+'/fault.r.nc')
-    shear_strike = a.shear_strike
-    num_rows = shear_strike.shape[0]
-    num_cols = shear_strike.shape[1]
-    middle_row_index = num_rows // 4 # 1/4th quartile depth of the whole model depth
-    middle_col_index = num_cols // 2
-    middle_row_index = middle_row_index*3
+def cycle_profiles(rdir, mode, ninterval, nwindow, ifault):
+    snaps = pu.sort_nicely(
+        [f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
+         if pu.step_of(f) is not None])[::ninterval]
+    cols = []
+    for f in snaps:
+        with nc.Dataset(f) as d:
+            v = np.asarray(pu.fault_slab(d.variables["slips"][:], ifault,
+                                         "slips", f), float)
+        line = v[:, v.shape[1] // 2] if mode == 1 else v[(v.shape[0] // 4) * 3, :]
+        cols.append(boxcar_average(line, min(nwindow, len(line))))
+    return np.array(cols).T
 
-    print(num_files, num_rows, num_cols, middle_row_index, middle_col_index)
 
-    if mode==1:
-        # plot vertical profile, count rows
-        data = np.zeros((num_rows, num_files))
-        data_ave = np.zeros((num_rows-nwindow+1, num_files))
-    elif mode ==2:
-        # plot horizontal profile, count columns
-        data = np.zeros((num_cols, num_files))
-        data_ave = np.zeros((num_cols-nwindow+1, num_files))
-    
-    itag = 0
-    for file1 in filenames:
-        b = xr.open_dataset(file1)
-        if var    =='effective_normal':
-            res   = b.effective_normal
-            res   = res/1.e6
-            ylabel='Stress MPa'
-            
-        elif var  =='slip_rate':
-            res   = b.slip_rate
-            ylabel='Slip rate m/s'
-            
-        elif var  =='shear_strike':
-            res   = b.shear_strike
-            res   = res/1.e6
-            ylabel='Stress MPa'
-            
-        elif var  =='slips':
-            res   = b.slips
-            ylabel='Slip along strike m'
-            
-        itag = itag + 1
-        if mode == 1:
-            data[:,itag-1] = res[:, middle_col_index]
-        elif mode == 2:
-            for i in range(num_cols):
-                data[i,itag-1] = res[middle_row_index,i]
-        
-        data_ave[:,itag-1] = boxcar_average(data[:,itag-1],nwindow) 
-        
-        data0 = data_ave[:,::ninterval]
-    return data0 # [# of nodes, # of steps]
+def main():
+    ap = pu.make_parser(__doc__, "plotAccumulated",
+                        "accumulatedSlip.{vertical,horizontal}.png, all cycles stacked in "
+                        "one figure.", PATTERNS)
+    ap.add_argument("--mode", type=int, choices=[1, 2], default=2,
+                    help="1: vertical profile at mid-strike; "
+                         "2: horizontal profile at 3/4 depth (default)")
+    ap.add_argument("--fault", type=int, default=0,
+                    help="fault index for multi-fault runs (default 0)")
+    ap.add_argument("--ninterval", type=int, default=1,
+                    help="draw every Nth snapshot (default 1: all)")
+    ap.add_argument("--nwindow", type=int, default=10,
+                    help="boxcar smoothing window in nodes (default 10)")
+    args = ap.parse_args()
 
-#dirFiles = os.listdir(os.getcwd())
-def _main_func(description):
-    
-    if len(sys.argv)==2 or len(sys.argv)==4:
+    targets = pu.resolve_targets(args.dirs, PATTERNS, "plotAccumulated")
+    data = None
+    for label, rdir in targets:
+        print(f"processing {label or rdir} ({rdir})")
+        tmp = cycle_profiles(rdir, args.mode, args.ninterval, args.nwindow,
+                             args.fault)
+        data = tmp if data is None else np.concatenate(
+            (data, tmp + data[:, -1, np.newaxis]), axis=1)
 
-        if sys.argv[1] == '-h':
-            print('plotAccumulated plots accumulated slips on a horizontal/vertical profile')
-            print('Usage: plotAccumulated [mode:1=Vert/2=Hori] [# of cycles: integer] [nwindow]')
-        else:
-        
-            mode = int(sys.argv[1]) # mode from terminal input
-            ncyc = int(sys.argv[2]) # # of cycles from terminal input
-            nwindow = int(sys.argv[3]) # # of fault nodes for the averaing window
-            
-            if mode == 1:
-                xlabel = 'Along Dip on-fault Nodes'
-                ylabel = 'Slip Along Dip m'
-                out_file = 'cVerticalProfile.slips.png'
-                title  = 'Accumulated Slips on a Vertical Profile'
-                print('Generating accumulated slips on a vertical profile')
-            elif mode == 2:
-                xlabel = 'Along Strike on-fault Nodes'
-                ylabel = 'Slip Along Strike m'
-                out_file = 'cHorizontalProfile.slips.png'
-                title  = 'Accumulated Slips on a Horizontal Profile'
-                print('Generating accumulated slips on a Horizontal profile')
-                
-            for i in range(ncyc):
-                model_path = 'Q'+str(i) 
-                print('Processing the '+str(i)+'th cycle')
-                tmp = generate_timeseries_profile_all(model_path, mode, 'slips', ninterval,nwindow)
-                #print(tmp.shape)
-                if i == 0:
-                    data = tmp
-                else:
-                    # adding final slip from last batch to the new data - tmp.
-                    result = tmp + data[:, -1, np.newaxis] 
-                    data = np.concatenate((data, result), axis=1)
-                
-            num_cols = data.shape[1]
-            print('Plot every ',ninterval,' steps')
-            print('Time time steps are', num_cols)
-            
-            plt.figure()
-            for i in range(num_cols):
-                plt.plot(data[:,i],color='black', linewidth=1)
-                
-            plt.xlabel(xlabel)
-            plt.ylabel(ylabel)
-            plt.title(title)
-            plt.savefig(out_file, dpi=300)
+    orient, xlabel = (("Vertical", "node # down dip") if args.mode == 1
+                      else ("Horizontal", "node # along strike"))
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    for i in range(data.shape[1]):
+        ax.plot(data[:, i], color="black", lw=0.7)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("accumulated slip (m)")
+    ax.set_title(f"Accumulated slip — {orient.lower()} profile — "
+                 f"{len(targets)} cycle(s), {data.shape[1]} snapshots"
+                 + (f" — fault {args.fault}" if args.fault else ""))
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+
+    name = f"accumulatedSlip.{orient.lower()}.png"
+    if args.outdir:
+        os.makedirs(args.outdir, exist_ok=True)
+        out = os.path.join(args.outdir, name)
+    elif len(targets) == 1:
+        out = os.path.join(targets[0][1], name)
     else:
-        print('Missing arguments. Type plotProfilesAll -h')
-    
+        out = name
+    pu.save(fig, out, dpi=150)
+    return 0
+
+
 if __name__ == "__main__":
-    _main_func(__doc__)
-
-
+    sys.exit(main())

@@ -39,9 +39,17 @@ def spacetime(ax, x, t, f, title, label, cmap="RdBu_r", vmin=None, vmax=None):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("result_dir")
-    ap.add_argument("-o", "--out", default="bp8")
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="usage from a results folder: plotBP8Comparison\n"
+               "from anywhere:               plotBP8Comparison <result_dir>")
+    ap.add_argument("result_dir", nargs="?", default=".",
+                    help="BP8 results directory holding the section 4.3 "
+                         "profiles and global.dat (default: current "
+                         "directory)")
+    ap.add_argument("-o", "--out", default="bp8",
+                    help="output figure prefix (default 'bp8', in cwd)")
     args = ap.parse_args()
     d = args.result_dir
 

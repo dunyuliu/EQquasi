@@ -175,9 +175,11 @@ def create_batch_script():
         f.write("    [ -e \"$f\" ] && mv \"$f\" \"./Q$((i-1))\"" + "\n")
         f.write("  done" + "\n")
         f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
-        f.write("  cd \"./Q$((i-1))/\"" + "\n")
-        f.write("  ../plotOnFaultVars"+"\n")
-        f.write("  cd .."+"\n")
+        # Post-processing tools live on PATH (source install.eqquasi.sh), not
+        # in the case directory; they take the cycle directory as an argument.
+        f.write("  plotOnFaultVars \"./Q$((i-1))\" || echo 'plotOnFaultVars "
+                "not on PATH; source install.eqquasi.sh and rerun by hand'"
+                + "\n")
         f.write("done" + "\n")
         # End excutable part.
 
@@ -291,7 +293,12 @@ def _main_func(description):
       # generateFaultInterface failed -- e.g. matplotlib missing from the
       # active interpreter -- case.setup reported success, the case looked
       # complete, and the run silently produced no output at all.
-      rc = os.system('./generateFaultInterface')
+      # The tool lives in scripts/ (on PATH once install.eqquasi.sh is
+      # sourced); older cases may still carry a copy beside case.setup.
+      gfi = ('./generateFaultInterface'
+             if os.path.exists('./generateFaultInterface')
+             else 'generateFaultInterface')
+      rc = os.system(gfi + ' .')
       if os.waitstatus_to_exitcode(rc) != 0:
           raise SystemExit(
               'case.setup: generateFaultInterface failed (exit '

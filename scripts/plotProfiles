@@ -1,108 +1,109 @@
 #! /usr/bin/env python3
-"""
-Script to plot temporal evolutions of on-fault variables
-    on a vertical and a horizontal profiles.
+"""Temporal evolution of on-fault variables along two fixed profiles.
+
+For each cycle, reads every fault.NNNNN.nc snapshot and draws the variable
+along (mode 1) the vertical profile at mid-strike and (mode 2) the horizontal
+profile at 3/4 of the model depth, one line per sampled snapshot, for each of:
+effective_normal, slip_rate, shear_strike, slips. Lines are boxcar-smoothed
+over --nwindow nodes and only every --ninterval-th snapshot is drawn.
+
+Multi-fault runs: --fault selects the fault (default 0); the fault index is
+appended to the file name and title.
+
+Reads:  fault.NNNNN.nc per cycle
+Writes: cVerticalProfile.<var>[.fN].png and cHorizontalProfile.<var>[.fN].png
+        into each cycle's directory
 """
 
-import xarray as xr
+import glob
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plotutils as pu
+from lib import boxcar_average
+
+pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
-import os, glob, re, imageio
-from pdf2image import convert_from_path
-from user_defined_params import par
-from lib import *
+import netCDF4 as nc
 
-ninterval = 20 # plot results in every 20 steps.
-# Read in file name from terminal.
-# fname = input("Enter the file name : ")
-    
-def generate_timeseries_profile(mode, var, ninterval,nwindow):
-    filenames = glob.glob('./fault.?????.nc')
-    filenames = sort_nicely(filenames)
-    num_files = len(filenames)
+PATTERNS = ["fault.[0-9]*.nc"]
 
-    # fault.r.nc must exist
-    a =xr.open_dataset('fault.r.nc')
-    shear_strike = a.shear_strike
-    num_rows = shear_strike.shape[0]
-    num_cols = shear_strike.shape[1]
-    middle_row_index = num_rows // 4 # 1/4th quartile depth of the whole model depth
-    middle_col_index = num_cols // 2
-    middle_row_index = middle_row_index*3
+VARS = {
+    "effective_normal": (1e6, "stress (MPa)"),
+    "slip_rate": (1.0, "slip rate (m/s)"),
+    "shear_strike": (1e6, "stress (MPa)"),
+    "slips": (1.0, "slip along strike (m)"),
+}
 
-    print(num_files, num_rows, num_cols, middle_row_index, middle_col_index)
 
-    if mode==1:
-        # plot vertical profile, count rows
-        data = np.zeros((num_rows, num_files))
-        data_ave = np.zeros((num_rows-nwindow+1, num_files))
-        out_file = 'cVerticalProfile.'+var+'.png'
-        xlabel = 'Depth to surface on-fault nodes'
-        title = 'Vertical profile for '+var
-    elif mode ==2:
-        # plot horizontal profile, count columns
-        data = np.zeros((num_cols, num_files))
-        data_ave = np.zeros((num_cols-nwindow+1, num_files))
-        out_file = 'cHorizontalProfile.'+var+'.png'
-        xlabel = 'Along strike on-fault nodes'
-        title = 'Horizontal profile for ' + var
-    
-    itag = 0
-    for file1 in filenames:
-        b = xr.open_dataset(file1)
-        if var    =='effective_normal':
-            res   = b.effective_normal
-            res   = res/1.e6
-            ylabel='Stress MPa'
-            
-        elif var  =='slip_rate':
-            res   = b.slip_rate
-            ylabel='Slip rate m/s'
-            
-        elif var  =='shear_strike':
-            res   = b.shear_strike
-            res   = res/1.e6
-            ylabel='Stress MPa'
-            
-        elif var  =='slips':
-            res   = b.slips
-            ylabel='Slip along strike m'
-            
-        itag = itag + 1
+def profile_series(rdir, mode, var, ninterval, nwindow, ifault):
+    """(nodes, series) array of smoothed profiles, one column per snapshot."""
+    snaps = pu.sort_nicely(
+        [f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
+         if pu.step_of(f) is not None])[::ninterval]
+    cols = []
+    for f in snaps:
+        with nc.Dataset(f) as d:
+            v = np.asarray(pu.fault_slab(d.variables[var][:], ifault, var, f),
+                           float)
+        nrow, ncol = v.shape
         if mode == 1:
-            data[:,itag-1] = res[:, middle_col_index]
-        elif mode == 2:
-            for i in range(num_cols):
-                data[i,itag-1] = res[middle_row_index,i]
+            line = v[:, ncol // 2]
+        else:
+            line = v[(nrow // 4) * 3, :]     # 3/4 of the way down the grid
+        cols.append(boxcar_average(line, min(nwindow, len(line))))
+    return np.array(cols).T
 
-        data_ave[:,itag-1] = boxcar_average(data[:,itag-1],nwindow)
-    
-    data0 = data_ave[:,::ninterval]
-    
-    plt.figure()
-    for i in range(data0.shape[1]):
-        plt.plot(data0[:,i])
-        
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.savefig(out_file, dpi=300)
 
-    return data0
-    
-def _main_func(description):
+def process_dir(rdir, outdir, ninterval, nwindow, ifault, nfault):
+    sfx = f".f{ifault}" if nfault > 1 else ""
+    for var, (scale, ylabel) in VARS.items():
+        for mode, orient, xlabel in ((1, "Vertical", "node # down dip"),
+                                     (2, "Horizontal", "node # along strike")):
+            data = profile_series(rdir, mode, var, ninterval, nwindow, ifault)
+            fig, ax = plt.subplots(figsize=(9, 5))
+            for i in range(data.shape[1]):
+                ax.plot(data[:, i] / scale, lw=0.9)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            ax.set_title(f"{orient} profile — {var} — "
+                         f"{os.path.basename(os.path.abspath(rdir))}"
+                         + (f" — fault {ifault}" if nfault > 1 else "")
+                         + f" ({data.shape[1]} snapshots)")
+            ax.grid(alpha=0.3)
+            fig.tight_layout()
+            pu.save(fig, pu.out_path(rdir, f"c{orient}Profile.{var}{sfx}.png",
+                                     outdir), dpi=150)
 
-    generate_timeseries_profile(1, 'effective_normal', ninterval,10)
-    generate_timeseries_profile(1, 'slip_rate', ninterval,10)
-    generate_timeseries_profile(1, 'shear_strike', ninterval,10)
-    generate_timeseries_profile(1, 'slips', ninterval,10)
 
-    generate_timeseries_profile(2, 'effective_normal', ninterval,10)
-    generate_timeseries_profile(2, 'slip_rate', ninterval,10)
-    generate_timeseries_profile(2, 'shear_strike', ninterval,10)
-    generate_timeseries_profile(2, 'slips', ninterval,10)
+def main():
+    ap = pu.make_parser(__doc__, "plotProfiles",
+                        "c{Vertical,Horizontal}Profile.<var>[.fN].png into "
+                        "each cycle's directory.", PATTERNS)
+    ap.add_argument("--fault", type=int, default=None,
+                    help="fault index for multi-fault runs "
+                         "(default: all faults)")
+    ap.add_argument("--ninterval", type=int, default=1,
+                    help="draw every Nth snapshot (default 1: all)")
+    ap.add_argument("--nwindow", type=int, default=10,
+                    help="boxcar smoothing window in nodes (default 10)")
+    args = ap.parse_args()
+
+    for label, rdir in pu.resolve_targets(args.dirs, PATTERNS, "plotProfiles"):
+        print(f"processing {label or rdir} ({rdir})")
+        first = min((f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
+                     if pu.step_of(f) is not None), key=pu.step_of)
+        with nc.Dataset(first) as d:
+            nfault = (d.dimensions["nid_fault"].size
+                      if "nid_fault" in d.dimensions else 1)
+        faults = range(nfault) if args.fault is None else [args.fault]
+        for ift in faults:
+            process_dir(rdir, args.outdir, args.ninterval, args.nwindow,
+                        ift, nfault)
+    return 0
+
 
 if __name__ == "__main__":
-    _main_func(__doc__)
-
-
+    sys.exit(main())

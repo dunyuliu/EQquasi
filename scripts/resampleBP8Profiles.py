@@ -86,10 +86,21 @@ def resample(path, out_path):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("result_dir")
-    ap.add_argument("out_dir")
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="examples:\n"
+               "  cd <results> && resampleBP8Profiles.py     -> ./submission_10m/\n"
+               "  resampleBP8Profiles.py work/bp8.sub147 out/")
+    ap.add_argument("result_dir", nargs="?", default=".",
+                    help="BP8 results directory holding the section 4.3 "
+                         "profiles (default: current directory)")
+    ap.add_argument("out_dir", nargs="?", default=None,
+                    help="where the submission-ready copy goes "
+                         "(default: <result_dir>/submission_10m)")
     args = ap.parse_args()
+    if args.out_dir is None:
+        args.out_dir = os.path.join(args.result_dir, "submission_10m")
 
     if not os.path.isdir(args.result_dir):
         print(f"not a directory: {args.result_dir}")

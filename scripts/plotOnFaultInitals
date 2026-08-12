@@ -1,68 +1,84 @@
 #! /usr/bin/env python3
+"""Map the on-fault initial conditions a case will run with.
+
+Reads par.on_fault_vars from the case's user_defined_params.py -- the array
+case.setup writes into on_fault_vars_input.nc -- and maps the RSF parameters
+(a, b, Dc), the initial slip rate, and the initial normal and shear stresses
+over the fault plane. Useful as a pre-run sanity check that the friction
+zonation and nucleation patch are where you intended.
+
+This is a case-level tool: it needs only user_defined_params.py, no run
+output, so there is no cycle discovery. Point it at the case directory
+(default: the current one).
+
+Reads:  user_defined_params.py
+Writes: Initials.png into the case directory
 """
-Script to plot on fault initials like friction and stresses.
-"""
-from user_defined_params import par
+
+import argparse
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plotutils as pu
+
+pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-from matplotlib import animation, rc
 
-SMALL_SIZE = 6
+# (slice index in on_fault_vars, title, unit, scale)
+PANELS = [
+    (9, "RSF a", "-", 1.0),
+    (10, "RSF b", "-", 1.0),
+    (11, "RSF Dc", "m", 1.0),
+    (46, "initial slip rate", "m/s", 1.0),
+    (7, "initial normal stress", "MPa", 1e6),
+    (8, "initial shear stress", "MPa", 1e6),
+]
 
-def plot_initials():
-  fig = plt.figure()
-  plt.rc('font', size=SMALL_SIZE)
-  
-  ax11 = fig.add_subplot(321)
-  plt.contourf(on_fault_vars[:,:,9])
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("RSF_a")
 
-  ax11 = fig.add_subplot(322)
-  plt.contourf(on_fault_vars[:,:,10])
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("RSF_b")
-  
-  ax11 = fig.add_subplot(323)
-  plt.contourf(on_fault_vars[:,:,11])
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("RSF_Dc")
+def main():
+    ap = argparse.ArgumentParser(
+        prog="plotOnFaultInitals", description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="usage from a case folder: plotOnFaultInitals\n"
+               "from anywhere:            plotOnFaultInitals <case>")
+    ap.add_argument("case_dir", nargs="?", default=".",
+                    help="case directory holding user_defined_params.py "
+                         "(default: current directory)")
+    ap.add_argument("-o", "--outdir", default=None, metavar="DIR",
+                    help="write Initials.png here instead of into the case")
+    args = ap.parse_args()
 
-  ax11 = fig.add_subplot(324)
-  plt.contourf(on_fault_vars[:,:,46])  
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("Initial slip rate")
+    par = pu.load_par(args.case_dir, "plotOnFaultInitals")
+    v = np.asarray(getattr(par, "on_fault_vars", None))
+    if v.ndim != 3:
+        pu.die(f"plotOnFaultInitals: par.on_fault_vars in {args.case_dir} is "
+               f"not the expected (nfz, nfx, nvar) array (got shape "
+               f"{None if v is None else v.shape})")
 
-  ax11 = fig.add_subplot(325)
-  plt.contourf(on_fault_vars[:,:,7])  
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("Initial normal")
-  
-  ax11 = fig.add_subplot(326)
-  plt.contourf(on_fault_vars[:,:,8])  
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  plt.colorbar()
-  plt.title("Initial shear")
-  
-  plt.savefig("Initials.png", dpi = 600)
-  plt.close()
-  
-  return (fig,)
+    ndip, nstrike = v.shape[:2]
+    x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike)
+    fig, ax = plt.subplots(2, 3, figsize=(15, 7))
+    for k, (idx, title, unit, scale) in enumerate(PANELS):
+        a = ax[k // 3, k % 3]
+        m = a.pcolormesh(x, z, v[:, :, idx] / scale, cmap="viridis",
+                         shading="nearest")
+        cb = plt.colorbar(m, ax=a)
+        cb.set_label(unit)
+        a.set_title(title)
+        a.set_xlabel(xlab)
+        a.set_ylabel(ylab)
+        a.set_aspect("equal")
+    fig.suptitle(f"On-fault initial conditions — "
+                 f"{getattr(par, 'casename', os.path.abspath(args.case_dir))}")
+    fig.tight_layout()
+    out = os.path.join(args.outdir or args.case_dir, "Initials.png")
+    if args.outdir:
+        os.makedirs(args.outdir, exist_ok=True)
+    pu.save(fig, out, dpi=150)
+    return 0
 
-def _main_func(description):
-    plot_initials()
 
 if __name__ == "__main__":
-    _main_func(__doc__)
+    sys.exit(main())

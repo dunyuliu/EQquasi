@@ -1,200 +1,156 @@
 #! /usr/bin/env python3
-"""
-Script to plot on fault variables.
+"""Map every on-fault variable of each fault.NNNNN.nc snapshot, plus a gif.
+
+For each snapshot this draws a 3x3 sheet: shear stresses (strike, dip),
+effective normal stress, log10 slip rate, normal-regularised state, log10
+state, and the peak-slip-rate history (linear, log10, and against simulated
+time) with the current step marked. Stresses are shown in MPa on a diverging
+map centred on the case's initial values (from user_defined_params.py, found
+in the results directory or its parent).
+
+Multi-fault runs (ntotft > 1): one PNG per fault per snapshot, suffixed .f0,
+.f1, ..., and one gif per fault -- no fault is silently dropped. Legacy 2-D
+snapshots (pre-nid_fault) are read transparently.
+
+The gif's cadence is the run's nt_out: nt_out = 1000 gives a handful of coarse
+frames. Each frame carries its step number and simulated time; a smooth movie
+needs a smaller nt_out at run time, not interpolation here.
+
+Reads:  fault.NNNNN.nc, global.dat, user_defined_params.py (dir or parent)
+Writes: fault.NNNNN.nc[.fN].png and on_fault_vars[.fN].gif per cycle
 """
 
-import xarray as xr
+import glob
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plotutils as pu
+
+pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
-import os, glob, re, imageio
-try:
-    from pdf2image import convert_from_path
-except ImportError:
-    # Only referenced by a commented-out branch of generate_gif(); a hard import
-    # made the entire post-processing workflow fail where it is not installed.
-    convert_from_path = None
-from user_defined_params import par
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from seasio import read_rows, read_array
+import netCDF4 as nc
 
-#
-SMALL_SIZE = 10
-r = 10e6 # half range to show stresses in Pa.
-mn = par.init_norm # initial normal stress
-ms = -mn*par.fric_rsf_r0 # initial mean shear stress for plotting.
-md = 0 # initial mean shear dip stress
+PATTERNS = ["fault.[0-9]*.nc", "global.dat"]
 
-def read_global_dat(path):
-    """Numeric rows of a benchmark output file. See scripts/seasio.py."""
-    return read_array(path)
-def peak_slip_rate(b):
-  # bp == 8 writes log10(max slip rate) in column 2, as the benchmark asks.
-  # Every other bp writes it linearly. Return (linear, log10) for both.
-  if getattr(par, 'bp', 0) == 8:
-    return 10.0**b[:,1], b[:,1]
-  return b[:,1], np.log10(b[:,1])
+STRESS_R = 10.0   # half-range around the reference stress, MPa
 
-def plot_fault(fname):
-  a = xr.open_dataset(fname)
-  #print (a)
-  shear_strike = a.shear_strike
-  shear_dip    = a.shear_dip
-  norm         = a.effective_normal
-  slip_rate    = a.slip_rate + 1e-30
-  state        = a.state_variable 
-  state2       = a.state_normal
 
-  b = read_global_dat('global.dat')
-  cumulativeTime = b[:,0] 
-  secondToDayConst = 24*60*60
-  secondToYearConst = 365*24*60*60
-  cumulativeTimeInDays = cumulativeTime/secondToDayConst
+def peak_slip_rate(b, par):
+    """(linear, log10) peak slip rate. bp == 8 writes log10(Vmax) in column 2,
+    as that benchmark asks; every other bp writes it linearly."""
+    if getattr(par, "bp", 0) == 8:
+        return 10.0 ** b[:, 1], b[:, 1]
+    return b[:, 1], np.log10(np.maximum(b[:, 1], 1e-300))
 
-  #n1 = re.findall(r'\d+',fname)
-  #nstep = int(n1[0])
-  nstep = int(''.join(filter(str.isdigit,fname)))
 
-  fig1 = plt.figure(figsize=(18,9))
-  plt.rc('font', size=SMALL_SIZE)
+def plot_fault_snapshot(fname, ift, nfault, par, b, png):
+    ds = nc.Dataset(fname)
+    v = {name: pu.fault_slab(ds.variables[name][:], ift, name, fname)
+         for name in ("shear_strike", "shear_dip", "effective_normal",
+                      "slip_rate", "state_variable", "state_normal")}
+    ds.close()
 
-  ax11 = fig1.add_subplot(3,3,1)
-  shear_strike.plot(vmin=ms-r, vmax=ms+r, extend = 'both')
-  ax11.set_xlabel('')
-  #ax11.set_ylabel('')
+    ndip, nstrike = v["shear_strike"].shape
+    x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike)
+    mn = par.init_norm / 1e6                    # initial normal stress, MPa
+    ms = -mn * par.fric_rsf_r0                  # initial mean shear, MPa
+    nstep = pu.step_of(fname)
+    i = min(nstep, len(b)) - 1
+    tdays = b[i, 0] / 86400.0
+    vlin, vlog = peak_slip_rate(b, par)
 
-  ax12 = fig1.add_subplot(3,3,2)
-  shear_dip.plot(vmin=md-r, vmax=md+r, extend = 'both')
-  ax12.set_xlabel('')
-  ax12.set_ylabel('')
-  ax12.set_title(str(fname))
+    panels = [
+        (v["shear_strike"] / 1e6, "shear stress (strike)", "MPa",
+         "RdBu_r", ms - STRESS_R, ms + STRESS_R),
+        (v["shear_dip"] / 1e6, "shear stress (dip)", "MPa",
+         "RdBu_r", -STRESS_R, STRESS_R),
+        (v["effective_normal"] / 1e6, "effective normal stress", "MPa",
+         "RdBu_r", mn - STRESS_R, mn + STRESS_R),
+        (np.log10(np.asarray(v["slip_rate"]) + 1e-30), "slip rate",
+         "log10 V (m/s)", "magma", -14, 2),
+        (v["state_normal"] / 1e6, "state (normal-regularised)", "MPa",
+         "RdBu_r", -mn - STRESS_R, -mn + STRESS_R),
+        (np.log10(np.maximum(np.asarray(v["state_variable"]), 1e-30)),
+         "state variable", "log10 theta (s)", "viridis", 0, 10),
+    ]
 
-  ax13 = fig1.add_subplot(3,3,3)
-  norm.plot(vmin=mn-r, vmax = mn+r, extend = 'both')
-  ax13.set_ylabel('')
-  ax13.set_ylabel('')
+    fig, ax = plt.subplots(3, 3, figsize=(16, 10))
+    for k, (arr, title, unit, cmap, vmin, vmax) in enumerate(panels):
+        a = ax[k // 3, k % 3]
+        m = a.pcolormesh(x, z, arr, cmap=cmap, vmin=vmin, vmax=vmax,
+                         shading="nearest")
+        cb = plt.colorbar(m, ax=a, extend="both")
+        cb.set_label(unit)
+        a.set_title(title)
+        a.set_xlabel(xlab)
+        a.set_ylabel(ylab)
+        a.set_aspect("equal")
 
-  ax21 = fig1.add_subplot(3,3,4)
-  log10_slip_rate = np.log10(slip_rate)
-  log10_slip_rate.rename('log10_slip_rate')
-  #log10_slip_rate.rename(name_dict = {"slip_rate":"log10(slip_rate)"})
-  log10_slip_rate.plot(vmin=-20, vmax=2, extend = 'both')
-  #ax21.set_ylabel('')
+    for a, (xx, yy, xl, yl) in zip(
+            ax[2], [(np.arange(1, len(b) + 1), vlin, "time step",
+                     "peak slip rate (m/s)"),
+                    (np.arange(1, len(b) + 1), vlog, "time step",
+                     "log10 peak slip rate (m/s)"),
+                    (b[:, 0] / 86400.0, vlog, "time (days)",
+                     "log10 peak slip rate (m/s)")]):
+        a.plot(xx, yy, lw=1.0)
+        a.plot(xx[i], yy[i], "ro", ms=6)
+        a.set_xlabel(xl)
+        a.set_ylabel(yl)
+        a.grid(alpha=0.3)
 
-  ax22 = fig1.add_subplot(3,3,5)
-  state2.plot(vmin=-mn-r, vmax=-mn+r, extend = 'both' )
-  ax22.set_ylabel('')
+    case = getattr(par, "casename", "")
+    flab = f" | fault {ift}/{nfault - 1}" if nfault > 1 else ""
+    fig.suptitle(f"{case} | {os.path.basename(fname)} | step {nstep}"
+                 f" | t = {tdays:.3f} d{flab}")
+    fig.tight_layout()
+    pu.save(fig, png, dpi=150)
 
-  ax23 = fig1.add_subplot(3,3,6)
-  log10_state     = np.log10(state)
-  log10_state.plot(vmin = 0, vmax = 10, extend = 'both')
-  ax23.set_ylabel('')
 
-  ax31 = fig1.add_subplot(3,3,7)
-  vlin, vlog = peak_slip_rate(b)
-  ax31.plot(vlin)
-  ax31.plot(nstep-1,vlin[nstep-1],'ro',markersize=10)
-  ax31.set_xlabel('Time Steps')
-  ax31.set_ylabel('Peak Slip Rate (m/s)')
-
-  ax31 = fig1.add_subplot(3,3,8)
-  ax31.plot(vlog)
-  ax31.plot(nstep-1,vlog[nstep-1],'ro',markersize=10)
-  ax31.set_xlabel('Time Steps')
-  ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
-
-  ax31 = fig1.add_subplot(3,3,9)
-  ax31.plot(cumulativeTimeInDays, vlog)
-  ax31.plot(cumulativeTimeInDays[nstep-1],vlog[nstep-1],'ro',markersize=10)
-  ax31.set_xlabel('Time in Days')
-  ax31.set_ylabel('Log10(Peak Slip Rate (m/s))')
-
-  plt.savefig(fname + ".png", dpi = 600)
-  plt.close()
-
-  return (fig1,)
-
-def plot_roughness(fname):
-  a = xr.open_dataset(fname)
-  #print (a)
-
-  b1 = a.peak
-  b2 = a.pypx
-  b3 = a.pypz
-
-  fig1 = plt.figure()
-  plt.rc('font', size=SMALL_SIZE)
-
-  ax11 = fig1.add_subplot(2,2,1)
-  b1.plot()
-  ax11.set_xlabel('')
-  #ax11.set_ylabel('')
-
-  ax12 = fig1.add_subplot(2,2,2)
-  b2.plot()
-  ax12.set_xlabel('')
-  ax12.set_ylabel('')
-
-  ax21 = fig1.add_subplot(2,2,3)
-  b3.plot()
-  #ax21.set_ylabel('')
-
-  plt.savefig(fname + ".png", dpi = 600)
-  plt.close()
-
-  return (fig1,)
-
-def tryint(s):
+def generate_gif(pngs, gif):
     try:
-        return int(s)
-    except:
-        return s
+        import imageio
+    except ImportError:
+        print(f"skipping {gif}: python package 'imageio' is not installed "
+              "(pip install imageio)")
+        return
+    with imageio.get_writer(gif, mode="I") as w:
+        for p in pngs:
+            w.append_data(imageio.v2.imread(p))
+    print(f"wrote {gif} ({len(pngs)} frames)")
 
-def alphanum_key(s):
-    return [tryint(c) for c in re.split('([0-9]+)', s)]
 
-def sort_nicely(l):
-    l.sort(key=alphanum_key, reverse=False)
-    return l
+def process_dir(rdir, outdir):
+    par = pu.load_par(rdir, "plotOnFaultVars")
+    b = np.loadtxt(os.path.join(rdir, "global.dat"), ndmin=2)
+    snaps = pu.sort_nicely([f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
+                            if pu.step_of(f) is not None])
+    with nc.Dataset(snaps[0]) as d:
+        nfault = d.dimensions["nid_fault"].size if "nid_fault" in d.dimensions else 1
 
-def generate_gif():
-  #images = []
-  #dirFiles = []
-  #for fname in os.listdir(os.getcwd()):
-  #  name, file_extension = os.path.splitext(fname)
-  #  if '.png' in file_extension:
-  #    dirFiles += fname
-  #print(dirFiles)
-  #for fname in sorted(dirFiles):
-  #  print(fname)
-  #  images.append(imageio.imread(fname))
-  #imageio.mimsave('on_fault_vars.gif',images)
-  filenames = glob.glob('.//*.png')
-  filenames = sort_nicely(filenames)
-  with imageio.get_writer('./on_fault_vars.gif', mode='I') as writer:
-      for filename in filenames:
-          image = imageio.v2.imread(filename)
-          #img = convert_from_path(filename)[0]
-          #image = np.array(img.getdata(), np.uint8).reshape(img.size[1], img.size[0], 3)
-          writer.append_data(image)
+    for ift in range(nfault):
+        sfx = f".f{ift}" if nfault > 1 else ""
+        frames = []
+        for f in snaps:
+            png = pu.out_path(rdir, os.path.basename(f) + sfx + ".png", outdir)
+            plot_fault_snapshot(f, ift, nfault, par, b, png)
+            frames.append(png)
+        generate_gif(frames, pu.out_path(rdir, f"on_fault_vars{sfx}.gif", outdir))
 
-def seek_numbers_filename(x):
-    return (x[6:10])
 
-#dirFiles = os.listdir(os.getcwd())
-def _main_func(description):
-    dirFiles = list()
-    for fname in os.listdir(os.getcwd()):
-        name, file_extension = os.path.splitext(fname)
-        if 'fault.' in name and '.nc' in file_extension and re.search(r'\.\d+',name):
-            dirFiles += fname
-            if os.path.exists(fname + '.png') == False: plot_fault(str(fname))
-        if 'roughness' in name and '.nc' in file_extension:
-            dirFiles += fname
-            plot_roughness(str(fname))
-    generate_gif()
+def main():
+    ap = pu.make_parser(__doc__, "plotOnFaultVars",
+                        "fault.NNNNN.nc[.fN].png and on_fault_vars[.fN].gif, "
+                        "one per fault, into each cycle's directory.",
+                        PATTERNS)
+    args = ap.parse_args()
+    for label, rdir in pu.resolve_targets(args.dirs, PATTERNS, "plotOnFaultVars"):
+        print(f"processing {label or rdir} ({rdir})")
+        process_dir(rdir, args.outdir)
+    return 0
+
 
 if __name__ == "__main__":
-    _main_func(__doc__)
-
-
+    sys.exit(main())

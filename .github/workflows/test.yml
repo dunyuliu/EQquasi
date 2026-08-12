@@ -33,18 +33,17 @@ jobs:
         sudo apt-get install libnetcdf-dev libnetcdff-dev
         pip install xarray imageio pdf2image numpy==1.26.4 netCDF4 pytest matplotlib
 
-    - name: Static regression suite
+    - name: Fast tiers (unit, contract, regression)
       run: python3 -m pytest tests/ -v
 
-    - name: Run tests
+    - name: End-to-end (fast tier)
       run: |
-        bash make.scripts.executable.sh 
+        bash make.scripts.executable.sh
         export EQQUASIROOT=$(pwd)
-        export PATH=$(pwd)/bin:$PATH
-        export PATH=$(pwd)/scripts:$PATH 
-        set -o pipefail   # otherwise tee's exit status masks testAll.py's
-        python3 testAll.py 2>&1 | tee testRunLog.txt
-        
+        export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
+        set -o pipefail
+        python3 -m pytest tests/ -m e2e_fast -v 2>&1 | tee testRunLog.txt
+
     - name: Print log
       if: always()   # otherwise a failing test step hides the very log needed to debug it
       run: cat testRunLog.txt
@@ -66,17 +65,17 @@ jobs:
       
     - name: Check errors in testRunLog.txt
       run: |
-        # check.test.py prints the literal string 'FAIL ' on divergence. The
+        # `tests/e2e/test_benchmarks.py` prints the literal string 'FAIL ' on divergence. The
         # old pattern did not match it, so a BP5 regression went green.
         if grep -qE 'FAIL' testRunLog.txt; then
-            echo "Regression detected: check.test.py reported FAIL."
+            echo "Regression detected: `tests/e2e/test_benchmarks.py` reported FAIL."
             exit 1
         fi
         if grep -qiE 'error|exception|failed|fatal|abort' testRunLog.txt; then
             exit 1
         fi
         if ! grep -q 'CHECK SUMMARY' testRunLog.txt; then
-            echo "check.test.py never ran to completion - refusing to pass."
+            echo "`tests/e2e/test_benchmarks.py` never ran to completion - refusing to pass."
             exit 1
         fi
     

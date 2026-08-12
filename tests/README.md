@@ -31,7 +31,7 @@ without tripping a single guard.
 
 Oracles:
 
-  - BP5, BP7 -- `test.reference.results/`, via `testAll.py` and `check.test.py`.
+  - BP5, BP7 -- `test.reference.results/`, via `pytest -m e2e` and `tests/e2e/test_benchmarks.py`.
     These predate this suite; `tests/e2e/test_bp5_bp7_regression.py` only wraps
     them so all three benchmarks report through one command.
   - BP8 -- `reference/bp8/summary.json`, frozen from v1.4.7.

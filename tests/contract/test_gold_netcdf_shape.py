@@ -5,7 +5,7 @@ dimension of size `ntotft`, so on-fault variables are stored 3-D as
 (nid_fault, nid_dip, nid_strike). Gold predating that change is 2-D.
 
 The `mfault` merge introduced the dimension and left the BP5, BP5-dip90 and BP7
-gold at the old 2-D shape. CI caught it -- `check.test.py` compares with
+gold at the old 2-D shape. CI caught it -- `tests/e2e/test_benchmarks.py` compares with
 xarray's `identical()`, which rejects differing dimensions -- but
 `scripts/plotAgainstGold.py` did not: its `load_field` keys on
 (variable, fault index) and maps (nz, nx) and (1, nz, nx) onto the same key, so

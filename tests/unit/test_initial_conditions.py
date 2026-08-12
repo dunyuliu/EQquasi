@@ -49,7 +49,9 @@ def slip_rate_from(a, b, Dc, v0, r0, sigma_bar, tau, theta):
 def test_tau0_is_table_1(case):
     """tau^0 must be Table 1's 14.6 MPa, which is what the reference uses."""
     par = load_case_params(case)
-    ofv = par.on_fault_vars
+    # on_fault_vars is (ntotft, nfz, nfx, 100) for every compset since v1.10;
+    # these BP8 cases are single-fault, so take fault 0.
+    ofv = par.on_fault_vars[0]
     nz, nx = ofv.shape[0], ofv.shape[1]
     for iz, ix in [(0, 0), (nz - 1, nx - 1), (nz // 2, nx // 2)]:
         assert ofv[iz, ix, 8] == pytest.approx(14.6e6), (
@@ -62,7 +64,9 @@ def test_tau0_is_table_1(case):
 def test_fault_starts_at_uniform_v_init(case):
     """The whole point of section 3: V(0) = V_init everywhere."""
     par = load_case_params(case)
-    ofv = par.on_fault_vars
+    # on_fault_vars is (ntotft, nfz, nfx, 100) for every compset since v1.10;
+    # these BP8 cases are single-fault, so take fault 0.
+    ofv = par.on_fault_vars[0]
     nz, nx = ofv.shape[0], ofv.shape[1]
     probes = [(0, 0), (0, nx - 1), (nz - 1, 0), (nz - 1, nx - 1), (nz // 2, nx // 2)]
 
@@ -89,7 +93,7 @@ def test_fault_starts_at_uniform_v_init(case):
 def test_derived_theta0_and_the_equation_29_discrepancy(case):
     """Pin the derived theta_0 and how far it sits from eq. (29)."""
     par = load_case_params(case)
-    theta0 = par.on_fault_vars[0, 0, 20]
+    theta0 = par.on_fault_vars[0, 0, 0, 20]
     assert theta0 == pytest.approx(4.0188e11, rel=1e-3), (
         f"{case}: derived theta_0 is {theta0:.4e} s, expected 4.0188e11 s."
     )
@@ -104,7 +108,9 @@ def test_derived_theta0_and_the_equation_29_discrepancy(case):
 @pytest.mark.parametrize("case", BP8_CASES)
 def test_table_1_parameters_are_unmodified(case):
     par = load_case_params(case)
-    ofv = par.on_fault_vars
+    # on_fault_vars is (ntotft, nfz, nfx, 100) for every compset since v1.10;
+    # these BP8 cases are single-fault, so take fault 0.
+    ofv = par.on_fault_vars[0]
     assert par.fric_rsf_a == 0.016
     assert par.fric_rsf_b == 0.010
     assert par.fric_rsf_Dc == 0.5e-3

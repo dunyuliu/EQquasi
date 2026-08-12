@@ -197,7 +197,7 @@ def compare_field(bench, run_dir, out, only=None):
     # (variable, fault index), which maps a 2-D (nz, nx) array and a 3-D
     # (1, nz, nx) array onto the same key -- so a gold file predating the
     # nid_fault dimension compared clean against a run that has it, and this
-    # script reported "matches gold" while check.test.py's xarray identical()
+    # script reported "matches gold" while `tests/e2e/test_benchmarks.py`'s xarray identical()
     # correctly failed in CI. A comparator must not normalise away the
     # structural change it exists to detect.
     gd, rd = raw_dims(gold_path), raw_dims(hits[0])

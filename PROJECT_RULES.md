@@ -270,8 +270,8 @@ skipped step, no warn-and-proceed.
 
 **Fixed since seeding (verified 2026-08-12)**: `install.eqquasi.sh`'s
 malformed `[ $MACHINE == "local"]` / `[! -f ...]` bash tests and the
-`.github/workflows/test.yml` `python3 testAll.py >> testRunLog.txt || true`
-that discarded `testAll.py`'s exit code are both gone from the current files;
+`.github/workflows/test.yml` `python3 `pytest -m e2e` >> testRunLog.txt || true`
+that discarded `pytest -m e2e`'s exit code are both gone from the current files;
 `tests/contract/test_release_gate.py` now guards the exit-code/grep path
 directly (see rule 3). Left here as the incident record — the failure mode (a
 syntax slip or a swallowed exit code makes a broken branch look green) is
@@ -332,13 +332,13 @@ through `tail` looks identical to a green one. This is the same failure mode
 CI already hit once (below); do not reintroduce it in a local workflow.
 
 **Fixed since seeding (verified 2026-08-12)**: the two gaps originally
-recorded here — `check.test.py`'s literal `'FAIL '` not matching CI's grep
-pattern, and `testAll.py`'s exit code being discarded by `|| true` — are both
+recorded here — `tests/e2e/test_benchmarks.py`'s literal `'FAIL '` not matching CI's grep
+pattern, and `pytest -m e2e`'s exit code being discarded by `|| true` — are both
 gone from `.github/workflows/test.yml` (now `set -o pipefail`, an explicit
 `grep -qE 'FAIL'` check, and a `CHECK SUMMARY` completion check), and are
-themselves guarded by `tests/contract/test_release_gate.py`. `check.test.py`
+themselves guarded by `tests/contract/test_release_gate.py`. `tests/e2e/test_benchmarks.py`
 still owns the BP5/BP5-dip90/BP7 comparison at `rtol=atol=1e-3`
-(`check.test.py:35,58`, `compare_nc_files`/`compare_txt_files`) — **this
+(`tests/e2e/test_benchmarks.py`:35,58`, `compare_nc_files`/`compare_txt_files`) — **this
 tolerance is still not bit-exact**, see Unenforceable rules.
 `reference/bp8/summary.json` plus `tests/e2e/test_bp8_against_gold.py`
 own BP8's, at tolerances near round-off (`RTOL_SLIP = 1e-4`, exact for the
@@ -467,8 +467,8 @@ inside an existing `if (bp == N)` block's byte range); not implemented today
 - **CI regression compset** → a second, smaller/faster directory named
   `test.<benchmark>.<mode>` (mirroring `test.bp5.qdc` vs `bp5.qdc.2000`: cut
   `nstep` and coarsen `dx`), added to `nameList`/`coreNumList` in
-  `testNameList.py` (or wired into a `tests/e2e/*.py` regression, for
-  benchmarks that moved off `testNameList.py` — see rule 12), with its
+  `tests/e2e/cases.py` (or wired into a `tests/e2e/*.py` regression, for
+  benchmarks that moved off `tests/e2e/cases.py` — see rule 12), with its
   reference output at `reference/<benchmark>/`.
 
 `scripts/create.newcase` does **not** validate `compset` against
@@ -529,7 +529,7 @@ the new files.
 nothing asserts on is dead weight masquerading as a safety net — an oracle
 nobody consults would not have caught the incidents rule 3 fixed. Before
 committing a new file under `reference/<benchmark>/`, confirm something
-in `tests/`, `scripts/`, `check.test.py` or `testNameList.py` actually names
+in `tests/`, `scripts/`, `tests/e2e/test_benchmarks.py` or `tests/e2e/cases.py` actually names
 it (a literal string, or a dynamically constructed one — see
 `tests/contract/test_reference_gold_is_referenced.py`, which checks both).
 
@@ -812,6 +812,27 @@ The same applies to the parameters: edit the compset, do not hand-edit the
 generated `model.txt` or `run.sh`. `./case.setup` regenerates both, so an edit
 to either is discarded the next time anyone runs it (see rule 15).
 
+**One parameter scheme, not two.** Every compset inherits from
+`scripts/defaultParameters.py`, and the default must cover every case the code
+supports -- otherwise a compset that needs something the default lacks builds it
+by hand, and there are two ways to express the same thing.
+
+*Open example.* `defaultParameters` carries `ntotft` and `faultgeom`, so it is
+multi-fault aware, but allocates `on_fault_vars` as a single-fault
+`(nfz, nfx, 100)`. `test.stepover.qdc` and `bp1002.qdc.2500` therefore allocate
+their own 4-D `(ntotft, nfzMax, nfxMax, 100)` and fill it themselves. Two
+schemes for one thing. The fix is the same `ntotft`-neutrality already required
+of the Fortran (rule 13): allocate 4-D always, with `ntotft = 1` the degenerate
+case.
+
+**Run what the workflow puts on PATH, and know which binary that is.**
+`install.eqquasi.sh` prepends `bin/` to PATH, but a stale EQquasi installation
+elsewhere on PATH will shadow it and fail confusingly -- on this machine
+`which -a eqquasi` finds a second copy under a different home directory that is
+missing `libdmumps-5.4.so`, so `run.sh` dies with a shared-library error that
+says nothing about the real cause. Check `which -a eqquasi` before concluding a
+run is broken.
+
 ## 17. CI is the gate, not the local suite
 
 **Instantiates: G3** (a gate is only real if it runs, fails loud, and is
@@ -826,7 +847,7 @@ after pushing -- `gh run list --repo dunyuliu/EQquasi --limit 5`, and
 red through four tagged releases (v1.5.0, v1.6.0, v1.7.0, v1.7.1, v1.7.2)
 because the local suite was green and nobody looked. The failure was real: the
 merge added a `nid_fault` dimension to every on-fault netCDF write, so runs
-produced `(1, nz, nx)` against gold's `(nz, nx)`, and `check.test.py` compares
+produced `(1, nz, nx)` against gold's `(nz, nx)`, and `tests/e2e/test_benchmarks.py` compares
 with xarray's `identical()`, which rejects differing dimensions.
 
 **A comparator must not normalise away the difference it exists to detect.**
@@ -846,7 +867,7 @@ before reshaping and refuses outright when they differ.
 
 | Rule | Why it can't be checked today | What would fix it |
 |---|---|---|
-| 3 (bit-exact BP5/BP5-dip90/BP7 tolerance) | `check.test.py` uses `rtol=atol=1e-3` (verified 2026-08-12, still true); nothing in the repo asserts the stronger "zero difference" property BP8's e2e tier already holds itself to | Tighten `check.test.py`'s threshold (or add a second, stricter mode) to match BP8's `max|diff| = 0.0` bar |
+| 3 (bit-exact BP5/BP5-dip90/BP7 tolerance) | `tests/e2e/test_benchmarks.py` uses `rtol=atol=1e-3` (verified 2026-08-12, still true); nothing in the repo asserts the stronger "zero difference" property BP8's e2e tier already holds itself to | Tighten `tests/e2e/test_benchmarks.py`'s threshold (or add a second, stricter mode) to match BP8's `max|diff| = 0.0` bar |
 | 4 (model.txt positional contract) | No schema file pairs `case.setup` writes with `read_input.f90` reads — verifying order-correctness means manually diffing two files | A generated/shared schema (YAML or a Python list of `(name, type)`) consumed by both a `case.setup` codegen step and a Fortran read-order check |
 | 6 (additive-only bp branches) | No script maps byte ranges of `if (bp == N)` blocks to a diff and rejects edits inside them | An AST/regex-based check scoped to `src/faulting.f90`, `src/library_output.f90`, `src/solveTimeLoopMUMPS.f90` |
 | 7 (compsets.txt registration) | `compsets.txt` is not read by any script — it can drift from `case_input/` silently | `diff` the compset directory listing against `compsets.txt` in CI |
@@ -878,7 +899,7 @@ describing BP8 and the tiered `tests/` suite as future work) — not "no rule
 book yet." The project has since reached v1.6.0: `test.reference.results/`
 was replaced by `reference/<benchmark>/`, the
 `tests/unit`/`contract`/`regression`/`e2e` suite now exists alongside
-`testAll.py`/`check.test.py`, the fault-node engine was made
+`pytest -m e2e`/`tests/e2e/test_benchmarks.py`, the fault-node engine was made
 `ntotft`-neutral, and two of rule 2/3's three originally-cited violations
 were fixed and are now mechanically guarded by
 `tests/contract/test_release_gate.py`. That pass updated the stale paths and

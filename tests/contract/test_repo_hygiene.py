@@ -4,7 +4,7 @@ Convention: every scratch artifact -- generated cases, simulation output, build
 products -- lives under `work/` at the repo root, which is gitignored. Nothing
 scratch is written to the repo root itself.
 
-This matters because `testAll.py` starts by deleting its scratch directory. A
+This matters because `pytest -m e2e` starts by deleting its scratch directory. A
 scratch directory at the repo root is one typo away from deleting something
 tracked, and it also means `git status` is never clean after a run.
 """
@@ -26,32 +26,21 @@ def test_scratch_root_is_gitignored():
         f"{SCRATCH_ROOT}/ must be gitignored; run artifacts are never committed"
 
 
-def test_test_harness_writes_under_the_scratch_root():
-    """testAll.py used to create and rm -rf a `test/` directory at the repo root."""
-    src = read("testAll.py")
-    assert "rm -rf work/test" in src, \
-        "testAll.py must clear its scratch dir under work/, not at the repo root"
-    assert re.search(r"rm -rf ['\"]?test['\"]?[\s'\"]*\)", src) is None, \
-        "testAll.py must not rm -rf a bare `test` directory at the repo root"
-    assert "work/test" in src
+def test_e2e_runs_stay_under_the_scratch_root():
+    """Runs go in work/, which is gitignored -- never beside the sources.
 
-
-def test_check_test_reads_from_the_scratch_root():
-    src = read("check.test.py")
-    m = re.search(r"testRoot\s*=\s*['\"]([^'\"]+)['\"]", src)
-    assert m, "could not find testRoot in check.test.py"
-    assert m.group(1).startswith(SCRATCH_ROOT + "/"), \
-        f"check.test.py must read outputs from {SCRATCH_ROOT}/, got {m.group(1)!r}"
-
-
-def test_reference_results_are_not_under_the_scratch_root():
-    """The oracles are committed data and must survive a scratch wipe."""
-    src = read("check.test.py")
-    m = re.search(r"refRoot\s*=\s*['\"]([^'\"]+)['\"]", src)
-    assert m, "could not find refRoot in check.test.py"
-    assert not m.group(1).startswith(SCRATCH_ROOT + "/"), \
-        "reference results must NOT live under the gitignored scratch root"
-    assert (ROOT / m.group(1)).is_dir()
+    Replaces three checks that policed testAll.py and check.test.py. Both are
+    gone; cases.run_case is now the single place a run directory is chosen, so
+    this asserts the property there instead of in two harnesses.
+    """
+    bench = read("tests/e2e/test_benchmarks.py")
+    m = re.search(r'WORK_ROOT\s*=\s*os\.path\.join\(str\(ROOT\),\s*"([^"]+)"', bench)
+    assert m, "test_benchmarks.py no longer names a work root"
+    assert m.group(1) == SCRATCH_ROOT, \
+        "e2e runs are written outside " + SCRATCH_ROOT + "/"
+    assert "shutil.rmtree(workdir" in read("tests/e2e/cases.py"), \
+        "cases.run_case no longer clears its work directory, so a stale result "\
+        "could be mistaken for a fresh one"
 
 
 def test_no_tracked_files_under_the_scratch_root():

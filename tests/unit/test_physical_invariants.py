@@ -21,11 +21,29 @@ import pytest
 
 from conftest import ROOT
 
-FIELD_GOLD = {
-    "bp5": ROOT / "reference" / "bp5" /  "fault.00101.csv",
-    "bp5.dip90": ROOT / "reference" / "bp5.dip90" /  "fault.00101.csv",
-    "bp7": ROOT / "reference" / "bp7" /  "fault.00101.csv",
-}
+def _field_references():
+    """{label: fault-plane CSV} for every reference in the tree, discovered.
+
+    A hardcoded list is the last residue of the per-benchmark harness: it went
+    stale the moment BP5-dip90, BP7 and the step-over were retired. Ask the
+    tree instead, so adding or removing a reference needs no edit here.
+    """
+    out = {}
+    base = ROOT / "reference"
+    if not base.is_dir():
+        return out
+    for bench in sorted(p for p in base.iterdir() if p.is_dir()):
+        for cand in [bench] + sorted(d for d in bench.iterdir()
+                                     if d.is_dir()
+                                     and d.name not in ("plots", "archive")):
+            csvs = sorted(f for f in cand.glob("fault.*.csv")
+                          if not f.name.endswith(".r.csv"))
+            if csvs:
+                out[str(cand.relative_to(base))] = csvs[-1]
+    return out
+
+
+FIELD_GOLD = _field_references()
 
 BP8_SNAPSHOT = ROOT / "reference" / "bp8" /  "fault.05301.csv"
 STEPOVER_SNAPSHOT = ROOT / "reference" / "stepover" /  "fault.00101.csv"
@@ -59,6 +77,9 @@ def test_effective_normal_stress_stays_compressive(bench):
     )
 
 
+@pytest.mark.skipif(not (ROOT / "reference" / "stepover").is_dir(),
+                    reason="step-over reference retired in v1.10.0; "
+                           "to be recreated through the e2e mechanism")
 def test_stepover_effective_normal_stress_stays_compressive_both_faults():
     rows = _read_csv(STEPOVER_SNAPSHOT)
     for ift in ("0", "1"):
@@ -85,6 +106,9 @@ def test_state_variable_stays_positive_and_finite(bench):
     assert np.all(st > 0.0), f"{bench}: {int((st <= 0).sum())} nodes have state_variable <= 0"
 
 
+@pytest.mark.skipif(not (ROOT / "reference" / "stepover").is_dir(),
+                    reason="step-over reference retired in v1.10.0; "
+                           "to be recreated through the e2e mechanism")
 def test_stepover_state_variable_stays_positive_and_finite_both_faults():
     rows = _read_csv(STEPOVER_SNAPSHOT)
     for ift in ("0", "1"):

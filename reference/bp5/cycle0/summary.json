@@ -32,17 +32,9 @@
    "fault.04483.nc",
    "fault.r.nc"
   ],
-  "disp_snapshots": [
-   "disp.00001.nc",
-   "disp.01001.nc",
-   "disp.02001.nc",
-   "disp.03001.nc",
-   "disp.04001.nc",
-   "disp.04483.nc",
-   "disp.r.nc"
-  ],
   "on_fault_stations": 9,
-  "off_fault_stations": 9
+  "off_fault_stations": 9,
+  "note": "disp.*.nc omitted: no comparison reads them (rule 8a)."
  },
  "provenance": {
   "run_dir": "work/gold.bp5.np4",

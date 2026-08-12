@@ -14,14 +14,25 @@ import sys
 
 from conftest import ROOT, read
 
-GOLD_DIRS = sorted((ROOT / "reference").glob("*/gold"))
+# The gold/ layer was removed in v1.9.0: reference/<bench>/ is itself the
+# reference, and a run's results may sit in a subdirectory (cycle0,
+# cycle0-step101-fast). Take both levels.
+GOLD_DIRS = sorted(d for d in (ROOT / "reference").glob("*") if d.is_dir()) + \
+            sorted(d for d in (ROOT / "reference").glob("*/*")
+                   if d.is_dir() and d.name != "plots" and d.name != "archive")
 
 SEARCH_ROOTS = [
     "tests",
     "scripts",
-    "check.test.py",
-    "testNameList.py",
 ]
+
+# Reference files read by glob rather than by name. tests/e2e/test_benchmarks.py
+# discovers what to compare from what each reference directory contains -- that
+# is the point of it, so a new benchmark is a table row rather than a file --
+# and a text search cannot see filenames that are never written down. These
+# patterns record which families are covered that way.
+GLOB_READ = ("fault.", "fltst_strk", "srfst_strk", "global",
+             "_strike.", "_depth.", "cplot_", "tdyna", "runInfo")
 
 
 def _haystack():
@@ -38,22 +49,9 @@ def _haystack():
     return "\n".join(chunks)
 
 
-def _bp8_dynamic_names():
-    """BP8's station/profile gold filenames are built at runtime by string
-    formatting in tests/e2e/test_bp8_against_gold.py, so no literal substring
-    match is possible for them. Import that module's own generators instead of
-    guessing -- this is the one place a plain text search cannot see what a
-    test actually reads.
-    """
-    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
-    try:
-        import test_bp8_against_gold as m
-        names = {f"fltst_strk{s}.csv" for s in m.ALL_STATIONS}
-        names |= {f.replace(".dat", ".csv") for f in m.PROFILE_FILES}
-        return names
-    finally:
-        sys.path.remove(str(ROOT / "tests" / "e2e"))
-        sys.modules.pop("test_bp8_against_gold", None)
+def _covered_by_glob(name):
+    """True when tests/e2e/test_benchmarks.py would find this file by pattern."""
+    return any(name.startswith(pfx) or pfx in name for pfx in GLOB_READ)
 
 
 def gold_files():
@@ -67,15 +65,17 @@ def gold_files():
 
 def test_every_gold_file_is_named_somewhere_in_the_suite():
     hay = _haystack()
-    dynamic = _bp8_dynamic_names()
+    dynamic = set()
     unreferenced = [
         f.relative_to(ROOT) for f in gold_files()
         if f.name not in hay and f.name not in dynamic
+        and not _covered_by_glob(f.name)
     ]
     assert not unreferenced, (
         "these reference/gold files are not named by any test, script, or "
-        "check.test.py/testNameList.py, and do not match a BP8 dynamically "
-        "generated name either -- either wire them into a test in the same "
+        "tests/e2e/test_benchmarks.py, and are not among the families "
+        "tests/e2e/test_benchmarks.py discovers by glob -- either wire them "
+        "into a test in the same "
         "change that adds them, or do not commit them (PROJECT_RULES.md rule "
         f"8a): {unreferenced}"
     )

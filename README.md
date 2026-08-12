@@ -37,13 +37,13 @@ To install and test *```EQquasi```*  on *Ubuntu*,
 git clone https://github.com/dunyuliu/EQquasi.git
 cd EQquasi
 bash make.scripts.executable.sh
-python3 testAll.py
+python3 `pytest -m e2e`
 ```
 To install *```EQquasi```* without testing, try
 ```
 ./install.eqquasi.sh -m ubuntu
 ```
-instead of ```python3 testAll.py```. In this case, *MUMPS* should have been installed via Ubuntu's apt-get. <br/>
+instead of ```python3 `pytest -m e2e```. In this case, *MUMPS* should have been installed via Ubuntu's apt-get. <br/>
 
 To install *```EQquasi```* on TACC's HPC Lonestar6, try
 ```
@@ -131,12 +131,12 @@ scratch is written to the repo root itself.
 
 ```
 work/                    # gitignored; create your cases here
-work/test/               # created and wiped by testAll.py
+work/test/               # created and wiped by `pytest -m e2e`
 test.reference.results/  # committed oracles; NOT scratch, never wiped
 bin/                     # gitignored build product
 ```
 
-```testAll.py``` begins by deleting its scratch directory, so keeping that
+```pytest -m e2e``` begins by deleting its scratch directory, so keeping that
 directory under ```work/``` is what stops a stray path from removing tracked
 files, and it keeps ```git status``` clean after a run.
 
@@ -166,12 +166,12 @@ is opt-in.
 python3 -m pytest tests/            # unit + contract + regression, ~4 s
 python3 -m pytest tests/ -m e2e     # builds and runs benchmarks, ~40 min
 python3 -m pytest tests/ -m ""      # everything
-python3 testAll.py                  # standalone driver: rebuild, run testNameList, compare
+python3 `pytest -m e2e`                  # standalone driver: rebuild, run testNameList, compare
 ```
 
-`testAll.py` predates the pytest tiers and still works. It rebuilds from source
-with `install.eqquasi.sh`, runs every compset in `testNameList.py` under
-`work/test/`, then `check.test.py` compares each against
+`pytest -m e2e` predates the pytest tiers and still works. It rebuilds from source
+with `install.eqquasi.sh`, runs every compset in `tests/e2e/cases.py` under
+`work/test/`, then `tests/e2e/test_benchmarks.py` compares each against
 `reference/<benchmark>/`. Use it when you want a clean-room rebuild-and-run
 in one command; use the `e2e` marker when you want the same comparisons as part
 of the suite.

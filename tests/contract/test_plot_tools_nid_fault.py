@@ -2,7 +2,7 @@
 
 `netcdf_write_on_fault` (src/netcdf_io.f90) stores every on-fault variable as
 (nid_fault, nid_dip, nid_strike). That shape has now broken consumers three
-separate times (check.test.py gold, plotAgainstGold.py's key-collision, the
+separate times (`tests/e2e/test_benchmarks.py` gold, plotAgainstGold.py's key-collision, the
 plotting utilities), each time because a consumer assumed 2-D or silently
 reduced the fault dimension -- xarray's .plot() on a 3-D array happily draws a
 histogram instead of a map. This test runs every converted tool, as a user

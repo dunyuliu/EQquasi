@@ -1,0 +1,34 @@
+{
+ "benchmark": "BP5",
+ "compset": "test.bp5.qdc",
+ "oracle_kind": "the compset's own 101 steps, stopped by nstep -- the fast gate",
+ "element_size_m": 2000.0,
+ "why": "Same shape as cycle0/, just stopped at step 101. It is pre-nucleation, so it constrains the initial transient rather than the event; cycle0/ covers the rupture. This one is cheap enough for CI to run on every push.",
+ "run": {
+  "steps": 101,
+  "simulated_time_s": 3.398333,
+  "wall_seconds_time_loop": 85.0,
+  "nodes": 75640,
+  "fault_nodes": 1891
+ },
+ "files": {
+  "fault_snapshots": [
+   "fault.00001.nc",
+   "fault.00101.nc",
+   "fault.r.nc"
+  ],
+  "on_fault_stations": 9,
+  "off_fault_stations": 9
+ },
+ "event": {
+  "peak_Vmax_m_s": 0.06978,
+  "note": "global.dat column 2 is linear m/s for bp != 8; do not exponentiate it."
+ },
+ "provenance": {
+  "run_dir": "work/ref.bp5.step101",
+  "date": "2026-08-12",
+  "version": "1.7.0",
+  "note": "produced through create.newcase -> case.setup -> run.sh (rule 19); fault.00101.nc is bit-identical to the oracle it replaces"
+ },
+ "caveat": "regression lock, not a validation."
+}

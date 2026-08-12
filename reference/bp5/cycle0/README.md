@@ -32,7 +32,6 @@ rupture, over 0.065–117 s, peaking at 1.16 m/s.
 |---|---|
 | `fault.0*.nc` | on-fault snapshots every `nt_out`, plus the final step |
 | `fault.r.nc` | restart state at exit |
-| `disp.0*.nc`, `disp.r.nc` | volumetric displacement field at the same cadence |
 | `fltst_*.txt` | 9 on-fault station time series |
 | `srfst_*.txt` | 9 off-fault station time series |
 | `global.dat` | 4483 × 7 |
@@ -41,9 +40,9 @@ rupture, over 0.065–117 s, peaking at 1.16 m/s.
 | `tdyna.txt` | rupture start and end times |
 | `runInfo.json`, `summary.json` | provenance and the scalars worth asserting |
 
-17 MB. The `disp.*.nc` files are most of it — the full field over 75640 nodes.
-If this pattern is repeated for BP5-dip90 and BP7, consider keeping only the
-on-fault snapshots, which is what every comparison actually reads.
+About 7 MB. The volumetric `disp.*.nc` fields are deliberately not kept: no
+comparison reads them, and rule 8a says a reference file nothing reads is
+dead weight. `fault.*.nc` carries everything the oracles check.
 
 ## The one thing to know before trusting it
 

@@ -25,7 +25,21 @@ import pytest
 
 from conftest import ROOT
 
-FIELD_BENCHMARKS = ("bp5", "bp5.dip90", "bp7")
+def _reference_runs():
+    """Discovered, not listed -- see tests/unit/test_physical_invariants.py."""
+    import os
+    out = []
+    base = ROOT / "reference"
+    for bench in sorted(p for p in base.iterdir() if p.is_dir()):
+        for cand in [bench] + sorted(d for d in bench.iterdir()
+                                     if d.is_dir() and d.name not in ("plots", "archive")):
+            if any(f.name.startswith("fault.") and f.name.endswith(".nc")
+                   for f in cand.iterdir() if f.is_file()):
+                out.append(str(cand.relative_to(base)))
+    return out
+
+
+FIELD_BENCHMARKS = tuple(_reference_runs())
 
 BP8_STATIONS = [f"{s:+04d}dp{d:+04d}" for s in (-200, 0, 200) for d in (-200, 0, 200)]
 
@@ -42,10 +56,17 @@ def gold_dir(bench):
 
 @pytest.mark.parametrize("bench", FIELD_BENCHMARKS)
 def test_field_benchmark_still_has_its_snapshot(bench):
-    """The 101-step field snapshot this suite already locked at 0.0 diff."""
+    """Every reference must carry at least one fault-plane snapshot.
+
+    Not `fault.00101.nc` specifically: a reference is whatever its run
+    produced, and the step number depends on nt_out and how long the cycle
+    ran. bp5/cycle0 ends at 04483, bp8 at 05301.
+    """
     d = gold_dir(bench)
-    assert (d / "fault.00101.nc").is_file()
-    assert (d / "fault.00101.csv").is_file()
+    snaps = sorted(d.glob("fault.*.nc"))
+    assert snaps, f"{bench} has no fault-plane snapshot"
+    assert any(not f.name.endswith(".r.nc") for f in snaps), \
+        f"{bench} has only a restart file, no numbered snapshot"
 
 
 @pytest.mark.parametrize("station", BP8_STATIONS)

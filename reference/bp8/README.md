@@ -205,30 +205,54 @@ number is the one most in doubt.
 
 ### Time-step factor: converged, closed
 
-`xi` is a non-issue and needs no further sweeping. Over an **eightfold** change,
-0.4 / 0.2 / 0.1 / 0.05, edge/centre is 0.5893 / 0.5895 / 0.5897 / 0.5899 and
-centre slip moves 0.07 mm. Compared across all 20 output files rather than two
-scalars, every physically meaningful column agrees to 0.2-0.5 %:
+`xi` needs no further sweeping. Over an **eightfold** change, 0.4 / 0.2 / 0.1 /
+0.05, edge/centre is 0.5893 / 0.5895 / 0.5897 / 0.5899 and centre slip moves
+0.07 mm. Step counts are 5184 / 5301 / 5927 / 7568, so `xi = 0.05` costs
+**42.8 %** more steps than `xi = 0.2` for no resolvable gain.
 
-| column | scale | max abs diff vs xi = 0.2 |
-|---|---|---|
-| slip_2 | 3.7e-2 m | 2.7e-4 (0.3 %) |
-| V2 | 15.4 (log10) | 5.1e-2 (0.2 %) |
-| tau_2 | 17.4 MPa | 1.1e-1 (0.2 %) |
-| p | 13.6 MPa | 5.7e-2 (0.2 %) |
-| state | 11.6 (log10) | 2.0e-1 (0.5 %) |
-| V3 | 30 (log10) | 5.3 -- see below |
+Per-column max absolute difference against `xi = 0.2`, interpolated onto its
+time base, across all 9 stations:
 
-`xi = 0.2` is the right setting; 0.05 costs 46 % more steps (7568 against 5301)
-and buys nothing.
+| column | scale | max abs diff | % |
+|---|---|---|---|
+| slip_2 | 3.73e-2 m | 2.75e-4 | 0.74 % |
+| V2 | 15.39 (log10) | 5.15e-2 | 0.33 % |
+| tau_2 | 17.41 MPa | 1.05e-1 | 0.60 % |
+| p | 13.63 MPa | 5.71e-2 | 0.42 % |
+| state | 11.60 (log10) | 1.97e-1 | 1.70 % |
 
-**A trap for any comparison on this benchmark.** BP8 is antiplane, so dip-direction
-slip is zero by construction (`V_zero = 1e-20`). V3 is the base-10 *log* of that,
-so the column sits near -30 and swings several log units on round-off; `slip_3`
-is 3.0e-4 m against slip_2's 3.7e-2, with differences of 1e-6. A relative-difference
-check normalised per column reports "3281 % change" for these fields. **Any
-relative check here needs an absolute floor**, or the identically-zero components
-dominate every report.
+All under 2 %. `xi = 0.2` is the right setting.
+
+### Dip-direction slip is real off the symmetry axes
+
+An earlier version of this file called the run-to-run spread in V3 (column 5,
+log10 of dip-direction slip rate) meaningless round-off. **That is true only on
+the symmetry axes.** Independent re-derivation, final step, `dx = 50 m`,
+domain +-500:
+
+| station | slip_2 | slip_3 | V3 | slip_3 / slip_2 |
+|---|---|---|---|---|
+| `+000dp+000` | 3.73e-2 | -7.0e-19 | -30.00 | 0 |
+| `-200dp+000` | 2.20e-2 |  1.4e-19 | -25.24 | 0 |
+| `+000dp+200` | 1.74e-2 | -4.3e-19 | -25.15 | 0 |
+| `+200dp+200` | 1.53e-2 |  2.89e-4 | **-10.68** | **1.89 %** |
+| `-200dp-200` | 1.53e-2 |  2.89e-4 | **-10.68** | **1.89 %** |
+| `+200dp-200` | 1.53e-2 | -2.89e-4 | **-10.68** | **1.89 %** |
+| `-200dp+200` | 1.53e-2 | -2.89e-4 | **-10.68** | **1.89 %** |
+
+The five on-axis stations (`strk = 0` or `dp = 0`) sit at the `V_zero = 1e-20`
+floor and do swing on round-off. The four **off-axis** stations do not: slip_3
+is a stable 2.89e-4 m, converged to under 1 % across the whole `xi` sweep, with
+an antisymmetric sign pattern. This is physical -- a slipping patch in 3-D
+produces shear-stress changes with both components, and only the symmetry axes
+force the dip component to zero. Section 4.1 asks for V3, and at these four
+stations it carries signal that must be submitted, not dismissed.
+
+**A trap for any comparison on this benchmark.** Because five of nine stations
+sit at the log floor, a relative-difference check normalised per column reports
+"3281 % change" for those fields. Any relative check here needs an absolute
+floor -- and must not then conclude the whole column is noise, which is the
+error this section corrects.
 
 Note `xi` sets `dt = xi * D_RS / V` (`faulting.f90:449`), not a CFL condition --
 cell size does not enter it, so refining `dx` does not shrink the step.

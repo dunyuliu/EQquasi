@@ -97,6 +97,28 @@ unseeded and whether it ruptures is the result, not the setup.
 
 Everything before this has been plumbing.
 
+## 5b. Mid-cycle resume is not possible
+
+`fault.r.nc` carries 12 variables -- shear stress (strike, dip), effective
+normal stress, slip rate, state, state-normal, and the six master/slave
+velocity components -- but not accumulated slip, and simulated `time` is never
+restored: it initialises to 0 and accumulates via `time = time + dtev1`
+(`solveTimeLoopMUMPS.f90:72`).
+
+That is correct for its intended use. A *cycle* restart legitimately resets the
+clock and the slip accumulator, since output is per-cycle in `Q0/`, `Q1/`,
+`Q2/`, and it is the stress and state carrying over that make the next cycle
+physical.
+
+But a run that hits `nstep` mid-cycle cannot be resumed. Stress and state
+continue correctly while time and slip both reset to zero, so an event ends up
+split across two files that cannot be concatenated -- the second file's `t = 0`
+is not the first file's end, and its slip starts from nothing. Until this is
+fixed, `nstep` must be large enough to reach the slip-rate exit in one run.
+
+Adding `time` and `slips`/`slipd` to the restart file, restored when
+`icstart > 1`, would fix it and would also let a long run survive a box reboot.
+
 ## 6. Known limits, named rather than hidden
 
 - `porepressure.f90` indexes `nftnd(1)` — no fluid injection on a multi-fault

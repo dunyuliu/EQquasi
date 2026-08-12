@@ -203,10 +203,35 @@ direction a stiff boundary predicts, and it is not obviously saturated. Because
 that y sweep was run at x, z = +-500 -- now known to be too small -- the y
 number is the one most in doubt.
 
-Time-step factor `xi` is a non-issue: 0.4 / 0.2 / 0.1 give edge/centre
-0.589 / 0.589 / 0.590 over a fourfold change in step size. Note `xi` sets
-`dt = xi * D_RS / V` (`faulting.f90:449`), not a CFL condition -- cell size does
-not enter it, so refining `dx` does not shrink the step.
+### Time-step factor: converged, closed
+
+`xi` is a non-issue and needs no further sweeping. Over an **eightfold** change,
+0.4 / 0.2 / 0.1 / 0.05, edge/centre is 0.5893 / 0.5895 / 0.5897 / 0.5899 and
+centre slip moves 0.07 mm. Compared across all 20 output files rather than two
+scalars, every physically meaningful column agrees to 0.2-0.5 %:
+
+| column | scale | max abs diff vs xi = 0.2 |
+|---|---|---|
+| slip_2 | 3.7e-2 m | 2.7e-4 (0.3 %) |
+| V2 | 15.4 (log10) | 5.1e-2 (0.2 %) |
+| tau_2 | 17.4 MPa | 1.1e-1 (0.2 %) |
+| p | 13.6 MPa | 5.7e-2 (0.2 %) |
+| state | 11.6 (log10) | 2.0e-1 (0.5 %) |
+| V3 | 30 (log10) | 5.3 -- see below |
+
+`xi = 0.2` is the right setting; 0.05 costs 46 % more steps (7568 against 5301)
+and buys nothing.
+
+**A trap for any comparison on this benchmark.** BP8 is antiplane, so dip-direction
+slip is zero by construction (`V_zero = 1e-20`). V3 is the base-10 *log* of that,
+so the column sits near -30 and swings several log units on round-off; `slip_3`
+is 3.0e-4 m against slip_2's 3.7e-2, with differences of 1e-6. A relative-difference
+check normalised per column reports "3281 % change" for these fields. **Any
+relative check here needs an absolute floor**, or the identically-zero components
+dominate every report.
+
+Note `xi` sets `dt = xi * D_RS / V` (`faulting.f90:449`), not a CFL condition --
+cell size does not enter it, so refining `dx` does not shrink the step.
 
 **The frozen gold uses x, z, y = +-500**, which is the under-converged corner of
 this table. It is a regression lock on the configuration that was submitted, not

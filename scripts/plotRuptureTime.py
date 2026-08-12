@@ -42,18 +42,20 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
+from seasio import read_array
 
 pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
 
-PATTERNS = ["cplot_EQquasi.txt"]
+# .txt from a run, .csv if a gold directory ever carries one.
+PATTERNS = ["cplot_EQquasi.*"]
 UNRUPTURED = -1000.0
 FNFT_COL = 15          # zero-based
 
 
-def process_dir(rdir, outdir, levels):
-    a = np.loadtxt(os.path.join(rdir, "cplot_EQquasi.txt"))
+def process_dir(rdir, outdir, interval):
+    a = np.atleast_2d(read_array(os.path.join(rdir, "cplot_EQquasi.txt")))
     x, z, fnft = a[:, 0], a[:, 1], a[:, FNFT_COL]
 
     ruptured = fnft > UNRUPTURED / 2.0        # well clear of the sentinel
@@ -74,20 +76,42 @@ def process_dir(rdir, outdir, levels):
     grid[np.searchsorted(zs, z), np.searchsorted(xs, x)] = \
         np.where(ruptured, fnft, np.nan)
 
-    fig, ax = plt.subplots(figsize=(10, 5.5))
-    m = ax.contourf(xs / 1e3, zs / 1e3, grid, levels=levels, cmap="turbo")
-    cs = ax.contour(xs / 1e3, zs / 1e3, grid, levels=levels,
-                    colors="k", linewidths=0.4, alpha=0.5)
-    ax.clabel(cs, inline=True, fontsize=7, fmt="%.2g")
-    cb = plt.colorbar(m, ax=ax)
-    cb.set_label("rupture time (s)")
+    # Column 2 of cplot_EQquasi.txt is -zcoor, i.e. depth below the free
+    # surface, so larger means deeper. Invert the axis: drawn the natural way
+    # up, the free surface is at the top and a rupture nucleating at 16 km and
+    # growing towards 4 km reads as growing upwards, which is what it does.
+    xk, zk = xs / 1e3, zs / 1e3
+
+    # Fixed contour interval, so the front's speed is directly readable: closely
+    # spaced lines mean a slow front, widely spaced a fast one. A count-based
+    # interval would change meaning between runs and make them incomparable.
+    step = interval
+    clev = np.arange(0.0, np.nanmax(grid) + step, step)
+
+    # Labelled contour lines carry the times, so a colourbar repeats what the
+    # labels already say and costs a fifth of the width. Drop it; keep a light
+    # fill only to show the front's shape.
+    fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
+    cs = ax.contour(xk, zk, grid, levels=clev, colors="k", linewidths=1.1)
+    ax.clabel(cs, inline=True, fontsize=11, fmt="%g")
     ax.set_xlabel("along strike (km)")
-    ax.set_ylabel("z (km)")
+    ax.set_ylabel("depth (km)")
+    ax.tick_params()
+    # z = 0 is the free surface, at the top, with depth increasing downward.
+    # Full fault extent, not cropped to the ruptured patch: how much of the
+    # fault did *not* rupture is part of the result.
+    ax.set_xlim(xk.min(), xk.max())
+    ax.set_ylim(zk.max(), 0.0)
+    ax.axhline(0.0, color="0.25", lw=1.6)
+    ax.text(xk.min() + 0.01 * (xk.max() - xk.min()), 0.0, " free surface",
+            va="bottom", ha="left", fontsize=10, color="0.25")
     ax.set_aspect("equal")
-    ax.set_title(f"Rupture-time contours — "
-                 f"{os.path.basename(os.path.abspath(rdir))}\n"
-                 f"{n}/{len(fnft)} nodes ruptured; unruptured masked")
-    fig.tight_layout()
+    ax.grid(alpha=0.15, lw=0.5)
+    # The node count and time range are diagnostics, already printed to stdout;
+    # in the title they crowd out the one thing a reader needs, which is what
+    # the figure shows and which run it came from.
+    ax.set_title(f"Rupture time, contours every {step:g} s\n"
+                 f"{os.path.basename(os.path.abspath(rdir))}")
     pu.save(fig, pu.out_path(rdir, "rupture_time.png", outdir), dpi=150)
 
 
@@ -95,13 +119,15 @@ def main():
     ap = pu.make_parser(__doc__, "plotRuptureTime.py",
                         "rupture_time.png into each cycle's directory "
                         "(empty run: a message, no figure).", PATTERNS)
-    ap.add_argument("--levels", type=int, default=20,
-                    help="number of contour levels (default 20)")
+    ap.add_argument("--interval", type=float, default=5.0, metavar="SECONDS",
+                    help="contour interval in seconds (default 5). Fixed "
+                         "rather than a level count, so line spacing means "
+                         "the same thing across runs.")
     args = ap.parse_args()
     for label, rdir in pu.resolve_targets(args.dirs, PATTERNS,
                                           "plotRuptureTime.py"):
         print(f"processing {label or rdir} ({rdir})")
-        process_dir(rdir, args.outdir, args.levels)
+        process_dir(rdir, args.outdir, args.interval)
     return 0
 
 

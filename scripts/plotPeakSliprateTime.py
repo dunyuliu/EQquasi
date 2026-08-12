@@ -23,12 +23,21 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
+from seasio import read_array
 
 pu.apply_style()
 import matplotlib.pyplot as plt
 import numpy as np
 
-PATTERNS = ["global.dat"]
+# Gold under reference/ stores global as .csv; run output as .dat.
+PATTERNS = ["global.*"]
+
+
+def _global(d):
+    """global.dat from a run, global.csv from a gold directory."""
+    import glob as _g
+    hits = _g.glob(os.path.join(d, "global.dat")) or _g.glob(os.path.join(d, "global.csv"))
+    return hits[0] if hits else os.path.join(d, "global.dat")
 SECONDS_PER_YEAR = 365.25 * 24 * 3600
 
 
@@ -37,13 +46,13 @@ def load_case(tokens_or_dir):
     parts = pu.resolve_targets(tokens_or_dir, PATTERNS, "plotPeakSliprateTime.py")
     times, rates, t0 = [], [], 0.0
     for label, rdir in parts:
-        path = os.path.join(rdir, "global.dat")
+        path = _global(rdir)
         is_log10 = False
         with open(path) as f:
             for line in f:
                 if line.startswith("#") and "Column #2" in line:
                     is_log10 = "log10" in line
-        d = np.loadtxt(path, ndmin=2)
+        d = np.atleast_2d(read_array(path))
         v = 10.0 ** d[:, 1] if is_log10 else d[:, 1]
         times.append(d[:, 0] + t0)
         rates.append(v)
@@ -74,17 +83,26 @@ def main():
         else:
             case_dirs.append((os.path.basename(os.path.abspath(t)), [t]))
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
     for name, toks in case_dirs:
         t, v = load_case(toks)
-        ax.plot(t, np.maximum(v, 1e-30), lw=1.2, label=name)
+        ax.plot(t, np.maximum(v, 1e-30), lw=2.2, label=name)
     ax.set_yscale("log")
     ax.set_xlabel("time (years)")
     ax.set_ylabel("peak slip rate (m/s)")
-    ax.set_title("Peak slip rate vs time")
-    ax.grid(alpha=0.3)
-    ax.legend()
-    fig.tight_layout()
+    ax.set_title("Peak slip rate vs time", fontsize=16)
+    ax.tick_params(which="major", length=6)
+    ax.tick_params(which="minor", length=3)
+    ax.grid(alpha=0.25, which="major", lw=0.8)
+    ax.grid(alpha=0.12, which="minor", lw=0.5)
+    # The seismic threshold is what the exit criterion tests against, so it is
+    # the line that makes the interseismic/coseismic split readable.
+    ax.axhline(1e-3, color="tab:red", ls="--", lw=1.6, alpha=0.8)
+    ax.text(0.995, 1e-3, " 1e-3 m/s (seismic threshold)", transform=
+            ax.get_yaxis_transform(), ha="right", va="bottom",
+            fontsize=11, color="tab:red")
+    if len(case_dirs) > 1:
+        ax.legend(fontsize=12)
 
     if args.outdir:
         out = os.path.join(args.outdir, "peak_slip_rate_vs_time.png")

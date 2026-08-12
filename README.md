@@ -172,7 +172,7 @@ python3 testAll.py                  # standalone driver: rebuild, run testNameLi
 `testAll.py` predates the pytest tiers and still works. It rebuilds from source
 with `install.eqquasi.sh`, runs every compset in `testNameList.py` under
 `work/test/`, then `check.test.py` compares each against
-`reference/<benchmark>/gold/`. Use it when you want a clean-room rebuild-and-run
+`reference/<benchmark>/`. Use it when you want a clean-room rebuild-and-run
 in one command; use the `e2e` marker when you want the same comparisons as part
 of the suite.
 
@@ -185,7 +185,7 @@ of the suite.
 
 ### What each `e2e` benchmark compares
 
-Gold lives in `reference/<benchmark>/gold/`, in both netCDF and CSV.
+Gold lives in `reference/<benchmark>/`, in both netCDF and CSV.
 
 | Benchmark | Compset | Gold | Compared | Run time |
 |---|---|---|---|---:|
@@ -494,7 +494,7 @@ requires -- A begins 65x faster.
 `slip_rate_2` at `log10` = -12 -- and it is the closest of the three readings at
 both compared stations.
 
-The gold result is frozen in `reference/bp8/gold/` (v1.4.7, `work/bp8.sub147`,
+The gold result is frozen in `reference/bp8/` (v1.4.7, `work/bp8.sub147`,
 dx = 50 m, aging law, 30 days) and is the oracle for
 `tests/e2e/test_bp8_against_gold.py`:
 

@@ -14,7 +14,7 @@ test compsets are deliberately coarse (`test.bp5.qdc` uses dx = 4000 m against
 BP5's 2000 m; `test.bp7.qdc` uses dx = 50 m, about four cells across BP7's
 velocity-weakening disc). They catch unintended change. They do not establish
 that a benchmark is reproduced correctly -- that needs the production compset at
-its native resolution, and for BP8 it needs `reference/bp8/gold/`.
+its native resolution, and for BP8 it needs `reference/bp8/`.
 
 Opt-in with the rest of the e2e tier:
 

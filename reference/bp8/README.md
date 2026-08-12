@@ -1,287 +1,142 @@
-# BP8-QD-GS: frozen record of the CRESCENT DET comparison against `taehoKim_ref`
+# BP8-QD-GS gold
 
-Read from the DET viewer on **2026-08-07**, stations `(0, 0)` and `(-200, 0)`.
+What this is, what it does and does not establish, and how to regenerate it.
 
-The screenshots themselves cannot be archived -- image attachments are not
-written to disk -- so the reference curves are **transcribed by eye** and marked
-`~`. Our own curves are exact and archived under `data/` (subsampled to 400 rows
-so they can live in git).
+## Configuration
 
-| legend on the platform | what it is |
+BP8-QD-GS (Gaussian source), aging law, from `case_input/test.bp8.qdc`:
+
+| | |
 |---|---|
-| `dliu_eqquasi14650m` | ours, v1.4.6, dx = 50 m, aging law, `tau^0` derived = 12.9277 MPa (reading B) |
-| `taehoKim_ref` | the reference, HBI (hierarchical boundary integral) |
+| cell size | `dx = 50 m` (the benchmark specifies 10 m; §6 invites two resolutions) |
+| domain | x, y, z all ±500 m |
+| time-step factor | `xi = 0.2` |
+| run | 5301 steps to 30.00 days, exits on `fluid_tend` |
+| cost | 796 s, 1 rank, 9702 nodes |
+| code | v1.7.0 |
 
-`data/` also carries our **reading A** (`tau^0` = 14.6 MPa, dx = 10 m) curves,
-which are the ones actually comparable to the reference -- see below.
-
-## FROZEN: what `taehoKim_ref` is, and how the three readings compare
-
-Read directly off the DET plots, station (0,0) and (-200,0), 2026-08-07:
-
-| reference quantity | value | read from |
-|---|---|---|
-| `tau^0` at t = 0 | **14.6 MPa** | `shear_stress_2` panel, both stations |
-| `V` at t = 0 | **1e-12 m/s** (log10 = -12) | `slip_rate_2` panel, both stations |
-| `slip_2` at 30 d, (0,0) | **~38 mm** | `slip_2` panel |
-| `slip_2` at 30 d, (-200,0) | **~21 mm** | `slip_2` panel |
-| edge/centre ratio | **0.553** | derived |
-| `state` | **flat ~2.8** for 30 d | `state` panel, both stations |
-| pore pressure peak, (0,0) | ~13.4 MPa | `pore_pressure` panel |
-| late-time uniform pressure | **~1.7 MPa** | `pore_pressure` panel, (-200,0) |
-
-`tau^0` = 14.6 MPa **and** `V(0)` = `V_init` together force
-`theta_0` = 4.0188e11 s, i.e. Table 1 + eq. (27), with eq. (29) given up. That is
-**reading C**, and it is what the compsets now ship.
-
-| reading | `tau^0` | `V`(step 1) | slip(0,0) | slip(-200,0) | ratio |
-|---|---|---|---|---|---|
-| A  Table 1 + eq. (29) | 14.6000 | 6.54e-11 | 42.74 mm | 27.65 mm | 0.647 |
-| **C  Table 1 + eq. (27)** | **14.6000** | **1.00e-12** | **37.30 mm** | **19.56 mm** | **0.524** |
-| B  eq. (27) + eq. (29) | 12.9277 | 1.00e-12 | 23.97 mm | 5.29 mm | 0.221 |
-| **`taehoKim_ref`** | **14.6000** | **1.0e-12** | **~38 mm** | **~21 mm** | **0.553** |
-
-Ours at dx = 50 m, old fluid scheme, ~22 d; the reference at 30 d. C is within
-2 % at the centre and 7 % at 200 m.
-
-## Slip at 30 d, the headline comparison
-
-| station | `taehoKim_ref` | ours reading A, dx = 10 | ours reading B, dx = 50 |
-|---|---|---|---|
-| `(0, 0)`    | ~38 mm | 45.04 mm (+18 %) | 23.97 mm (-37 %) |
-| `(-200, 0)` | ~21 mm | 31.95 mm (+52 %) | 5.35 mm (-75 %) |
-
-**Reading A is much the closer of the two**, at both stations. Reading B, which
-the compsets currently ship, is the worse match -- see "What went wrong" below.
-
-Our slip profile is also **broader** than the reference. Edge/centre ratio,
-`slip(-200,0) / slip(0,0)`:
-
-    taehoKim_ref     0.553
-    ours reading A   0.709
-
-We put relatively more slip out at 200 m than the reference does. That shape
-difference, not the amplitude, is the substantive discrepancy -- and see
-"Elastic domain truncation" in README: it shrinks as the computational box
-grows, so it is at least partly the truncation that section 6 warns about.
-
-## Station (0, 0)
-
-| quantity | `taehoKim_ref` | ours (reading B, dx = 50) |
-|---|---|---|
-| `slip_2` | ~0.038 m, plateau by ~0.4e6 s | 0.02397 m |
-| `slip_3` | flat 0 | ~-2e-19 m (float noise) |
-| `slip_rate_2` | peak ~-6.5, decays to ~-15 | peak -6.748, decays to ~-16.5 |
-| `slip_rate_3` | flat 0 | ~-25 to -30 (float noise) |
-| **`shear_stress_2`** | **starts 14.6 MPa**, min ~7.0, recovers to ~8.3 | **starts 12.9277 MPa**, min ~6.9, flat ~7.15 |
-| `shear_stress_3` | flat 0 | +-1e-15 MPa (float noise) |
-| `pore_pressure` | peak ~13.4 MPa at `t_off` | 13.625 MPa |
-| `darcy_vel_2` | ~-4.4e-7 m/s, roughly constant during injection | **0** |
-| `darcy_vel_3` | ~-4.4e-7 m/s | **0** |
-| `state` | **flat ~2.8** for 30 days | 8.699 -> 3.5 -> 6.35 |
-
-## Station (-200, 0)
-
-| quantity | `taehoKim_ref` | ours (reading B, dx = 50) |
-|---|---|---|
-| `slip_2` | ~0.021 m, still rising at 30 d | 0.00535 m, plateaued |
-| `slip_rate_2` | peak ~-7.4 at ~0.35e6 s, decays to ~-8.9 | peak ~-7.8, decays to ~-10 |
-| `shear_stress_2` | rises 14.6 -> **peak ~17.8** at ~0.3e6 s, then falls to ~13 | rises 12.93 -> peak ~15, falls to ~12.8 |
-| `pore_pressure` | peak ~2.75 MPa, settles ~1.7 | 2.856 MPa, settles ~1.5 |
-| `darcy_vel_2` | ~-1.37e-6 m/s at the dip | -1.471e-6 m/s (good agreement) |
-| `darcy_vel_3` | ~-3.1e-8 m/s | **0** |
-| `state` | flat ~2.75 | 8.699 -> 5.0 -> 6.2 |
-
-Note the shear stress *rises* before falling here: the slipping patch loads the
-surrounding fault before the front arrives. Both codes show it.
-
-## The three things this settles
-
-**1. The reference uses Table 1's `tau_init` = 14.6 MPa.** Its `shear_stress_2`
-starts there at both stations. So the benchmark's own author resolves the
-over-determined initial condition by keeping Table 1 and letting `V(0)` be
-6.54e-11 m/s, 65x `V_init`, rather than honouring eq. (27). Reading A is the
-community-comparable choice. See README, "The initial condition is
-over-determined".
-
-**2. The reference's state variable is flat at ~2.8 for 30 days**, at both
-stations. The aging law cannot do that -- once slip decays `d(theta)/dt -> 1`
-and `theta` grows to ~1e6 s, as ours does. With the slip law removed from BP8 on
-2026-08-06 this is **unexplained**.
-
-**3. The reference's Darcy velocity is inconsistent with its own pressure
-field**, and the earlier "half-cell collocation offset" explanation does **not**
-survive measurement:
-
-  - At `(-200, 0)`, `q_2` agrees well (-1.37e-6 vs our -1.471e-6), but `q_3` is
-    -3.1e-8 where symmetry on the `x3 = 0` axis requires exactly 0. The ratio
-    `q_3/q_2 = 0.023` implies an offset of ~4.5 m at r = 200 m, i.e. about half
-    a cell. Consistent with a collocation convention.
-  - At `(0, 0)`, both components are ~-4.4e-7, so `|q| = 6.22e-7 m/s`. Our field
-    -- verified against the analytic solution at all nine stations, exact at
-    r = 200 m and 0.4 % at r = 283 m -- reaches that magnitude only at
-    **r ~ 278 m**. That is 28 cells, not half of one. Meanwhile its pore
-    pressure at the same station peaks at ~13.4 MPa, which is unambiguously the
-    injection point.
-
-  So within a single file the pressure says "centre" and the Darcy velocity says
-  "r ~ 280 m". A half-cell offset explains `(-200, 0)` but cannot explain
-  `(0, 0)`. Our value at `(0, 0)` is 0 and is correct on principle: the pressure
-  maximum sits there, a maximum has zero gradient, and `q = -(k/eta) grad p`.
-
-## A cosmetic defect of ours
-
-`slip_3`, `slip_rate_3` and `shear_stress_3` are identically zero for this
-problem, but we emit float noise (~1e-19 m, ~1e-15 to 1e-16 MPa) that the
-platform renders as a dense band filling the panel, where the reference plots a
-clean line. Not wrong, but it reads badly. Worth flushing to zero below a
-threshold before the next upload.
-
-## What went wrong, and the lesson
-
-An earlier comparison was made at `(-200, 0)`, where the reference reads ~21 mm.
-That number was then carried forward as though it were the **centre**-station
-value and set against our centre-station 45 mm, manufacturing an apparent 1.8x
-disagreement that did not exist. The real figure at matched `tau^0` is +18 %.
-
-The invented gap drove an investigation into domain truncation, radiation
-damping, the state evolution law and a rewrite of the initial condition. None
-explained a 1.8x that was never there, and it led to switching the shipped
-default from reading A to reading B, which made our submission *less* comparable
-at both stations, not more.
-
-The irony is that domain truncation was dismissed too early and *is* a genuine
-contributor -- just to the shape, not the amplitude. It was ruled out on the
-centre-station slip and the peak slip rate, which are precisely the quantities
-least sensitive to it. Doubling the box moves the centre by 2.6 % and the edge by
-10.8 %. Ruling a cause out requires measuring the quantity it would actually
-affect.
-
-Two things would have prevented it. Record the station alongside any number read
-off someone else's plot -- a value without its coordinates is not a measurement.
-And when a discrepancy appears, check it at more than one station before
-theorising about its cause; the second station here would have exposed the error
-immediately.
-
-## Domain truncation: what the boundaries actually are
-
-BP8 is a whole space. Kim's HBI is a boundary-element code and has no
-boundaries at all. Ours is a finite element box, so the truncation is ours to
-justify, and the two horizontal axes are not treated the same way.
-
-**The y faces are rigid walls.** `meshgen.f90:167` gives every node at `iy == 1`
-and `iy == nyt` a prescribed-velocity condition on all three components
-(`-2/-21/-1` and `-3/-31/-1`), and the BP8 compsets set
-`far_vel_load = far_norm_load_vel = 0.0`. Prescribed velocity of zero is
-`u = 0`. This is the stiffest possible truncation: a rigid wall near the fault
-suppresses slip, and its elastostatic influence decays slowly with distance.
-
-**The x and z faces are free.** There is no `ix == 1` or `iz == 1` condition;
-those nodes fall through to the `else` branch at `meshgen.f90:182` and receive
-equation numbers, so they are traction-free.
-
-The two axes also mean different things physically. `fxmin/fxmax` and
-`fzmin/fzmax` set **both** the elastic domain and the fault extent, so widening
-x or z extends the *fault plane* -- locked outside Omega_f (800 x 800 m) --
-towards an infinite plane. Widening y adds *elastic medium* and moves a
-constraint away from the fault; nothing about the fault changes.
-
-That asymmetry is visible in how fast each converges. Edge/centre slip at
-30 days, dx = 50 m, xi = 0.2:
-
-| x, z extent | y extent | slip(0,0) mm | slip(-200) mm | edge/centre |
-|---|---|---|---|---|
-| +-500  | +-500  | 37.31 | 21.99 | 0.589 |
-| +-1000 | +-500  | 36.94 | 19.58 | 0.530 |
-| +-1500 | +-500  | 36.90 | 19.52 | 0.529 |
-| +-500  | +-2000 | 38.33 | 29.66 | 0.774 |
-| Kim (HBI) | infinite | ~38 | ~21 | 0.553 |
-
-x and z are converged by +-1000 (0.530 against 0.529 at +-1500, 0.2 %). y is
-not: moving the rigid wall from +-500 to +-2000 raised edge slip by 35 %, in the
-direction a stiff boundary predicts, and it is not obviously saturated. Because
-that y sweep was run at x, z = +-500 -- now known to be too small -- the y
-number is the one most in doubt.
-
-### Time-step factor: converged, closed
-
-`xi` needs no further sweeping. Over an **eightfold** change, 0.4 / 0.2 / 0.1 /
-0.05, edge/centre is 0.5893 / 0.5895 / 0.5897 / 0.5899 and centre slip moves
-0.07 mm. Step counts are 5184 / 5301 / 5927 / 7568, so `xi = 0.05` costs
-**42.8 %** more steps than `xi = 0.2` for no resolvable gain.
-
-Per-column max absolute difference against `xi = 0.2`, interpolated onto its
-time base, across all 9 stations:
-
-| column | scale | max abs diff | % |
-|---|---|---|---|
-| slip_2 | 3.73e-2 m | 2.75e-4 | 0.74 % |
-| V2 | 15.39 (log10) | 5.15e-2 | 0.33 % |
-| tau_2 | 17.41 MPa | 1.05e-1 | 0.60 % |
-| p | 13.63 MPa | 5.71e-2 | 0.42 % |
-| state | 11.60 (log10) | 1.97e-1 | 1.70 % |
-
-All under 2 %. `xi = 0.2` is the right setting.
-
-### Dip-direction slip is real off the symmetry axes
-
-An earlier version of this file called the run-to-run spread in V3 (column 5,
-log10 of dip-direction slip rate) meaningless round-off. **That is true only on
-the symmetry axes.** Independent re-derivation, final step, `dx = 50 m`,
-domain +-500:
-
-| station | slip_2 | slip_3 | V3 | slip_3 / slip_2 |
-|---|---|---|---|---|
-| `+000dp+000` | 3.73e-2 | -7.0e-19 | -30.00 | 0 |
-| `-200dp+000` | 2.20e-2 |  1.4e-19 | -25.24 | 0 |
-| `+000dp+200` | 1.74e-2 | -4.3e-19 | -25.15 | 0 |
-| `+200dp+200` | 1.53e-2 |  2.89e-4 | **-10.68** | **1.89 %** |
-| `-200dp-200` | 1.53e-2 |  2.89e-4 | **-10.68** | **1.89 %** |
-| `+200dp-200` | 1.53e-2 | -2.89e-4 | **-10.68** | **1.89 %** |
-| `-200dp+200` | 1.53e-2 | -2.89e-4 | **-10.68** | **1.89 %** |
-
-The five on-axis stations (`strk = 0` or `dp = 0`) sit at the `V_zero = 1e-20`
-floor and do swing on round-off. The four **off-axis** stations do not: slip_3
-is a stable 2.89e-4 m, converged to under 1 % across the whole `xi` sweep, with
-an antisymmetric sign pattern. This is physical -- a slipping patch in 3-D
-produces shear-stress changes with both components, and only the symmetry axes
-force the dip component to zero. Section 4.1 asks for V3, and at these four
-stations it carries signal that must be submitted, not dismissed.
-
-**A trap for any comparison on this benchmark.** Because five of nine stations
-sit at the log floor, a relative-difference check normalised per column reports
-"3281 % change" for those fields. Any relative check here needs an absolute
-floor -- and must not then conclude the whole column is noise, which is the
-error this section corrects.
-
-Note `xi` sets `dt = xi * D_RS / V` (`faulting.f90:449`), not a CFL condition --
-cell size does not enter it, so refining `dx` does not shrink the step.
-
-**The frozen gold uses x, z, y = +-500**, which is the under-converged corner of
-this table. It is a regression lock on the configuration that was submitted, not
-a claim that the configuration is right. Expect the converged answer to sit
-nearer centre 36.9 mm and edge/centre 0.53, a few percent from Kim, once y is
-carried far enough.
+This is the configuration packaged as `dliu_eqquasi-1-7-0-50m.zip` and uploaded
+to the CRESCENT platform. Gold is that run itself at full time resolution, not a
+decimation of it.
 
 ## Files
 
+| File | Contents |
+|---|---|
+| `fltst_strk*.csv` | 9 stations, 5302 rows × 11 columns (§4.1) |
+| `global.csv` | 5302 rows × 3 (§4.2: time, log₁₀ max slip rate, moment rate) |
+| `*_strike.csv`, `*_depth.csv` | 10 profiles, 664 rows × 19 (§4.3, at the native 17-node grid) |
+| `fault.05301.nc` | fault-plane snapshot at the final step |
+| `runInfo.json` | node count, steps, wall time, version |
+| `summary.json` | per-station scalars the e2e asserts by name, plus provenance |
 
-    README.md          this record
-    gold/summary.json  the numbers a rerun must reproduce, plus provenance
-    gold/runInfo.json  the run's own performance log, verbatim
-    gold/*.csv         four stations and global.dat, 500 rows each
-    archive/data/readingA-dx10_fltst_strk+000dp+000.csv
-    data/readingA-dx10_fltst_strk-200dp+000.csv
-    data/readingB-dx50_fltst_strk+000dp+000.csv
-    data/readingB-dx50_fltst_strk-200dp+000.csv
+Written at 17 significant digits. At 9, the time column could not resolve
+2.59×10⁶ s to better than 4 ms, which showed up as a uniform 4.167×10⁻³
+max\|diff\| across every file — an artifact of the gold writer, not the solver.
 
-Subsampled from the full time series, 11 columns in the section 4.1 field order.
+## How it is checked
 
-The gold was produced by EQquasi v1.4.7 in `work/bp8.sub147` on `cotopaxi`
-(2 x AMD EPYC 7532, 64 logical cores) using **1 MPI rank and 1 OpenMP thread** --
-8000 elements, 23814 equations, dx = 50 m, 5301 steps at 0.151 s/step. Single
-core is deliberate: 8 ranks measured only 1.24x, and running one core per job
-lets several sweeps proceed at once. `gold/runInfo.json` is the run's own log,
-copied verbatim, and the same fields are mirrored under `provenance` in
-`summary.json` so a future comparison can tell what produced these numbers
-without opening a second file.
+`tests/e2e/test_bp8_against_gold.py` rebuilds, reruns `test.bp8.qdc` at this
+configuration, and diffs **every file whole** to 10⁻⁶ — not sampled. Named
+scalar assertions sit alongside the full diffs because they say *which* quantity
+moved; the full diffs exist because seven scalars out of ~58 000 entries per
+station left most of every curve unguarded, including columns nothing sampled
+(`slip_3`, both Darcy velocities). The run must also pass
+`scripts/checkBP8Submission`.
+
+Quick check without the suite:
+
+```
+python3 scripts/plotAgainstGold.py bp8 <run_dir>
+```
+
+## What this does not establish
+
+**Gold is a regression lock, not a validation.** It detects unintended change.
+It does not establish that BP8 is reproduced correctly, for two reasons:
+
+1. `dx = 50 m` is five times the benchmark's cell size.
+2. **The domain is not converged.** x, y, z = ±500 m is the under-converged
+   corner. The y faces are rigid walls (`u = 0`) and the fault plane cuts
+   edge-to-edge through the box, leaving 100 m outside Ω_f. Edge/centre slip
+   moves from 0.589 here to 0.529 once x and z reach ±1000, and to 0.774 when
+   the y wall moves to ±2000. See `../README.md` for the full sweep and the
+   boundary conditions behind it.
+
+Against Kim's HBI (boundary element, unbounded): centre 37.31 mm vs ~38, edge
+21.99 vs ~21, late pressure 1.690 MPa vs ~1.70. Peak pressure 13.63 MPa against
+eq. (21)'s analytic 13.0. The agreement at this configuration is partly luck —
+the converged numbers are centre 36.9 and edge/centre 0.53.
+
+## Convergence study (independently audited, 2026-08-12)
+
+Sweeps at dx = 50 m, aging law, 30-day runs, under `work/`. Every number
+re-derived directly from `fltst_strk*.dat` and `runInfo.json`.
+
+### Time-step factor `xi` — converged
+
+| xi | steps | edge/centre |
+|---|---|---|
+| 0.4  | 5184 | 0.5893 |
+| 0.2  | 5301 | 0.5895 |
+| 0.1  | 5927 | 0.5897 |
+| 0.05 | 7568 | 0.5899 |
+
+Centre slip moves 0.07 mm over the eightfold sweep. Per-column max absolute
+difference against `xi = 0.2` across all 9 stations: slip_2 0.74 %, V2 0.33 %,
+tau_2 0.60 %, p 0.42 %, state 1.70 %. All under 2 %. `xi = 0.05` costs 42.8 %
+more steps for no resolvable gain, so `xi = 0.2` is the right setting.
+
+### Domain — **not** converged, and this gold sits at the worst corner
+
+| x, z | y | grading | centre (mm) | edge (mm) | edge/centre |
+|---|---|---|---|---|---|
+| **±500** | **±500** | 1.15 | **37.31** | **21.99** | **0.5895** ← this gold |
+| ±1000 | ±500  | 1.15 | 36.94 | 19.58 | 0.5302 |
+| ±1500 | ±500  | 1.15 | 36.90 | 19.52 | 0.5291 |
+| ±500  | ±2000 | 1.15 | 38.33 | 29.66 | 0.7739 |
+| ±500  | ±2000 | 1.0  | 38.32 | 29.44 | 0.7682 |
+
+In x and z the ratio change shrinks 59-fold across the two refinement steps
+(0.059 then 0.001), which is **consistent with convergence but not established
+from two points** — the ±3000 run that would confirm it is still running. In y
+it is plainly not converged: moving the rigid wall from ±500 to ±2000 shifts the
+ratio 31 % with no sign of saturation, and only two y points have been tested.
+Mesh grading (`enlarging_ratio` 1.15 against 1.0) changes it by 0.7 %.
+
+### Dip-direction slip is real off the symmetry axes
+
+Five of the nine stations lie on `strk = 0` or `dp = 0`, where antiplane
+symmetry forces dip slip to zero; there `slip_3` is 1e-19 or smaller and V3 sits
+pinned at the `V_zero = 1e-20` floor, swinging on round-off. **The other four do
+not.** At `strk = ±200` *and* `dp = ±200`, `slip_3` is a stable 2.89e-4 m —
+1.89 % of the co-located `slip_2`, converged to under 1 % across the whole `xi`
+sweep — with V3 at −10.68 and an antisymmetric sign pattern.
+
+That is physical: a slipping patch in 3-D produces shear-stress changes with
+both components, and only the symmetry axes force the dip component to zero.
+Section 4.1 asks for V3, and at these four stations the submitted column carries
+signal.
+
+Consequence for anyone comparing runs here: a relative-difference check
+normalised per column reports meaningless percentages for the five on-axis
+stations, so **any relative check needs an absolute floor** — and must not then
+conclude the whole column is noise.
+
+### What the study establishes, and what it does not
+
+**Establishes:** `xi = 0.2` and `dx = 50 m` are adequate; the y extent dominates
+the domain error; grading is not a factor.
+
+**Does not establish:** a converged x, z extent (pending ±3000); a converged y
+extent (two points, both far from flat); or that this gold's ±500 configuration
+is right — it is the corner the sweep argues against. Its agreement with Kim
+(37.31 vs ~38 mm centre, 21.99 vs ~21 edge) is partly luck; the better-resolved
+domains give 36.9 mm and edge/centre 0.53.
+
+## Regenerating
+
+Run `case_input/test.bp8.qdc` with `xi = 0.2`, `nstep = nt_out = 8000`, which
+exits on `fluid_tend` at 30.0 days. Anything less than ~5301 steps is a
+truncated run: the compset default `nstep = 200` reaches only 1.14 days, and
+comparing that against this oracle produces a failure that is not real.

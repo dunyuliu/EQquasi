@@ -7,7 +7,7 @@ happened twice in this project: the pore-pressure boundary treatment and the
 initial condition both changed the answer by tens of percent without tripping a
 single guard.
 
-The oracle is `reference/bp8/gold/summary.json`, frozen from EQquasi v1.4.7:
+The oracle is `reference/bp8/summary.json`, frozen from EQquasi v1.4.7:
 Table 1's `tau^0` = 14.6 MPa with `theta_0` derived so the fault starts at
 `V_init`, and the finite-volume Omega_f boundary. That result agrees with
 `taehoKim_ref` to -2 % on slip at the injection point, +5 % at 200 m, and 0.7 %
@@ -37,8 +37,8 @@ import pytest
 
 from conftest import ROOT
 
-GOLD = os.path.join(str(ROOT), "reference", "bp8", "gold", "summary.json")
-GOLD_DIR = os.path.join(str(ROOT), "reference", "bp8", "gold")
+GOLD = os.path.join(str(ROOT), "reference", "bp8", "summary.json")
+GOLD_DIR = os.path.join(str(ROOT), "reference", "bp8")
 WORK = os.path.join(str(ROOT), "work", "e2e.bp8.gold")
 
 # The nine on-fault stations x2, x3 in {-200, 0, 200} m (section 4.1). All nine
@@ -210,7 +210,7 @@ def test_fault_snapshot_matches_gold(run_dir):
 
     Confirmed before freezing: work/bp8.sub147 (v1.4.7) and a fresh v1.6.0 rerun
     at this same configuration agree on every variable to max|diff| = 0.0, the
-    same bar BP5/BP7 hold their snapshots to (reference/bp5/gold/summary.json).
+    same bar BP5/BP7 hold their snapshots to (reference/bp5/summary.json).
     A single MPI rank, deterministic solver and fixed seed make that the right
     tolerance -- anything looser would let a real change through silently.
     """

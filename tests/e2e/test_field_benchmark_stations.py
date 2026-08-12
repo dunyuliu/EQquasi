@@ -9,7 +9,7 @@ the interseismic-to-nucleation physics stations are meant to exercise.
 This runs each test compset's *first full cycle* (Q0: istart=1, to its own
 `exit_slip_rate = 1e-3` exit rather than a step cap) and checks scalar
 quantities read off the resulting station files against
-reference/<bench>/gold/summary.json -- the same "read named numbers off the
+reference/<bench>/summary.json -- the same "read named numbers off the
 raw run, not off a subsampled CSV" pattern test_bp8_against_gold.py uses. The
 committed fltst_strk*.csv files are for plotting/eyeballing (there is no
 existing multi-station overlay tool for BP5/BP7, unlike BP8's
@@ -57,7 +57,7 @@ def _env():
 
 
 def _gold(bench):
-    path = os.path.join(str(ROOT), "reference", bench, "gold", "summary.json")
+    path = os.path.join(str(ROOT), "reference", bench, "summary.json")
     data = json.load(open(path))
     return {k: v for k, v in data.items() if k.startswith("fltst_strk")}
 

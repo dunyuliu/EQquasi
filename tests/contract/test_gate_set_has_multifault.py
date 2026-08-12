@@ -7,7 +7,7 @@ the gate, because nothing in it ever exercised ntotft > 1. This is expected to
 FAIL until a multi-fault compset (case_input/test.stepover.qdc and
 case_input/bp1002.qdc.2000 both already have ntotft = 2) is added to
 testNameList.nameList or to a tests/e2e/*.py regression, and gets its own
-reference/<bench>/gold/.
+reference/<bench>/.
 """
 
 from conftest import ROOT, compset_dirs, load_case_params, read
@@ -52,5 +52,5 @@ def test_gate_set_includes_a_multifault_compset():
         "project were found only by running a new case by hand. Add "
         "test.stepover.qdc or bp1002.qdc.2000 (both ntotft = 2) to "
         "testNameList.nameList or to a tests/e2e/*.py regression, with its own "
-        "reference/<bench>/gold/ (PROJECT_RULES.md rule 12)."
+        "reference/<bench>/ (PROJECT_RULES.md rule 12)."
     )

@@ -8,7 +8,7 @@ physical invariant does not need a frozen prior value to catch a fault with
 zero nodes, an all-zero slab, or effective normal stress that has gone
 tensile.
 
-These read the committed reference/*/gold/ files directly -- no build, no
+These read the committed reference/*/ files directly -- no build, no
 solve, milliseconds -- so they run on every save and still catch a
 regenerated gold that violates physics, not just a gold that moved.
 """
@@ -22,15 +22,15 @@ import pytest
 from conftest import ROOT
 
 FIELD_GOLD = {
-    "bp5": ROOT / "reference" / "bp5" / "gold" / "fault.00101.csv",
-    "bp5.dip90": ROOT / "reference" / "bp5.dip90" / "gold" / "fault.00101.csv",
-    "bp7": ROOT / "reference" / "bp7" / "gold" / "fault.00101.csv",
+    "bp5": ROOT / "reference" / "bp5" /  "fault.00101.csv",
+    "bp5.dip90": ROOT / "reference" / "bp5.dip90" /  "fault.00101.csv",
+    "bp7": ROOT / "reference" / "bp7" /  "fault.00101.csv",
 }
 
-BP8_SNAPSHOT = ROOT / "reference" / "bp8" / "gold" / "fault.05301.csv"
-STEPOVER_SNAPSHOT = ROOT / "reference" / "stepover" / "gold" / "fault.00101.csv"
+BP8_SNAPSHOT = ROOT / "reference" / "bp8" /  "fault.05301.csv"
+STEPOVER_SNAPSHOT = ROOT / "reference" / "stepover" /  "fault.00101.csv"
 
-BP8_GOLD_DIR = ROOT / "reference" / "bp8" / "gold"
+BP8_GOLD_DIR = ROOT / "reference" / "bp8" 
 BP8_STATIONS = [f"{s:+04d}dp{d:+04d}" for s in (-200, 0, 200) for d in (-200, 0, 200)]
 T_OFF_S = 100 * 3600.0  # BP8 Table 1: injection turns off at 100 hours
 

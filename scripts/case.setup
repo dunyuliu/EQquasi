@@ -165,19 +165,19 @@ def create_batch_script():
         f.write("do" + "\n")
         f.write("  echo $i > currentcycle.txt" + "\n")
         f.write("  ibrun eqquasi" + "\n")
-        f.write("  mkdir \"./Q$((i-1))\"" + "\n")
+        f.write("  mkdir \"./cycle$((i-1))\"" + "\n")
         # Move only what exists. A bare `mv a* b*` spams "cannot stat" for every
         # pattern that did not match, which buries real errors. The BP8 section
         # 4.3 profiles and runInfo.json must be included, or they are stranded in
         # the case root and overwritten by the next cycle.
         f.write("  for f in fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \\" + "\n")
         f.write("           *_strike.dat *_depth.dat runInfo.json; do" + "\n")
-        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./Q$((i-1))\"" + "\n")
+        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./cycle$((i-1))\"" + "\n")
         f.write("  done" + "\n")
-        f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
+        f.write("  cp \"./cycle$((i-1))/\"*.r.nc ./" + "\n")
         # Post-processing tools live on PATH (source install.eqquasi.sh), not
         # in the case directory; they take the cycle directory as an argument.
-        f.write("  plotOnFaultVars \"./Q$((i-1))\" || echo 'plotOnFaultVars "
+        f.write("  plotOnFaultVars \"./cycle$((i-1))\" || echo 'plotOnFaultVars "
                 "not on PATH; source install.eqquasi.sh and rerun by hand'"
                 + "\n")
         f.write("done" + "\n")
@@ -195,16 +195,16 @@ def create_run_sh():
         f.write("do" + "\n")
         f.write("  echo $i > currentcycle.txt" + "\n")
         f.write("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " eqquasi" +"\n")
-        f.write("  mkdir \"./Q$((i-1))\"" + "\n")
+        f.write("  mkdir \"./cycle$((i-1))\"" + "\n")
         # Move only what exists. A bare `mv a* b*` spams "cannot stat" for every
         # pattern that did not match, which buries real errors. The BP8 section
         # 4.3 profiles and runInfo.json must be included, or they are stranded in
         # the case root and overwritten by the next cycle.
         f.write("  for f in fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \\" + "\n")
         f.write("           *_strike.dat *_depth.dat runInfo.json; do" + "\n")
-        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./Q$((i-1))\"" + "\n")
+        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./cycle$((i-1))\"" + "\n")
         f.write("  done" + "\n")
-        f.write("  cp \"./Q$((i-1))/\"*.r.nc ./" + "\n")
+        f.write("  cp \"./cycle$((i-1))/\"*.r.nc ./" + "\n")
         f.write("done" + "\n")
         # End excutable part.
 
@@ -243,21 +243,21 @@ def create_batch_script_cycle():
         f.write("  ibrun eqquasi"                   + "\n")
         f.write("# move results to Q(i-1)"          + "\n")
         f.write("# delete Q(i-1)"                   + "\n")
-        f.write("  rm -rf \"Q$((i-1))\""            + "\n")
+        f.write("  rm -rf \"cycle$((i-1))\""            + "\n")
         f.write("# create Q(i-1) and copy results and inputs over" + "\n")
-        f.write("  mkdir \"Q$((i-1))\""             + "\n")
-        f.write("  cp -r a.eqquasi.log* \"Q$((i-1))\""         + "\n")
-        f.write("  cp -r on_fault_vars_input.nc \"Q$((i-1))\"" + "\n")
-        f.write("  cp -r currentcycle.txt \"Q$((i-1))\""       + "\n")
+        f.write("  mkdir \"cycle$((i-1))\""             + "\n")
+        f.write("  cp -r a.eqquasi.log* \"cycle$((i-1))\""         + "\n")
+        f.write("  cp -r on_fault_vars_input.nc \"cycle$((i-1))\"" + "\n")
+        f.write("  cp -r currentcycle.txt \"cycle$((i-1))\""       + "\n")
         f.write("  for f in fltst* srfst* tdyna* *_strike.dat *_depth.dat runInfo.json; do" + "\n")
-        f.write("    [ -e \"$f\" ] && cp -r \"$f\" \"Q$((i-1))\"" + "\n")
+        f.write("    [ -e \"$f\" ] && cp -r \"$f\" \"cycle$((i-1))\"" + "\n")
         f.write("  done" + "\n")
-        f.write("  cp -r global* p1* p2* disp.* \"Q$((i-1))\"" + "\n")
-        f.write("  cp -r rough* \"Q$((i-1))\"" + "\n")
-        f.write("  cp -r fault.* cplot* \"Q$((i-1))\""         + "\n")
-        f.write("  cp -r eqquasi/plot_on_fault_vars2 \"Q$((i-1))\"" + "\n")
-        f.write("  cp -r eqquasi/user_defined_params.py \"Q$((i-1))\"" + "\n")
-        f.write("  cp -r eqquasi/lib.py \"Q$((i-1))\""                 + "\n")
+        f.write("  cp -r global* p1* p2* disp.* \"cycle$((i-1))\"" + "\n")
+        f.write("  cp -r rough* \"cycle$((i-1))\"" + "\n")
+        f.write("  cp -r fault.* cplot* \"cycle$((i-1))\""         + "\n")
+        f.write("  cp -r eqquasi/plot_on_fault_vars2 \"cycle$((i-1))\"" + "\n")
+        f.write("  cp -r eqquasi/user_defined_params.py \"cycle$((i-1))\"" + "\n")
+        f.write("  cp -r eqquasi/lib.py \"cycle$((i-1))\""                 + "\n")
         f.write("# clean up the root for running eqdyna"               + "\n")
         f.write("  rm -rf a.eqquasi.log* model.txt stations.txt"       + "\n")
         f.write("  rm -rf on_fault_vars_input.nc"                      + "\n")
@@ -265,7 +265,7 @@ def create_batch_script_cycle():
         f.write("  rm -rf fault.* cplot* "                             + "\n")
         f.write("  rm -rf eqquasi.mesh.*"                              + "\n")
         f.write("# postprocessing"                                     + "\n")
-        f.write("  cd \"Q$((i-1))\""                                   + "\n")
+        f.write("  cd \"cycle$((i-1))\""                                   + "\n")
         f.write("  ibrun -np 1 python plot_on_fault_vars2"             + "\n")
         f.write("  cd .."                                              + "\n")
         # End excutable part.

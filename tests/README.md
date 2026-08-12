@@ -34,7 +34,7 @@ Oracles:
   - BP5, BP7 -- `test.reference.results/`, via `testAll.py` and `check.test.py`.
     These predate this suite; `tests/e2e/test_bp5_bp7_regression.py` only wraps
     them so all three benchmarks report through one command.
-  - BP8 -- `reference/bp8/gold/summary.json`, frozen from v1.4.7.
+  - BP8 -- `reference/bp8/summary.json`, frozen from v1.4.7.
 
 Note the difference in strength. The BP5/BP7 references are *regression locks*
 on deliberately coarse compsets: they detect change, but they were never checked

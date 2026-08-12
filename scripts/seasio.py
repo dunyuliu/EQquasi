@@ -23,6 +23,9 @@ callers genuinely differed:
     strip     checkBP8Submission stores stripped header lines (it reports them);
               resampleBP8Profiles keeps them verbatim (it rewrites them to a new
               file, so leading whitespace must survive).
+    Delimiter
+              Whitespace or comma, detected per line. Gold references are
+              comma-separated; run output is whitespace-separated.
     collect_bad
               checkBP8Submission must report malformed rows with line numbers
               rather than crash, since its job is to explain why a submission is
@@ -46,7 +49,12 @@ def read_table(path, strip=True, collect_bad=False):
         if text.startswith("#"):
             header.append(text if strip else raw)
             continue
-        tok = text.split()
+        # Run output is whitespace-separated; the frozen gold under reference/
+        # is comma-separated with a one-line header. Detect per line rather than
+        # requiring the caller to know which it has -- otherwise no
+        # post-processing utility can be pointed at a gold directory, which is
+        # how BP8's gold ended up unplottable.
+        tok = text.split(",") if "," in text else text.split()
         try:
             float(tok[0])
         except ValueError:

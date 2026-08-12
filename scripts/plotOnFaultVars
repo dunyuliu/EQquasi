@@ -26,6 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
+from seasio import read_array
 
 pu.apply_style()
 import matplotlib.pyplot as plt
@@ -76,16 +77,22 @@ def plot_fault_snapshot(fname, ift, nfault, par, b, png):
          "state variable", "log10 theta (s)", "viridis", 0, 10),
     ]
 
-    fig, ax = plt.subplots(3, 3, figsize=(16, 10))
+    # The six maps carry set_aspect("equal") -- a fault plane drawn to its real
+    # proportions -- while the three time series do not, so in a plain grid the
+    # rows do not line up. constrained_layout aligns them; the maps keep their
+    # aspect and the series fill the row they share.
+    fig, ax = plt.subplots(3, 3, figsize=(13, 9.5), constrained_layout=True)
     for k, (arr, title, unit, cmap, vmin, vmax) in enumerate(panels):
         a = ax[k // 3, k % 3]
         m = a.pcolormesh(x, z, arr, cmap=cmap, vmin=vmin, vmax=vmax,
                          shading="nearest")
-        cb = plt.colorbar(m, ax=a, extend="both")
-        cb.set_label(unit)
-        a.set_title(title)
-        a.set_xlabel(xlab)
-        a.set_ylabel(ylab)
+        cb = plt.colorbar(m, ax=a, extend="both", fraction=0.046, pad=0.02)
+        cb.set_label(unit, fontsize=11)
+        cb.ax.tick_params(labelsize=10)
+        a.set_title(title, fontsize=13)
+        a.set_xlabel(xlab, fontsize=11)
+        a.set_ylabel(ylab, fontsize=11)
+        a.tick_params(labelsize=10)
         a.set_aspect("equal")
 
     for a, (xx, yy, xl, yl) in zip(
@@ -95,17 +102,19 @@ def plot_fault_snapshot(fname, ift, nfault, par, b, png):
                      "log10 peak slip rate (m/s)"),
                     (b[:, 0] / 86400.0, vlog, "time (days)",
                      "log10 peak slip rate (m/s)")]):
-        a.plot(xx, yy, lw=1.0)
-        a.plot(xx[i], yy[i], "ro", ms=6)
-        a.set_xlabel(xl)
-        a.set_ylabel(yl)
-        a.grid(alpha=0.3)
+        a.plot(xx, yy, lw=2.2, color="tab:blue")
+        a.plot(xx[i], yy[i], "o", color="tab:red", ms=9,
+               label="this snapshot")
+        a.set_xlabel(xl, fontsize=11)
+        a.set_ylabel(yl, fontsize=11)
+        a.tick_params(labelsize=10)
+        a.grid(alpha=0.25, lw=0.8)
+        a.legend(fontsize=10, loc="best")
 
     case = getattr(par, "casename", "")
     flab = f" | fault {ift}/{nfault - 1}" if nfault > 1 else ""
     fig.suptitle(f"{case} | {os.path.basename(fname)} | step {nstep}"
-                 f" | t = {tdays:.3f} d{flab}")
-    fig.tight_layout()
+                 f" | t = {tdays:.3f} d{flab}", fontsize=15)
     pu.save(fig, png, dpi=150)
 
 
@@ -124,7 +133,7 @@ def generate_gif(pngs, gif):
 
 def process_dir(rdir, outdir):
     par = pu.load_par(rdir, "plotOnFaultVars")
-    b = np.loadtxt(os.path.join(rdir, "global.dat"), ndmin=2)
+    b = np.atleast_2d(read_array(os.path.join(rdir, "global.dat")))
     snaps = pu.sort_nicely([f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
                             if pu.step_of(f) is not None])
     with nc.Dataset(snaps[0]) as d:

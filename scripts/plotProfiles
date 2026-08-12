@@ -63,7 +63,7 @@ def process_dir(rdir, outdir, ninterval, nwindow, ifault, nfault):
         for mode, orient, xlabel in ((1, "Vertical", "node # down dip"),
                                      (2, "Horizontal", "node # along strike")):
             data = profile_series(rdir, mode, var, ninterval, nwindow, ifault)
-            fig, ax = plt.subplots(figsize=(9, 5))
+            fig, ax = plt.subplots(figsize=(8, 6))
             for i in range(data.shape[1]):
                 ax.plot(data[:, i] / scale, lw=0.9)
             ax.set_xlabel(xlabel)

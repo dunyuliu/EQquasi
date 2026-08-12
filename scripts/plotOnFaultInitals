@@ -59,7 +59,7 @@ def main():
 
     ndip, nstrike = v.shape[:2]
     x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike)
-    fig, ax = plt.subplots(2, 3, figsize=(15, 7))
+    fig, ax = plt.subplots(2, 3, figsize=(12, 7))
     for k, (idx, title, unit, scale) in enumerate(PANELS):
         a = ax[k // 3, k % 3]
         m = a.pcolormesh(x, z, v[:, :, idx] / scale, cmap="viridis",

@@ -72,7 +72,7 @@ def main():
 
     orient, xlabel = (("Vertical", "node # down dip") if args.mode == 1
                       else ("Horizontal", "node # along strike"))
-    fig, ax = plt.subplots(figsize=(9, 5.5))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for i in range(data.shape[1]):
         ax.plot(data[:, i], color="black", lw=0.7)
     ax.set_xlabel(xlabel)

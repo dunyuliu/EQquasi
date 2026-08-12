@@ -308,8 +308,8 @@ judgment for new code in general.
 
 **Instantiates**: G3.
 
-`reference/bp5/gold/`, `reference/bp5.dip90/gold/`, `reference/bp7/gold/` and
-`reference/bp8/gold/` are the project's safety net (moved here from
+`reference/bp5/`, `reference/bp5.dip90/`, `reference/bp7/` and
+`reference/bp8/` are the project's safety net (moved here from
 `test.reference.results/` when the reference layout was unified, git
 `ab05778`/`a771065` — that older path no longer exists; do not look for it).
 Before merging any change to `src/*.f90` or to
@@ -340,14 +340,14 @@ themselves guarded by `tests/contract/test_release_gate.py`. `check.test.py`
 still owns the BP5/BP5-dip90/BP7 comparison at `rtol=atol=1e-3`
 (`check.test.py:35,58`, `compare_nc_files`/`compare_txt_files`) — **this
 tolerance is still not bit-exact**, see Unenforceable rules.
-`reference/bp8/gold/summary.json` plus `tests/e2e/test_bp8_against_gold.py`
+`reference/bp8/summary.json` plus `tests/e2e/test_bp8_against_gold.py`
 own BP8's, at tolerances near round-off (`RTOL_SLIP = 1e-4`, exact for the
 fault-plane snapshot).
 
 **BP8 must be gated at its gold configuration**, not the fast regression
 compset's defaults: `xi = 0.2`, run to `fluid_tend` rather than an `nstep`
 cap — the gold run took 5301 steps ≈ 30.0 days
-(`reference/bp8/gold/runInfo.json`: `"steps_completed": 5301`).
+(`reference/bp8/runInfo.json`: `"steps_completed": 5301`).
 `case_input/test.bp8.qdc/user_defined_params.py` defaults to `nstep = 200`
 (~1.14 days) for the *fast* regression tier and must never be compared
 directly to the BP8 gold — this has already misled two agents.
@@ -469,7 +469,7 @@ inside an existing `if (bp == N)` block's byte range); not implemented today
   `nstep` and coarsen `dx`), added to `nameList`/`coreNumList` in
   `testNameList.py` (or wired into a `tests/e2e/*.py` regression, for
   benchmarks that moved off `testNameList.py` — see rule 12), with its
-  reference output at `reference/<benchmark>/gold/`.
+  reference output at `reference/<benchmark>/`.
 
 `scripts/create.newcase` does **not** validate `compset` against
 `compsets.txt` — it just does `os.listdir` + `shutil.copy` from
@@ -498,7 +498,7 @@ case by hand; none were caught by the gate, because nothing in it ever
 exercised `ntotft > 1`. `case_input/test.stepover.qdc` and
 `case_input/bp1002.qdc.2000` both already have `ntotft = 2` and exist in the
 repo today but are wired into neither `testNameList.nameList` nor any
-`tests/e2e/*.py` regression, and have no `reference/<benchmark>/gold/`.
+`tests/e2e/*.py` regression, and have no `reference/<benchmark>/`.
 
 **How to apply**: add one of them (or an equivalent) to the gate, generate
 its gold under `reference/`, and confirm rule 8a's reader check passes for
@@ -514,7 +514,7 @@ the new files.
 
 **Instantiates**: G8.
 
-`reference/<benchmark>/gold/*` are oracles (rule 3):
+`reference/<benchmark>/*` are oracles (rule 3):
 
 - Never edit or regenerate an existing gold file as a side effect of
   unrelated work.
@@ -528,7 +528,7 @@ the new files.
 **8a. Every reference artifact needs a test that reads it.** Gold that
 nothing asserts on is dead weight masquerading as a safety net — an oracle
 nobody consults would not have caught the incidents rule 3 fixed. Before
-committing a new file under `reference/<benchmark>/gold/`, confirm something
+committing a new file under `reference/<benchmark>/`, confirm something
 in `tests/`, `scripts/`, `check.test.py` or `testNameList.py` actually names
 it (a literal string, or a dynamically constructed one — see
 `tests/contract/test_reference_gold_is_referenced.py`, which checks both).
@@ -690,7 +690,7 @@ need agent-identity information this repo has no way to obtain.)
 **Instantiates**: G14.
 
 All work here runs on one shared 64-core box (`cotopaxi`, per
-`reference/bp8/gold/runInfo.json`). All simulation artifacts belong under
+`reference/bp8/runInfo.json`). All simulation artifacts belong under
 `work/` (gitignored, see `tests/contract/test_repo_hygiene.py`), and launches
 should default to `mpirun -np 1`, `OMP_NUM_THREADS=1` (already pinned by
 `scripts/case.setup`'s generated launchers — see
@@ -748,6 +748,69 @@ omitted because a rule book that only states what it can check would hide
 exactly the failure mode this rule is about.
 
 ---
+
+## 18. The whole workflow must work for every example
+
+**Instantiates: G7** (a configuration doesn't exist to the safety net until it's
+registered where the net looks) and **G3** (a gate is only real if it runs and
+fails loud).
+
+Create the case, run it, post-process it. All three steps must work for **every**
+compset in `case_input/`, and above all for the runs frozen under `reference/`.
+A gold reference nobody can regenerate or plot is a file, not a reference.
+
+Concretely, for each example:
+
+- `create.newcase <dir> <compset>` succeeds and `./case.setup` produces a
+  runnable case;
+- the solver runs it to its own exit criterion, not a step cap;
+- **every post-processing utility runs on the result** and produces a figure,
+  or says clearly why it does not (BP8 is aseismic, so an empty rupture-time
+  plot is the correct answer -- that is a message, not a traceback).
+
+*Incidents, 2026-08-12, all found by pointing a tool at a benchmark it had never
+been run against.* `plotOnFaultVars` failed on BP8 because it read `global.dat`
+with `np.loadtxt`, which chokes on the section 4.2 field-name line that BP5 does
+not have -- four utilities had the same defect and now all route through
+`seasio.read_array`. `plotStations.py` was written against the BP8 column layout
+and mislabelled the 9-column BP5/BP7 one throughout: slip rate is **linear**
+there, not log10, and column 7 is effective normal stress, not pore pressure.
+`plotOnFaultInitals` had never run at all. `plotAccumulated` and `plotProfiles`
+were broken by a missing helper and a dead `pdf2image` import.
+
+None of these were caught by a test, because the tests exercised one benchmark
+each. The cheap guard is to run the utilities across all of them: differences in
+column count, file extension (`.txt` against `.dat`), header presence and cycle
+layout are exactly what a single-benchmark test cannot see.
+
+Related: rule 8a (every reference file has a reader) covers whether a gold file
+is *read*; this rule covers whether the pipeline that produced it still *works*.
+
+## 19. Drive runs through the workflow, never the binary directly
+
+**Instantiates: G3** (a gate is only real if it runs at the right
+configuration) and **G18** (the whole workflow must work for every example).
+
+To change what a run does, change `user_defined_params.py`, then `./case.setup`,
+then `bash run.sh`. Do not invoke `mpirun ... bin/eqquasi` by hand.
+
+`run.sh` is not a convenience wrapper. It owns the cycle loop: it writes
+`currentcycle.txt`, moves each cycle's output into `cycle<i>/`, copies the
+restart files back to the case root between cycles, and invokes the
+post-processing. Calling the solver directly silently skips all of it.
+
+*Incident, 2026-08-12.* The BP5 full-cycle gold was produced by running the
+binary directly. Its output therefore landed flat in the case root instead of in
+`cycle0/`, so it did not look like any other run; `plotOnFaultVars` then failed
+on it because `user_defined_params.py` was not where a cycle directory would
+have had it, and the file had to be copied in by hand to make the gold
+plottable at all. Every conclusion drawn from that run was still valid -- but
+the artifact was shaped unlike anything the workflow produces, which is the
+opposite of what a reference should be.
+
+The same applies to the parameters: edit the compset, do not hand-edit the
+generated `model.txt` or `run.sh`. `./case.setup` regenerates both, so an edit
+to either is discarded the next time anyone runs it (see rule 15).
 
 ## 17. CI is the gate, not the local suite
 
@@ -813,7 +876,7 @@ including in the three test files that cite them by number.
 Earlier the same day: this file was found already seeded (dated 2026-08-02,
 describing BP8 and the tiered `tests/` suite as future work) — not "no rule
 book yet." The project has since reached v1.6.0: `test.reference.results/`
-was replaced by `reference/<benchmark>/gold/`, the
+was replaced by `reference/<benchmark>/`, the
 `tests/unit`/`contract`/`regression`/`e2e` suite now exists alongside
 `testAll.py`/`check.test.py`, the fault-node engine was made
 `ntotft`-neutral, and two of rule 2/3's three originally-cited violations

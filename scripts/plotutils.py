@@ -37,6 +37,37 @@ import sys
 import numpy as np
 
 
+# One place for figure style, applied on import so every utility that uses this
+# module gets the same look. Sizes are chosen for figures printed at roughly
+# 8 x 6 inches: readable in a talk or a paper column without rescaling, which
+# the matplotlib defaults (10 pt on a 6.4 x 4.8 in figure) are not.
+def apply_style():
+    import matplotlib
+    matplotlib.rcParams.update({
+        "figure.dpi": 150,
+        "savefig.dpi": 150,
+        "font.size": 14,
+        "axes.titlesize": 16,
+        "axes.labelsize": 15,
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 13,
+        "figure.titlesize": 17,
+        "axes.linewidth": 1.1,
+        "lines.linewidth": 2.2,
+        "lines.markersize": 8,
+        "xtick.major.width": 1.1,
+        "ytick.major.width": 1.1,
+        "xtick.major.size": 5.5,
+        "ytick.major.size": 5.5,
+        "grid.alpha": 0.25,
+        "savefig.bbox": "tight",
+    })
+
+
+apply_style()
+
+
 def die(msg):
     """Fail with a message, not a traceback. These tools are run by people
     looking at results, not reading source."""
@@ -90,12 +121,15 @@ def resolve_results_dirs(path, patterns, tool=""):
     if ok(path):
         return [("", path)]
     qs = []
-    for d in glob.glob(os.path.join(path, "Q[0-9]*")):
-        m = re.fullmatch(r"Q(\d+)", os.path.basename(d))
+    # run.sh writes cycle0, cycle1, ... Older cases used Q0, Q1 -- accept both
+    # so existing output stays readable.
+    for d in glob.glob(os.path.join(path, "cycle[0-9]*")) + \
+             glob.glob(os.path.join(path, "Q[0-9]*")):
+        m = re.fullmatch(r"(?:cycle|Q)(\d+)", os.path.basename(d))
         if m and os.path.isdir(d) and ok(d):
             qs.append((int(m.group(1)), d))
     if qs:
-        return [(f"Q{n}", d) for n, d in sorted(qs)]
+        return [(os.path.basename(d), d) for _, d in sorted(qs)]
     die(f"{tag}found none of the required files ({', '.join(patterns)}) in "
         f"{path} or in any {os.path.join(path, 'Q*')} cycle directory.\n"
         "Point me at a results directory, or at a case directory whose Q* "
@@ -118,12 +152,15 @@ def resolve_targets(tokens, patterns, tool=""):
     for t in tokens:
         cand = t
         if not os.path.isdir(cand):
-            m = re.fullmatch(r"Q?(\d+)", t)
-            if m and os.path.isdir(f"Q{int(m.group(1))}"):
-                cand = f"Q{int(m.group(1))}"
+            m = re.fullmatch(r"(?:cycle|Q)?(\d+)", t)
+            hit = next((f"{pre}{int(m.group(1))}" for pre in ("cycle", "Q")
+                        if m and os.path.isdir(f"{pre}{int(m.group(1))}")), None)
+            if hit:
+                cand = hit
             else:
                 have = sorted(os.path.basename(d)
-                              for d in glob.glob("Q[0-9]*") if os.path.isdir(d))
+                              for d in glob.glob("cycle[0-9]*") + glob.glob("Q[0-9]*")
+                              if os.path.isdir(d))
                 die(f"{tag}no such directory or cycle: {t}"
                     + (f" (cycles here: {', '.join(have)})" if have else ""))
         out.extend(resolve_results_dirs(cand, patterns, tool))
@@ -149,11 +186,11 @@ def make_parser(doc, prog, writes, patterns):
     import argparse
     epilog = f"""\
 cycle selection (a case run via run.sh keeps each cycle's output in Q<i>/):
-  cd <case> && {prog}              all cycles (Q0, Q1, ...) found in the case
-  cd <case> && {prog} Q1           just Q1 (bare '1' also works)
-  cd <case> && {prog} Q1 Q2        exactly those two
+  cd <case> && {prog}              all cycles (cycle0, cycle1, ...) in the case
+  cd <case> && {prog} cycle1           just Q1 (bare '1' also works)
+  cd <case> && {prog} cycle1 Q2        exactly those two
   {prog} <case>                    all cycles of a case, from anywhere
-  {prog} <case>/Q0                 one cycle, from anywhere
+  {prog} <case>/cycle0            one cycle, from anywhere
 A directory that itself holds the required files ({', '.join(patterns)})
 is treated as a single results directory and processed directly.
 

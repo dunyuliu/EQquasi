@@ -26,7 +26,7 @@ from conftest import ROOT
 
 pytestmark = pytest.mark.contract
 
-FAULT_SNAPSHOTS = sorted(glob.glob(str(ROOT / "reference" / "*" / "gold" / "fault.*.nc")))
+FAULT_SNAPSHOTS = sorted(glob.glob(str(ROOT / "reference" / "*" / "fault.*.nc")))
 
 # Variables are (nid_fault, nid_dip, nid_strike). Coordinate variables named
 # nid_* are 1-D by construction and are not on-fault fields.

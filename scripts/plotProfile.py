@@ -27,6 +27,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
+from seasio import read_array
 
 pu.apply_style()
 import matplotlib.pyplot as plt
@@ -45,8 +46,8 @@ def slab_at_nucleation(rdir, var, ifault):
     td = os.path.join(rdir, "tdyna.txt")
     ref = None
     if os.path.exists(td) and os.path.getsize(td) > 0:
-        tdyna = np.atleast_1d(np.loadtxt(td))
-        g = np.loadtxt(os.path.join(rdir, "global.dat"), ndmin=2)
+        tdyna = np.atleast_1d(read_array(td))
+        g = np.atleast_2d(read_array(os.path.join(rdir, "global.dat")))
         hit = np.where(g[:, 0] == tdyna[0])[0]
         if hit.size:
             ref = min(snaps, key=lambda f: abs(pu.step_of(f) - hit[0]))
@@ -125,7 +126,7 @@ def main():
     elif args.var == "state_variable":
         unit = "s"
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for label, rdir in targets:
         print(f"processing {label or rdir} ({rdir})")
         p = extract_profile(rdir, args.var, args.file, args.profile_type,

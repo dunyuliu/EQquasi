@@ -39,7 +39,7 @@ import pytest
 from conftest import ROOT
 
 COMPSET = "test.stepover.qdc"
-GOLD_DIR = os.path.join(str(ROOT), "reference", "stepover", "gold")
+GOLD_DIR = os.path.join(str(ROOT), "reference", "stepover")
 WORK = os.path.join(str(ROOT), "work", "e2e.stepover")
 SNAPSHOT = "fault.00101.nc"
 
@@ -136,7 +136,7 @@ def test_the_two_faults_have_distinct_effective_normal_stress(run_dir):
     """The compset sets init_norm to -25 MPa (fault 0) and -27 MPa (fault 1)
     specifically so a swapped or aliased per-fault read is visible as a
     value on the wrong fault, not merely a value that looks plausible either
-    way (reference/stepover/gold/summary.json's per_fault_design).
+    way (reference/stepover/summary.json's per_fault_design).
     """
     run = _load(os.path.join(run_dir, SNAPSHOT))
     en = run["effective_normal"]
@@ -152,7 +152,7 @@ def test_the_two_faults_have_distinct_effective_normal_stress(run_dir):
 def test_field_snapshot_matches_gold_per_fault(run_dir):
     """The regression lock proper: every variable, every fault, max|diff| = 0.
 
-    Mirrors BP5/BP7's tolerance (reference/bp5/gold/summary.json). A fault
+    Mirrors BP5/BP7's tolerance (reference/bp5/summary.json). A fault
     present in gold but missing from the run (bug #3's exact shape) is named,
     not merged away into an aggregate that could pass by averaging it out.
     """

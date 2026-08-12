@@ -76,21 +76,54 @@ def create_station_input_file():
             f.write(str(par.st_coor_off_fault[i][0]) + " " + str(par.st_coor_off_fault[i][1]) + " " + str(par.st_coor_off_fault[i][2]) + "\n")
 
 def netcdf_write_on_fault_vars():
-  # Function to on_fault_vars input used by EQquasi.
+  # Function to write on_fault_vars input used by EQquasi.
+  #
+  # par.on_fault_vars is either:
+  #   - (nfz, nfx, 100): legacy single-fault layout. Written exactly as
+  #     before -- dims (dip, strike), no fault dimension.
+  #   - (ntotft, nfzMax, nfxMax, 100): multi-fault layout, padded to the
+  #     largest fault's (nfxMax, nfzMax) extent, matching the convention
+  #     netcdf_read_on_fault (src/netcdf_io.f90) expects: dims
+  #     (fault, dip, strike), fault outermost (slowest-varying), so a
+  #     fault's own (dip, strike) slab lands contiguously.
+  # The layout is detected from array rank, never from par.ntotft, so the
+  # reader and writer share one detection rule.
   ds = nc.Dataset("on_fault_vars_input.nc", "w", format="NETCDF4")
-  dip = ds.createDimension('dip', par.nfz)
-  strike = ds.createDimension('strike', par.nfx)
-  dip_var = ds.createVariable('dip', np.float64, ('dip',))
-  strike_var = ds.createVariable('strike', np.float64, ('strike',))
-  var0 = ds.createVariable('a', np.float64, ('dip','strike',))
-  var1 = ds.createVariable('b', np.float64, ('dip','strike',))
-  var2 = ds.createVariable('Dc', np.float64, ('dip','strike',))
-  var3 = ds.createVariable('v0', np.float64, ('dip','strike',))
-  var4 = ds.createVariable('r0', np.float64, ('dip','strike',))
-  var5 = ds.createVariable('init_slip_rate', np.float64, ('dip','strike',))
-  var6 = ds.createVariable('init_shear_stress', np.float64, ('dip','strike',))
-  var7 = ds.createVariable('init_normal_stress', np.float64, ('dip','strike',))
-  var8 = ds.createVariable('init_state', np.float64, ('dip','strike',))
+  ovars = par.on_fault_vars
+
+  if ovars.ndim == 3:
+    nfz, nfx = ovars.shape[0], ovars.shape[1]
+    ds.createDimension('dip', nfz)
+    ds.createDimension('strike', nfx)
+    dims = ('dip', 'strike')
+    dip_var = ds.createVariable('dip', np.float64, ('dip',))
+    strike_var = ds.createVariable('strike', np.float64, ('strike',))
+    dip_var[:] = par.fz[:]
+    strike_var[:] = par.fx[:]
+    slab = lambda icol: ovars[:, :, icol]
+  elif ovars.ndim == 4:
+    ntotft, nfzMax, nfxMax = ovars.shape[0], ovars.shape[1], ovars.shape[2]
+    ds.createDimension('fault', ntotft)
+    ds.createDimension('dip', nfzMax)
+    ds.createDimension('strike', nfxMax)
+    dims = ('fault', 'dip', 'strike')
+    slab = lambda icol: ovars[:, :, :, icol]
+  else:
+    raise ValueError(
+        f'par.on_fault_vars has unsupported rank {ovars.ndim}; expected 3 (single-fault) or 4 (multi-fault).')
+
+  # Variable names are literal here (not built from a table) because
+  # tests/contract/test_io_contracts.py greps for createVariable('name', ...)
+  # and compares the set against netcdf_io.f90's nf90_inq_varid('name') calls.
+  var0 = ds.createVariable('a', np.float64, dims)
+  var1 = ds.createVariable('b', np.float64, dims)
+  var2 = ds.createVariable('Dc', np.float64, dims)
+  var3 = ds.createVariable('v0', np.float64, dims)
+  var4 = ds.createVariable('r0', np.float64, dims)
+  var5 = ds.createVariable('init_slip_rate', np.float64, dims)
+  var6 = ds.createVariable('init_shear_stress', np.float64, dims)
+  var7 = ds.createVariable('init_normal_stress', np.float64, dims)
+  var8 = ds.createVariable('init_state', np.float64, dims)
   var0.units = 'unit'
   var1.units = 'unit'
   var2.units = 'meters'
@@ -100,17 +133,15 @@ def netcdf_write_on_fault_vars():
   var6.units = 'Pa'
   var7.units = 'Pa'
   var8.units = 'unit'
-  strike_var[:] = par.fx[:]
-  dip_var[:] = par.fz[:]
-  var0[:,:] = par.on_fault_vars[:,:,9]
-  var1[:,:] = par.on_fault_vars[:,:,10]
-  var2[:,:] = par.on_fault_vars[:,:,11]
-  var3[:,:] = par.on_fault_vars[:,:,12]
-  var4[:,:] = par.on_fault_vars[:,:,13]
-  var5[:,:] = par.on_fault_vars[:,:,46]
-  var6[:,:] = par.on_fault_vars[:,:,8]
-  var7[:,:] = par.on_fault_vars[:,:,7]
-  var8[:,:] = par.on_fault_vars[:,:,20]
+  var0[...] = slab(9)
+  var1[...] = slab(10)
+  var2[...] = slab(11)
+  var3[...] = slab(12)
+  var4[...] = slab(13)
+  var5[...] = slab(46)
+  var6[...] = slab(8)
+  var7[...] = slab(7)
+  var8[...] = slab(20)
   ds.close()
   
 def create_batch_script():

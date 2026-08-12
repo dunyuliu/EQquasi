@@ -356,20 +356,50 @@ end subroutine netcdf_write_roughness
 
 ! Subroutine #4.
 ! netcdf_read_on_fault reads in on-fault quantities from netcdf files created by case.setup.
+!
+! The file may be in either of two layouts, detected from the rank of its
+! variables -- never from ntotft:
+!   - legacy 2-D layout (dims: dip, strike), written by every compset before
+!     multi-fault support, for the one fault that then spanned the whole
+!     model grid.
+!   - 3-D layout (dims: dip, strike, nid_fault), written by case.setup's
+!     multi-fault netcdf_write_on_fault_vars, padded to the largest fault's
+!     (nfxMax, nfzMax) extent -- the same convention netcdf_write_on_fault
+!     (this file) uses for its own output, see that subroutine's header.
+! Either way, a fault node's local (i,j) is recovered from its own
+! coordinates rather than assumed from loop order (node ordinal number is
+! not guaranteed to enumerate a fault's own strike-major grid once a fault
+! does not span the whole mesh), so this same code runs whether ntotft is 1
+! or more.
 subroutine netcdf_read_on_fault(infile)
     use netcdf
     use globalvar
-    implicit none 
+    implicit none
     character (len = 50 ) :: infile
-    integer (kind = 4) :: ncid,  var_id(20), i, j, nvar
-    real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
-    
+    integer (kind = 4) :: ncid, var_id(20), i, j, n, ift, nvar, ndims_var
+    integer (kind = 4) :: dimids3(3), dimlen1, dimlen2, dimlen3
+    integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
+    integer (kind = 4) :: nfxMax, nfzMax
+    real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
+
     nvar = 9
-    allocate(on_fault_vars(nxt,nzt,nvar))
-    
-    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
+
+    ! Per-fault local grid extent, from that fault's own bounding box; same
+    ! formula as netcdf_write_on_fault, so the padded shape agrees exactly.
+    allocate(nfx(ntotft), nfz(ntotft))
+    do ift = 1, ntotft
+        nfx(ift) = int((fltxyz(2,1,ift) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+        nfz(ift) = int((fltxyz(2,3,ift) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+    enddo
+    nfxMax = maxval(nfx)
+    nfzMax = maxval(nfz)
+
+    allocate(on_fault_vars(nfxMax,nfzMax,ntotft,nvar))
+    on_fault_vars = 0.0d0
+
+    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
     call check( nf90_open(infile, NF90_NOWRITE, ncid))
-    
+
     ! Get the varid of the data variables, based on their names.
     call check( nf90_inq_varid(ncid, "a",  var_id(1)))
     call check( nf90_inq_varid(ncid, "b",  var_id(2)))
@@ -380,27 +410,66 @@ subroutine netcdf_read_on_fault(infile)
     call check( nf90_inq_varid(ncid, "init_shear_stress",  var_id(7)))
     call check( nf90_inq_varid(ncid, "init_normal_stress", var_id(8)))
     call check( nf90_inq_varid(ncid, "init_state",         var_id(9)))
-    
-    ! Read the data
-    do i = 1, nvar
-        call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
-    enddo        
-    ! do i = 1,nxt
-        ! do j = 1,nzt
-            ! write(*,*) j,i, on_fault_vars(j,i,1)
-        ! enddo 
-    ! enddo 
-    do i = 1, nxt
-        do j = 1, nzt
-            fric(9,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,1) ! a
-            fric(10, (i-1)*nzt+j, 1) = on_fault_vars(i,j,2)! b
-            fric(11, (i-1)*nzt+j, 1) = on_fault_vars(i,j,3)! Dc
-            fric(12, (i-1)*nzt+j, 1) = on_fault_vars(i,j,4)! v0
-            fric(13, (i-1)*nzt+j, 1) = on_fault_vars(i,j,5)! r0
-            fric(46, (i-1)*nzt+j, 1) = on_fault_vars(i,j,6)! init_slip_rate
-            fric(8,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,7)! shear
-            fric(7,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,8)! norm
-            fric(20, (i-1)*nzt+j, 1) = on_fault_vars(i,j,9)! state variable
+
+    ! Detect the file layout from the rank of "a": 2 for the legacy
+    ! single-fault format, 3 once a nid_fault dimension is present.
+    dimids3 = 0
+    call check( nf90_inquire_variable(ncid, var_id(1), ndims = ndims_var, dimids = dimids3))
+
+    if (ndims_var == 2) then
+        ! Legacy format has no fault dimension at all -- it structurally
+        ! cannot supply more than fault 1's data. Fail loudly rather than
+        ! silently leaving fault 2..ntotft zeroed.
+        if (ntotft > 1) then
+            print *, 'netcdf_read_on_fault: ', trim(infile), &
+                ' has no nid_fault dimension (rank-2 legacy format) but ntotft = ', &
+                ntotft, '. Regenerate on_fault_vars_input.nc with case.setup.'
+            stop 'Stopped'
+        endif
+        call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
+        call check( nf90_inquire_dimension(ncid, dimids3(2), len = dimlen2))
+        if (dimlen1 /= nfx(1) .or. dimlen2 /= nfz(1)) then
+            print *, 'netcdf_read_on_fault: ', trim(infile), &
+                ' strike/dip extent (', dimlen1, dimlen2, &
+                ') does not match fault 1''s mesh extent (', nfx(1), nfz(1), ').'
+            stop 'Stopped'
+        endif
+        do i = 1, nvar
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfx(1), 1:nfz(1), 1, i)))
+        enddo
+    elseif (ndims_var == 3) then
+        call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
+        call check( nf90_inquire_dimension(ncid, dimids3(2), len = dimlen2))
+        call check( nf90_inquire_dimension(ncid, dimids3(3), len = dimlen3))
+        if (dimlen1 /= nfxMax .or. dimlen2 /= nfzMax .or. dimlen3 /= ntotft) then
+            print *, 'netcdf_read_on_fault: ', trim(infile), &
+                ' shape (', dimlen1, dimlen2, dimlen3, &
+                ') does not match expected (nfxMax, nfzMax, ntotft) = (', &
+                nfxMax, nfzMax, ntotft, ').'
+            stop 'Stopped'
+        endif
+        do i = 1, nvar
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfxMax, 1:nfzMax, 1:ntotft, i)))
+        enddo
+    else
+        print *, 'netcdf_read_on_fault: ', trim(infile), &
+            ' variable "a" has unsupported rank ', ndims_var, '; expected 2 or 3.'
+        stop 'Stopped'
+    endif
+
+    do ift = 1, ntotft
+        do n = 1, nftnd(ift)
+            i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+            j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+            fric(9,  n, ift) = on_fault_vars(i,j,ift,1) ! a
+            fric(10, n, ift) = on_fault_vars(i,j,ift,2) ! b
+            fric(11, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
+            fric(12, n, ift) = on_fault_vars(i,j,ift,4) ! v0
+            fric(13, n, ift) = on_fault_vars(i,j,ift,5) ! r0
+            fric(46, n, ift) = on_fault_vars(i,j,ift,6) ! init_slip_rate
+            fric(8,  n, ift) = on_fault_vars(i,j,ift,7) ! shear
+            fric(7,  n, ift) = on_fault_vars(i,j,ift,8) ! norm
+            fric(20, n, ift) = on_fault_vars(i,j,ift,9) ! state variable
             ! The aging law (friclaw 3) carries theta, a time in seconds. The
             ! slip law (friclaw 4) carries psi = f* + b*ln(V* theta / Dc), which
             ! is dimensionless and of order f*. Compsets specify the initial
@@ -409,19 +478,19 @@ subroutine netcdf_read_on_fault(infile)
             ! exp(psi/a) then overflows and the Newton solve returns NaN on the
             ! very first step.
             if (friclaw == 4) then
-                fric(20, (i-1)*nzt+j, 1) = fric(13, (i-1)*nzt+j, 1) &
-                    + fric(10, (i-1)*nzt+j, 1) * dlog(fric(12, (i-1)*nzt+j, 1) &
-                    * on_fault_vars(i,j,9) / fric(11, (i-1)*nzt+j, 1))
+                fric(20, n, ift) = fric(13, n, ift) &
+                    + fric(10, n, ift) * dlog(fric(12, n, ift) &
+                    * on_fault_vars(i,j,ift,9) / fric(11, n, ift))
             endif
             ! Snapshot the initial state. The t = 0 row of the station files is
             ! written when the file is created, which happens at the end of the
             ! run, so reading fric(20) there reports the *final* state under the
             ! label t = 0. Keep the initial value so that row is honest.
-            fric(48, (i-1)*nzt+j, 1) = fric(20, (i-1)*nzt+j, 1)! initial state
-            fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
-            fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
-        enddo 
-    enddo 
+            fric(48, n, ift) = fric(20, n, ift) ! initial state
+            fric(47, n, ift) = fric(46, n, ift) ! peak slip rate
+            fric(23, n, ift) = abs(fric(7, n, ift)) ! initialize theta_pc as abs(normal stress)
+        enddo
+    enddo
 
     ! Close the file, freeing all resources.
     call check( nf90_close(ncid))
@@ -430,63 +499,25 @@ end subroutine netcdf_read_on_fault
 
 ! Subroutine #5.
 ! netcdf_read_on_fault_restart reads in additional on-fault quantities from netcdf files created by previous cycles.
+!
+! Phase one re-reads a, b, Dc, v0, r0 from infile1 (on_fault_vars_input.nc,
+! the same file netcdf_read_on_fault reads for cycle 1): rank-detected and
+! coordinate-mapped exactly as there, see that subroutine's header. Phase
+! two reads the previous cycle's state from infile2 (fault.r.nc, written by
+! netcdf_write_on_fault) and was already ift-looped.
 subroutine netcdf_read_on_fault_restart(infile1, infile2)
     use netcdf
     use globalvar
     implicit none
     character (len = 50 ) :: infile1, infile2
-    integer (kind = 4)    :: ncid,  var_id(20), i, j, n, ift, nvar
+    integer (kind = 4)    :: ncid,  var_id(20), i, j, n, ift, nvar, ndims_var
+    integer (kind = 4) :: dimids3(3), dimlen1, dimlen2, dimlen3
     integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
     integer (kind = 4) :: nfxMax, nfzMax
-    real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
+    real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars4
-    
-    ! Read in 5 variables a, b, Dc, v0, r0 from .
-    nvar = 5
-    allocate(on_fault_vars(nxt,nzt,nvar))
-    
-    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
-    call check( nf90_open(infile1, NF90_NOWRITE, ncid))
-    
-    ! Get the varid of the data variables, based on their names.
-    call check( nf90_inq_varid(ncid, "a",  var_id(1)))
-    call check( nf90_inq_varid(ncid, "b",  var_id(2)))
-    call check( nf90_inq_varid(ncid, "Dc", var_id(3)))
-    call check( nf90_inq_varid(ncid, "v0", var_id(4)))
-    call check( nf90_inq_varid(ncid, "r0", var_id(5)))
-    !call check( nf90_inq_varid(ncid, "init_slip_rate", var_id(6)))
-    !call check( nf90_inq_varid(ncid, "init_shear_stress", var_id(7)))
-    !call check( nf90_inq_varid(ncid, "init_normal_stress", var_id(8)))
-    !call check( nf90_inq_varid(ncid, "init_state", var_id(9)))
-    
-    ! Read the data
-    do i = 1, nvar
-        call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
-    enddo         
-    do i = 1, nxt
-        do j = 1, nzt
-            fric(9,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,1) ! a
-            fric(10, (i-1)*nzt+j, 1) = on_fault_vars(i,j,2)! b
-            fric(11, (i-1)*nzt+j, 1) = on_fault_vars(i,j,3)! Dc
-            fric(12, (i-1)*nzt+j, 1) = on_fault_vars(i,j,4)! v0
-            fric(13, (i-1)*nzt+j, 1) = on_fault_vars(i,j,5)! r0
-            !fric(46, (i-1)*nzt+j, 1) = on_fault_vars(j,i,6)! init_slip_rate
-            !fric(8, (i-1)*nzt+j, 1) = on_fault_vars(j,i,7)! shear
-            !fric(7, (i-1)*nzt+j, 1) = on_fault_vars(j,i,8)! norm
-            !fric(20, (i-1)*nzt+j, 1) = on_fault_vars(j,i,9)! norm
-            !fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
-        enddo 
-    enddo 
-    ! Close the file, freeing all resources.
-    call check( nf90_close(ncid))
-    
-    deallocate(on_fault_vars)
-    
-    ! Phase two, read in initial conditions from restart files fault.r.nc
-    ! (written by netcdf_write_on_fault, which carries an explicit nid_fault
-    ! dimension of size ntotft and per-fault local (strike, dip) grids -- see
-    ! that subroutine's header comment).
-    nvar = 12
+
+    ! Per-fault local grid extent, shared by both phases below.
     allocate(nfx(ntotft), nfz(ntotft))
     do ift = 1, ntotft
         nfx(ift) = int((fltxyz(2,1,ift) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
@@ -494,6 +525,85 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     enddo
     nfxMax = maxval(nfx)
     nfzMax = maxval(nfz)
+
+    ! Read in 5 variables a, b, Dc, v0, r0.
+    nvar = 5
+    allocate(on_fault_vars(nfxMax,nfzMax,ntotft,nvar))
+    on_fault_vars = 0.0d0
+
+    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
+    call check( nf90_open(infile1, NF90_NOWRITE, ncid))
+
+    ! Get the varid of the data variables, based on their names.
+    call check( nf90_inq_varid(ncid, "a",  var_id(1)))
+    call check( nf90_inq_varid(ncid, "b",  var_id(2)))
+    call check( nf90_inq_varid(ncid, "Dc", var_id(3)))
+    call check( nf90_inq_varid(ncid, "v0", var_id(4)))
+    call check( nf90_inq_varid(ncid, "r0", var_id(5)))
+
+    ! Detect the file layout from the rank of "a", as netcdf_read_on_fault does.
+    dimids3 = 0
+    call check( nf90_inquire_variable(ncid, var_id(1), ndims = ndims_var, dimids = dimids3))
+
+    if (ndims_var == 2) then
+        if (ntotft > 1) then
+            print *, 'netcdf_read_on_fault_restart: ', trim(infile1), &
+                ' has no nid_fault dimension (rank-2 legacy format) but ntotft = ', &
+                ntotft, '. Regenerate on_fault_vars_input.nc with case.setup.'
+            stop 'Stopped'
+        endif
+        call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
+        call check( nf90_inquire_dimension(ncid, dimids3(2), len = dimlen2))
+        if (dimlen1 /= nfx(1) .or. dimlen2 /= nfz(1)) then
+            print *, 'netcdf_read_on_fault_restart: ', trim(infile1), &
+                ' strike/dip extent (', dimlen1, dimlen2, &
+                ') does not match fault 1''s mesh extent (', nfx(1), nfz(1), ').'
+            stop 'Stopped'
+        endif
+        do i = 1, nvar
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfx(1), 1:nfz(1), 1, i)))
+        enddo
+    elseif (ndims_var == 3) then
+        call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
+        call check( nf90_inquire_dimension(ncid, dimids3(2), len = dimlen2))
+        call check( nf90_inquire_dimension(ncid, dimids3(3), len = dimlen3))
+        if (dimlen1 /= nfxMax .or. dimlen2 /= nfzMax .or. dimlen3 /= ntotft) then
+            print *, 'netcdf_read_on_fault_restart: ', trim(infile1), &
+                ' shape (', dimlen1, dimlen2, dimlen3, &
+                ') does not match expected (nfxMax, nfzMax, ntotft) = (', &
+                nfxMax, nfzMax, ntotft, ').'
+            stop 'Stopped'
+        endif
+        do i = 1, nvar
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfxMax, 1:nfzMax, 1:ntotft, i)))
+        enddo
+    else
+        print *, 'netcdf_read_on_fault_restart: ', trim(infile1), &
+            ' variable "a" has unsupported rank ', ndims_var, '; expected 2 or 3.'
+        stop 'Stopped'
+    endif
+
+    do ift = 1, ntotft
+        do n = 1, nftnd(ift)
+            i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+            j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+            fric(9,  n, ift) = on_fault_vars(i,j,ift,1) ! a
+            fric(10, n, ift) = on_fault_vars(i,j,ift,2) ! b
+            fric(11, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
+            fric(12, n, ift) = on_fault_vars(i,j,ift,4) ! v0
+            fric(13, n, ift) = on_fault_vars(i,j,ift,5) ! r0
+        enddo
+    enddo
+    ! Close the file, freeing all resources.
+    call check( nf90_close(ncid))
+
+    deallocate(on_fault_vars)
+
+    ! Phase two, read in initial conditions from restart files fault.r.nc
+    ! (written by netcdf_write_on_fault, which carries an explicit nid_fault
+    ! dimension of size ntotft and per-fault local (strike, dip) grids -- see
+    ! that subroutine's header comment).
+    nvar = 12
     allocate(on_fault_vars4(nfxMax,nfzMax,nvar,ntotft))
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
     call check( nf90_open(infile2, NF90_NOWRITE, ncid))

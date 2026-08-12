@@ -1,0 +1,54 @@
+{
+ "benchmark": "BP5",
+ "compset": "test.bp5.qdc",
+ "oracle_kind": "first full earthquake cycle (Q0): interseismic loading, nucleation, rupture, postseismic decay",
+ "element_size_m": 2000.0,
+ "run": {
+  "steps": 4483,
+  "simulated_days": 1.165932,
+  "mpi_ranks": 4,
+  "wall_seconds_time_loop": 3087.1,
+  "seconds_per_step": 0.6886,
+  "nodes": 75640,
+  "fault_nodes": 1891
+ },
+ "event": {
+  "nodes_ruptured": 310,
+  "fault_nodes": 1891,
+  "rupture_time_s": [
+   0.065,
+   117.2983
+  ],
+  "peak_Vmax_m_s": 1.1645,
+  "note": "global.dat column 2 is linear m/s for bp != 8 (globaldat(2,it) = maxSlipRate, written raw). Only the BP8 .dat writer applies dlog10. Do not exponentiate it."
+ },
+ "files": {
+  "fault_snapshots": [
+   "fault.00001.nc",
+   "fault.01001.nc",
+   "fault.02001.nc",
+   "fault.03001.nc",
+   "fault.04001.nc",
+   "fault.04483.nc",
+   "fault.r.nc"
+  ],
+  "disp_snapshots": [
+   "disp.00001.nc",
+   "disp.01001.nc",
+   "disp.02001.nc",
+   "disp.03001.nc",
+   "disp.04001.nc",
+   "disp.04483.nc",
+   "disp.r.nc"
+  ],
+  "on_fault_stations": 9,
+  "off_fault_stations": 9
+ },
+ "provenance": {
+  "run_dir": "work/gold.bp5.np4",
+  "date": "2026-08-12",
+  "version": "1.7.2",
+  "note": "nstep raised to 100000 so the cycle exits on its own criterion rather than a step cap; nt_out = 1000"
+ },
+ "caveat": "regression lock, not a physics validation. The cycle length depends on hang_time = 1e5 s, hardcoded in solveTimeLoopMUMPS.f90 with the comment 'subjective to change', not on a compset parameter -- changing it moves this oracle."
+}

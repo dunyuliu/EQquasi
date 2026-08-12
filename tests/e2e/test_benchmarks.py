@@ -107,7 +107,9 @@ def test_summary_scalars_match(runs, case):
 
     def check(label, got, want, rel=1e-4):
         nonlocal failed
-        ok = abs(got - want) <= abs(want) * rel
+        # Absolute floor: peak slip rate is legitimately ~0 before nucleation,
+        # and a pure relative test on zero can never pass.
+        ok = abs(got - want) <= abs(want) * rel + 1e-12
         lines.append(f"{'SUCCESS' if ok else 'FAIL   '} {label}: "
                      f"{got:.6g} vs {want:.6g}")
         failed |= not ok

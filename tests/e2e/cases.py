@@ -172,7 +172,9 @@ def station_files(d, prefix):
 def counterpart(ref_dir, run_dir, name):
     """The run file matching a reference file, whatever its extension."""
     stem = os.path.splitext(name)[0]
-    for ext in (".dat", ".txt", ".csv"):
+    # .nc must be here: a fault.*.nc reference otherwise has no counterpart and
+    # every snapshot reports "not produced by the run".
+    for ext in (".nc", ".dat", ".txt", ".csv"):
         p = os.path.join(run_dir, stem + ext)
         if os.path.exists(p):
             return p
@@ -223,17 +225,31 @@ def manifest(ref_dir):
             for f in (category_files(ref_dir, c),) if f}
 
 
-def compare_series(gpath, rpath, atol=1e-6):
-    """(ok, message) for two numeric tables. Full array, not sampled."""
+def compare_series(gpath, rpath, rtol=1e-9, atol=1e-12):
+    """(ok, message) for two numeric tables. Full array, not sampled.
+
+    Relative, with an absolute floor. A fixed absolute tolerance cannot work
+    here: one file holds time in seconds (1e6), moment rate (1e11), slip in
+    metres (1e-2) and log10 slip rates near -30. At atol=1e-6 a moment rate
+    agreeing to 1e-9 relative -- which is what a different compiler on the same
+    source gives -- reads as a failure, while a slip rate off by 100 % passes.
+    """
     import numpy as _np
     g, r = read_any(gpath), read_any(rpath)
     if g.shape != r.shape:
         return False, f"shape {r.shape} vs reference {g.shape}"
-    d = float(_np.max(_np.abs(g - r)))
-    if d > atol:
-        col = int(_np.unravel_index(_np.argmax(_np.abs(g - r)), g.shape)[1]) + 1
-        return False, f"max|diff| = {d:.3e} at column {col}"
-    return True, f"{g.shape[0]} rows x {g.shape[1]} cols, max|diff| = {d:.1e}"
+    diff = _np.abs(g - r)
+    tol = atol + rtol * _np.abs(g)
+    bad = diff > tol
+    if bad.any():
+        k = int(_np.argmax(diff / _np.maximum(tol, 1e-300)))
+        i, j = _np.unravel_index(k, g.shape)
+        return False, (f"{int(bad.sum())} of {g.size} entries outside "
+                       f"rtol={rtol:g}; worst at row {i}, column {j+1}: "
+                       f"{r[i, j]:.8g} vs {g[i, j]:.8g}")
+    worst = float((diff / _np.maximum(_np.abs(g), 1e-300)).max())
+    return True, (f"{g.shape[0]} rows x {g.shape[1]} cols, "
+                  f"max relative diff = {worst:.1e}")
 
 
 def compare_netcdf(gpath, rpath):

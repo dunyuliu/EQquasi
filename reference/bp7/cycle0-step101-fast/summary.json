@@ -14,7 +14,7 @@
  "event": {
   "nodes_ruptured": 0,
   "note": "pre-nucleation",
-  "peak_Vmax_m_s": 0.0
+  "peak_Vmax_m_s": 2.83e-08
  },
  "files": {
   "fault_snapshots": [

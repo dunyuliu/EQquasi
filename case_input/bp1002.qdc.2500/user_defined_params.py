@@ -37,7 +37,7 @@ from math import *
 par = parameters()
 
 par.istart = 1
-par.iend = 3   # a few cycles
+par.iend = 1   # one cycle, beginning to end
 par.mode = 1  # quasi-dynamic
 
 # Two-fault geometry: (xlo, xhi, ycoor, zlo, zhi) per fault, meters.
@@ -177,7 +177,7 @@ par.dx_trans = 50
 ####################################
 par.casename = "bp1002-stepover-qd-2500"
 par.HPC_nnode = 1
-par.HPC_ncpu = 2
+par.HPC_ncpu = 3
 par.HPC_queue = "normal"
 par.HPC_time = "04:00:00"
 par.HPC_account = "EAR22013"

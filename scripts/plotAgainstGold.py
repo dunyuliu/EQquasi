@@ -98,6 +98,38 @@ def label(key):
     return v if ift == 0 else f"{v} [fault {ift}]"
 
 
+# Units worth showing in, keyed by the netCDF variable name. Stresses in Pa
+# print as "1e7" offsets that hide the value; slip rates and slip are already
+# in sensible units.
+_UNITS = {"shear_strike": (1e-6, "MPa"), "shear_dip": (1e-6, "MPa"),
+          "effective_normal": (1e-6, "MPa"), "state_normal": (1e-6, "MPa"),
+          "slip_rate": (1.0, "m/s"), "state_variable": (1.0, "s"),
+          "slips": (1.0, "m"), "slipd": (1.0, "m"), "slipn": (1.0, "m")}
+
+
+def _scale(name, arr):
+    return _UNITS.get(name, (1.0, ""))
+
+
+def _case_params(run_dir):
+    """Fault extent in metres from the run's model.txt, or None.
+
+    model.txt is a positional contract (src/read_input.f90): line 1 is
+    xmin xmax, line 3 is zmin zmax. Read it rather than importing the compset,
+    so this works on any run directory including a bare cycle folder.
+    """
+    for d in (run_dir, os.path.dirname(os.path.normpath(run_dir))):
+        f = os.path.join(d, "model.txt")
+        if os.path.exists(f):
+            try:
+                rows = [l.split() for l in open(f) if l.strip()]
+                return {"xlo": float(rows[0][0]), "xhi": float(rows[0][1]),
+                        "zlo": float(rows[2][0]), "zhi": float(rows[2][1])}
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
 def raw_dims(path):
     """Dimension sizes exactly as stored, before any per-fault reshaping."""
     import netCDF4 as nc
@@ -137,27 +169,55 @@ def compare_field(bench, run_dir, out, only=None):
     # so a run that meshed fewer faults writes fewer slabs.
     bad = [f"{label(k)}: missing from the run" for k in gold if k not in run]
 
-    fig, ax = plt.subplots(len(keys), 3, figsize=(13, 3.1 * len(keys)),
-                           squeeze=False)
+    # Physical axes. The fault plane is tens of km across; drawn on array
+    # indices with no aspect ratio it is unreadable, and a rectangular
+    # nucleation patch reads as a diagonal smear.
+    par = _case_params(run_dir)
+    nz, nx = np.asarray(gold[keys[0]]).shape
+    xs = (np.linspace(par["xlo"], par["xhi"], nx) / 1e3 if par else np.arange(nx))
+    zs = (np.linspace(par["zlo"], par["zhi"], nz) / 1e3 if par else np.arange(nz))
+    xlab, zlab = ("along strike (km)", "depth (km)") if par else ("strike index", "dip index")
+
+    fig, ax = plt.subplots(len(keys), 3, figsize=(15, 3.4 * len(keys)),
+                           squeeze=False, constrained_layout=True)
     for r, k in enumerate(keys):
         g, u = np.asarray(gold[k], float), np.asarray(run[k], float)
         if g.shape != u.shape:
             bad.append(f"{label(k)}: shape {u.shape} vs gold {g.shape}")
+            for c in range(3):
+                ax[r, c].set_visible(False)
             continue
         d = u - g
-        if np.max(np.abs(d)) > 0.0:
-            bad.append(f"{label(k)}: max|diff| = {np.max(np.abs(d)):.3e}")
-        for c, (arr, ttl, cmap) in enumerate(
-                [(g, "gold", "viridis"), (u, "run", "viridis"),
-                 (d, "run - gold", "RdBu_r")]):
-            lim = np.max(np.abs(d)) or 1.0
-            kw = dict(cmap=cmap, vmin=-lim, vmax=lim) if c == 2 else dict(cmap=cmap)
-            m = ax[r, c].pcolormesh(arr, shading="nearest", **kw)
-            plt.colorbar(m, ax=ax[r, c])
-            ax[r, c].set_title(f"{label(k)} — {ttl}", fontsize=9)
-    fig.suptitle(f"{bench}: {run_dir} against reference/{bench}/gold", fontsize=11)
-    fig.tight_layout()
-    fig.savefig(f"{out}_field.png", dpi=110)
+        dmax = float(np.max(np.abs(d)))
+        if dmax > 0.0:
+            bad.append(f"{label(k)}: max|diff| = {dmax:.3e}")
+        sc, unit = _scale(k[0], g)
+        for c, (arr, ttl) in enumerate([(g * sc, "gold"), (u * sc, "run"),
+                                        (d * sc, "run - gold")]):
+            a = ax[r, c]
+            if c == 2 and dmax == 0.0:
+                # An exactly-zero residual is the expected result here, so say
+                # so rather than drawing an empty panel under a +-1 colourbar
+                # that implies a scale nothing occupies.
+                a.text(0.5, 0.5, "identical\n(max|diff| = 0)", ha="center",
+                       va="center", fontsize=11, color="0.35",
+                       transform=a.transAxes)
+                a.set_xticks([]); a.set_yticks([])
+                a.set_title(f"{label(k)} — residual", fontsize=10)
+                continue
+            kw = (dict(cmap="RdBu_r", vmin=-dmax * sc, vmax=dmax * sc)
+                  if c == 2 else dict(cmap="magma"))
+            m = a.pcolormesh(xs, zs, arr, shading="nearest", **kw)
+            cb = plt.colorbar(m, ax=a)
+            cb.set_label(unit, fontsize=8)
+            a.set_aspect("equal")
+            a.set_xlabel(xlab, fontsize=8); a.set_ylabel(zlab, fontsize=8)
+            a.tick_params(labelsize=7)
+            a.set_title(f"{label(k)} — {ttl}", fontsize=10)
+    fig.suptitle(f"{bench}: {run_dir} against reference/{bench}/gold "
+                 f"— step 101, {nx} x {nz} fault nodes", fontsize=12)
+    fig.savefig(f"{out}_field.png", dpi=150)
+    plt.close(fig)
     print(f"wrote {out}_field.png")
     return bad
 

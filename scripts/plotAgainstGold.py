@@ -49,7 +49,7 @@ def read_gold_csv(path):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-FIELD_BENCHMARKS = ("bp5", "bp5.dip90", "bp7")
+FIELD_BENCHMARKS = ("bp5", "bp5.dip90", "bp7", "stepover")
 SNAPSHOT = "fault.00101.nc"
 
 # Station quantities worth eyeballing, as (column index, label).
@@ -66,13 +66,14 @@ def gold_dir(bench):
 
 
 def load_field(path):
-    """Fault-plane snapshot as {variable: 2-D array}, from netCDF.
+    """Fault-plane snapshot as {(variable, fault index): 2-D array}, from netCDF.
 
     netcdf_write_on_fault (src/netcdf_io.f90) always carries a leading
-    nid_fault dimension, size ntotft, so single- and multi-fault runs write
-    the same shape of variable. These single-fault gold/reference cases have
-    ntotft == 1: squeeze that dimension away here rather than in the writer,
-    so the comparison stays a plain 2-D map per fault.
+    nid_fault dimension of size ntotft, so single- and multi-fault runs write
+    the same shape. Key on (name, ift) rather than squeezing that dimension
+    away: a multi-fault snapshot then compares fault by fault, and a swapped
+    or unwritten fault shows up as a named mismatch instead of hiding inside
+    an aggregate. Single-fault cases just get ift = 0 throughout.
     """
     try:
         import netCDF4 as nc
@@ -85,13 +86,16 @@ def load_field(path):
             continue
         arr = d.variables[v][:]
         if arr.ndim == 3:
-            if arr.shape[0] != 1:
-                raise SystemExit(
-                    f"{path}: variable '{v}' has {arr.shape[0]} faults; "
-                    "this comparison only supports single-fault snapshots")
-            arr = arr[0]
-        out[v] = arr
+            for ift in range(arr.shape[0]):
+                out[(v, ift)] = arr[ift]
+        else:
+            out[(v, 0)] = arr
     return out
+
+
+def label(key):
+    v, ift = key
+    return v if ift == 0 else f"{v} [fault {ift}]"
 
 
 def compare_field(bench, run_dir, out, only=None):
@@ -101,18 +105,25 @@ def compare_field(bench, run_dir, out, only=None):
         raise SystemExit(f"no {SNAPSHOT} under {run_dir}")
     run = load_field(hits[0])
 
-    names = [only] if only else [v for v in gold if v in run]
-    bad = []
-    fig, ax = plt.subplots(len(names), 3, figsize=(13, 3.1 * len(names)),
+    keys = [k for k in gold if k in run and (only is None or k[0] == only)]
+    if only and not keys:
+        raise SystemExit(f"no variable '{only}' in both run and gold")
+
+    # A fault present in gold but missing from the run is a silent failure
+    # mode worth naming: netcdf_write_on_fault sizes its output from ntotft,
+    # so a run that meshed fewer faults writes fewer slabs.
+    bad = [f"{label(k)}: missing from the run" for k in gold if k not in run]
+
+    fig, ax = plt.subplots(len(keys), 3, figsize=(13, 3.1 * len(keys)),
                            squeeze=False)
-    for r, v in enumerate(names):
-        g, u = np.asarray(gold[v], float), np.asarray(run[v], float)
+    for r, k in enumerate(keys):
+        g, u = np.asarray(gold[k], float), np.asarray(run[k], float)
         if g.shape != u.shape:
-            bad.append(f"{v}: shape {u.shape} vs gold {g.shape}")
+            bad.append(f"{label(k)}: shape {u.shape} vs gold {g.shape}")
             continue
         d = u - g
         if np.max(np.abs(d)) > 0.0:
-            bad.append(f"{v}: max|diff| = {np.max(np.abs(d)):.3e}")
+            bad.append(f"{label(k)}: max|diff| = {np.max(np.abs(d)):.3e}")
         for c, (arr, ttl, cmap) in enumerate(
                 [(g, "gold", "viridis"), (u, "run", "viridis"),
                  (d, "run - gold", "RdBu_r")]):
@@ -120,7 +131,7 @@ def compare_field(bench, run_dir, out, only=None):
             kw = dict(cmap=cmap, vmin=-lim, vmax=lim) if c == 2 else dict(cmap=cmap)
             m = ax[r, c].pcolormesh(arr, shading="nearest", **kw)
             plt.colorbar(m, ax=ax[r, c])
-            ax[r, c].set_title(f"{v} — {ttl}", fontsize=9)
+            ax[r, c].set_title(f"{label(k)} — {ttl}", fontsize=9)
     fig.suptitle(f"{bench}: {run_dir} against reference/{bench}/gold", fontsize=11)
     fig.tight_layout()
     fig.savefig(f"{out}_field.png", dpi=110)

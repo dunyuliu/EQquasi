@@ -33,7 +33,10 @@ STATION_FIELDS = [
     "shear_stress_3", "pore_pressure", "darcy_vel_2", "darcy_vel_3", "state",
 ]
 
-GLOBAL_FIELDS = ["t", "max_slip_rate", "moment_density_rate"]
+# Section 4.2 renamed this column on 2026-08-12: "moment density rate (N/s)"
+# became "moment rate (N.m/s)". Only the label changed -- the quantity was
+# always the integral of mu*V over Omega_f.
+GLOBAL_FIELDS = ["t", "max_slip_rate", "moment_rate"]
 
 # Section 4.3: ten profile files.
 PROFILES = [

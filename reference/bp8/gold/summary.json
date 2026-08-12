@@ -1,134 +1,129 @@
 {
-  "+000dp+000": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 37.308,
-    "p_peak_MPa": 13.6276,
-    "p_late_MPa": 1.6901,
-    "state_t0": 11.604,
-    "state_end": 6.349,
-    "V_peak_log10": -6.576,
-    "V_peak_day": 1.201
-  },
-  "-200dp+000": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 21.992,
-    "p_peak_MPa": 2.8706,
-    "p_late_MPa": 1.688,
-    "state_t0": 11.604,
-    "state_end": 5.431,
-    "V_peak_log10": -6.896,
-    "V_peak_day": 3.193
-  },
-  "+200dp+000": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 21.992,
-    "p_peak_MPa": 2.8706,
-    "p_late_MPa": 1.688,
-    "state_t0": 11.604,
-    "state_end": 5.431,
-    "V_peak_log10": -6.896,
-    "V_peak_day": 3.193
-  },
-  "+000dp+200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 17.387,
-    "p_peak_MPa": 2.8706,
-    "p_late_MPa": 1.688,
-    "state_t0": 11.604,
-    "state_end": 5.246,
-    "V_peak_log10": -6.912,
-    "V_peak_day": 5.511
-  },
-  "+000dp-200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 17.387,
-    "p_peak_MPa": 2.8706,
-    "p_late_MPa": 1.688,
-    "state_t0": 11.604,
-    "state_end": 5.246,
-    "V_peak_log10": -6.912,
-    "V_peak_day": 5.511
-  },
-  "+200dp+200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 15.319,
-    "p_peak_MPa": 1.6859,
-    "p_late_MPa": 1.6859,
-    "state_t0": 11.604,
-    "state_end": 5.108,
-    "V_peak_log10": -7.786,
-    "V_peak_day": 10.309
-  },
-  "+200dp-200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 15.319,
-    "p_peak_MPa": 1.6859,
-    "p_late_MPa": 1.6859,
-    "state_t0": 11.604,
-    "state_end": 5.108,
-    "V_peak_log10": -7.786,
-    "V_peak_day": 10.309
-  },
-  "-200dp+200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 15.319,
-    "p_peak_MPa": 1.6859,
-    "p_late_MPa": 1.6859,
-    "state_t0": 11.604,
-    "state_end": 5.108,
-    "V_peak_log10": -7.786,
-    "V_peak_day": 10.309
-  },
-  "-200dp-200": {
-    "tau0_MPa": 14.6,
-    "V_step1": 1e-12,
-    "slip_mm": 15.319,
-    "p_peak_MPa": 1.6859,
-    "p_late_MPa": 1.6859,
-    "state_t0": 11.604,
-    "state_end": 5.108,
-    "V_peak_log10": -7.786,
-    "V_peak_day": 10.309
-  },
-  "global": {
-    "t_end_d": 30.002,
-    "nsteps": 5301,
-    "peak_Vmax_log10": -6.395,
-    "peak_Vmax_day": 2.373,
-    "peak_moment": 632930000.0
-  },
-  "provenance": {
-    "code": "EQquasi",
-    "version": "1.4.7",
-    "host": "cotopaxi",
-    "cpu_model": "AMD EPYC 7532 32-Core Processor",
-    "host_logical_cores": 64,
-    "mpi_ranks": 1,
-    "omp_threads_per_rank": 1,
-    "num_elements": 8000,
-    "num_equations": 23814,
-    "element_size_m": 50.0,
-    "steps_completed": 5301,
-    "seconds_per_step": 0.1506639,
-    "run_timestamp": "2026-08-07T13:43:33",
-    "run_dir": "work/bp8.sub147"
-  },
-  "extended_2026-08-12": {
-    "note": "Added the 5 remaining stations, fault.05301.nc/.csv (field snapshot, no BP5/BP7-style oracle existed for BP8 before), and the 10 section-4.3 profiles as CSV. All pulled from a fresh run of v1.6.0 at the exact gold configuration (xi=0.2, nstep=nt_out=8000, case_input/test.bp8.qdc), not re-derived analytically.",
-    "reproduction_check": "Before adding anything, this fresh run's RUN SUMMARY (5301 steps, 30.0019 days, 0.14973 s/step) and scripts/plotAgainstGold.py bp8 both matched the frozen v1.4.7 gold exactly ('matches gold', exit 0) -- v1.6.0's mesh/ntotft-neutrality refactor since v1.4.7 did not move BP8's answer.",
-    "run_dir": "work/verify.bp8/Q0",
-    "run_timestamp": "2026-08-12",
-    "version": "1.6.0",
-    "station_csv_sampling": "500 rows, floor(linspace(0, N-1, 500)) indices into the raw .dat -- verified to reproduce the pre-existing 4 station gold CSVs and global.csv exactly before being applied to the 5 new stations.",
-    "profile_csv": "kept in full (664 time rows x 17 spatial nodes at dx=50m); not resampled to the 81-node submission grid -- that resampling is scripts/resampleBP8Profiles.py's job and is exercised by tests/e2e/test_bp8_against_gold.py::test_submission_validator_passes.",
-    "symmetry_check": "the four +-200dp+-200 corner stations agree to all reported digits, and +000dp+200 == +000dp-200, as required by the Gaussian source's symmetry about both x2=0 and x3=0 -- a sign/indexing bug in either station lookup or the source term would break this."
-  }
+ "+000dp+000": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 37.3079,
+  "p_peak_MPa": 13.6276,
+  "p_late_MPa": 1.6901,
+  "state_t0": 11.604,
+  "state_end": 6.3494,
+  "V_peak_log10": -6.576,
+  "V_peak_day": 1.201
+ },
+ "-200dp+000": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 21.992,
+  "p_peak_MPa": 2.8706,
+  "p_late_MPa": 1.688,
+  "state_t0": 11.604,
+  "state_end": 5.4312,
+  "V_peak_log10": -6.896,
+  "V_peak_day": 3.193
+ },
+ "+200dp+000": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 21.992,
+  "p_peak_MPa": 2.8706,
+  "p_late_MPa": 1.688,
+  "state_t0": 11.604,
+  "state_end": 5.4312,
+  "V_peak_log10": -6.896,
+  "V_peak_day": 3.193
+ },
+ "+000dp+200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 17.3872,
+  "p_peak_MPa": 2.8706,
+  "p_late_MPa": 1.688,
+  "state_t0": 11.604,
+  "state_end": 5.2459,
+  "V_peak_log10": -6.912,
+  "V_peak_day": 5.511
+ },
+ "+000dp-200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 17.3872,
+  "p_peak_MPa": 2.8706,
+  "p_late_MPa": 1.688,
+  "state_t0": 11.604,
+  "state_end": 5.2459,
+  "V_peak_log10": -6.912,
+  "V_peak_day": 5.511
+ },
+ "+200dp+200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 15.3186,
+  "p_peak_MPa": 1.6859,
+  "p_late_MPa": 1.6859,
+  "state_t0": 11.604,
+  "state_end": 5.1077,
+  "V_peak_log10": -7.786,
+  "V_peak_day": 10.309
+ },
+ "+200dp-200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 15.3186,
+  "p_peak_MPa": 1.6859,
+  "p_late_MPa": 1.6859,
+  "state_t0": 11.604,
+  "state_end": 5.1077,
+  "V_peak_log10": -7.786,
+  "V_peak_day": 10.309
+ },
+ "-200dp+200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 15.3186,
+  "p_peak_MPa": 1.6859,
+  "p_late_MPa": 1.6859,
+  "state_t0": 11.604,
+  "state_end": 5.1077,
+  "V_peak_log10": -7.786,
+  "V_peak_day": 10.309
+ },
+ "-200dp-200": {
+  "tau0_MPa": 14.6,
+  "V_step1": 1e-12,
+  "slip_mm": 15.3186,
+  "p_peak_MPa": 1.6859,
+  "p_late_MPa": 1.6859,
+  "state_t0": 11.604,
+  "state_end": 5.1077,
+  "V_peak_log10": -7.786,
+  "V_peak_day": 10.309
+ },
+ "global": {
+  "t_end_d": 30.002,
+  "nsteps": 5301,
+  "peak_Vmax_log10": -6.395,
+  "peak_Vmax_day": 2.373,
+  "peak_moment": 632930000.0,
+  "V_peak_log10": -6.3946,
+  "steps": 5302
+ },
+ "provenance": {
+  "run_dir": "work/sub50.gs",
+  "date": "2026-08-12",
+  "version": "1.7.0",
+  "config": "BP8-QD-GS, dx = 50 m, domain +-500 m in x, y and z, ungraded, xi = 0.2",
+  "note": "the configuration submitted as dliu_eqquasi-1-7-0-50m.zip; gold is the run itself at full time resolution, not a decimation",
+  "wall_seconds": 796
+ },
+ "extended_2026-08-12": {
+  "note": "Added the 5 remaining stations, fault.05301.nc/.csv (field snapshot, no BP5/BP7-style oracle existed for BP8 before), and the 10 section-4.3 profiles as CSV. All pulled from a fresh run of v1.6.0 at the exact gold configuration (xi=0.2, nstep=nt_out=8000, case_input/test.bp8.qdc), not re-derived analytically.",
+  "reproduction_check": "Before adding anything, this fresh run's RUN SUMMARY (5301 steps, 30.0019 days, 0.14973 s/step) and scripts/plotAgainstGold.py bp8 both matched the frozen v1.4.7 gold exactly ('matches gold', exit 0) -- v1.6.0's mesh/ntotft-neutrality refactor since v1.4.7 did not move BP8's answer.",
+  "run_dir": "work/verify.bp8/Q0",
+  "run_timestamp": "2026-08-12",
+  "version": "1.6.0",
+  "station_csv_sampling": "500 rows, floor(linspace(0, N-1, 500)) indices into the raw .dat -- verified to reproduce the pre-existing 4 station gold CSVs and global.csv exactly before being applied to the 5 new stations.",
+  "profile_csv": "kept in full (664 time rows x 17 spatial nodes at dx=50m); not resampled to the 81-node submission grid -- that resampling is scripts/resampleBP8Profiles.py's job and is exercised by tests/e2e/test_bp8_against_gold.py::test_submission_validator_passes.",
+  "symmetry_check": "the four +-200dp+-200 corner stations agree to all reported digits, and +000dp+200 == +000dp-200, as required by the Gaussian source's symmetry about both x2=0 and x3=0 -- a sign/indexing bug in either station lookup or the source term would break this."
+ },
+ "caveat": "regression lock on the submitted 50 m configuration. Edge/centre slip is sensitive to domain extent at the 0.2 level and is not converged -- this detects change, it does not establish that the benchmark is reproduced correctly."
 }

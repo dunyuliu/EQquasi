@@ -156,24 +156,46 @@ Key progress
 Verification
 ---------------------
 
-### Regression suite
+### Test suite
+
+Four tiers, selected by marker (`pytest.ini`). The first three need neither MPI
+nor MUMPS and run on every change; `e2e` builds the code, runs a benchmark, and
+is opt-in.
 
 ```
-python3 -m pytest tests/   # static/structural guards, ~1 s, no MPI or MUMPS
-python3 testAll.py         # physics regression: builds, runs, compares to references
+python3 -m pytest tests/            # unit + contract + regression, ~4 s
+python3 -m pytest tests/ -m e2e     # builds and runs benchmarks, ~40 min
+python3 -m pytest tests/ -m ""      # everything
 ```
 
-`testAll.py` runs `test.bp5.qdc`, `test.bp5.qdc.dip90` and `test.bp7.qdc` and
-compares `fault.00101.nc` against `test.reference.results/`. Both BP5 cases
-reproduce their references with **max absolute difference 0.0** across all 17
-variables.
+| Tier | Tests | What it checks | Cost |
+|---|---:|---|---|
+| `unit` | 36 | Numerics in isolation: the pore-pressure operator against its analytic solution, initial conditions against the benchmark equations, physical invariants (slip non-decreasing, effective normal stress compressive, state positive and finite) | ms |
+| `contract` | 136 | File formats and cross-file agreement: BP8 section 4 output conformance, `model.txt`'s positional contract, compset registration, build and release gates, and that every `reference/` file has a reader | ~1 s |
+| `regression` | 9 | One guard per defect that actually occurred here, including the fault plane that fell between mesh lines and the codebase's known Fortran landmines | ~2 s |
+| `e2e` | 41 | Builds, runs a benchmark end to end, and diffs the result against frozen gold | ~40 min |
 
-The committed references are *regression locks*, not physics validations. The
-test compsets are deliberately coarse (`test.bp5.qdc` uses `dx = 4000 m` against
-BP5's 2000 m; `test.bp7.qdc` uses `dx = 50 m`, which spans BP7's
-velocity-weakening disc with only about four cells). They catch unintended
-changes; they do not establish that a benchmark is reproduced correctly. That
-requires the production compset at its native resolution.
+### What each `e2e` benchmark compares
+
+Gold lives in `reference/<benchmark>/gold/`, in both netCDF and CSV.
+
+| Benchmark | Compset | Gold | Compared | Run time |
+|---|---|---|---|---:|
+| BP5 | `test.bp5.qdc` | `fault.00101.nc` | Every variable on the fault plane at step 101, max abs diff **0.0** | ~8 min |
+| BP5-dip90 | `test.bp5.qdc.dip90` | `fault.00101.nc` | as above | ~8 min |
+| BP7 | `test.bp7.qdc` | `fault.00101.nc` | as above | ~8 min |
+| BP8-QD-GS | `test.bp8.qdc` | 9 stations, `global`, 10 section-4.3 profiles, `fault.05301.nc` | Every gold file diffed **in full**, not sampled; plus named scalars, and that the output passes `checkBP8Submission` | ~13 min |
+| Step-over | `test.stepover.qdc` | `fault.00101.nc` | Per fault: a slab exists for every declared fault, none all-zero or NaN, the two faults' normal stresses stay distinct, and each fault's field matches gold | ~2 min |
+
+The step-over case is the only `ntotft > 1` gate. It exists because three
+multi-fault bugs reached `master` while every other benchmark ran a single
+fault — a zero-node fault, uninitialised output slabs, and accumulator aliasing
+across faults. Each is now covered by a named assertion.
+
+Gold is a **regression lock, not a physics validation**. It detects unintended
+change; it does not establish that a benchmark is reproduced correctly. The
+compsets are deliberately coarse, and BP8's frozen configuration is not
+converged in domain size (see `PATHWAY_FORWARD.md`).
 
 ### BP8 pore fluid diffusion
 

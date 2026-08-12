@@ -164,6 +164,47 @@ def test_global_matches_gold(run_dir, gold):
     assert a[:, 2].max() == pytest.approx(g["peak_moment"], rel=1e-3)
 
 
+# Every gold file is diffed whole, not sampled. The scalar checks above name
+# *which* quantity moved and are worth keeping for that, but they read a
+# handful of entries out of ~58000 per station: a change confined to the middle
+# of a curve, or to a column nothing samples (slip_3, the Darcy velocities),
+# passes them untouched. These two compare the full array, which is possible
+# only because the gold now stores the run at full time resolution rather than
+# decimated to 500 rows.
+FULL_DIFF_ATOL = 1e-6
+
+
+def _gold_csv(name):
+    p = os.path.join(GOLD_DIR, name)
+    if not os.path.exists(p):
+        pytest.skip(f"no gold at {p}")
+    return np.genfromtxt(p, delimiter=",", skip_header=1)
+
+
+@pytest.mark.parametrize("station", ALL_STATIONS)
+def test_station_series_matches_gold_in_full(run_dir, station):
+    gold = _gold_csv(f"fltst_strk{station}.csv")
+    run = _read(os.path.join(run_dir, f"fltst_strk{station}.dat"))
+    assert run.shape == gold.shape, \
+        f"{station}: shape {run.shape} vs gold {gold.shape}"
+    d = np.max(np.abs(run - gold))
+    assert d == pytest.approx(0.0, abs=FULL_DIFF_ATOL), (
+        f"station {station} diverged from gold over the full series: "
+        f"max|diff| = {d:.3e} at column "
+        f"{int(np.unravel_index(np.argmax(np.abs(run - gold)), run.shape)[1]) + 1}"
+    )
+
+
+def test_global_series_matches_gold_in_full(run_dir):
+    gold = _gold_csv("global.csv")
+    run = _read(os.path.join(run_dir, "global.dat"))
+    assert run.shape == gold.shape, \
+        f"global: shape {run.shape} vs gold {gold.shape}"
+    d = np.max(np.abs(run - gold))
+    assert d == pytest.approx(0.0, abs=FULL_DIFF_ATOL), \
+        f"global.dat diverged from gold over the full series: max|diff| = {d:.3e}"
+
+
 def test_fault_snapshot_matches_gold(run_dir):
     """BP5/BP7 have long compared a frozen fault.*.nc; BP8 never had one.
 

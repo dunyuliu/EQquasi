@@ -1,9 +1,23 @@
-#! /usr/bin/env python3 
+#! /usr/bin/env python3
 
-import xml.etree.ElementTree as ET
 import shutil, sys, os
 
-def case_copy(src, dst):
+# Only the case machinery is copied into a new case: what is executed from
+# inside the case (./case.setup, ./case.submit) and what those imports pull in
+# (user_defined_params.py -> defaultParameters.py -> lib.py). The
+# post-processing tools (plot*, generateFaultInterface, resampleBP8Profiles.py,
+# checkBP8Submission, ...) are NOT copied: they live once in scripts/, on PATH
+# via install.eqquasi.sh, and take the case/cycle directory as an argument --
+# a copied tool silently freezes at the vintage the case was created with,
+# which is how three separate nid_fault breakages went unnoticed.
+CASE_MACHINERY = [
+    "case.setup",
+    "case.submit",
+    "defaultParameters.py",
+    "lib.py",
+]
+
+def case_copy(src, dst, only=None):
     # copy files from src to dst. Skip directories: shutil.copy raises on them,
     # and a stray __pycache__/ in case_input or scripts is enough to abort case
     # creation entirely.
@@ -11,6 +25,8 @@ def case_copy(src, dst):
     for f in filenames:
         srcf = src + '/' + f
         if os.path.isdir(srcf):
+            continue
+        if only is not None and f not in only:
             continue
         shutil.copy(srcf, dst)
 
@@ -24,13 +40,13 @@ def _main_func(description):
 
     shutil.rmtree(str(case_path), ignore_errors=True)
     os.mkdir(str(case_path))
-    
+
     eqquasi_root = env_var['EQQUASIROOT']
-    input_path = eqquasi_root + '/case_input/' + str(compset) 
+    input_path = eqquasi_root + '/case_input/' + str(compset)
     utils_path = eqquasi_root + '/scripts'
-  
+
     case_copy(input_path, case_path)
-    case_copy(utils_path, case_path)
+    case_copy(utils_path, case_path, only=CASE_MACHINERY)
 
 if __name__ == "__main__":
     _main_func(__doc__)

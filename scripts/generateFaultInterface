@@ -1,12 +1,28 @@
 #! /usr/bin/env python3
+"""Generate and visualize the (fractal or planar, possibly dipping) fault
+interface a case will mesh.
+
+Reads the geometry parameters (insertFaultType, dip, nfx, nfz, dx, dz, fxmin,
+fzmin) from the case's user_defined_params.py and writes the interface file
+the solver reads, plus a figure of the surface and its slopes. Run by
+case.setup automatically when par.insertFaultType > 0; can also be run by
+hand from (or pointed at) a case directory.
+
+Reads:  user_defined_params.py
+Writes: bFault_Rough_Geometry.txt and cFaultInterfaceGeometry.png into the
+        case directory
 """
-Script to generate and visualize fractal and dipping fault interface.
-"""
+import argparse
+import os, sys
 import numpy as np
 from math import cos,sin,tan,pi
 from numpy.fft import fft2, ifft2
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plotutils as pu
+
+pu.apply_style()
 import matplotlib.pyplot as plt
-from user_defined_params import par
 
 def generateFractalSurface(lx, hurst_exponent, seed=None):
     np.random.seed(seed)
@@ -63,7 +79,7 @@ def generatePlane(nz, nx, dx):
     result = np.zeros((nz,nx))
     return result
 
-def generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
+def generateFaultInterface(par, case_dir, nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
     if isRoughFault == 2:
         hurst_exponent = 1.
         alpha0 = 0.005
@@ -78,6 +94,9 @@ def generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
     elif isRoughFault == 1:
         subSurface     = generatePlane(nz, nx, dx)
         figTitle = 'Planar fault'
+    else:
+        pu.die(f'generateFaultInterface: par.insertFaultType={isRoughFault} '
+               'inserts no fault (1: planar, 2: rough); nothing to generate.')
     
     # The fault interface is discretized to dx by dx squares.   
     # Rotate y coordinates to y+ by the (90-dip) angle.
@@ -113,7 +132,7 @@ def generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
             result[ntmp,2] = dSurface_dz[j,i]
             ntmp = ntmp + 1
 
-    np.savetxt('bFault_Rough_Geometry.txt', result, fmt='%f', delimiter='\t')
+    np.savetxt(os.path.join(case_dir, 'bFault_Rough_Geometry.txt'), result, fmt='%f', delimiter='\t')
 
     print('Peak roughness of the fractal surface is ', np.max(subSurface),' m')
     print('Dip of the fault is ', dipAngle)
@@ -140,17 +159,23 @@ def generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=None):
     plt.colorbar()
     plt.title('Derivative along z/dipAngle')
 
-    plt.savefig('cFaultInterfaceGeometry.png', dpi = 600)
+    out = os.path.join(case_dir, 'cFaultInterfaceGeometry.png')
+    plt.savefig(out, dpi=150, pil_kwargs={'optimize': True})
+    print(f'wrote {out} ({os.path.getsize(out)/1024:.0f} KB)')
 
 def _main_func(description):
-    #dipAngle = par.dip
-    isRoughFault = par.insertFaultType
-    dipAngle     = par.dip
-    nx           = par.nfx
-    nz           = par.nfz
-    dx           = par.dx
-    dz           = par.dz
-    generateFaultInterface(nx, nz, dx, dz, isRoughFault, dipAngle, seedId=1)
+    ap = argparse.ArgumentParser(
+        prog='generateFaultInterface', description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='usage from a case folder: generateFaultInterface\n'
+               'from anywhere:            generateFaultInterface <case>')
+    ap.add_argument('case_dir', nargs='?', default='.',
+                    help='case directory holding user_defined_params.py '
+                         '(default: current directory)')
+    args = ap.parse_args()
+    par = pu.load_par(args.case_dir, 'generateFaultInterface')
+    generateFaultInterface(par, args.case_dir, par.nfx, par.nfz, par.dx,
+                           par.dz, par.insertFaultType, par.dip, seedId=1)
 
 if __name__ == "__main__":
     _main_func(__doc__)

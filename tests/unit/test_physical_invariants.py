@@ -76,18 +76,6 @@ def test_effective_normal_stress_stays_compressive(bench):
         f"positive (tensile) effective normal stress, max = {en.max():.3e} Pa"
     )
 
-
-@pytest.mark.skipif(not (ROOT / "reference" / "stepover").is_dir(),
-                    reason="step-over reference retired in v1.10.0; "
-                           "to be recreated through the e2e mechanism")
-def test_stepover_effective_normal_stress_stays_compressive_both_faults():
-    rows = _read_csv(STEPOVER_SNAPSHOT)
-    for ift in ("0", "1"):
-        en = np.array([float(r["effective_normal"]) for r in rows if r["fault_index"] == ift])
-        assert en.size > 0, f"fault {ift}: no rows in the snapshot"
-        assert np.all(en <= 0.0), f"fault {ift}: effective normal stress went tensile"
-
-
 def test_bp8_effective_normal_stress_stays_compressive():
     rows = _read_csv(BP8_SNAPSHOT)
     en = _col(rows, "effective_normal")
@@ -104,18 +92,6 @@ def test_state_variable_stays_positive_and_finite(bench):
     st = _col(rows, "state_variable")
     assert np.all(np.isfinite(st)), f"{bench}: non-finite state_variable present"
     assert np.all(st > 0.0), f"{bench}: {int((st <= 0).sum())} nodes have state_variable <= 0"
-
-
-@pytest.mark.skipif(not (ROOT / "reference" / "stepover").is_dir(),
-                    reason="step-over reference retired in v1.10.0; "
-                           "to be recreated through the e2e mechanism")
-def test_stepover_state_variable_stays_positive_and_finite_both_faults():
-    rows = _read_csv(STEPOVER_SNAPSHOT)
-    for ift in ("0", "1"):
-        st = np.array([float(r["state_variable"]) for r in rows if r["fault_index"] == ift])
-        assert np.all(np.isfinite(st)), f"fault {ift}: non-finite state_variable"
-        assert np.all(st > 0.0), f"fault {ift}: state_variable <= 0 present"
-
 
 def test_bp8_state_variable_stays_positive_and_finite():
     rows = _read_csv(BP8_SNAPSHOT)

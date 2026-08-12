@@ -115,13 +115,23 @@ def run_case(compset, over, workdir):
                     "tier: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
                     "mv src/eqquasi bin/  (or run install.eqquasi.sh)")
 
+    def step(cmd, cwd):
+        """Run a setup command, and on failure say what it printed.
+
+        DEVNULL here made a CI failure undiagnosable: create.newcase exited 1
+        and the only evidence was CalledProcessError. A test that hides the
+        error it just caught is worse than no test.
+        """
+        r = subprocess.run(cmd, cwd=cwd, env=e, capture_output=True, text=True)
+        if r.returncode != 0:
+            pytest.fail(f"{' '.join(cmd)} failed (exit {r.returncode}) in {cwd}\n"
+                        f"stdout:\n{r.stdout[-3000:]}\n"
+                        f"stderr:\n{r.stderr[-3000:]}")
+
     shutil.rmtree(workdir, ignore_errors=True)
-    subprocess.run(["create.newcase", workdir, compset], cwd=str(ROOT), env=e,
-                   check=True, stdout=subprocess.DEVNULL,
-                   stderr=subprocess.DEVNULL)
+    step(["create.newcase", workdir, compset], str(ROOT))
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)
-    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    step(["./case.setup"], workdir)
 
     with open(os.path.join(workdir, "run.log"), "w") as log:
         proc = subprocess.Popen(["bash", "run.sh"], cwd=workdir, env=e,

@@ -1,0 +1,36 @@
+{
+ "benchmark": "BP7",
+ "compset": "test.bp7.qdc",
+ "oracle_kind": "the compset's own 101 steps -- the fast gate",
+ "element_size_m": 25.0,
+ "run": {
+  "steps": 101,
+  "simulated_time_s": 0.2104167,
+  "wall_seconds_time_loop": 79.7,
+  "mpi_ranks": 2,
+  "nodes": 70602,
+  "fault_nodes": 1681
+ },
+ "event": {
+  "nodes_ruptured": 0,
+  "note": "pre-nucleation",
+  "peak_Vmax_m_s": 0.0
+ },
+ "files": {
+  "fault_snapshots": [
+   "fault.00001.nc",
+   "fault.00101.nc",
+   "fault.r.nc"
+  ],
+  "on_fault_stations": 13,
+  "off_fault_stations": 5,
+  "note": "disp.*.nc omitted: no comparison reads them (rule 8a)."
+ },
+ "provenance": {
+  "run_dir": "work/ref.bp7.step101",
+  "date": "2026-08-12",
+  "version": "1.7.0",
+  "note": "produced through create.newcase -> case.setup -> run.sh (rule 19)"
+ },
+ "caveat": "regression lock, not a validation."
+}

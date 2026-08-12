@@ -1,0 +1,41 @@
+{
+ "benchmark": "BP7",
+ "compset": "test.bp7.qdc",
+ "oracle_kind": "first full earthquake cycle",
+ "element_size_m": 25.0,
+ "run": {
+  "steps": 1358,
+  "simulated_time_s": 101381.7,
+  "wall_seconds_time_loop": 1013.1,
+  "mpi_ranks": 2,
+  "nodes": 70602,
+  "fault_nodes": 1681
+ },
+ "event": {
+  "nodes_ruptured": 202,
+  "fault_nodes": 1681,
+  "rupture_time_s": [
+   0.575,
+   1.675
+  ],
+  "peak_Vmax_m_s": 0.120364
+ },
+ "files": {
+  "fault_snapshots": [
+   "fault.00001.nc",
+   "fault.01001.nc",
+   "fault.01358.nc",
+   "fault.r.nc"
+  ],
+  "on_fault_stations": 13,
+  "off_fault_stations": 5,
+  "note": "disp.*.nc omitted: no comparison reads them (rule 8a)."
+ },
+ "provenance": {
+  "run_dir": "work/ref.bp7.cycle0",
+  "date": "2026-08-12",
+  "version": "1.7.0",
+  "note": "produced through create.newcase -> case.setup -> run.sh (rule 19)"
+ },
+ "caveat": "regression lock, not a validation."
+}

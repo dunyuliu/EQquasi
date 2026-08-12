@@ -47,11 +47,14 @@ sys.path.insert(0, os.path.join(str(ROOT), "scripts"))
 CASES = [
     # fast: what CI runs on every push.
     ("bp5",       "test.bp5.qdc",       {}, "cycle0-step101-fast", "fast"),
+    ("bp7",       "test.bp7.qdc",       {}, "cycle0-step101-fast", "fast"),
     ("bp8",       "test.bp8.qdc",
      {"xi": 0.2, "nstep": 8000, "nt_out": 8000}, "",               "fast"),
 
     # full: -m e2e only.
     ("bp5",       "test.bp5.qdc",
+     {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
+    ("bp7",       "test.bp7.qdc",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
 
     # Recreated later, through this mechanism, from a clean run: BP5-dip90,
@@ -128,6 +131,10 @@ def run_case(compset, over, workdir):
                         f"stdout:\n{r.stdout[-3000:]}\n"
                         f"stderr:\n{r.stderr[-3000:]}")
 
+    # work/ is gitignored, so it does not exist in a fresh checkout and
+    # create.newcase fails on the missing parent. Locally it is always there,
+    # which is why this only ever failed in CI.
+    os.makedirs(os.path.dirname(os.path.abspath(workdir)), exist_ok=True)
     shutil.rmtree(workdir, ignore_errors=True)
     step(["create.newcase", workdir, compset], str(ROOT))
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)

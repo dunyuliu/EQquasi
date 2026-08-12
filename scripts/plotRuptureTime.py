@@ -80,13 +80,25 @@ def process_dir(rdir, outdir, interval):
     # surface, so larger means deeper. Invert the axis: drawn the natural way
     # up, the free surface is at the top and a rupture nucleating at 16 km and
     # growing towards 4 km reads as growing upwards, which is what it does.
-    xk, zk = xs / 1e3, zs / 1e3
+    # cplot column 2 is -zcoor; negate to get the real coordinate.
+    xk, zk = xs / 1e3, -zs / 1e3
 
     # Fixed contour interval, so the front's speed is directly readable: closely
     # spaced lines mean a slow front, widely spaced a fast one. A count-based
     # interval would change meaning between runs and make them incomparable.
     step = interval
-    clev = np.arange(0.0, np.nanmax(grid) + step, step)
+    lo, hi = float(np.nanmin(grid)), float(np.nanmax(grid))
+    # A fixed interval keeps runs comparable, but draws nothing when the event
+    # is shorter than one interval: BP7 ruptures over 1.1 s against BP5's 117,
+    # so at 5 s the only levels are 0 and 5 and neither lies inside the data.
+    # Fall back to a round interval giving ~8 lines, and say so on the figure.
+    auto = False
+    if (hi - lo) / step < 3.0:
+        raw = max(hi - lo, 1e-12) / 8.0
+        mag = 10.0 ** np.floor(np.log10(raw))
+        step = next(m * mag for m in (1, 2, 2.5, 5, 10) if raw <= m * mag)
+        auto = True
+    clev = np.arange(np.floor(lo / step) * step, hi + step, step)
 
     # Labelled contour lines carry the times, so a colourbar repeats what the
     # labels already say and costs a fifth of the width. Drop it; keep a light
@@ -95,22 +107,27 @@ def process_dir(rdir, outdir, interval):
     cs = ax.contour(xk, zk, grid, levels=clev, colors="k", linewidths=1.1)
     ax.clabel(cs, inline=True, fontsize=11, fmt="%g")
     ax.set_xlabel("along strike (km)")
-    ax.set_ylabel("depth (km)")
     ax.tick_params()
-    # z = 0 is the free surface, at the top, with depth increasing downward.
+    # Column 2 of cplot_EQquasi.txt is -zcoor, so negate it back and plot the
+    # real coordinate. Then the axis is just z, increasing upward, and nothing
+    # here needs to know whether zero is a free surface (BP5, z in [-60, 0] km)
+    # or the middle of a whole space (BP7 and BP8, z in [-0.5, 0.5] km). An
+    # earlier version inverted the axis and annotated "free surface"
+    # unconditionally, which drew BP7 upside down under a label that did not
+    # apply.
+    #
     # Full fault extent, not cropped to the ruptured patch: how much of the
     # fault did *not* rupture is part of the result.
     ax.set_xlim(xk.min(), xk.max())
-    ax.set_ylim(zk.max(), 0.0)
-    ax.axhline(0.0, color="0.25", lw=1.6)
-    ax.text(xk.min() + 0.01 * (xk.max() - xk.min()), 0.0, " free surface",
-            va="bottom", ha="left", fontsize=10, color="0.25")
+    ax.set_ylim(zk.min(), zk.max())
+    ax.set_ylabel("z (km)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.15, lw=0.5)
     # The node count and time range are diagnostics, already printed to stdout;
     # in the title they crowd out the one thing a reader needs, which is what
     # the figure shows and which run it came from.
-    ax.set_title(f"Rupture time, contours every {step:g} s\n"
+    ax.set_title(f"Rupture time, contours every {step:g} s"
+                 f"{' (auto: event shorter than the 5 s default)' if auto else ''}\n"
                  f"{os.path.basename(os.path.abspath(rdir))}")
     pu.save(fig, pu.out_path(rdir, "rupture_time.png", outdir), dpi=150)
 

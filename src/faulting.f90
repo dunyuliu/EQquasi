@@ -4,13 +4,13 @@ use globalvar
 implicit none
 
 !  
-integer (kind=4)::ift, i,i1,j,k,n,isn,imn,loc(1)
+integer (kind=4)::ift, i,i1,j,k,n,isn,imn,loc(2)
 real (kind = dp) ::slipn,slips,slipd,slip,slipraten,sliprates,sliprated,&
 sliprate,xmu,mmast,mslav,mtotl,fnfault,fsfault,fdfault,tnrm,tstk, &
 tdip,taox,taoy,taoz,ttao,taoc,ftix,ftiy,ftiz,trupt,tr,&
 tmp1,tmp2,tmp3,tmp4,tnrm0,xmu1,xmu2
 
-real (kind = dp) :: dtev1D(nftnd(1))
+real (kind = dp) :: dtev1D(maxval(nftnd),ntotft)
 real (kind = dp),dimension(6,2,4)::fvd=0.0d0
 real (kind = dp)::fa, fb, phi
 real (kind = dp) :: rr,R0,T,dtao0, dtao, mr!RSF
@@ -26,16 +26,22 @@ real (kind = dp) :: v_trial,v_trial_new,sliprs_trial,sliprd_trial, tau_fric_tria
     anm,asm,adm,ans,ass,ads,&
     slipratemast,sliprateslav,&
     slipaccn,slipaccs,slipaccd
-real (kind = dp) :: ma_bar_ku_arr(nftnd(1)), sliprate_arr(nftnd(1)),    momrate_arr(nftnd(1)),      &
-                    momRateVW(nftnd(1)),     ruptarea_arr(nftnd(1)),    taoruptarea_arr(nftnd(1)),  &
-                    slipruptarea_arr(nftnd(1))
+! Sized (maxval(nftnd), ntotft) and indexed (i,ift), not (nftnd(1)) indexed by
+! local node number alone: with the latter, fault 2's local node i aliased
+! fault 1's slot i, and since these feed pma and maxSlipRate -- which set the
+! adaptive step dtev -- the corruption reached the time integrator.
+real (kind = dp) :: ma_bar_ku_arr(maxval(nftnd),ntotft), sliprate_arr(maxval(nftnd),ntotft),    momrate_arr(maxval(nftnd),ntotft),      &
+                    momRateVW(maxval(nftnd),ntotft),     ruptarea_arr(maxval(nftnd),ntotft),    taoruptarea_arr(maxval(nftnd),ntotft),  &
+                    slipruptarea_arr(maxval(nftnd),ntotft)
 
 ! All seven accumulators must be zeroed, not just three. momrate_arr,
 ! momRateVW and ma_bar_ku_arr are assigned only inside the frictional branch
 ! below, so every fault node in the creeping / no-slip region would otherwise
 ! contribute uninitialised stack memory to sum(momrate_arr) and
 ! maxval(ma_bar_ku_arr) -- i.e. to global.dat and the pma printout. That is not
-! caught by the regression oracle, which only compares fault.*.nc.
+! caught by the regression oracle, which only compares fault.*.nc. The same is
+! true of any node beyond nftnd(ift) up to maxval(nftnd), now that every fault
+! shares the maxval(nftnd) capacity.
 ma_bar_ku_arr = 0.0d0
 sliprate_arr = 0.0d0
 momrate_arr = 0.0d0
@@ -43,6 +49,9 @@ momRateVW = 0.0d0
 ruptarea_arr = 0.0d0
 taoruptarea_arr = 0.0d0
 slipruptarea_arr = 0.0d0
+! dtev1D likewise must not carry stack garbage into minval() below for any
+! node beyond nftnd(ift); huge() keeps padding out of the minimum.
+dtev1D = huge(1.0d0)
 do ift = 1, ntotft
     do i=1,nftnd(ift)    !just fault nodes
         fnfault = fric(7,i,ift) !initial forces on the fault node
@@ -90,7 +99,7 @@ do ift = 1, ntotft
         fric(74,i,ift) = sliprates  !save for final slip output
         fric(75,i,ift) = sliprated
         sliprate = sqrt(slipraten**2+sliprates**2+sliprated**2)
-            sliprate_arr(i) = sliprate
+            sliprate_arr(i,ift) = sliprate
         if (sliprate>fric(76,i,ift)) then 
             fric(76,i,ift)=sliprate
         endif
@@ -342,23 +351,23 @@ do ift = 1, ntotft
                 elseif (itag == 1) then 
                     fric(20,i,ift)      = fric(22,i,ift)  ! update state at itag == 1
                     fric(23,i,ift)      = fric(24,i,ift)  ! update state2 at itag == 1
-                    ma_bar_ku_arr(i)    = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
-                    ma_bar_ku_arr(i)    = abs(ma_bar_ku_arr(i))
-                    momrate_arr(i)      = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
-                                        momRateVW(i)        = 0.0d0
+                    ma_bar_ku_arr(i,ift)    = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
+                    ma_bar_ku_arr(i,ift)    = abs(ma_bar_ku_arr(i,ift))
+                    momrate_arr(i,ift)      = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                                        momRateVW(i,ift)        = 0.0d0
                                         if (bp == 7) then 
                                           if (sqrt(x(1,isn)**2+x(3,isn)**2)<200.0d0) then 
-                                            momRateVW(i)    = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                                            momRateVW(i,ift)    = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
                                           endif
                                         endif
-                    ruptarea_arr(i)     = 0.0d0
-                    taoruptarea_arr(i)  = 0.0d0
-                    slipruptarea_arr(i) = 0.0d0
+                    ruptarea_arr(i,ift)     = 0.0d0
+                    taoruptarea_arr(i,ift)  = 0.0d0
+                    slipruptarea_arr(i,ift) = 0.0d0
                     
                     if (v_trial>=slipr_thres) then
-                        ruptarea_arr(i)     = dx*dx
-                        taoruptarea_arr(i)  = ttao*dx*dx
-                        slipruptarea_arr(i) = slip*dx*dx
+                        ruptarea_arr(i,ift)     = dx*dx
+                        taoruptarea_arr(i,ift)  = ttao*dx*dx
+                        slipruptarea_arr(i,ift) = slip*dx*dx
                     endif
                                     
                     consv(1,imn)=vxm
@@ -437,10 +446,10 @@ do ift = 1, ntotft
             endif
             
             ! update new time step size according to new slip rate v_trial.
-            dtev1D(i) = ksi * fric(11,i,ift)/v_trial
+            dtev1D(i,ift) = ksi * fric(11,i,ift)/v_trial
             
             ! [WARNING]: exit the code if time step size is negative.
-            if (dtev1D(i) < 0) then
+            if (dtev1D(i,ift) < 0) then
                 write(*,*) 'NEGATIVE SLIPRATE, ITS LOC = ', x(1,isn),x(3,isn)
                 write(*,*) 'PROBLEMATIC V_TRIAL = ', v_trial
                 stop 502

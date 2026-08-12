@@ -19,6 +19,7 @@ subroutine readmodel
     character (len = 50) :: fileName
     logical::file_exists
     integer (kind = 4) :: ios
+    integer (kind = 4) :: ift
 
     if (me == 0) then 
         INQUIRE(FILE="model.txt", EXIST=file_exists)
@@ -85,21 +86,30 @@ subroutine readmodel
     
     allocate(nonfs(ntotft))
     allocate(nftnd(ntotft))
-    
-    if (rough_fault == 1) then 
-        call read_fault_rough_geometry 
+
+    if (rough_fault == 1) then
+        call read_fault_rough_geometry
         fileName = 'roughness.nc'
         call netcdf_write_roughness(fileName)
-    endif 
-    
-    fltxyz(1,1,1)=xmin
-    fltxyz(2,1,1)=xmax
-    fltxyz(1,2,1)=0.0d0
-    fltxyz(2,2,1)=0.0d0
-    fltxyz(1,3,1)=zmin
-    fltxyz(2,3,1)=zmax
-    fltxyz(1,4,1)=270.0d0/180.0d0*pi
-    fltxyz(2,4,1)=90.0d0/180.0d0*pi
+    endif
+
+    ! Per-fault bounding box (x/z extent, y position, dip). There is no
+    ! per-fault geometry input yet (case.setup only emits a single model
+    ! domain), so every fault is given the same domain-derived box: a
+    ! same-shaped loop for ift = 1..ntotft rather than a single-fault
+    ! assignment, so ntotft > 1 exercises the identical statements ntotft == 1
+    ! does.
+    allocate(fltxyz(2,4,ntotft))
+    do ift = 1, ntotft
+        fltxyz(1,1,ift)=xmin
+        fltxyz(2,1,ift)=xmax
+        fltxyz(1,2,ift)=0.0d0
+        fltxyz(2,2,ift)=0.0d0
+        fltxyz(1,3,ift)=zmin
+        fltxyz(2,3,ift)=zmax
+        fltxyz(1,4,ift)=270.0d0/180.0d0*pi
+        fltxyz(2,4,ift)=90.0d0/180.0d0*pi
+    enddo
 
     dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
     dymax = min(12.0d0*dx, 3.0d3) ! The coarsest element size near ymax/ymin in m.

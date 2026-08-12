@@ -293,9 +293,13 @@ end subroutine exitCriteria
 
 subroutine getScalarOnFaultQuant
     use globalvar
-    implicit none 
-    maxSlipRate = maxval(fric(47, 1:nftnd(1), 1)) 
-end subroutine getScalarOnFaultQuant 
+    implicit none
+    integer (kind = 4) :: ift
+    maxSlipRate = 0.0d0
+    do ift = 1, ntotft
+        if (nftnd(ift) > 0) maxSlipRate = max(maxSlipRate, maxval(fric(47, 1:nftnd(ift), ift)))
+    enddo
+end subroutine getScalarOnFaultQuant
 
 subroutine bound_load
 
@@ -445,8 +449,8 @@ end subroutine bound_ft_ku
 
 subroutine initOnFaultKinematics
     use globalvar
-    implicit none 
-    integer (kind = 4) :: i
+    implicit none
+    integer (kind = 4) :: i, ift
     dtev       = ksi*minDc/maxSlipRate
     dtev1      = ksi*minDc/maxSlipRate!Initial dtev1>dt to enter static state.
     cons       = 0.0d0
@@ -454,15 +458,17 @@ subroutine initOnFaultKinematics
     consvtmp   = 0.0d0
     consv      = 0.0d0
     consa      = 0.0d0
-    if (nftnd(1) > 0) then !RSF
-        do i=1,nftnd(1)
-            if (icstart == 1) then 
-                consv(1,nsmp(1,i,1)) =  -fric(46,i,1)/2.0d0
-                consv(1,nsmp(2,i,1)) =  fric(46,i,1)/2.0d0
-            else
-            consv(1:3,nsmp(1,i,1)) = fric(34:36,i,1)
-            consv(1:3,nsmp(2,i,1)) = fric(31:33,i,1)
-            endif     
-        enddo    
-    endif
+    do ift = 1, ntotft
+        if (nftnd(ift) > 0) then !RSF
+            do i=1,nftnd(ift)
+                if (icstart == 1) then
+                    consv(1,nsmp(1,i,ift)) =  -fric(46,i,ift)/2.0d0
+                    consv(1,nsmp(2,i,ift)) =  fric(46,i,ift)/2.0d0
+                else
+                consv(1:3,nsmp(1,i,ift)) = fric(34:36,i,ift)
+                consv(1:3,nsmp(2,i,ift)) = fric(31:33,i,ift)
+                endif
+            enddo
+        endif
+    enddo
 end subroutine initOnFaultKinematics

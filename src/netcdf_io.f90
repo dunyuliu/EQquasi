@@ -127,105 +127,137 @@ subroutine netcdf_write(outfile, outtype)
 
 end subroutine netcdf_write
 
-! #2 
+! #2
 ! netcdf_write_on_fault writes on-fault quantities to netcdf files.
+!
+! Each fault has its own local (strike, dip) grid, sized from its own
+! fltxyz(:,:,ift) box, not from the whole-model mesh (nxt, nzt): those only
+! happen to coincide with the fault's own extent when a single fault spans
+! the entire model, which is the only case exercised so far. A fault node's
+! local (i,j) is recovered from its own coordinates rather than assumed from
+! loop order, since node ordinal number is not guaranteed to enumerate a
+! fault's own strike-major grid once a fault does not span the whole mesh.
+! The written arrays are padded to the largest fault's extent
+! (nfxMax, nfzMax) and carry an explicit nid_fault dimension of size ntotft,
+! so the same statements run whether ntotft is 1 or more.
 subroutine netcdf_write_on_fault(outfile)
     use netcdf
     use globalvar
-    implicit none 
-    character (len = 50 ) :: outfile, outtype, lat_name, lon_name, lat_units, lon_units, UNITS
+    implicit none
+    character (len = 50 ) :: outfile, lat_name, lon_name, flt_name, lat_units, lon_units, flt_units, UNITS
     character (len = 50), allocatable, dimension(:) :: var_name, var_unit
-    integer (kind = 4) :: ncid, lat_dimid, lon_dimid, lat_varid, lon_varid, var_id(20), ilat, ilon, i, j, nlat, nlon, nvar
-    integer (kind = 4) :: dimids(2)
-    integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index
-    real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
+    integer (kind = 4) :: ncid, lat_dimid, lon_dimid, flt_dimid, lat_varid, lon_varid, flt_varid, &
+        var_id(20), i, j, n, ift, nlat, nlon, nvar
+    integer (kind = 4) :: dimids(3)
+    integer (kind = 4), allocatable, dimension(:) :: lat_index, lon_index, flt_index
+    integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
+    integer (kind = 4) :: nfxMax, nfzMax
+    real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
 
     nvar = 15 ! nvar variables.
-    allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nxt, nzt, nvar)) ! on_fault_vars(lon,lat,nvar)
+
+    ! Per-fault local grid extent, from that fault's own bounding box.
+    allocate(nfx(ntotft), nfz(ntotft))
+    do ift = 1, ntotft
+        nfx(ift) = int((fltxyz(2,1,ift) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+        nfz(ift) = int((fltxyz(2,3,ift) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+    enddo
+    nfxMax = maxval(nfx)
+    nfzMax = maxval(nfz)
+
+    allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nfxMax, nfzMax, nvar, ntotft)) ! on_fault_vars(lon,lat,nvar,fault)
     on_fault_vars = 0.0d0
-    
+
     UNITS     = 'units'
     lat_name  = 'nid_dip'
     lon_name  = 'nid_strike'
+    flt_name  = 'nid_fault'
     lat_units = 'unit'
     lon_units = 'unit'
+    flt_units = 'unit'
     var_name  = [ character(len=20) :: 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', &
         'state_normal', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs', 'slips', 'slipd', 'slipn']
     var_unit  = [ character(len=20) :: 'Pa'          , 'Pa'       , 'Pa'              , 'm/s'       , 'unit'          , &
         'Pa'          , 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'm/s', 'slips', 'slipd', 'slipn']
-    nlat = nzt ! Total nodes along dip.  
-    nlon = nxt ! Total nodes along strike. 
-    
-    allocate(lat_index(nlat))
-    allocate(lon_index(nlon))
-    
+    nlat = nfzMax ! Total nodes along dip.
+    nlon = nfxMax ! Total nodes along strike.
+
+    allocate(lat_index(nlat), lon_index(nlon), flt_index(ntotft))
+
     lat_index = (/ (i, i = 1, nlat) /)
     lon_index = (/ (i, i = 1, nlon) /)
-    
-    do i = 1, nxt
-        do j = 1, nzt
-            on_fault_vars(i,j,1)  = fric(28, (i-1)*nzt+j, 1) ! tstk0
-            on_fault_vars(i,j,2)  = fric(29, (i-1)*nzt+j, 1) ! tdip0
-            on_fault_vars(i,j,3)  = fric(30, (i-1)*nzt+j, 1) ! tnorm0
-            on_fault_vars(i,j,4)  = fric(26, (i-1)*nzt+j, 1) ! sliprate
-            on_fault_vars(i,j,5)  = fric(20, (i-1)*nzt+j, 1) ! state
-            on_fault_vars(i,j,6)  = fric(23, (i-1)*nzt+j, 1) ! state variable for normal stress, theta_pc
-            on_fault_vars(i,j,7)  = fric(31, (i-1)*nzt+j, 1) ! vxm
-            on_fault_vars(i,j,8)  = fric(32, (i-1)*nzt+j, 1) ! vym
-            on_fault_vars(i,j,9)  = fric(33, (i-1)*nzt+j, 1) ! vzm
-            on_fault_vars(i,j,10) = fric(34, (i-1)*nzt+j, 1) ! vxs
-            on_fault_vars(i,j,11) = fric(35, (i-1)*nzt+j, 1) ! vys
-            on_fault_vars(i,j,12) = fric(36, (i-1)*nzt+j, 1) ! vzs
-            on_fault_vars(i,j,13) = fric(71, (i-1)*nzt+j, 1) ! vxs
-            on_fault_vars(i,j,14) = fric(72, (i-1)*nzt+j, 1) ! vys
-            on_fault_vars(i,j,15) = fric(73, (i-1)*nzt+j, 1) ! vzs
-        enddo 
-    enddo 
+    flt_index = (/ (i, i = 1, ntotft) /)
+
+    do ift = 1, ntotft
+        do n = 1, nftnd(ift)
+            i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+            j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+            on_fault_vars(i,j,1,ift)  = fric(28, n, ift) ! tstk0
+            on_fault_vars(i,j,2,ift)  = fric(29, n, ift) ! tdip0
+            on_fault_vars(i,j,3,ift)  = fric(30, n, ift) ! tnorm0
+            on_fault_vars(i,j,4,ift)  = fric(26, n, ift) ! sliprate
+            on_fault_vars(i,j,5,ift)  = fric(20, n, ift) ! state
+            on_fault_vars(i,j,6,ift)  = fric(23, n, ift) ! state variable for normal stress, theta_pc
+            on_fault_vars(i,j,7,ift)  = fric(31, n, ift) ! vxm
+            on_fault_vars(i,j,8,ift)  = fric(32, n, ift) ! vym
+            on_fault_vars(i,j,9,ift)  = fric(33, n, ift) ! vzm
+            on_fault_vars(i,j,10,ift) = fric(34, n, ift) ! vxs
+            on_fault_vars(i,j,11,ift) = fric(35, n, ift) ! vys
+            on_fault_vars(i,j,12,ift) = fric(36, n, ift) ! vzs
+            on_fault_vars(i,j,13,ift) = fric(71, n, ift) ! vxs
+            on_fault_vars(i,j,14,ift) = fric(72, n, ift) ! vys
+            on_fault_vars(i,j,15,ift) = fric(73, n, ift) ! vzs
+        enddo
+    enddo
     ! Create the netCDF file.
     call check(nf90_create(outfile, NF90_CLOBBER, ncid))
-    
+
     ! Define the dimensions.
     call check(nf90_def_dim(ncid, lat_name, nlat, lat_dimid))
     call check(nf90_def_dim(ncid, lon_name, nlon, lon_dimid))
-    
-    ! Define coordiante variables. They will hold the coordinate 
-    ! information, that is, the latitudes (y), and longitudes (x). A varid is 
+    call check(nf90_def_dim(ncid, flt_name, ntotft, flt_dimid))
+
+    ! Define coordiante variables. They will hold the coordinate
+    ! information, that is, the latitudes (y), and longitudes (x). A varid is
     ! returned for each.
     call check(nf90_def_var(ncid, lat_name, NF90_INT, lat_dimid, lat_varid))
     call check(nf90_def_var(ncid, lon_name, NF90_INT, lon_dimid, lon_varid))
-    
+    call check(nf90_def_var(ncid, flt_name, NF90_INT, flt_dimid, flt_varid))
+
     ! Assign units attributes to coordinate var data. This attaches a
     ! text attribute to each of the coordinate variables, containing the
     ! units.
     call check( nf90_put_att(ncid, lat_varid, UNITS, lat_units) )
-    call check( nf90_put_att(ncid, lon_varid, UNITS, lon_units) )    
+    call check( nf90_put_att(ncid, lon_varid, UNITS, lon_units) )
+    call check( nf90_put_att(ncid, flt_varid, UNITS, flt_units) )
 
-    ! Define the netcdf variables. The dimids array is used to pass the 
+    ! Define the netcdf variables. The dimids array is used to pass the
     ! dimids of the dimensions of the netCDF variables.
-    dimids = (/ lon_dimid, lat_dimid /)
-    
+    dimids = (/ lon_dimid, lat_dimid, flt_dimid /)
+
     do i = 1, nvar
-        call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 
+        call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i)))
         ! Assign units attributes to the pressure and temperature netCDF
         ! variables.
         call check(nf90_put_att(ncid, var_id(i), UNITS, var_unit(i)))
-    enddo 
+    enddo
 
     ! End definitions.
     call check(nf90_enddef(ncid))
-    
+
     ! Write data.
-    ! Write the coordinate variable data. This will put the x, and y 
+    ! Write the coordinate variable data. This will put the x, and y
     ! of our data grid into the netCDF file.
     call check(nf90_put_var(ncid, lat_varid, lat_index))
     call check(nf90_put_var(ncid, lon_varid, lon_index))
-    
-    ! Write the data. This will write our displacement fields "cons" which is defined 
+    call check(nf90_put_var(ncid, flt_varid, flt_index))
+
+    ! Write the data. This will write our displacement fields "cons" which is defined
     ! globally. Its dimension is 3 by numnp (row by column).
     do i = 1,nvar
-        call check(nf90_put_var(ncid, var_id(i), on_fault_vars(:,:,i)))
+        call check(nf90_put_var(ncid, var_id(i), on_fault_vars(:,:,i,:)))
     enddo
-    
+
     ! Close the file.
     call check(nf90_close(ncid))
     !call writegrid(outfile, xpos, ypos, zpos, data_arr, nxtmp, nytmp, nztmp)
@@ -401,10 +433,13 @@ end subroutine netcdf_read_on_fault
 subroutine netcdf_read_on_fault_restart(infile1, infile2)
     use netcdf
     use globalvar
-    implicit none 
+    implicit none
     character (len = 50 ) :: infile1, infile2
-    integer (kind = 4)    :: ncid,  var_id(20), i, j, nvar
+    integer (kind = 4)    :: ncid,  var_id(20), i, j, n, ift, nvar
+    integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
+    integer (kind = 4) :: nfxMax, nfzMax
     real (kind = dp), allocatable, dimension(:,:,:) :: on_fault_vars
+    real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars4
     
     ! Read in 5 variables a, b, Dc, v0, r0 from .
     nvar = 5
@@ -447,13 +482,20 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     
     deallocate(on_fault_vars)
     
-    ! Phase two, read in initial conditions from restart files fault.r.nc 
-    nvar = 12 
-    ! NOTE. the array structure is different than loading python generated nc file.
-    ! here we follow the structure of subroutine netcdf_write_on_fault.
-    ! on_fault_vars is now nxt by nzt!!!
-    allocate(on_fault_vars(nxt,nzt,nvar))
-    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file. 
+    ! Phase two, read in initial conditions from restart files fault.r.nc
+    ! (written by netcdf_write_on_fault, which carries an explicit nid_fault
+    ! dimension of size ntotft and per-fault local (strike, dip) grids -- see
+    ! that subroutine's header comment).
+    nvar = 12
+    allocate(nfx(ntotft), nfz(ntotft))
+    do ift = 1, ntotft
+        nfx(ift) = int((fltxyz(2,1,ift) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+        nfz(ift) = int((fltxyz(2,3,ift) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+    enddo
+    nfxMax = maxval(nfx)
+    nfzMax = maxval(nfz)
+    allocate(on_fault_vars4(nfxMax,nfzMax,nvar,ntotft))
+    ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
     call check( nf90_open(infile2, NF90_NOWRITE, ncid))
 
     ! Get the varid of the data variables, based on their names.
@@ -472,32 +514,34 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     call check( nf90_inq_varid(ncid, "vzs", var_id(12)))
     ! Read the data
     do i = 1, nvar
-        call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:,:,i)))
-    enddo         
-    
-    do i = 1, nxt
-        do j = 1, nzt
-            fric(8,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,1)! tstk0
-            fric(49, (i-1)*nzt+j, 1) = on_fault_vars(i,j,2)! tdip0
-            fric(7,  (i-1)*nzt+j, 1) = on_fault_vars(i,j,3)! tnorm0
-            fric(46, (i-1)*nzt+j, 1) = on_fault_vars(i,j,4)! sliprate
-            fric(20, (i-1)*nzt+j, 1) = on_fault_vars(i,j,5)! state
-            fric(23, (i-1)*nzt+j, 1) = on_fault_vars(i,j,6)! state_normal
-            fric(31, (i-1)*nzt+j, 1) = on_fault_vars(i,j,7)! vxm
-            fric(32, (i-1)*nzt+j, 1) = on_fault_vars(i,j,8)! vym
-            fric(33, (i-1)*nzt+j, 1) = on_fault_vars(i,j,9)! vzm
-            fric(34, (i-1)*nzt+j, 1) = on_fault_vars(i,j,10)! vxs
-            fric(35, (i-1)*nzt+j, 1) = on_fault_vars(i,j,11)! vys
-            fric(36, (i-1)*nzt+j, 1) = on_fault_vars(i,j,12)! vzs
-            fric(48, (i-1)*nzt+j, 1) = fric(20, (i-1)*nzt+j, 1)! state at cycle start
-            fric(47, (i-1)*nzt+j, 1) = fric(46, (i-1)*nzt+j, 1)! peak slip rate
-            !fric(23, (i-1)*nzt+j, 1) = abs(fric(7, (i-1)*nzt+j, 1))! initialize theta_pc as abs(normal stress)
-        enddo 
-    enddo 
+        call check( nf90_get_var(ncid, var_id(i), on_fault_vars4(:,:,i,:)))
+    enddo
+
+    do ift = 1, ntotft
+        do n = 1, nftnd(ift)
+            i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+            j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+            fric(8,  n, ift) = on_fault_vars4(i,j,1,ift)! tstk0
+            fric(49, n, ift) = on_fault_vars4(i,j,2,ift)! tdip0
+            fric(7,  n, ift) = on_fault_vars4(i,j,3,ift)! tnorm0
+            fric(46, n, ift) = on_fault_vars4(i,j,4,ift)! sliprate
+            fric(20, n, ift) = on_fault_vars4(i,j,5,ift)! state
+            fric(23, n, ift) = on_fault_vars4(i,j,6,ift)! state_normal
+            fric(31, n, ift) = on_fault_vars4(i,j,7,ift)! vxm
+            fric(32, n, ift) = on_fault_vars4(i,j,8,ift)! vym
+            fric(33, n, ift) = on_fault_vars4(i,j,9,ift)! vzm
+            fric(34, n, ift) = on_fault_vars4(i,j,10,ift)! vxs
+            fric(35, n, ift) = on_fault_vars4(i,j,11,ift)! vys
+            fric(36, n, ift) = on_fault_vars4(i,j,12,ift)! vzs
+            fric(48, n, ift) = fric(20, n, ift)! state at cycle start
+            fric(47, n, ift) = fric(46, n, ift)! peak slip rate
+            !fric(23, n, ift) = abs(fric(7, n, ift))! initialize theta_pc as abs(normal stress)
+        enddo
+    enddo
     ! Close the file, freeing all resources.
     call check( nf90_close(ncid))
-    
-    deallocate(on_fault_vars)
+
+    deallocate(on_fault_vars4)
 
 end subroutine netcdf_read_on_fault_restart
 

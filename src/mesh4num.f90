@@ -16,7 +16,7 @@ subroutine mesh4num
 			xmin1,xmax1,ymin1,ymax1,zmin1
 	real(kind=8),allocatable,dimension(:)::xlinet,ylinet,zlinet,xline,yline,zline
 	integer(kind=4)::i1
-	real(kind=8)::fltx1,fltx2,fltz1,fltz2
+	real(kind=8)::fltx1,fltx2,fltz1,fltz2,yflt_lo,yflt_hi
 
 
 	dy=dx
@@ -68,9 +68,15 @@ subroutine mesh4num
 	enddo
 	xmax1=xlinet(nxt)
 	!Y
-	nyuni=dis4uniF+dis4uniB+1
+	! Uniform-dy belt spans the union of every fault's y position, not just
+	! fault 1's -- mirrors the x/z generalization above and must stay
+	! consistent with meshgen.f90, which this mirrors. ntotft==1 collapses
+	! yflt_lo==yflt_hi==0 and this reduces to the original single-fault belt.
+	yflt_lo=minval(fltxyz(1,2,:))
+	yflt_hi=maxval(fltxyz(2,2,:))
+	nyuni=int((yflt_hi-yflt_lo)/dy+0.5d0)+dis4uniF+dis4uniB+1
 	ystep=dy
-	ycoor=-dy*(dis4uniF)
+	ycoor=yflt_lo-dy*(dis4uniF)
 	do iy=1,np
 		ystep=ystep*rat
 		if (ystep>=dymax) ystep = dymax
@@ -79,7 +85,7 @@ subroutine mesh4num
 	enddo
 	edgey1=iy
 	ystep=dy
-	ycoor=dy*(dis4uniB)
+	ycoor=yflt_hi+dy*(dis4uniB)
 	do iy=1,np
 		ystep=ystep*rat
 		if (ystep>=dymax) ystep = dymax
@@ -90,7 +96,7 @@ subroutine mesh4num
 	!...pre-determine y-coor
 	allocate(ylinet(nyt))
 	!...predetermine y-coor
-	ylinet(edgey1+1)=-dy*(dis4uniF)
+	ylinet(edgey1+1)=yflt_lo-dy*(dis4uniF)
 	ystep=dy
 	do iy=edgey1,1,-1
 		ystep=ystep*rat
@@ -143,10 +149,11 @@ subroutine mesh4num
 				xcoor=xlinet(ix)
 				ycoor=ylinet(iy)
 				zcoor=zlinet(iz)
-				nnode0=nnode0 + 1	
-				if(ycoor==0.0d0.or.iy==1.or.iy==nyt) then 
-				
-				!if (ycoor==0.0d0) then 
+				nnode0=nnode0 + 1
+				! No equation number on a domain edge (iy==1/nyt) or on any
+				! fault's own y-plane -- one check per fault, not just y==0.
+				if(iy==1.or.iy==nyt.or.any(abs(ycoor-fltxyz(1,2,1:ntotft))<tol)) then
+
 				else
 					do i1=1,ndof
 						neq0=neq0+1

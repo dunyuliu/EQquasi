@@ -11,7 +11,7 @@ subroutine meshgen
     real(kind=dp)::tmp1,tmp2
     integer (kind=4)::nxuni,nyuni,nzuni    
     real(kind=dp)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
-            xmin1,xmax1,ymin1,ymax1,zmin1,yfar_lo,yfar_hi
+            xmin1,xmax1,ymin1,ymax1,zmin1,yfar_lo,yfar_hi,yflt_lo,yflt_hi
     real (kind = dp), allocatable, dimension(:) :: xlinet,ylinet,zlinet,xline,yline,zline
     integer (kind = 4), allocatable, dimension(:,:) :: plane1,plane2
     integer (kind = 4), allocatable, dimension(:,:,:,:) :: fltrc    
@@ -79,9 +79,15 @@ subroutine meshgen
     enddo
     xmax1=xlinet(nxt)
     !Y
-    nyuni=dis4uniF+dis4uniB+1
+    ! Uniform-dy belt spans the union of every fault's y position, not just
+    ! fault 1's -- mirrors the x/z generalization above and must stay
+    ! consistent with mesh4num.f90, which this mirrors. ntotft==1 collapses
+    ! yflt_lo==yflt_hi==0 and this reduces to the original single-fault belt.
+    yflt_lo=minval(fltxyz(1,2,:))
+    yflt_hi=maxval(fltxyz(2,2,:))
+    nyuni=int((yflt_hi-yflt_lo)/dy+0.5d0)+dis4uniF+dis4uniB+1
     ystep=dy
-    ycoor=-dy*(dis4uniF)
+    ycoor=yflt_lo-dy*(dis4uniF)
     do iy=1,np
         ystep=ystep*rat
         if (ystep>=dymax) ystep = dymax
@@ -90,7 +96,7 @@ subroutine meshgen
     enddo
     edgey1=iy
     ystep=dy
-    ycoor=dy*(dis4uniB)
+    ycoor=yflt_hi+dy*(dis4uniB)
     do iy=1,np
         ystep=ystep*rat
         if (ystep>=dymax) ystep = dymax
@@ -101,7 +107,7 @@ subroutine meshgen
     !...pre-determine y-coor
     allocate(ylinet(nyt))
     !...predetermine y-coor
-    ylinet(edgey1+1)=-dy*(dis4uniF)
+    ylinet(edgey1+1)=yflt_lo-dy*(dis4uniF)
     ystep=dy
     do iy=edgey1,1,-1
         ystep=ystep*rat
@@ -176,21 +182,27 @@ subroutine meshgen
                 endif 
 
                 plane2(iy,iz) = nnode
-                if(iy==1.or.iy==nyt.or.ycoor==0.0d0) then 
-                    if (ycoor>0.0d0) then 
+                ! Domain edges (iy==1/nyt) get velocity boundary conditions;
+                ! any interior fault plane -- one per distinct fault y, not
+                ! just y==0 -- gets the fault boundary marker instead.
+                ! Dispatch on iy, not on the sign of ycoor: a fault offset to
+                ! ycoor>0 is not the ymax edge, and the old sign-based
+                ! dispatch would have mis-tagged it as one.
+                if(iy==1.or.iy==nyt.or.any(abs(ycoor-fltxyz(1,2,1:ntotft))<tol)) then
+                    if (iy==nyt) then
                         id(1,nnode)=-3  ! ymax, +x vel, right lateral
                         id(2,nnode)=-31 ! ymax, +y vel, extensional
-                        id(3,nnode)=-1  ! fixed 
-                    elseif (ycoor<0.0d0) then 
+                        id(3,nnode)=-1  ! fixed
+                    elseif (iy==1) then
                         id(1,nnode)=-2  ! ymin, -x vel
                         id(2,nnode)=-21 ! ymin, -y vel
                         id(3,nnode)=-1  ! fixed
-                    elseif (ycoor==0.0d0) then 
+                    else
                         id(1,nnode)=-5  ! fault boundaries
-                        id(2,nnode)=-5  ! 
+                        id(2,nnode)=-5  !
                         id(3,nnode)=-5  !
-                    endif 
-                else 
+                    endif
+                else
                     do i1=1,ndof
                         neq0=neq0+1
                         id(i1,nnode)=neq0!Only nodes inside two blocks have equation numbers.
@@ -481,10 +493,18 @@ subroutine meshgen
                     endif                
                     
                     !if((center(2)>0.0d0 + kinkx - dy/2.0d0).and.(center(2)<(dy/2.0d0 + tol +kinkx))) then
-                    ! The fault resides on x-z plane and penetrates the whole model.
-                    ! Use undistorted mesh ycoor to locate elements on the y+ side of the fault.
-                    if (ycoor>0 .and. abs(ycoor-dy)<tol) then
-                        do ift=1,ntotft
+                    ! Each fault plane resides on an x-z plane and penetrates the
+                    ! whole model. Use undistorted mesh ycoor to locate elements
+                    ! on the y+ side of that fault: this element's y-range is
+                    ! [ylinet(iy-1), ycoor], so it sits immediately above fault
+                    ! ift's plane exactly when its bottom face is on that plane,
+                    ! i.e. ycoor == fltxyz(1,2,ift)+dy. Only that layer's ien
+                    ! entries reference fault ift's nodes at all (elsewhere in y
+                    ! they are ordinary, unsplit nodes); the -y layer is left on
+                    ! the slave copy by construction (plane2 holds the slave id
+                    ! by default).
+                    do ift=1,ntotft
+                        if (abs(ycoor-(fltxyz(1,2,ift)+dy))<tol) then
                             do i=1,nftnd0(ift)
                                 do k=1,8
                                     if(ien(k,nelement)==nsmp(1,i,ift)) then
@@ -492,12 +512,12 @@ subroutine meshgen
                                     endif
                                 enddo
                             enddo
-                        enddo
-                    endif
+                        endif
+                    enddo
                     !if((center(2)>(-2.0d0*dy-tol+kinkx)).and.(center(2)<(2.0d0*dy+tol+kinkx))) then
-                    ! Use undistorted mesh ycoor to locate fault elements. 
-                    ! Assign element et to 2.
-                    if (abs(ycoor)<2.0d0*dy) then  
+                    ! Use undistorted mesh ycoor to locate fault elements, one
+                    ! fault plane at a time. Assign element et to 2.
+                    if (any(abs(ycoor-fltxyz(1,2,1:ntotft))<2.0d0*dy)) then
                         et(nelement)=2!Fault boundary, essential boundary treatment.
                         ! open(1002,file='faultelem.txt',form='formatted',status='unknown',position='append')
                             ! write(1002,'(1x,i10,3e18.7e4,32i10)') nelement,center(1),center(2),center(3),ien(1,nelement),id(1,ien(1,nelement)),id(2,ien(1,nelement)),id(3,ien(1,nelement)),&
@@ -650,7 +670,8 @@ subroutine report_element_types
             write(*,*) '= No fault-adjacent elements (et=2) were tagged, but the fault has ='
             write(*,'(X,A,i7,A)') '= ', sum(nftnd(1:ntotft)), ' nodes. Every fault node would carry zero mass.'
             write(*,*) '=                                                                  ='
-            write(*,*) '= Fault elements are tagged where abs(ycoor) < 2*dy, then far-field ='
+            write(*,*) '= Fault elements are tagged where abs(ycoor-yflt) < 2*dy for some  ='
+            write(*,*) '= fault plane yflt, then far-field                                 ='
             write(*,*) '= elements are tagged where ycoor is within 2*dymax of ymin/ymax.   ='
             write(*,'(X,A,3(E13.5,A))') '=   dx = ', dx, ' m, dymax = ', dymax, ' m, y half-width = ', yhalf, ' m'
             write(*,*) '=                                                                  ='

@@ -40,6 +40,12 @@ class parameters:
     rheology    = 1 # elastic(1). 
     friclaw     = 3 # rsf_aging(3), rsf_slip(4).
     ntotft      = 1 # number of total faults.
+    # Optional per-fault geometry override, one 5-tuple per fault:
+    #   (xlo, xhi, ycoor, zlo, zhi) in meters.
+    # None (default) means every fault uses the single domain-derived box
+    # (ycoor = 0) that case.setup has always emitted; set this to a list of
+    # len(ntotft) tuples to place faults at different y (e.g. a step-over).
+    faultgeom   = None
     solver      = 1 # solver option. MUMPS(1, recommended). AZTEC(2).
     nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold
     nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.

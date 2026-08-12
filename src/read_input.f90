@@ -20,6 +20,7 @@ subroutine readmodel
     logical::file_exists
     integer (kind = 4) :: ios
     integer (kind = 4) :: ift
+    logical :: fltGeomFromFile
 
     if (me == 0) then 
         INQUIRE(FILE="model.txt", EXIST=file_exists)
@@ -75,6 +76,25 @@ subroutine readmodel
             read(1002,*) dtmax
             read(1002,*,iostat=ios) fric_pc_L
         endif
+        ! Optional per-fault geometry block, one line per fault:
+        !   xlo xhi ycoor zlo zhi   (meters)
+        ! Appended after the bp8 block and read with iostat so a model.txt
+        ! from before this existed -- which leaves the file positioned past
+        ! EOF already once the reads above start failing -- still loads:
+        ! every fault falls back to the single domain-derived box below.
+        allocate(fltxyz(2,4,ntotft))
+        fltGeomFromFile = .true.
+        do ift = 1, ntotft
+            read(1002,*,iostat=ios) fltxyz(1,1,ift), fltxyz(2,1,ift), fltxyz(1,2,ift), &
+                                     fltxyz(1,3,ift), fltxyz(2,3,ift)
+            if (ios /= 0) then
+                fltGeomFromFile = .false.
+                exit
+            endif
+            fltxyz(2,2,ift) = fltxyz(1,2,ift) ! degenerate box: one y-plane per fault
+            fltxyz(1,4,ift) = 270.0d0/180.0d0*pi
+            fltxyz(2,4,ift) = 90.0d0/180.0d0*pi
+        enddo
     close(1002)
     
     if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) stop ! Creeping zone bounds should be within model bounds. 
@@ -93,23 +113,24 @@ subroutine readmodel
         call netcdf_write_roughness(fileName)
     endif
 
-    ! Per-fault bounding box (x/z extent, y position, dip). There is no
-    ! per-fault geometry input yet (case.setup only emits a single model
-    ! domain), so every fault is given the same domain-derived box: a
+    ! Per-fault bounding box (x/z extent, y position, dip). If model.txt
+    ! carried the optional per-fault geometry block it is already filled
+    ! above; otherwise every fault is given the same domain-derived box: a
     ! same-shaped loop for ift = 1..ntotft rather than a single-fault
     ! assignment, so ntotft > 1 exercises the identical statements ntotft == 1
     ! does.
-    allocate(fltxyz(2,4,ntotft))
-    do ift = 1, ntotft
-        fltxyz(1,1,ift)=xmin
-        fltxyz(2,1,ift)=xmax
-        fltxyz(1,2,ift)=0.0d0
-        fltxyz(2,2,ift)=0.0d0
-        fltxyz(1,3,ift)=zmin
-        fltxyz(2,3,ift)=zmax
-        fltxyz(1,4,ift)=270.0d0/180.0d0*pi
-        fltxyz(2,4,ift)=90.0d0/180.0d0*pi
-    enddo
+    if (.not. fltGeomFromFile) then
+        do ift = 1, ntotft
+            fltxyz(1,1,ift)=xmin
+            fltxyz(2,1,ift)=xmax
+            fltxyz(1,2,ift)=0.0d0
+            fltxyz(2,2,ift)=0.0d0
+            fltxyz(1,3,ift)=zmin
+            fltxyz(2,3,ift)=zmax
+            fltxyz(1,4,ift)=270.0d0/180.0d0*pi
+            fltxyz(2,4,ift)=90.0d0/180.0d0*pi
+        enddo
+    endif
 
     dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
     dymax = min(12.0d0*dx, 3.0d3) ! The coarsest element size near ymax/ymin in m.

@@ -1,0 +1,36 @@
+{
+  "benchmark": "two-fault step-over",
+  "compset": "test.stepover.qdc",
+  "oracle_kind": "exact field snapshot at step 101, both faults",
+  "comparison": "max absolute difference must be 0.0 across all variables, per fault",
+  "ntotft": 2,
+  "element_size_m": 1000.0,
+  "grid": {
+    "nid_dip": 21,
+    "nid_strike": 41
+  },
+  "purpose": "The only ntotft > 1 gate in the suite. Three multi-fault bugs reached master and were each found only by a person running a new case by hand: accumulator aliasing reaching dtev, netcdf_write_on_fault reading 735 slots of uninitialised memory per file, and a fault plane falling between mesh lines so one fault got zero nodes while the run completed 4240 steps and reported 11 m of slip on a phantom single fault. This gate exists so the next one is caught by pytest instead.",
+  "per_fault_design": {
+    "fault_0": {
+      "y_m": 0.0,
+      "init_norm_Pa": -25.0e6,
+      "note": "matches BP5's init_norm"
+    },
+    "fault_1": {
+      "y_m": -5000.0,
+      "init_norm_Pa": -27.0e6,
+      "note": "deliberately offset from fault 0 by 2 MPa so a swapped-fault or wrong-local-index read on either the Python (case.setup) or Fortran (netcdf_read_on_fault) side of the on_fault_vars_input.nc contract shows up as the wrong constant on the wrong fault's nodes rather than a value that happens to look plausible either way"
+    }
+  },
+  "provenance": {
+    "code": "EQquasi",
+    "version": "1.7.0",
+    "host": "cotopaxi",
+    "run_dir": "work/gate.stepover",
+    "run_timestamp": "2026-08-12T11:34:41",
+    "steps_completed": 101,
+    "seconds_per_step": 0.9883216,
+    "generated_by": "the owner (Dunyu Liu), handed off mid-session; test infrastructure and assertions added by this session's test-architecture pass"
+  },
+  "caveat": "regression lock on a deliberately coarse (dx=1000m), short (101-step) compset, never compared against an independent code -- it detects change, and specifically detects the three historical multi-fault failure modes, but it does not establish that the step-over benchmark is reproduced correctly"
+}

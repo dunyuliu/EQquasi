@@ -25,6 +25,7 @@ regenerate the gold deliberately and say so in the commit -- do not widen the
 tolerance.
 """
 
+import glob
 import json
 import os
 import shutil
@@ -37,7 +38,22 @@ import pytest
 from conftest import ROOT
 
 GOLD = os.path.join(str(ROOT), "reference", "bp8", "gold", "summary.json")
+GOLD_DIR = os.path.join(str(ROOT), "reference", "bp8", "gold")
 WORK = os.path.join(str(ROOT), "work", "e2e.bp8.gold")
+
+# The nine on-fault stations x2, x3 in {-200, 0, 200} m (section 4.1). All nine
+# now have gold: the first four were frozen from v1.4.7's work/bp8.sub147, the
+# remaining five were added from a v1.6.0 rerun of the same configuration,
+# confirmed bit-identical to the first four before being trusted as gold.
+ALL_STATIONS = [
+    f"{s:+04d}dp{d:+04d}" for s in (-200, 0, 200) for d in (-200, 0, 200)
+]
+
+PROFILE_FILES = [
+    f"{q}_{line}.dat"
+    for q in ("slip_2", "slip_3", "shear_stress_2", "shear_stress_3", "pore_pressure")
+    for line in ("strike", "depth")
+]
 
 # Deterministic rerun of the same case: agreement should be near round-off.
 RTOL_SLIP = 1e-4
@@ -119,7 +135,7 @@ def gold():
     return json.load(open(GOLD))
 
 
-@pytest.mark.parametrize("station", ["+000dp+000", "-200dp+000"])
+@pytest.mark.parametrize("station", ALL_STATIONS)
 def test_station_matches_gold(run_dir, gold, station):
     g = gold[station]
     a = _read(os.path.join(run_dir, f"fltst_strk{station}.dat"))
@@ -146,6 +162,70 @@ def test_global_matches_gold(run_dir, gold):
     assert a[:, 1].max() == pytest.approx(g["peak_Vmax_log10"], abs=ATOL_LOG)
     assert a[a[:, 1].argmax(), 0] / 86400.0 == pytest.approx(g["peak_Vmax_day"], rel=1e-2)
     assert a[:, 2].max() == pytest.approx(g["peak_moment"], rel=1e-3)
+
+
+def test_fault_snapshot_matches_gold(run_dir):
+    """BP5/BP7 have long compared a frozen fault.*.nc; BP8 never had one.
+
+    Confirmed before freezing: work/bp8.sub147 (v1.4.7) and a fresh v1.6.0 rerun
+    at this same configuration agree on every variable to max|diff| = 0.0, the
+    same bar BP5/BP7 hold their snapshots to (reference/bp5/gold/summary.json).
+    A single MPI rank, deterministic solver and fixed seed make that the right
+    tolerance -- anything looser would let a real change through silently.
+    """
+    netCDF4 = pytest.importorskip("netCDF4")
+
+    hits = glob.glob(os.path.join(run_dir, "fault.?????.nc"))
+    hits = [h for h in hits if not h.endswith("fault.r.nc")
+            and not os.path.basename(h) == "fault.00001.nc"]
+    assert hits, f"no fault.*.nc snapshot under {run_dir}"
+    run_path = max(hits, key=os.path.getmtime)
+
+    gold_path = os.path.join(GOLD_DIR, "fault.05301.nc")
+    if not os.path.exists(gold_path):
+        pytest.skip("no fault.05301.nc gold")
+
+    g = netCDF4.Dataset(gold_path)
+    r = netCDF4.Dataset(run_path)
+    bad = []
+    for v in g.variables:
+        if v.startswith("nid_"):
+            continue
+        gv = np.asarray(g.variables[v][:]).squeeze()
+        rv = np.asarray(r.variables[v][:]).squeeze()
+        if gv.shape != rv.shape:
+            bad.append(f"{v}: shape {rv.shape} vs gold {gv.shape}")
+            continue
+        d = np.max(np.abs(gv - rv))
+        if d > 0.0:
+            bad.append(f"{v}: max|diff| = {d:.3e}")
+    assert not bad, "fault-plane snapshot diverged from gold:\n" + "\n".join(bad)
+
+
+@pytest.mark.parametrize("fname", PROFILE_FILES)
+def test_section_43_profile_matches_gold(run_dir, fname):
+    """Section 4.3 profiles at the gold's native dx = 50 m (17 nodes), not the
+    submission's resampled 81-node grid -- that resampling is
+    resampleBP8Profiles.py's job and is covered by test_submission_validator_passes.
+    """
+    gold_path = os.path.join(GOLD_DIR, fname.replace(".dat", ".csv"))
+    if not os.path.exists(gold_path):
+        pytest.skip(f"no gold for {fname}")
+    gold = np.genfromtxt(gold_path, delimiter=",", skip_header=1)
+
+    run_path = os.path.join(run_dir, fname)
+    assert os.path.exists(run_path), f"{fname} not produced by the run"
+    run = _read(run_path)
+
+    assert run.shape == gold.shape, (
+        f"{fname}: shape {run.shape} vs gold {gold.shape}"
+    )
+    # Row 0 is [0, 0, coords...]; later rows are [t, max_slip_rate, values...].
+    # Deterministic rerun of the same config: hold to the same bar as the
+    # station and global checks above.
+    assert np.max(np.abs(run - gold)) == pytest.approx(0.0, abs=1e-6), (
+        f"{fname} diverged from gold: max|diff| = {np.max(np.abs(run - gold)):.3e}"
+    )
 
 
 def test_submission_validator_passes(run_dir):

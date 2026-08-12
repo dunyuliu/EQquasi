@@ -84,3 +84,29 @@ def test_the_case_table_covers_both_tiers():
     tiers = {c[4] for c in C.CASES}
     assert "fast" in tiers, "no fast case in tests/e2e/cases.py"
     assert "full" in tiers, "no full-only case in tests/e2e/cases.py"
+
+
+def test_ci_builds_before_it_runs_benchmarks():
+    """A benchmark with no binary skips, and a skipped gate still reports green.
+
+    CI did exactly that: `2 passed, 18 skipped in 8.13s`, having run no
+    benchmark at all, because pytest collects test_benchmarks.py before
+    test_clean_build.py and the binary did not exist yet.
+    """
+    wf = _wf()
+    build = wf.find("install.eqquasi.sh")
+    e2e = wf.find("-m e2e_fast")
+    assert build != -1, "CI never builds the solver"
+    assert build < e2e, (
+        "CI runs the e2e tier before building, so every benchmark skips for "
+        "want of bin/eqquasi and the job passes having tested nothing")
+
+
+def test_a_missing_binary_fails_rather_than_skips():
+    """The e2e runner must not skip its way to green."""
+    src = read("tests/e2e/cases.py")
+    assert "pytest.fail" in src and "does not exist" in src, (
+        "cases.run_case should fail when bin/eqquasi is missing. A skip there "
+        "silently empties the gate.")
+    assert 'pytest.skip("bin/eqquasi not built")' not in src, \
+        "cases.run_case still skips when the binary is missing"

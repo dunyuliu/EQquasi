@@ -106,8 +106,14 @@ def run_case(compset, over, workdir):
     other run's (rule 19).
     """
     e = env()
-    if not os.path.exists(os.path.join(str(ROOT), "bin", "eqquasi")):
-        pytest.skip("bin/eqquasi not built")
+    exe = os.path.join(str(ROOT), "bin", "eqquasi")
+    if not os.path.exists(exe):
+        # Not a skip. A skipped benchmark takes the entire e2e gate with it and
+        # still reports green -- CI did exactly that: 2 passed, 18 skipped in
+        # 8 seconds, having run no benchmark at all. Build first.
+        pytest.fail(f"{exe} does not exist. Build before running the e2e "
+                    "tier: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
+                    "mv src/eqquasi bin/  (or run install.eqquasi.sh)")
 
     shutil.rmtree(workdir, ignore_errors=True)
     subprocess.run(["create.newcase", workdir, compset], cwd=str(ROOT), env=e,

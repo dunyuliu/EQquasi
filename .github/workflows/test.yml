@@ -36,9 +36,15 @@ jobs:
     - name: Fast tiers (unit, contract, regression)
       run: python3 -m pytest tests/ -v
 
-    - name: End-to-end (fast tier)
+    - name: Build
       run: |
         bash make.scripts.executable.sh
+        export EQQUASIROOT=$(pwd)
+        bash install.eqquasi.sh -m ubuntu
+        test -x bin/eqquasi
+
+    - name: End-to-end (fast tier)
+      run: |
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
         set -o pipefail

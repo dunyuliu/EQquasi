@@ -108,9 +108,11 @@ par.nfx = round((par.fxmax - par.fxmin)/par.dx + 1)
 par.nfz = round((par.fzmax - par.fzmin)/par.dz + 1)
 par.fx = np.linspace(par.fxmin,par.fxmax,par.nfx) # coordinates of fault grids along strike.
 par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids along dip.
+# Sized here, not in defaultParameters: the compset redefines nfx/nfz above,
+# so the array must be allocated once the grid is known. Always 4-D --
+# (ntotft, nfz, nfx, 100) -- with ntotft = 1 the degenerate case.
+par.on_fault_vars = np.zeros((par.ntotft, par.nfz, par.nfx, 100))
 # Create on_fault_vars array for on_fault varialbes.
-par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
-
 def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
   # BP8 reading C. Table 1 gives tau_init = 14.6 MPa and eq. (27) requires the
   # fault to start at a uniform V_init; eq. (12) then fixes theta_0, so eq. (29)
@@ -126,20 +128,20 @@ def state_from_stress_and_rate(a, b, Dc, v0, r0, norm, tau, slip_rate):
 
 for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
-    par.on_fault_vars[iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
-    par.on_fault_vars[iz,ix,10] = par.fric_rsf_b  # b in RSF, uniform.
-    par.on_fault_vars[iz,ix,11] = par.fric_rsf_Dc # Dc in RSF.
-    par.on_fault_vars[iz,ix,12] = par.fric_rsf_v0 # reference slip rate V*.
-    par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # reference friction f*.
+    par.on_fault_vars[0,iz,ix,9]  = par.fric_rsf_a  # a in RSF, uniform.
+    par.on_fault_vars[0,iz,ix,10] = par.fric_rsf_b  # b in RSF, uniform.
+    par.on_fault_vars[0,iz,ix,11] = par.fric_rsf_Dc # Dc in RSF.
+    par.on_fault_vars[0,iz,ix,12] = par.fric_rsf_v0 # reference slip rate V*.
+    par.on_fault_vars[0,iz,ix,13] = par.fric_rsf_r0 # reference friction f*.
 
-    par.on_fault_vars[iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
+    par.on_fault_vars[0,iz,ix,46] = par.init_slip_rate # initial slip rate V_init.
     # BP8 eq. (29): the initial state is at steady state with V_init over the
     # entire fault. Prescribed by the benchmark.
-    par.on_fault_vars[iz,ix,20] = state_from_stress_and_rate(
+    par.on_fault_vars[0,iz,ix,20] = state_from_stress_and_rate(
         par.fric_rsf_a, par.fric_rsf_b, par.fric_rsf_Dc, par.fric_rsf_v0,
         par.fric_rsf_r0, par.init_norm, par.init_shear, par.init_slip_rate)
-    par.on_fault_vars[iz,ix,7]  = par.init_norm  # initial effective normal stress.
-    par.on_fault_vars[iz,ix,8]  = par.init_shear # tau^0, Table 1. # tau^0, derived. See above.
+    par.on_fault_vars[0,iz,ix,7]  = par.init_norm  # initial effective normal stress.
+    par.on_fault_vars[0,iz,ix,8]  = par.init_shear # tau^0, Table 1. # tau^0, derived. See above.
 
 ####################################
 ##### HPC resource allocation ######

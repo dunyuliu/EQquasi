@@ -72,8 +72,11 @@ par.nfx = round((par.fxmax - par.fxmin)/par.dx + 1)
 par.nfz = round((par.fzmax - par.fzmin)/par.dx + 1)
 par.fx = np.linspace(par.fxmin,par.fxmax,par.nfx) # coordinates of fault grids along strike.
 par.fz = np.linspace(par.fzmin,par.fzmax,par.nfz) # coordinates of fault grids along dip.
+# Sized here, not in defaultParameters: the compset redefines nfx/nfz above,
+# so the array must be allocated once the grid is known. Always 4-D --
+# (ntotft, nfz, nfx, 100) -- with ntotft = 1 the degenerate case.
+par.on_fault_vars = np.zeros((par.ntotft, par.nfz, par.nfx, 100))
 # Create on_fault_vars array for on_fault varialbes.
-par.on_fault_vars = np.zeros((par.nfz,par.nfx,100))
 def shear_steady_state(a,b,v0,r0,load_rate,norm,slip_rate, rou, vs):
   # calculate shear stress at steady state
   res = -norm*a*asinh(slip_rate/2.0/v0*exp((r0+b*log(v0/load_rate))/a)) + rou*vs/2.0*slip_rate
@@ -83,32 +86,32 @@ for ix, xcoor in enumerate(par.fx):
   for iz, zcoor in enumerate(par.fz):
   # assign a in RSF. a is a 2D distribution.
     if abs(zcoor)>=18e3 or abs(xcoor)>=32e3 or abs(zcoor)<=2e3: 
-      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + par.fric_rsf_deltaa
+      par.on_fault_vars[0,iz,ix,9] = par.fric_rsf_a + par.fric_rsf_deltaa
     elif abs(zcoor)<=16e3 and abs(zcoor)>=4e3 and abs(xcoor)<=30e3:
-      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a
+      par.on_fault_vars[0,iz,ix,9] = par.fric_rsf_a
     else:
       tmp1 = (abs(abs(zcoor)-10e3) - 6e3)/2e3
       tmp2 = (abs(xcoor)-30e3)/2e3
-      par.on_fault_vars[iz,ix,9] = par.fric_rsf_a + max(tmp1,tmp2)*par.fric_rsf_deltaa
-    par.on_fault_vars[iz,ix,10] = par.fric_rsf_b # assign b in RSF 
-    par.on_fault_vars[iz,ix,11] = par.fric_rsf_Dc # assign Dc in RSF.
+      par.on_fault_vars[0,iz,ix,9] = par.fric_rsf_a + max(tmp1,tmp2)*par.fric_rsf_deltaa
+    par.on_fault_vars[0,iz,ix,10] = par.fric_rsf_b # assign b in RSF 
+    par.on_fault_vars[0,iz,ix,11] = par.fric_rsf_Dc # assign Dc in RSF.
     if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
-      par.on_fault_vars[iz,ix,11] = par.minDc # a special Dc zone.
-    par.on_fault_vars[iz,ix,12] = par.fric_rsf_v0 # initial reference slip rate.
-    par.on_fault_vars[iz,ix,13] = par.fric_rsf_r0 # initial reference friction.
+      par.on_fault_vars[0,iz,ix,11] = par.minDc # a special Dc zone.
+    par.on_fault_vars[0,iz,ix,12] = par.fric_rsf_v0 # initial reference slip rate.
+    par.on_fault_vars[0,iz,ix,13] = par.fric_rsf_r0 # initial reference friction.
     
-    par.on_fault_vars[iz,ix,46] = par.creep_slip_rate # initial slip rates
+    par.on_fault_vars[0,iz,ix,46] = par.creep_slip_rate # initial slip rates
     if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
-      par.on_fault_vars[iz,ix,46] = 0.03 # initial high slip rate patch.
-    par.on_fault_vars[iz,ix,20] = par.on_fault_vars[iz,ix,11]/par.creep_slip_rate # initial state var.
-    par.on_fault_vars[iz,ix,7] = par.init_norm # initial normal stress.
-    par.on_fault_vars[iz,ix,8] = shear_steady_state(par.on_fault_vars[iz,ix,9], 
-                                                par.on_fault_vars[iz,ix,10],
-                                                par.on_fault_vars[iz,ix,12],
-                                                par.on_fault_vars[iz,ix,13],
+      par.on_fault_vars[0,iz,ix,46] = 0.03 # initial high slip rate patch.
+    par.on_fault_vars[0,iz,ix,20] = par.on_fault_vars[0,iz,ix,11]/par.creep_slip_rate # initial state var.
+    par.on_fault_vars[0,iz,ix,7] = par.init_norm # initial normal stress.
+    par.on_fault_vars[0,iz,ix,8] = shear_steady_state(par.on_fault_vars[0,iz,ix,9], 
+                                                par.on_fault_vars[0,iz,ix,10],
+                                                par.on_fault_vars[0,iz,ix,12],
+                                                par.on_fault_vars[0,iz,ix,13],
                                                 par.creep_slip_rate,
-                                                par.on_fault_vars[iz,ix,7],
-                                                par.on_fault_vars[iz,ix,46],
+                                                par.on_fault_vars[0,iz,ix,7],
+                                                par.on_fault_vars[0,iz,ix,46],
                                                 par.rou,
                                                 par.vs)
 ###############################################

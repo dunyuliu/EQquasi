@@ -119,9 +119,8 @@ Currently supported compsets are listed in ```case_input/compsets.txt```:
   - liu2020.fdc.planar
   - liu2020.fdc.rough.250
 
-In addition, ```test.bp5.qdc```, ```test.bp5.qdc.dip90``` and
-```test.bp7.qdc``` are small, fast compsets used by the regression suite; they
-are deliberately not listed in ```compsets.txt```.
+In addition, ```test.*``` compsets are small, fast versions used by the test
+suite and deliberately not listed in ```compsets.txt```.
 
 Where things run
 ---------------------
@@ -130,15 +129,15 @@ belongs under ```work/``` at the repository root, which is gitignored. Nothing
 scratch is written to the repo root itself.
 
 ```
-work/                    # gitignored; create your cases here
-work/test/               # created and wiped by `pytest -m e2e`
-test.reference.results/  # committed oracles; NOT scratch, never wiped
-bin/                     # gitignored build product
+work/          # gitignored; create your cases here
+reference/     # committed reference results; never wiped
+bin/           # gitignored build product
 ```
 
-```pytest -m e2e``` begins by deleting its scratch directory, so keeping that
-directory under ```work/``` is what stops a stray path from removing tracked
-files, and it keeps ```git status``` clean after a run.
+A case run through ```run.sh``` keeps each cycle's output in ```cycle0/```,
+```cycle1/```, ... The post-processing utilities discover those automatically:
+from inside a case, ```plotRuptureTime.py``` with no arguments processes every
+cycle.
 
 Example
 ---------------------
@@ -147,7 +146,9 @@ The case can be created by the following command:
 ```
 create.newcase caseDir bp5.qdc.2000
 ```
-With the default user_defined_params.py, it should take about 27 minutes to finish the 1st earthquake cycle. For 1st + 2nd earthquake cycles, 1 hour 33 minutes will be expected on Lonestar6. <br/>
+With the default ```user_defined_params.py``` the first cycle takes about
+27 minutes on Lonestar6, or ~51 minutes on 4 MPI ranks of a shared
+workstation. <br/>
 
 Key progress
 ---------------------
@@ -158,52 +159,44 @@ Verification
 
 ### Test suite
 
-Four tiers, selected by marker (`pytest.ini`). The first three need neither MPI
-nor MUMPS and run on every change; `e2e` builds the code, runs a benchmark, and
-is opt-in.
+Five tiers, selected by marker (`pytest.ini`). The first three read source and
+reference files only -- no MPI, no MUMPS, seconds. The `e2e` tiers build the
+code and run benchmarks.
 
 ```
-python3 -m pytest tests/            # unit + contract + regression, ~4 s
-python3 -m pytest tests/ -m e2e     # builds and runs benchmarks, ~40 min
-python3 -m pytest tests/ -m ""      # everything
-python3 `pytest -m e2e`                  # standalone driver: rebuild, run testNameList, compare
+python3 -m pytest tests/              # unit + contract + regression, ~4 s
+python3 -m pytest tests/ -m e2e_fast  # what CI runs on every push, ~20 min
+python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
 ```
 
-`pytest -m e2e` predates the pytest tiers and still works. It rebuilds from source
-with `install.eqquasi.sh`, runs every compset in `tests/e2e/cases.py` under
-`work/test/`, then `tests/e2e/test_benchmarks.py` compares each against
-`reference/<benchmark>/`. Use it when you want a clean-room rebuild-and-run
-in one command; use the `e2e` marker when you want the same comparisons as part
-of the suite.
+| tier | checks | cost |
+|---|---|---|
+| `unit` | numerics in isolation: the pore-pressure operator against its analytic solution, initial conditions against the benchmark equations, physical invariants | ms |
+| `contract` | file formats and cross-file agreement: BP8 section 4 conformance, `model.txt`'s positional contract, compset registration, the CI gate, and that every reference file has a reader | ~1 s |
+| `regression` | one guard per defect that actually occurred here | ~2 s |
+| `e2e_fast` | BP5 at 101 steps, BP8 over 30 days, and a clean `install.eqquasi.sh` build | ~20 min |
+| `e2e` | the above plus BP5's full first cycle | ~75 min |
 
-| Tier | Tests | What it checks | Cost |
-|---|---:|---|---|
-| `unit` | 36 | Numerics in isolation: the pore-pressure operator against its analytic solution, initial conditions against the benchmark equations, physical invariants (slip non-decreasing, effective normal stress compressive, state positive and finite) | ms |
-| `contract` | 136 | File formats and cross-file agreement: BP8 section 4 output conformance, `model.txt`'s positional contract, compset registration, build and release gates, and that every `reference/` file has a reader | ~1 s |
-| `regression` | 9 | One guard per defect that actually occurred here, including the fault plane that fell between mesh lines and the codebase's known Fortran landmines | ~2 s |
-| `e2e` | 41 | Builds, runs a benchmark end to end, and diffs the result against frozen gold | ~40 min |
+### References
 
-### What each `e2e` benchmark compares
+`reference/<benchmark>/` holds frozen results. A reference is a **run**, not a
+file: `reference/bp5/cycle0/` is a full earthquake cycle,
+`reference/bp5/cycle0-step101-fast/` the same case stopped at step 101.
 
-Gold lives in `reference/<benchmark>/`, in both netCDF and CSV.
+`tests/e2e/cases.py` holds the case table and the single runner; a new
+benchmark is a row there plus a reference directory. What gets compared is
+decided by what the reference contains -- fault snapshots per fault at
+max\|diff\| 0, station and profile series in full, and the scalars each
+`summary.json` names. Results are reported per file:
 
-| Benchmark | Compset | Gold | Compared | Run time |
-|---|---|---|---|---:|
-| BP5 | `test.bp5.qdc` | `fault.00101.nc` | Every variable on the fault plane at step 101, max abs diff **0.0** | ~8 min |
-| BP5-dip90 | `test.bp5.qdc.dip90` | `fault.00101.nc` | as above | ~8 min |
-| BP7 | `test.bp7.qdc` | `fault.00101.nc` | as above | ~8 min |
-| BP8-QD-GS | `test.bp8.qdc` | 9 stations, `global`, 10 section-4.3 profiles, `fault.05301.nc` | Every gold file diffed **in full**, not sampled; plus named scalars, and that the output passes `checkBP8Submission` | ~13 min |
-| Step-over | `test.stepover.qdc` | `fault.00101.nc` | Per fault: a slab exists for every declared fault, none all-zero or NaN, the two faults' normal stresses stay distinct, and each fault's field matches gold | ~2 min |
+```
+SUCCESS fltst_strk000dp000.txt: 4483 rows x 9 cols, max|diff| = 0.0e+00
+FAIL    global.dat: max|diff| = 3.1e-04 at column 6
+```
 
-The step-over case is the only `ntotft > 1` gate. It exists because three
-multi-fault bugs reached `master` while every other benchmark ran a single
-fault — a zero-node fault, uninitialised output slabs, and accumulator aliasing
-across faults. Each is now covered by a named assertion.
-
-Gold is a **regression lock, not a physics validation**. It detects unintended
-change; it does not establish that a benchmark is reproduced correctly. The
-compsets are deliberately coarse, and BP8's frozen configuration is not
-converged in domain size (see `PATHWAY_FORWARD.md`).
+References are **regression locks, not validations**. They detect unintended
+change; they do not establish that a benchmark is reproduced correctly. See
+`reference/bp8/README.md` for what BP8's does and does not establish.
 
 ### BP8 pore fluid diffusion
 

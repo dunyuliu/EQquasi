@@ -86,8 +86,13 @@ subroutine pore_pressure_init
     wsum = sum(pfWt)
     if (wsum > 0.0d0) pfWt = pfWt / wsum
 
-    ! Peaceman well index, m^3/(Pa s). re = 0.198*dx for a 5-point stencil.
-    re = 0.198d0 * dx
+    ! Peaceman well index, m^3/(Pa s). The equivalent radius is
+    ! discretization-dependent: the 2026-08-12 benchmark description gives
+    ! re = 0.198*dx for a five-point finite-difference stencil and
+    ! re = 0.208*sqrt(A) for finite volume on the same mesh. This solver is
+    ! finite volume, so the latter applies. A is the cell area, which is dx*dx
+    ! in the interior but half or a quarter of that on the boundary of Omega_f.
+    re = 0.208d0 * dsqrt(dx * dx)
     fluid_WI = 2.0d0 * pi * fluid_perm * fluid_Lfwid / (fluid_eta * dlog(re/fluid_rwell))
 
     if (me == 0) then

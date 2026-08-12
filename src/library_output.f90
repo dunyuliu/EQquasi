@@ -280,9 +280,9 @@ subroutine output_globaldat
             write(1113,'(A,I0)')    '# num_time_steps=', it
             write(1113,'(A)') '# Column #1 = Time (s)'
             write(1113,'(A)') '# Column #2 = Max_slip_rate (log10 m/s)'
-            write(1113,'(A)') '# Column #3 = Moment_density_rate (N/s)'
+            write(1113,'(A)') '# Column #3 = Moment_rate (N.m/s)'
             write(1113,'(A)') '# The line below lists the names of the data fields'
-            write(1113,'(A)') 't max_slip_rate moment_density_rate'
+            write(1113,'(A)') 't max_slip_rate moment_rate'
             write(1113,'(A)') '# Here is the time-series data.'
             ! Initial condition at t = 0, as for the station files.
             write(1113,'(E22.14,2E15.7)') 0.0d0, &

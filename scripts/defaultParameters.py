@@ -148,7 +148,7 @@ class parameters:
     fluid_perm   = 5.0e-14 # permeability, m^2.
     fluid_eta    = 1.0e-3  # fluid viscosity, Pa s.
     fluid_Swell  = 1.0e-7  # volumetric well storage, m^3/Pa.
-    fluid_rwell  = 0.0508  # well radius, m. 2 inches; not fixed by the BP8 table.
+    fluid_rwell  = 0.05    # true well radius, m. BP8 Table 1 (2026-08-12 revision).
     dtmax        = 0.0     # cap on the adaptive time step, s. 0 means no cap.
     # Prakash-Clifton relaxation distance for the normal-stress state variable, m.
     #   0.0 : default. No state; use the instantaneous effective normal stress.

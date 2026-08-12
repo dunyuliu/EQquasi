@@ -95,7 +95,7 @@ par.fluid_phi    = 0.1      # phi, porosity.
 par.fluid_perm   = 5.0e-14  # k, permeability, m^2.
 par.fluid_eta    = 1.0e-3   # eta, fluid viscosity, Pa s.
 par.fluid_Swell  = 1.0e-7   # S_well, volumetric well storage, m^3/Pa.
-par.fluid_rwell  = 0.0508   # r_well, well radius, m. Not fixed by Table 1; 2 inches.
+par.fluid_rwell  = 0.05     # r_well, true well radius, m. Table 1, 2026-08-12 revision.
 # Cap the adaptive time step. Without a cap, xi*Dc/V is ~1e7 s at V_init.
 # 500 s also satisfies the explicit diffusion limit dx^2/(4*alpha) at dx = 10 m.
 par.dtmax        = 500.0

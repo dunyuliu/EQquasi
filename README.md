@@ -166,7 +166,15 @@ is opt-in.
 python3 -m pytest tests/            # unit + contract + regression, ~4 s
 python3 -m pytest tests/ -m e2e     # builds and runs benchmarks, ~40 min
 python3 -m pytest tests/ -m ""      # everything
+python3 testAll.py                  # standalone driver: rebuild, run testNameList, compare
 ```
+
+`testAll.py` predates the pytest tiers and still works. It rebuilds from source
+with `install.eqquasi.sh`, runs every compset in `testNameList.py` under
+`work/test/`, then `check.test.py` compares each against
+`reference/<benchmark>/gold/`. Use it when you want a clean-room rebuild-and-run
+in one command; use the `e2e` marker when you want the same comparisons as part
+of the suite.
 
 | Tier | Tests | What it checks | Cost |
 |---|---:|---|---|

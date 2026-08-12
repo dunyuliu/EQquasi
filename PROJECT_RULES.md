@@ -749,6 +749,36 @@ exactly the failure mode this rule is about.
 
 ---
 
+## 17. CI is the gate, not the local suite
+
+**Instantiates: G3** (a gate is only real if it runs, fails loud, and is
+evaluated at the right configuration) and **G15** (a finding is a hypothesis
+until checked against the source).
+
+A red CI run stops work. Do not commit, tag or release on top of one. Check it
+after pushing -- `gh run list --repo dunyuliu/EQquasi --limit 5`, and
+`gh run view <id> --log-failed` when it is red.
+
+*Incident, 2026-08-12.* CI went red on the `mfault` merge at 03:41 and stayed
+red through four tagged releases (v1.5.0, v1.6.0, v1.7.0, v1.7.1, v1.7.2)
+because the local suite was green and nobody looked. The failure was real: the
+merge added a `nid_fault` dimension to every on-fault netCDF write, so runs
+produced `(1, nz, nx)` against gold's `(nz, nx)`, and `check.test.py` compares
+with xarray's `identical()`, which rejects differing dimensions.
+
+**A comparator must not normalise away the difference it exists to detect.**
+`scripts/plotAgainstGold.py` reported "matches gold" throughout, because its
+`load_field` keys on `(variable, fault index)` and maps a 2-D and a 3-D array
+onto the same key -- the shape difference was consumed before any comparison.
+Two comparators disagreed for fourteen hours and the more permissive one was
+believed.
+
+Enforced in part by `tests/contract/test_gold_netcdf_shape.py`, which asserts
+every gold fault snapshot carries `nid_fault` and stores its variables 3-D --
+the cheap version of the CI signal, failing in seconds rather than after an
+eleven-minute pipeline. `plotAgainstGold.py` now compares stored dimensions
+before reshaping and refuses outright when they differ.
+
 ## Unenforceable rules (as written)
 
 | Rule | Why it can't be checked today | What would fix it |

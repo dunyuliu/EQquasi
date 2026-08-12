@@ -98,11 +98,34 @@ def label(key):
     return v if ift == 0 else f"{v} [fault {ift}]"
 
 
+def raw_dims(path):
+    """Dimension sizes exactly as stored, before any per-fault reshaping."""
+    import netCDF4 as nc
+    d = nc.Dataset(path)
+    return {k: len(v) for k, v in d.dimensions.items()}
+
+
 def compare_field(bench, run_dir, out, only=None):
-    gold = load_field(os.path.join(gold_dir(bench), SNAPSHOT))
+    gold_path = os.path.join(gold_dir(bench), SNAPSHOT)
     hits = glob.glob(os.path.join(run_dir, "**", SNAPSHOT), recursive=True)
     if not hits:
         raise SystemExit(f"no {SNAPSHOT} under {run_dir}")
+
+    # Compare the stored shape BEFORE load_field reduces it. load_field keys on
+    # (variable, fault index), which maps a 2-D (nz, nx) array and a 3-D
+    # (1, nz, nx) array onto the same key -- so a gold file predating the
+    # nid_fault dimension compared clean against a run that has it, and this
+    # script reported "matches gold" while check.test.py's xarray identical()
+    # correctly failed in CI. A comparator must not normalise away the
+    # structural change it exists to detect.
+    gd, rd = raw_dims(gold_path), raw_dims(hits[0])
+    if gd != rd:
+        raise SystemExit(
+            f"{bench}: stored dimensions differ from gold, so the files are not "
+            f"comparable.\n  gold {gold_path}: {gd}\n  run  {hits[0]}: {rd}\n"
+            "Regenerate the gold from a current run.")
+
+    gold = load_field(gold_path)
     run = load_field(hits[0])
 
     keys = [k for k in gold if k in run and (only is None or k[0] == only)]

@@ -163,7 +163,59 @@ And when a discrepancy appears, check it at more than one station before
 theorising about its cause; the second station here would have exposed the error
 immediately.
 
+## Domain truncation: what the boundaries actually are
+
+BP8 is a whole space. Kim's HBI is a boundary-element code and has no
+boundaries at all. Ours is a finite element box, so the truncation is ours to
+justify, and the two horizontal axes are not treated the same way.
+
+**The y faces are rigid walls.** `meshgen.f90:167` gives every node at `iy == 1`
+and `iy == nyt` a prescribed-velocity condition on all three components
+(`-2/-21/-1` and `-3/-31/-1`), and the BP8 compsets set
+`far_vel_load = far_norm_load_vel = 0.0`. Prescribed velocity of zero is
+`u = 0`. This is the stiffest possible truncation: a rigid wall near the fault
+suppresses slip, and its elastostatic influence decays slowly with distance.
+
+**The x and z faces are free.** There is no `ix == 1` or `iz == 1` condition;
+those nodes fall through to the `else` branch at `meshgen.f90:182` and receive
+equation numbers, so they are traction-free.
+
+The two axes also mean different things physically. `fxmin/fxmax` and
+`fzmin/fzmax` set **both** the elastic domain and the fault extent, so widening
+x or z extends the *fault plane* -- locked outside Omega_f (800 x 800 m) --
+towards an infinite plane. Widening y adds *elastic medium* and moves a
+constraint away from the fault; nothing about the fault changes.
+
+That asymmetry is visible in how fast each converges. Edge/centre slip at
+30 days, dx = 50 m, xi = 0.2:
+
+| x, z extent | y extent | slip(0,0) mm | slip(-200) mm | edge/centre |
+|---|---|---|---|---|
+| +-500  | +-500  | 37.31 | 21.99 | 0.589 |
+| +-1000 | +-500  | 36.94 | 19.58 | 0.530 |
+| +-1500 | +-500  | 36.90 | 19.52 | 0.529 |
+| +-500  | +-2000 | 38.33 | 29.66 | 0.774 |
+| Kim (HBI) | infinite | ~38 | ~21 | 0.553 |
+
+x and z are converged by +-1000 (0.530 against 0.529 at +-1500, 0.2 %). y is
+not: moving the rigid wall from +-500 to +-2000 raised edge slip by 35 %, in the
+direction a stiff boundary predicts, and it is not obviously saturated. Because
+that y sweep was run at x, z = +-500 -- now known to be too small -- the y
+number is the one most in doubt.
+
+Time-step factor `xi` is a non-issue: 0.4 / 0.2 / 0.1 give edge/centre
+0.589 / 0.589 / 0.590 over a fourfold change in step size. Note `xi` sets
+`dt = xi * D_RS / V` (`faulting.f90:449`), not a CFL condition -- cell size does
+not enter it, so refining `dx` does not shrink the step.
+
+**The frozen gold uses x, z, y = +-500**, which is the under-converged corner of
+this table. It is a regression lock on the configuration that was submitted, not
+a claim that the configuration is right. Expect the converged answer to sit
+nearer centre 36.9 mm and edge/centre 0.53, a few percent from Kim, once y is
+carried far enough.
+
 ## Files
+
 
     README.md          this record
     gold/summary.json  the numbers a rerun must reproduce, plus provenance

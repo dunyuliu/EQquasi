@@ -51,6 +51,16 @@ CASES = [
     ("bp8",       "test.bp8.qdc",
      {"xi": 0.2, "nstep": 8000, "nt_out": 8000}, "",               "fast"),
 
+    # The only ntotft > 1 row, and the reason it exists: every other case in
+    # this list has a single fault, so nothing in the gate exercised per-fault
+    # routing of on-fault input. Three multi-fault bugs in this project's
+    # history were found by hand because of that (PROJECT_RULES rule 7).
+    #
+    # No step-limited variant, unlike bp5 and bp7: the whole event is only
+    # ~220 s on 3 ranks -- cheaper than BP8's fast row -- so the fast tier
+    # locks the complete rupture rather than 101 steps of nucleation.
+    ("bp1002",    "bp1002.qdc.2500",   {},       "cycle0",         "fast"),
+
     # full: -m e2e only.
     ("bp5",       "test.bp5.qdc",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
@@ -58,10 +68,12 @@ CASES = [
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
 
     # Recreated later, through this mechanism, from a clean run: BP5-dip90,
-    # BP7 and the step-over. Their old references were produced ad hoc, before
-    # the workflow rule and before the gold/ flatten, so they are not carried
-    # forward -- a reference nobody can regenerate is worse than none. Add a
-    # row here when its reference exists and has been verified.
+    # and BP1002's full-event cycle0 (the fast row above stops at step 101,
+    # before the rupture; the complete event is what says whether B jumps).
+    # Its old reference was produced ad hoc, before the workflow rule and
+    # before the gold/ flatten, so it is not carried forward -- a reference
+    # nobody can regenerate is worse than none. Add a row here when its
+    # reference exists and has been verified.
 ]
 
 RUN_TIMEOUT_S = 7200
@@ -101,6 +113,52 @@ def apply_overrides(udp, over):
     open(udp, "w").writelines(out)
 
 
+def declared_version():
+    """The version src/globalvar.f90 declares, or None if it says nothing."""
+    src = os.path.join(str(ROOT), "src", "globalvar.f90")
+    if not os.path.exists(src):
+        return None
+    for line in open(src):
+        if "EQQUASI_VERSION" in line and "'" in line:
+            return line.split("'")[1]
+    return None
+
+
+def binary_version(exe):
+    """The version bin/eqquasi prints in its banner, or None."""
+    try:
+        r = subprocess.run([exe], cwd=str(ROOT), capture_output=True,
+                           text=True, timeout=120)
+    except Exception:
+        return None
+    for tok in (r.stdout + r.stderr).split():
+        if tok.count(".") == 2 and tok.replace(".", "").isdigit():
+            return tok
+    return None
+
+
+def check_binary_is_current(exe):
+    """Refuse to run a benchmark against a binary older than the source.
+
+    This lives here, in the path every benchmark and every reference
+    generation goes through, rather than only in a test that reports the
+    problem afterwards. A stale binary does not fail loudly: comparisons pass,
+    because the oracle was frozen from the same stale build, and a reference
+    blessed from it locks last week's physics in as ground truth. On
+    2026-08-12 a full session of BP1002 step-over work ran on 1.7.0 while src
+    was 1.10.0 -- across commits that changed the very multi-fault paths the
+    case exercises -- and a half-generated reference had to be discarded.
+    """
+    declared, built = declared_version(), binary_version(exe)
+    if declared and built and declared != built:
+        pytest.fail(
+            f"bin/eqquasi is {built} but src/globalvar.f90 declares "
+            f"{declared}. Running a benchmark against a stale binary tests "
+            f"last week's code and would bless it as a reference. Rebuild: "
+            f"EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
+            f"mv src/eqquasi bin/   (MACHINE=utig on the utig hosts)")
+
+
 def run_case(compset, over, workdir):
     """Drive one case through the workflow and return its cycle0 directory.
 
@@ -117,6 +175,8 @@ def run_case(compset, over, workdir):
         pytest.fail(f"{exe} does not exist. Build before running the e2e "
                     "tier: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
                     "mv src/eqquasi bin/  (or run install.eqquasi.sh)")
+
+    check_binary_is_current(exe)
 
     def step(cmd, cwd):
         """Run a setup command, and on failure say what it printed.
@@ -252,16 +312,38 @@ def compare_series(gpath, rpath, rtol=1e-9, atol=1e-12):
                   f"max relative diff = {worst:.1e}")
 
 
-def compare_netcdf(gpath, rpath):
-    """(ok, message) per fault, so a missing or aliased fault is named."""
+def compare_netcdf(gpath, rpath, rtol=1e-11):
+    """(ok, message) per fault, so a missing or aliased fault is named.
+
+    Compares each variable's RMS difference against the reference variable's
+    own RMS, rather than demanding bit equality. Two reasons:
+
+    - A field that is zero by symmetry -- shear_dip on a vertical strike-slip
+      fault -- comes back as 3e-18 Pa rather than 0.0 when the runner's
+      compiler orders an accumulation differently than the machine the
+      reference was blessed on. Against stresses of order 2e7 Pa that is
+      1e-25 relative: FP noise, not a regression. Exact equality made the
+      noise indistinguishable from a real change.
+    - RMS over the whole field, not max, so the verdict is not set by one
+      outlier node. A real regression moves many nodes and lifts the RMS; a
+      single node at the last bit does not.
+
+    Absolute max is still reported alongside, since that is the number to
+    quote when chasing down a failure. A reference variable that is zero
+    everywhere gets an absolute floor rather than a scale of its own, so it
+    cannot hide a change behind its own smallness."""
     import numpy as _np
     import netCDF4 as _nc
+
+    def _rms(a):
+        return float(_np.sqrt(_np.mean(_np.square(a)))) if a.size else 0.0
+
     g, r = _nc.Dataset(gpath), _nc.Dataset(rpath)
     gd = {k: len(v) for k, v in g.dimensions.items()}
     rd = {k: len(v) for k, v in r.dimensions.items()}
     if gd != rd:
         return False, f"dimensions {rd} vs reference {gd}"
-    worst, where = 0.0, ""
+    worst, where, worst_abs = 0.0, "", 0.0
     for v in g.variables:
         if v.startswith("nid_"):
             continue
@@ -270,12 +352,16 @@ def compare_netcdf(gpath, rpath):
         for ift in range(nf):
             x = a[ift] if a.ndim == 3 else a
             y = b[ift] if b.ndim == 3 else b
-            d = float(_np.max(_np.abs(x - y)))
-            if d > worst:
-                worst, where = d, f"{v}{f'[fault {ift}]' if nf > 1 else ''}"
-    if worst > 0.0:
-        return False, f"max|diff| = {worst:.3e} in {where}"
-    return True, f"{len(gd)} dims, {len(g.variables)} variables, max|diff| = 0"
+            d, scale = _rms(x - y), _rms(y)
+            rel = d / scale if scale > 0.0 else d / _np.finfo(float).tiny
+            if rel > worst:
+                worst, worst_abs = rel, float(_np.max(_np.abs(x - y)))
+                where = f"{v}{f'[fault {ift}]' if nf > 1 else ''}"
+    if worst > rtol:
+        return False, (f"RMS relative diff = {worst:.3e} (max abs "
+                       f"{worst_abs:.3e}) in {where}, rtol={rtol:g}")
+    return True, (f"{len(gd)} dims, {len(g.variables)} variables, "
+                  f"RMS relative diff = {worst:.3e}")
 
 
 COMPARATORS = {"series": compare_series, "netcdf": compare_netcdf}

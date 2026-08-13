@@ -8,7 +8,7 @@ none, for no reason beyond which file was edited last.
 A case is defined by the files its reference holds. `cases.manifest()` sorts
 them into categories, and each category has one comparison method:
 
-    snapshot  fault.0*.nc        netcdf, per fault, max|diff| must be 0
+    snapshot  fault.0*.nc        netcdf, per fault, relative to each variable
     restart   fault.r.nc         netcdf
     onfault   fltst_strk*        full series diff
     offfault  srfst_strk*        full series diff

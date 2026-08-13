@@ -94,3 +94,40 @@ def test_makefile_mpi_wrapper_resolves_to_a_real_executable():
     # And it must actually work, not merely exist.
     r2 = subprocess.run([picked, "-show"], capture_output=True, text=True)
     assert r2.returncode == 0, f"{picked} exists but fails to run: {r2.stderr}"
+
+
+def test_binary_on_disk_is_built_from_the_current_source():
+    """bin/eqquasi's version must match what src/globalvar.f90 declares.
+
+    This is the fast-tier copy of the same check e2e makes before running a
+    benchmark, and it is here because the e2e one only speaks after a 14-minute
+    run. On 2026-08-12 a whole session of BP1002 step-over work -- runs,
+    numbers quoted in a deck, and a part-generated reference -- was produced
+    against a 1.7.0 binary while src declared 1.10.0, across commits that
+    changed the multi-fault fault-node engine that case exercises. The e2e
+    tier had been failing on exactly this and nobody read it in time.
+
+    A stale binary is silent by construction: comparisons pass, because the
+    oracle was frozen from the same stale build. Catch it in seconds, on the
+    tier that runs on every push.
+    """
+    binary = ROOT / "bin" / "eqquasi"
+    if not binary.exists():
+        import pytest
+        pytest.skip("no bin/eqquasi; nothing built yet")
+
+    declared = None
+    for line in read(ROOT / "src" / "globalvar.f90").splitlines():
+        if "EQQUASI_VERSION" in line and "'" in line:
+            declared = line.split("'")[1]
+            break
+    assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
+
+    r = subprocess.run([str(binary)], cwd=str(ROOT), capture_output=True,
+                       text=True, timeout=120)
+    assert declared in (r.stdout + r.stderr), (
+        f"bin/eqquasi does not report {declared}, the version "
+        f"src/globalvar.f90 declares. Every result and reference produced "
+        f"from it describes older code. Rebuild: EQQUASIROOT=$(pwd) "
+        f"MACHINE=<host> make -C src && mv src/eqquasi bin/   "
+        f"(MACHINE=utig on the utig hosts)")

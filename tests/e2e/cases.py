@@ -49,8 +49,15 @@ CASES = [
     # fast: what CI runs on every push.
     ("bp5",       "test.bp5.qdc",       {}, "cycle0-step101-fast", "fast"),
     ("bp7",       "test.bp7.qdc",       {}, "cycle0-step101-fast", "fast"),
+    # HPC_ncpu is overridden to 2, matching bp5 and bp7. The compset asks for
+    # 20, which is right for the machine it was written for and impossible on
+    # a GitHub runner: ubuntu-latest has 4 cores, so `mpirun -np 20` fails
+    # before the solver starts. BP8 failed in CI for several releases for this
+    # reason alone, passing locally every time on a 64-core host, and the
+    # failure was unreadable because run.sh's log was never surfaced.
     ("bp8",       "test.bp8.qdc",
-     {"xi": 0.2, "nstep": 8000, "nt_out": 8000}, "",               "fast"),
+     {"xi": 0.2, "nstep": 8000, "nt_out": 8000, "HPC_ncpu": 2},
+     "",                                                            "fast"),
 
     # The only ntotft > 1 row, and the reason it exists: every other case in
     # this list has a single fault, so nothing in the gate exercised per-fault
@@ -249,8 +256,17 @@ def run_case(compset, over, workdir):
             proc.kill()
             pytest.fail(f"{compset} exceeded {RUN_TIMEOUT_S} s")
         time.sleep(10)
-    assert proc.returncode == 0, (
-        f"run.sh exited {proc.returncode} for {compset}; see {workdir}/run.log")
+    if proc.returncode != 0:
+        # Print the log, do not merely point at it. On a CI runner the file is
+        # gone the moment the job ends, so "see workdir/run.log" is an
+        # instruction nobody can follow: BP8 failed this way on GitHub for two
+        # releases running and the only evidence available was the exit code.
+        try:
+            tail = open(os.path.join(workdir, "run.log")).read()[-4000:]
+        except OSError as exc:
+            tail = f"(run.log unreadable: {exc})"
+        pytest.fail(f"run.sh exited {proc.returncode} for {compset}.\n"
+                    f"--- tail of {workdir}/run.log ---\n{tail}")
 
     cyc = os.path.join(workdir, "cycle0")
     assert os.path.isdir(cyc), f"run.sh produced no cycle0/ for {compset}"

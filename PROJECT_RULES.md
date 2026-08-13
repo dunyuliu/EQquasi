@@ -49,7 +49,7 @@ load-bearing.
 
 Rule numbers are cited in commits, reports, and the test suite itself
 (`tests/contract/test_reference_gold_is_referenced.py` cites 8a,
-`tests/contract/test_gate_set_has_multifault.py` cites 12,
+`tests/unit/test_physical_invariants.py` cites 12,
 `tests/regression/test_code_convention_landmines.py` cites 13a/13b/13c) —
 they never change even when a rule's position in this document does. This
 file was reorganized general-first/specific-second on 2026-08-12; every rule
@@ -495,18 +495,28 @@ BP5, BP5-dip90, BP7 and BP8's regression compsets (`test.bp5.qdc`,
 `test.bp5.qdc.dip90`, `test.bp7.qdc`, `test.bp8.qdc`) all have `ntotft = 1`.
 Three multi-fault bugs in this project's history were found by running a new
 case by hand; none were caught by the gate, because nothing in it ever
-exercised `ntotft > 1`. `case_input/test.stepover.qdc` and
-`case_input/bp1002.qdc.2000` both already have `ntotft = 2` and exist in the
-repo today but are wired into neither `testNameList.nameList` nor any
-`tests/e2e/*.py` regression, and have no `reference/<benchmark>/`.
+exercised `ntotft > 1`. `case_input/bp1002.qdc.2500` is the two-fault
+step-over that now carries this: it has a reference under
+`reference/bp1002/cycle0/`, a row in `tests/e2e/cases.py`, and a physical
+invariant in `tests/unit/test_physical_invariants.py` asserting the seed
+lands on fault 0 and only fault 0.
 
-**How to apply**: add one of them (or an equivalent) to the gate, generate
-its gold under `reference/`, and confirm rule 8a's reader check passes for
-the new files.
+It sits in the **full** tier, not the every-push fast tier, because the event
+is 7417 steps and ~700 s on 3 ranks. So every-push CI still has no
+`ntotft > 1` case. That is a known, costed gap, recorded in the CASES table
+beside the row — not an oversight.
+
+**How to apply**: keep a multi-fault case in the gate with a regenerable
+reference and at least one assertion that distinguishes the faults from each
+other, so a fault-aliased or misrouted read fails rather than merely moving a
+number.
 
 **Tier**: mechanical —
-`python3 -m pytest tests/contract/test_gate_set_has_multifault.py`.
-**Currently failing** (verified 2026-08-12); see Violations.
+`python3 -m pytest tests/unit/test_physical_invariants.py -k multifault`.
+The earlier citation here pointed at
+`tests/contract/test_gate_set_has_multifault.py`, deleted in 2ccafe4; a rule
+whose stated check does not exist is unenforceable, which is the failure mode
+rule 12 is itself about.
 
 ---
 

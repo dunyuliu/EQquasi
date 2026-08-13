@@ -46,7 +46,10 @@ def _field_references():
 FIELD_GOLD = _field_references()
 
 BP8_SNAPSHOT = ROOT / "reference" / "bp8" /  "fault.05301.csv"
-STEPOVER_SNAPSHOT = ROOT / "reference" / "stepover" /  "fault.00101.csv"
+# reference/stepover/ never existed under that name; the two-fault case is
+# BP1002, and its snapshots are netCDF, not CSV. The constant sat here unused
+# and unreachable, so nothing noticed.
+STEPOVER_SNAPSHOT = ROOT / "reference" / "bp1002" / "cycle0" / "fault.00001.nc"
 
 BP8_GOLD_DIR = ROOT / "reference" / "bp8" 
 BP8_STATIONS = [f"{s:+04d}dp{d:+04d}" for s in (-200, 0, 200) for d in (-200, 0, 200)]
@@ -187,3 +190,42 @@ def test_bp8_pore_pressure_decays_after_injection_shutoff():
         f"pore pressure is still rising in the back half of the post-shutoff "
         f"series ({tail[0]:.4f} -> {tail[-1]:.4f} MPa)"
     )
+
+
+def test_multifault_reference_seeds_exactly_one_fault():
+    """BP1002's step-1 snapshot must show the seed on fault 0 and only fault 0.
+
+    This is the assertion the multi-fault reference exists to support, and it
+    was missing: the README described the discriminating signal in prose while
+    no test read it. Every multi-fault bug this project has hit -- a fault's
+    slab written to the wrong index, both faults reading fault 1's data, a
+    fault silently meshed with zero nodes -- shows up here as the seed landing
+    on the wrong fault, on both, or on neither, and none of them needs a frozen
+    prior value to detect.
+    """
+    if not STEPOVER_SNAPSHOT.exists():
+        pytest.skip(f"{STEPOVER_SNAPSHOT} not present")
+    nc = pytest.importorskip("netCDF4")
+    with nc.Dataset(STEPOVER_SNAPSHOT) as d:
+        assert "nid_fault" in d.dimensions, (
+            f"{STEPOVER_SNAPSHOT.name} has no nid_fault dimension; it is not a "
+            "multi-fault snapshot, so it cannot demonstrate per-fault routing")
+        nfault = len(d.dimensions["nid_fault"])
+        assert nfault == 2, f"expected 2 faults, found {nfault}"
+        v = np.asarray(d["slip_rate"][:], float)
+
+    seeded = [int((v[i] > 1e-3).sum()) for i in range(nfault)]
+    assert seeded[0] > 0, (
+        "fault 0 carries the nucleation patch but no node on it exceeds "
+        f"1 mm/s at step 1 (counts per fault: {seeded}). The seed was not "
+        "routed to fault 0.")
+    assert seeded[1] == 0, (
+        f"fault 1 must start at the creep rate everywhere -- whether it "
+        f"ruptures is the question the case asks -- but {seeded[1]} of its "
+        f"nodes already exceed 1 mm/s at step 1 (counts per fault: {seeded}). "
+        "Fault 1 is reading fault 0's on-fault input.")
+    # The two faults must not be byte-identical: that is what an aliased read
+    # looks like once both happen to carry plausible values.
+    assert not np.array_equal(v[0], v[1]), (
+        "both faults have identical slip-rate slabs at step 1, which is what "
+        "a fault-aliased read of on_fault_vars_input.nc produces")

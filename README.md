@@ -1,6 +1,3 @@
-# News in 2023
-* 20230327 *```EQquasi```* works on Ubuntu.
-
 *EQquasi*
 =======
 *```EQquasi```* is a parallel finite-element software to simulate quasi-static/quasi-dynamic earthquake cycle deformation induced by fault slips governed by rate- and state- friction. It is part of the fully dynamic earthquake cycle simulator *```EQsimu```* [(*Liu et al.*, 2020, *GJI*)](https://doi.org/10.1093/gji/ggz475) to simulate deformation during the inter-seismic, nucleation, post-seismic, and dynamic rupture phases of earthquake cycles. It relies on parallel solvers [*MUMPS*](http://mumps-solver.org) or [*AZTEC*](https://trilinos.github.io/aztecoo.html#aztec-21-foundation-for-aztecoo) to handle the computing loads. It is written in FORTRAN90 with pre-staging and post-processing scripts in Python3.
@@ -37,7 +34,7 @@ To install and test *```EQquasi```*  on *Ubuntu*,
 git clone https://github.com/dunyuliu/EQquasi.git
 cd EQquasi
 bash make.scripts.executable.sh
-python3 `pytest -m e2e`
+python3 -m pytest -m e2e
 ```
 To install *```EQquasi```* without testing, try
 ```
@@ -113,13 +110,18 @@ Here, ```compset``` stands for predefined cases with each defiend via a single p
 Currently supported compsets are listed in ```case_input/compsets.txt```:
   - bp5.qdc.2000
   - bp7.qdc.a.10
+  - bp8.qdc.gs.10
   - bp1001.fdc.250
   - bp1001.fdc.rough.250
   - bp1001.qdc.rough.250
+  - bp1002.qdc.2500 (two-fault step-over; the only `ntotft > 1` compset)
   - liu2020.fdc.planar
   - liu2020.fdc.rough.250
+  - das.cycle
 
-In addition, ```test.*``` compsets are small, fast versions used by the test
+In addition, ```test.*``` compsets (```test.bp5.qdc```,
+```test.bp5.qdc.dip90```, ```test.bp7.qdc```, ```test.bp8.qdc```,
+```test.stepover.qdc```) are small, fast versions used by the test
 suite and deliberately not listed in ```compsets.txt```.
 
 Where things run
@@ -164,7 +166,7 @@ reference files only -- no MPI, no MUMPS, seconds. The `e2e` tiers build the
 code and run benchmarks.
 
 ```
-python3 -m pytest tests/              # unit + contract + regression, ~4 s
+python3 -m pytest tests/              # unit + contract + regression, ~1 min
 python3 -m pytest tests/ -m e2e_fast  # what CI runs on every push, ~20 min
 python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
 ```
@@ -174,7 +176,7 @@ python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
 | `unit` | numerics in isolation: the pore-pressure operator against its analytic solution, initial conditions against the benchmark equations, physical invariants | ms |
 | `contract` | file formats and cross-file agreement: BP8 section 4 conformance, `model.txt`'s positional contract, compset registration, the CI gate, and that every reference file has a reader | ~1 s |
 | `regression` | one guard per defect that actually occurred here | ~2 s |
-| `e2e_fast` | BP5 at 101 steps, BP8 over 30 days, and a clean `install.eqquasi.sh` build | ~20 min |
+| `e2e_fast` | BP5 and BP7 at 101 steps, BP8 over 30 days, BP1002's complete step-over event, and a clean `install.eqquasi.sh` build | ~20 min |
 | `e2e` | the above plus BP5's full first cycle | ~75 min |
 
 ### References
@@ -185,13 +187,23 @@ file: `reference/bp5/cycle0/` is a full earthquake cycle,
 
 `tests/e2e/cases.py` holds the case table and the single runner; a new
 benchmark is a row there plus a reference directory. What gets compared is
-decided by what the reference contains -- fault snapshots per fault at
-max\|diff\| 0, station and profile series in full, and the scalars each
-`summary.json` names. Results are reported per file:
+decided by what the reference contains -- fault snapshots per fault, station
+and profile series in full, and the scalars each `summary.json` names.
+
+Comparison is relative, never bit-for-bit. Two runs of the same case, same
+binary, same host differ by ~2e-14 from MPI reduction ordering alone, so exact
+equality would fail on noise and could not distinguish it from a regression.
+Each value is judged against the size of the quantity it belongs to -- its
+column, for a table; its vector, for a fault variable -- so a component that
+vanishes by symmetry (dip shear on a strike-slip fault, fault opening under
+the contact condition) is measured against the component that does not.
+Columns the SEAS format stores as log10 are linearised first, since -30 and
+-24 are both zero. A 1 mPa change in dip shear still fails. Results are
+reported per file:
 
 ```
-SUCCESS fltst_strk000dp000.txt: 4483 rows x 9 cols, max|diff| = 0.0e+00
-FAIL    global.dat: max|diff| = 3.1e-04 at column 6
+SUCCESS fltst_strk000dp000.txt: 4483 rows x 9 cols, worst diff = 0.0e+00 of the file's scale
+FAIL    global.dat: 12 of 8964 entries outside rtol=1e-09; worst at row 40, column 6
 ```
 
 References are **regression locks, not validations**. They detect unintended

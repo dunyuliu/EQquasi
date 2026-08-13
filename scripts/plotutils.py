@@ -252,10 +252,21 @@ def load_par(run_dir, tool=""):
                 sys.path.remove(a)
 
 
-def fault_coords(par, ndip, nstrike):
-    """(x, z, xlabel, ylabel) for fault-plane axes, in km when the case's
-    fault grid matches the snapshot, node indices otherwise (e.g. multi-fault
-    cases, where par.fx spans the union of segments, not one fault)."""
+def fault_coords(par, ndip, nstrike, ift=0):
+    """(x, z, xlabel, ylabel) for fault ift's plane, in km.
+
+    A multi-fault case's par.fx spans the union of the segments, not any one
+    fault, so it cannot label a single fault's axes -- falling back to node
+    indices there loses the very thing a step-over plot is for, namely where
+    each segment actually sits along strike. par.faultgeom carries the
+    per-fault (xlo, xhi, ycoor, zlo, zhi), so use it when present and only
+    then fall back."""
+    geom = getattr(par, "faultgeom", None)
+    if geom is not None and ift < len(geom):
+        xlo, xhi, _ycoor, zlo, zhi = geom[ift]
+        return (np.linspace(xlo, xhi, nstrike) / 1e3,
+                np.linspace(zlo, zhi, ndip) / 1e3,
+                "along strike (km)", "z (km)")
     try:
         fx, fz = np.asarray(par.fx), np.asarray(par.fz)
         if fx.size == nstrike and fz.size == ndip:
@@ -264,6 +275,15 @@ def fault_coords(par, ndip, nstrike):
         pass
     return (np.arange(nstrike), np.arange(ndip),
             "node # along strike", "node # along dip")
+
+
+def fault_y(par, ift):
+    """Fault ift's fault-normal offset in km, or None if the case does not
+    declare one (single-fault cases, legacy compsets)."""
+    geom = getattr(par, "faultgeom", None)
+    if geom is not None and ift < len(geom):
+        return geom[ift][2] / 1e3
+    return None
 
 
 # ----------------------------------------------------------------- aesthetics

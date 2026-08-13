@@ -158,9 +158,17 @@ for ift, (xlo, xhi, ycoor, zlo, zhi) in enumerate(par.faultgeom):
             par.on_fault_vars[ift, iz, ix, 20] = (
                 par.on_fault_vars[ift, iz, ix, 11] / par.creep_slip_rate)
             par.on_fault_vars[ift, iz, ix, 7]  = init_norm
+            # The shear must be the steady state for *this node's own* initial
+            # slip rate, not for the creep rate: inside the nucleation patch
+            # that rate is 0.03 m/s, and pairing it with the creep-consistent
+            # shear makes the initial condition self-inconsistent. The Newton
+            # solve then resolves it in favour of the stress, dropping V to the
+            # creep rate at step 1 -- which sends dtev = xi*Dc/V to ~2e6 s and
+            # flattens the whole model. BP5 passes its own [..., 46] here.
             par.on_fault_vars[ift, iz, ix, 8]  = shear_steady_state(
                 a, par.fric_rsf_b, par.fric_rsf_v0, par.fric_rsf_r0,
-                par.creep_slip_rate, init_norm, par.creep_slip_rate,
+                par.creep_slip_rate, init_norm,
+                par.on_fault_vars[ift, iz, ix, 46],
                 par.rou, par.vs)
             par.on_fault_vars[ift, iz, ix, 99] = ift * 100 + ix  # mapping marker, not physical
 

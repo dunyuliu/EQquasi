@@ -141,9 +141,17 @@ for ift, (xlo, xhi, ycoor, zlo, zhi) in enumerate(par.faultgeom):
             par.on_fault_vars[ift, iz, ix, 46] = par.creep_slip_rate
             par.on_fault_vars[ift, iz, ix, 20] = par.fric_rsf_Dc / par.creep_slip_rate
             par.on_fault_vars[ift, iz, ix, 7]  = init_norm
+            # Steady state for *this node's own* initial slip rate, [..., 46],
+            # not for creep_slip_rate. This case seeds no nucleation patch, so
+            # the two are equal here and the value is unchanged; it is written
+            # this way so that adding a patch later cannot silently pair a
+            # 0.03 m/s node with creep-consistent shear. That inconsistency
+            # collapses V to the creep rate on step 1, which sends the adaptive
+            # step dtev = xi*Dc/V to ~2e6 s and flattens the model.
             par.on_fault_vars[ift, iz, ix, 8]  = shear_steady_state(
                 a, par.fric_rsf_b, par.fric_rsf_v0, par.fric_rsf_r0,
-                par.creep_slip_rate, init_norm, par.creep_slip_rate,
+                par.creep_slip_rate, init_norm,
+                par.on_fault_vars[ift, iz, ix, 46],
                 par.rou, par.vs)
             par.on_fault_vars[ift, iz, ix, 99] = ift * 100 + ix  # mapping marker, not physical
 

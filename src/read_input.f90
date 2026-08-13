@@ -97,7 +97,21 @@ subroutine readmodel
         enddo
     close(1002)
     
-    if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) stop ! Creeping zone bounds should be within model bounds. 
+    ! The rate-and-state box must lie inside the model. A bare `stop` here
+    ! printed nothing at all, which is the least useful thing a guard can do:
+    ! the run ends with no message, no code, and no indication that the
+    ! geometry was rejected rather than the solver failing.
+    if (xminc < xmin .or. xmaxc > xmax .or. zminc < zmin) then
+        write(*,*) '====================================================='
+        write(*,*) '= The rate-and-state box falls outside the model.   ='
+        write(*,*) '=   xminc, xmin =', xminc, xmin
+        write(*,*) '=   xmaxc, xmax =', xmaxc, xmax
+        write(*,*) '=   zminc, zmin =', zminc, zmin
+        write(*,*) '= Fix par.xminc/xmaxc/zminc, or the model bounds,   ='
+        write(*,*) '= in user_defined_params.py and rerun case.setup.   ='
+        write(*,*) '====================================================='
+        stop 4
+    endif
     !ccosphi=coheplas*dcos(atan(bulk))
     !sinphi=dsin(atan(bulk))
     !nstep=idnint(term/dt)

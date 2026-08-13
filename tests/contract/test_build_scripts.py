@@ -7,6 +7,7 @@ following the README to run BP5 on a host without system MUMPS.
 import re
 import shutil
 import subprocess
+import sys
 
 from conftest import ROOT, read
 
@@ -111,23 +112,29 @@ def test_binary_on_disk_is_built_from_the_current_source():
     oracle was frozen from the same stale build. Catch it in seconds, on the
     tier that runs on every push.
     """
+    import pytest
     binary = ROOT / "bin" / "eqquasi"
     if not binary.exists():
-        import pytest
         pytest.skip("no bin/eqquasi; nothing built yet")
 
-    declared = None
-    for line in read(ROOT / "src" / "globalvar.f90").splitlines():
-        if "EQQUASI_VERSION" in line and "'" in line:
-            declared = line.split("'")[1]
-            break
-    assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
+    # Share the e2e tier's implementation rather than paraphrasing it. The two
+    # copies had drifted into different semantics -- one matched the version as
+    # a substring, the other tokenised it; one failed on an unreadable binary,
+    # the other passed silently -- so "the check passes" meant different things
+    # depending on which tier you asked.
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    from cases import binary_version, declared_version
 
-    r = subprocess.run([str(binary)], cwd=str(ROOT), capture_output=True,
-                       text=True, timeout=120)
-    assert declared in (r.stdout + r.stderr), (
-        f"bin/eqquasi does not report {declared}, the version "
-        f"src/globalvar.f90 declares. Every result and reference produced "
-        f"from it describes older code. Rebuild: EQQUASIROOT=$(pwd) "
-        f"MACHINE=<host> make -C src && mv src/eqquasi bin/   "
-        f"(MACHINE=utig on the utig hosts)")
+    declared = declared_version()
+    assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
+    try:
+        built = binary_version(str(binary))
+    except Exception as exc:
+        pytest.fail(f"could not read bin/eqquasi's version ({exc}); a binary "
+                    f"of unknown provenance cannot be trusted to have been "
+                    f"built from this source.")
+    assert built == declared, (
+        f"bin/eqquasi reports {built}, but src/globalvar.f90 declares "
+        f"{declared}. Every result and reference produced from it describes "
+        f"older code. Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src "
+        f"&& mv src/eqquasi bin/   (MACHINE=utig on the utig hosts)")

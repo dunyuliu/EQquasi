@@ -1,0 +1,51 @@
+{
+ "benchmark": "BP1002",
+ "compset": "bp1002.qdc.2500",
+ "oracle_kind": "the compset's own complete cycle 0 -- nucleation on fault 0 through arrest of both faults",
+ "element_size_m": 2500.0,
+ "ntotft": 2,
+ "run": {
+  "steps": 7417,
+  "simulated_time_s": 102522.36499999992,
+  "wall_seconds_time_loop": 703.0,
+  "mpi_ranks": 3,
+  "nodes": 7281,
+  "elements": 5760,
+  "fault_nodes_per_fault": 153
+ },
+ "event": {
+  "peak_Vmax_m_s": 1.1868,
+  "max_slip_m_fault0": 9.488,
+  "max_slip_m_fault1": 9.405,
+  "nodes_slipped_over_1cm_fault0": 153,
+  "nodes_slipped_over_1cm_fault1": 153,
+  "effective_normal_change_max_MPa": 7.45,
+  "effective_normal_change_min_MPa": -0.41,
+  "note": "Rupture nucleates on fault 0, and after a delay jumps the 5 km step-over: fault 1 nucleates around step 3000 and reaches its own peak near step 6000 as fault 0 arrests. Both faults slip their full length."
+ },
+ "files": {
+  "fault_snapshots": [
+   "fault.00001.nc",
+   "fault.01001.nc",
+   "fault.02001.nc",
+   "fault.03001.nc",
+   "fault.04001.nc",
+   "fault.05001.nc",
+   "fault.06001.nc",
+   "fault.07001.nc",
+   "fault.07417.nc",
+   "fault.r.nc"
+  ],
+  "on_fault_stations": 1,
+  "off_fault_stations": 3,
+  "note": "disp.*.nc omitted: no comparison reads them (rule 8a)."
+ },
+ "provenance": {
+  "run_dir": "work/mfix",
+  "date": "2026-08-13",
+  "version": "1.10.0",
+  "binary_version_verified": true,
+  "note": "produced through create.newcase -> case.setup -> run.sh (rule 19), on a binary checked against src/globalvar.f90 immediately beforehand. Generated AFTER the meshgen/mesh4num fix that stopped the whole fault y-plane being clamped; any bp1002 result from before that fix is superseded."
+ },
+ "caveat": "First reference for BP1002, not yet independently verified against any prior oracle (rule 8). Regression lock, not a validation."
+}

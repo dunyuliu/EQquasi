@@ -27,6 +27,7 @@ contains, exactly as `scripts/plotStations.py` decides its layout.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,20 +57,28 @@ CASES = [
     # routing of on-fault input. Three multi-fault bugs in this project's
     # history were found by hand because of that (PROJECT_RULES rule 7).
     #
-    # No step-limited variant, unlike bp5 and bp7: the whole event is only
-    # ~220 s on 3 ranks -- cheaper than BP8's fast row -- so the fast tier
-    # locks the complete rupture rather than 101 steps of nucleation.
-    ("bp1002",    "bp1002.qdc.2500",   {},       "cycle0",         "fast"),
+    # BP1002 is deliberately NOT in the fast tier. It is the only ntotft > 1
+    # case, so it is the only row that exercises per-fault routing of on-fault
+    # input, and leaving it out of every-push CI is a known gap (PROJECT_RULES
+    # rule 7) -- not an oversight.
+    #
+    # The reason is cost. It ran the whole event in ~220 s while its domain
+    # was the faults' own extent, but that geometry put both faults' corners
+    # on the mesh boundary and manufactured +25 MPa of normal-stress change
+    # against a ~5 MPa real step-over signal (see the compset). The elastic
+    # buffer that fixes it takes the mesh from 5.8k to 49k elements: ~70 s for
+    # 101 steps and ~28 min for the event, on 64 cores. A GitHub runner has
+    # two. It stays in the full tier until either the mesh is cheaper or CI
+    # runs somewhere that can afford it.
 
     # full: -m e2e only.
     ("bp5",       "test.bp5.qdc",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
     ("bp7",       "test.bp7.qdc",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
+    ("bp1002",    "bp1002.qdc.2500",   {},       "cycle0",         "full"),
 
-    # Recreated later, through this mechanism, from a clean run: BP5-dip90,
-    # and BP1002's full-event cycle0 (the fast row above stops at step 101,
-    # before the rupture; the complete event is what says whether B jumps).
+    # Recreated later, through this mechanism, from a clean run: BP5-dip90.
     # Its old reference was produced ad hoc, before the workflow rule and
     # before the gold/ flatten, so it is not carried forward -- a reference
     # nobody can regenerate is worse than none. Add a row here when its
@@ -125,16 +134,24 @@ def declared_version():
 
 
 def binary_version(exe):
-    """The version bin/eqquasi prints in its banner, or None."""
-    try:
-        r = subprocess.run([exe], cwd=str(ROOT), capture_output=True,
-                           text=True, timeout=120)
-    except Exception:
-        return None
-    for tok in (r.stdout + r.stderr).split():
-        if tok.count(".") == 2 and tok.replace(".", "").isdigit():
-            return tok
-    return None
+    """The version bin/eqquasi prints in its banner.
+
+    Raises rather than returning None when the binary cannot be run or prints
+    no version: a check whose failure mode is "silently pass" is worse than no
+    check, and this one exists precisely because a stale binary is otherwise
+    undetectable.
+    """
+    r = subprocess.run([exe], cwd=str(ROOT), capture_output=True,
+                       text=True, timeout=120)
+    out = r.stdout + r.stderr
+    # Anchored on the banner text, not on "any dotted number": a build date
+    # like 2026.08.12 in the output otherwise reads as a version.
+    m = re.search(r"Welcome to EQquasi\s+([0-9]+(?:\.[0-9]+)+)", out)
+    if not m:
+        raise RuntimeError(
+            f"{exe} printed no recognisable version banner, so its build "
+            f"cannot be checked against the source. Output was:\n{out[:2000]}")
+    return m.group(1)
 
 
 def check_binary_is_current(exe):
@@ -149,8 +166,16 @@ def check_binary_is_current(exe):
     was 1.10.0 -- across commits that changed the very multi-fault paths the
     case exercises -- and a half-generated reference had to be discarded.
     """
-    declared, built = declared_version(), binary_version(exe)
-    if declared and built and declared != built:
+    declared = declared_version()
+    if not declared:
+        pytest.fail("src/globalvar.f90 declares no EQQUASI_VERSION, so the "
+                    "binary cannot be checked against it.")
+    try:
+        built = binary_version(exe)
+    except Exception as exc:
+        pytest.fail(f"could not read {exe}'s version ({exc}). Refusing to run "
+                    f"a benchmark against a binary of unknown provenance.")
+    if declared != built:
         pytest.fail(
             f"bin/eqquasi is {built} but src/globalvar.f90 declares "
             f"{declared}. Running a benchmark against a stale binary tests "
@@ -196,6 +221,20 @@ def run_case(compset, over, workdir):
     # which is why this only ever failed in CI.
     os.makedirs(os.path.dirname(os.path.abspath(workdir)), exist_ok=True)
     shutil.rmtree(workdir, ignore_errors=True)
+    # ignore_errors hides the one failure that matters. On NFS, a file still
+    # open by a process -- ranks left behind when a previous run was killed --
+    # is silly-renamed to .nfsXXXX rather than unlinked, so the directory
+    # survives, create.newcase refuses it, and every category of every
+    # remaining case fails on a comparison it never got to make. Twenty
+    # failures, none of them saying "a stale process is holding the old run".
+    if os.path.exists(workdir):
+        leftovers = sorted(os.listdir(workdir))[:8]
+        pytest.fail(
+            f"{workdir} still exists after rmtree; create.newcase will refuse "
+            f"it. Most likely a previous run's MPI ranks are still alive and "
+            f"holding files open (NFS .nfs* entries). Check with "
+            f"`ps -eo pid,cmd | grep eqquasi`, kill them, then remove the "
+            f"directory. Leftovers: {leftovers}")
     step(["create.newcase", workdir, compset], str(ROOT))
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)
     step(["./case.setup"], workdir)
@@ -215,6 +254,27 @@ def run_case(compset, over, workdir):
 
     cyc = os.path.join(workdir, "cycle0")
     assert os.path.isdir(cyc), f"run.sh produced no cycle0/ for {compset}"
+
+    # A directory is not a result. When BP1002 hit STOP 508 in cycle 2, the
+    # loop carried on and left two more cycleN/ directories behind, each with
+    # one snapshot written at step 1 and no RUN SUMMARY -- output shaped like a
+    # completed cycle, holding nothing. runInfo.json is written only after the
+    # time loop finishes, so its presence, and a nonzero step count in it, is
+    # what separates a run from a directory.
+    info = os.path.join(cyc, "runInfo.json")
+    if not os.path.exists(info):
+        pytest.fail(
+            f"{cyc} has no runInfo.json, so the time loop never completed for "
+            f"{compset}. The run stopped early -- see {workdir}/run.log for "
+            f"the reason (a STOP code, or the step cap).")
+    try:
+        steps = json.load(open(info)).get("steps_completed", 0)
+    except (ValueError, OSError) as exc:
+        pytest.fail(f"{info} is unreadable ({exc}); the run did not finish "
+                    f"cleanly for {compset}.")
+    if not steps:
+        pytest.fail(f"{info} reports steps_completed = {steps} for {compset}: "
+                    f"the run produced a cycle directory but took no steps.")
     return cyc
 
 
@@ -285,83 +345,246 @@ def manifest(ref_dir):
             for f in (category_files(ref_dir, c),) if f}
 
 
-def compare_series(gpath, rpath, rtol=1e-9, atol=1e-12):
+def _scaled_tol(ref, rtol, floor_rtol, scale):
+    """Elementwise tolerance: the entry's own size, plus a floor from `scale`.
+
+        rtol * |ref|          -- the entry itself
+        floor_rtol * scale    -- the size of the QUANTITY it belongs to
+
+    `scale` must come from a sibling of the same physical kind -- the other
+    components of the same vector -- and never from the file as a whole. An
+    earlier version used the file's maximum, which in a station file is time
+    in seconds (2.6e6); every slip-rate entry then sat below the resulting
+    threshold and was dropped from comparison entirely, so halving BP8's slip
+    rate at all 5302 rows passed with "worst diff = 0.0e+00". Nothing is
+    exempted now; a component that vanishes by symmetry is merely judged
+    against the component that does not.
+    """
+    import numpy as _np
+    return rtol * _np.abs(ref) + floor_rtol * scale
+
+
+def compare_arrays(ref, run, rtol=1e-9, floor_rtol=1e-9, scale=None):
+    """(ok, n_bad, worst_index, worst_scaled) for two same-shaped arrays.
+
+    One rule for tables and netCDF alike: they used to disagree, tables
+    comparing against a fixed 1e-12 floor and netCDF demanding bit equality,
+    so the same floating-point noise was a pass in one and a failure in the
+    other.
+    """
+    import numpy as _np
+    ref = _np.asarray(ref, float)
+    run = _np.asarray(run, float)
+    # A NaN compares False against every tolerance, so `diff > tol` silently
+    # accepts it. Catch non-finite values explicitly and on both sides: a run
+    # that returns NaN is the single most important thing this gate can say.
+    bad_finite = _np.isfinite(ref) != _np.isfinite(run)
+    bad_finite |= ~_np.isfinite(run) & ~_np.isfinite(ref) & (
+        _np.nan_to_num(run, nan=0.0, posinf=1.0, neginf=-1.0)
+        != _np.nan_to_num(ref, nan=0.0, posinf=1.0, neginf=-1.0))
+    if scale is None:
+        scale = float(_np.max(_np.abs(ref[_np.isfinite(ref)]))) if ref.size else 0.0
+    diff = _np.abs(run - ref)
+    tol = _scaled_tol(ref, rtol, floor_rtol, scale)
+    bad = (_np.isfinite(diff) & (diff > tol)) | bad_finite
+    ratio = _np.where(_np.isfinite(diff), diff / _np.maximum(tol, 1e-300), _np.inf)
+    k = int(_np.argmax(_np.where(_np.isfinite(ratio), ratio, _np.finfo(float).max)))
+    idx = _np.unravel_index(k, ref.shape)
+    denom = float(_np.max(_np.abs(ref[_np.isfinite(ref)]))) if ref.size else 0.0
+    worst = float(_np.max(diff[_np.isfinite(diff)]) / (denom or 1.0)) if diff.size else 0.0
+    return (not bad.any()), int(bad.sum()), idx, worst
+
+
+def column_group_scales(ref, header):
+    """Per-column scale: the largest magnitude among that column's siblings.
+
+    SEAS station columns name a vector's components with a trailing _2 / _3
+    (slip_2/slip_3, slip_rate_2/slip_rate_3, shear_stress_2/shear_stress_3).
+    Stripping that suffix groups them, so BP8's dip components -- which are
+    zero by symmetry and carry only rounding -- are measured against their
+    strike siblings instead of against themselves. Without a header every
+    column stands alone, which is right for cplot and global.dat, whose
+    near-zero entries sit inside columns that do carry signal.
+    """
+    import numpy as _np
+    col_max = _np.max(_np.abs(_np.where(_np.isfinite(ref), ref, 0.0)), axis=0)
+    if not header or len(header) != ref.shape[1]:
+        return col_max
+    groups = {}
+    for j, name in enumerate(header):
+        g = name[:-2] if name.endswith(("_2", "_3")) else name
+        groups.setdefault(g, []).append(j)
+    out = col_max.copy()
+    for cols in groups.values():
+        out[cols] = col_max[cols].max()
+    return out
+
+
+# Columns the SEAS output format stores as log10, by header name. They are
+# compared in linear space: BP8's slip_rate_3 is the dip slip rate on a fault
+# with no dip motion, so it wanders between 1e-30 and 1e-20 m/s -- all of it
+# zero next to the 1e-12 m/s strike rate -- but in log10 that reads as a
+# difference of 4, and no tolerance on the logarithm can tell that from a real
+# change. Taking 10**x first puts the comparison back where zero means zero.
+LOG10_COLUMNS = ("slip_rate_2", "slip_rate_3")
+
+
+def _header_of(*paths, ncols=None):
+    """Column names from whichever path is a .csv with a usable header."""
+    for p in paths:
+        if not isinstance(p, str) or not p.endswith(".csv"):
+            continue
+        try:
+            with open(p) as fh:
+                names = fh.readline().strip().split(",")
+        except OSError:
+            continue
+        if ncols is not None and len(names) != ncols:
+            continue
+        return names
+    return None
+
+
+def sibling_component_scale(path, ncols):
+    """Largest magnitude across the sibling files of a vector component.
+
+    BP8's section 4.3 profiles put each component in its own file --
+    shear_stress_2_depth.csv holds strike, shear_stress_3_depth.csv holds dip.
+    A file that is entirely one component has no in-file sibling to be scaled
+    against, and dip shear on this fault is 1e-16 Pa of rounding, so judged
+    against itself it fails every time while carrying no information. Look up
+    the other component's file and use its magnitude instead.
+
+    Returns None when the file is not a component file or no sibling exists,
+    in which case the caller falls back to per-column scaling.
+    """
+    import glob as _g
+    import numpy as _np
+    import os as _os
+    import re as _re
+    base = _os.path.basename(path)
+    m = _re.match(r"^(.*?)_([23])_(.*)$", base)
+    if not m:
+        return None
+    stem, _comp, tail = m.groups()
+    best = 0.0
+    for sib in _g.glob(_os.path.join(_os.path.dirname(path) or ".",
+                                     f"{stem}_[23]_{tail}")):
+        try:
+            a = _np.atleast_2d(_np.asarray(read_any(sib), float))
+        except Exception:
+            continue
+        if a.shape[1] != ncols:
+            continue
+        finite = a[_np.isfinite(a)]
+        if finite.size:
+            best = max(best, float(_np.max(_np.abs(finite))))
+    return best or None
+
+
+def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
     """(ok, message) for two numeric tables. Full array, not sampled.
 
-    Relative, with an absolute floor. A fixed absolute tolerance cannot work
-    here: one file holds time in seconds (1e6), moment rate (1e11), slip in
-    metres (1e-2) and log10 slip rates near -30. At atol=1e-6 a moment rate
-    agreeing to 1e-9 relative -- which is what a different compiler on the same
-    source gives -- reads as a failure, while a slip rate off by 100 % passes.
+    Relative, with a per-quantity floor. A fixed absolute tolerance cannot
+    work here: one file holds time in seconds (1e6), moment rate (1e11), slip
+    in metres (1e-2) and log10 slip rates near -30.
     """
     import numpy as _np
     g, r = read_any(gpath), read_any(rpath)
     if g.shape != r.shape:
         return False, f"shape {r.shape} vs reference {g.shape}"
-    diff = _np.abs(g - r)
-    tol = atol + rtol * _np.abs(g)
-    bad = diff > tol
-    if bad.any():
-        k = int(_np.argmax(diff / _np.maximum(tol, 1e-300)))
-        i, j = _np.unravel_index(k, g.shape)
-        return False, (f"{int(bad.sum())} of {g.size} entries outside "
-                       f"rtol={rtol:g}; worst at row {i}, column {j+1}: "
+    g, r = _np.atleast_2d(_np.array(g, float)), _np.atleast_2d(_np.array(r, float))
+
+    header = _header_of(gpath, rpath, ncols=g.shape[1])
+    if header:
+        for j, name in enumerate(header):
+            if name in LOG10_COLUMNS:
+                g[:, j] = 10.0 ** g[:, j]
+                r[:, j] = 10.0 ** r[:, j]
+
+    scale = column_group_scales(g, header)
+    sib = sibling_component_scale(gpath, g.shape[1])
+    if sib is not None:
+        scale = _np.maximum(scale, sib)
+    ok, nbad, idx, worst = compare_arrays(g, r, rtol, floor_rtol, scale=scale)
+    if not ok:
+        i, j = idx
+        return False, (f"{nbad} of {g.size} entries outside rtol={rtol:g}; "
+                       f"worst at row {i}, column {j+1}: "
                        f"{r[i, j]:.8g} vs {g[i, j]:.8g}")
-    worst = float((diff / _np.maximum(_np.abs(g), 1e-300)).max())
     return True, (f"{g.shape[0]} rows x {g.shape[1]} cols, "
-                  f"max relative diff = {worst:.1e}")
+                  f"worst diff = {worst:.1e} of the file's scale")
 
 
-def compare_netcdf(gpath, rpath, rtol=1e-11):
+def variable_group(name):
+    """The family a fault variable belongs to: its vector, not itself.
+
+    A component that vanishes by symmetry has to be judged against the vector
+    it is a component of. `slipn` is fault opening, forbidden by the contact
+    condition, so it sits at 4.6e-26 m while `slips` carries 3.7e-2 m of real
+    slip; `vzm` is 3.5e-35 m/s beside `vxm`'s 5e-10.
+    """
+    for suffix in ("_strike", "_dip", "_normal"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    if len(name) > 1 and name[:-1] in ("slip",) and name[-1] in "sdn":
+        return name[:-1]
+    if len(name) == 3 and name[0] == "v" and name[1] in "xyz" and name[2] in "ms":
+        return f"v_{name[2]}"
+    return name
+
+
+def compare_netcdf(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
     """(ok, message) per fault, so a missing or aliased fault is named.
 
-    Compares each variable's RMS difference against the reference variable's
-    own RMS, rather than demanding bit equality. Two reasons:
-
-    - A field that is zero by symmetry -- shear_dip on a vertical strike-slip
-      fault -- comes back as 3e-18 Pa rather than 0.0 when the runner's
-      compiler orders an accumulation differently than the machine the
-      reference was blessed on. Against stresses of order 2e7 Pa that is
-      1e-25 relative: FP noise, not a regression. Exact equality made the
-      noise indistinguishable from a real change.
-    - RMS over the whole field, not max, so the verdict is not set by one
-      outlier node. A real regression moves many nodes and lifts the RMS; a
-      single node at the last bit does not.
-
-    Absolute max is still reported alongside, since that is the number to
-    quote when chasing down a failure. A reference variable that is zero
-    everywhere gets an absolute floor rather than a scale of its own, so it
-    cannot hide a change behind its own smallness."""
+    Same tolerance rule as compare_series, with each variable's vector as the
+    scale. Bit equality is not available: the same case, same binary, same
+    host, run twice on 3 MPI ranks differs by ~2e-14 from reduction ordering
+    alone.
+    """
     import numpy as _np
     import netCDF4 as _nc
-
-    def _rms(a):
-        return float(_np.sqrt(_np.mean(_np.square(a)))) if a.size else 0.0
-
     g, r = _nc.Dataset(gpath), _nc.Dataset(rpath)
     gd = {k: len(v) for k, v in g.dimensions.items()}
     rd = {k: len(v) for k, v in r.dimensions.items()}
     if gd != rd:
         return False, f"dimensions {rd} vs reference {gd}"
-    worst, where, worst_abs = 0.0, "", 0.0
-    for v in g.variables:
+
+    # nid_* are the per-fault index maps -- the very thing bp1002 exists to
+    # check -- so they are compared exactly rather than skipped.
+    names = [v for v in g.variables]
+    for v in names:
         if v.startswith("nid_"):
-            continue
+            a = _np.asarray(g[v][:]); b = _np.asarray(r[v][:])
+            if a.shape != b.shape or not _np.array_equal(a, b):
+                return False, f"index map {v} differs from the reference"
+
+    names = [v for v in names if not v.startswith("nid_")]
+    group_scale = {}
+    for v in names:
+        grp = variable_group(v)
+        a = _np.asarray(g[v][:], float)
+        m = float(_np.max(_np.abs(a[_np.isfinite(a)]))) if a.size else 0.0
+        group_scale[grp] = max(group_scale.get(grp, 0.0), m)
+
+    worst, where, nbad = 0.0, "", 0
+    for v in names:
         a, b = _np.asarray(g[v][:], float), _np.asarray(r[v][:], float)
         nf = a.shape[0] if a.ndim == 3 else 1
         for ift in range(nf):
             x = a[ift] if a.ndim == 3 else a
             y = b[ift] if b.ndim == 3 else b
-            d, scale = _rms(x - y), _rms(y)
-            rel = d / scale if scale > 0.0 else d / _np.finfo(float).tiny
+            ok, n, _idx, rel = compare_arrays(
+                x, y, rtol, floor_rtol, scale=group_scale[variable_group(v)])
+            nbad += n
             if rel > worst:
-                worst, worst_abs = rel, float(_np.max(_np.abs(x - y)))
+                worst = rel
                 where = f"{v}{f'[fault {ift}]' if nf > 1 else ''}"
-    if worst > rtol:
-        return False, (f"RMS relative diff = {worst:.3e} (max abs "
-                       f"{worst_abs:.3e}) in {where}, rtol={rtol:g}")
+    if nbad:
+        return False, (f"{nbad} entries outside rtol={rtol:g}; worst is "
+                       f"{worst:.3e} of the field's scale in {where}")
     return True, (f"{len(gd)} dims, {len(g.variables)} variables, "
-                  f"RMS relative diff = {worst:.3e}")
+                  f"worst diff = {worst:.1e} of the field's scale")
 
 
 COMPARATORS = {"series": compare_series, "netcdf": compare_netcdf}

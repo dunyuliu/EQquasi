@@ -52,31 +52,51 @@ def main():
 
     par = pu.load_par(args.case_dir, "plotOnFaultInitals")
     v = np.asarray(getattr(par, "on_fault_vars", None))
-    if v.ndim != 3:
+    # Compsets now always carry the leading fault axis -- (ntotft, nfz, nfx,
+    # nvar) -- with ntotft = 1 the degenerate case, matching what case.setup
+    # writes. Rejecting anything but rank 3 refused every multi-fault case,
+    # exactly the ones whose initial conditions are worth looking at.
+    if v.ndim == 3:
+        v = v[None, ...]
+    if v.ndim != 4:
         pu.die(f"plotOnFaultInitals: par.on_fault_vars in {args.case_dir} is "
-               f"not the expected (nfz, nfx, nvar) array (got shape "
+               f"not the expected (ntotft, nfz, nfx, nvar) array (got shape "
                f"{None if v is None else v.shape})")
+    nfault = v.shape[0]
 
-    ndip, nstrike = v.shape[:2]
-    x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike)
-    fig, ax = plt.subplots(2, 3, figsize=(12, 7))
-    for k, (idx, title, unit, scale) in enumerate(PANELS):
-        a = ax[k // 3, k % 3]
-        m = a.pcolormesh(x, z, v[:, :, idx] / scale, cmap="viridis",
-                         shading="nearest")
-        cb = plt.colorbar(m, ax=a)
-        cb.set_label(unit)
-        a.set_title(title)
-        a.set_xlabel(xlab)
-        a.set_ylabel(ylab)
-        a.set_aspect("equal")
-    fig.suptitle(f"On-fault initial conditions — "
-                 f"{getattr(par, 'casename', os.path.abspath(args.case_dir))}")
-    fig.tight_layout()
-    out = os.path.join(args.outdir or args.case_dir, "Initials.png")
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
-    pu.save(fig, out, dpi=150)
+    for ift in range(nfault):
+        ndip, nstrike = v.shape[1:3]
+        x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike, ift)
+        fig, ax = plt.subplots(2, 3, figsize=(12, 7))
+        for k, (idx, title, unit, scale) in enumerate(PANELS):
+            a = ax[k // 3, k % 3]
+            vals = v[ift, :, :, idx] / scale
+            # A uniform field gives vmin == vmax, which normalises to nothing:
+            # matplotlib then colours it arbitrarily, so two faults holding the
+            # same constant can come out different colours. Widen the range so
+            # a constant reads as a constant.
+            vmin, vmax = float(np.min(vals)), float(np.max(vals))
+            if vmin == vmax:
+                pad = abs(vmin) * 0.01 or 1.0
+                vmin, vmax = vmin - pad, vmax + pad
+            m = a.pcolormesh(x, z, vals, cmap="viridis", vmin=vmin, vmax=vmax,
+                             shading="nearest")
+            cb = plt.colorbar(m, ax=a)
+            cb.set_label(unit)
+            a.set_title(title)
+            a.set_xlabel(xlab)
+            a.set_ylabel(ylab)
+            a.set_aspect("equal")
+        flab = f" | fault {ift}/{nfault - 1}" if nfault > 1 else ""
+        fig.suptitle(f"On-fault initial conditions — "
+                     f"{getattr(par, 'casename', os.path.abspath(args.case_dir))}"
+                     f"{flab}")
+        fig.tight_layout()
+        sfx = f".f{ift}" if nfault > 1 else ""
+        out = os.path.join(args.outdir or args.case_dir, f"Initials{sfx}.png")
+        pu.save(fig, out, dpi=150)
     return 0
 
 

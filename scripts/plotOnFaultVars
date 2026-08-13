@@ -8,10 +8,10 @@ time) with the current step marked. Stresses are shown in MPa on a diverging
 map centred on the case's initial values (from user_defined_params.py, found
 in the results directory or its parent).
 
-Multi-fault runs (ntotft > 1): every fault is drawn on the same sheet, each
-map panel stacking the segments along z at their true along-strike km, so a
-step-over's geometry is visible rather than split across files. Legacy 2-D
-snapshots (pre-nid_fault) are read transparently.
+Multi-fault runs (ntotft > 1): one PNG per fault per snapshot, suffixed .f0,
+.f1, ..., and one gif per fault -- no fault is silently dropped. Each fault's
+axes are its own segment's along-strike km, taken from par.faultgeom. Legacy
+2-D snapshots (pre-nid_fault) are read transparently.
 
 The gif's cadence is the run's nt_out: nt_out = 1000 gives a handful of coarse
 frames. Each frame carries its step number and simulated time; a smooth movie
@@ -70,57 +70,37 @@ def panel_specs(par):
     ]
 
 
-def plot_fault_snapshot(fname, nfault, par, b, png):
-    """One sheet per snapshot showing every fault, not one fault per sheet.
-
-    A step-over is a statement about where the segments sit relative to each
-    other; splitting them across files hides exactly that. Each map panel
-    stacks the faults along z -- fault 0 at its own depth, each later fault
-    dropped below the previous one -- while keeping true along-strike km on a
-    shared x axis, so the along-strike offset between segments is read
-    directly off the plot."""
+def plot_fault_snapshot(fname, ift, nfault, par, b, png):
     ds = nc.Dataset(fname)
-    slabs = [{name: pu.fault_slab(ds.variables[name][:], ift, name, fname)
-              for name in VARS} for ift in range(nfault)]
+    v = {name: pu.fault_slab(ds.variables[name][:], ift, name, fname)
+         for name in VARS}
     ds.close()
 
-    coords, zspan = [], 0.0
-    for ift, v in enumerate(slabs):
-        ndip, nstrike = v["shear_strike"].shape
-        x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike, ift)
-        coords.append((x, z))
-        zspan = max(zspan, float(np.ptp(z)))
-    gap = 0.15 * zspan if zspan else 1.0
-    # Offset each fault so the strips never overlap; fault 0 keeps its true z.
-    zoff = [-(zspan + gap) * ift for ift in range(nfault)]
-
+    ndip, nstrike = v["shear_strike"].shape
+    x, z, xlab, ylab = pu.fault_coords(par, ndip, nstrike, ift)
     nstep = pu.step_of(fname)
     i = min(nstep, len(b)) - 1
     tdays = b[i, 0] / 86400.0
     vlin, vlog = peak_slip_rate(b, par)
 
+    # The six maps carry set_aspect("equal") -- a fault plane drawn to its real
+    # proportions -- while the three time series do not, so in a plain grid the
+    # rows do not line up. constrained_layout aligns them; the maps keep their
+    # aspect and the series fill the row they share.
     fig, ax = plt.subplots(3, 3, figsize=(13, 9.5), constrained_layout=True)
     for k, (key, title, unit, cmap, vmin, vmax, scale) in enumerate(panel_specs(par)):
         a = ax[k // 3, k % 3]
-        for ift, v in enumerate(slabs):
-            arr = np.asarray(v[key])
-            arr = (np.log10(np.maximum(arr, 1e-30)) if scale == "log"
-                   else arr / scale)
-            x, z = coords[ift]
-            m = a.pcolormesh(x, z + zoff[ift], arr, cmap=cmap, vmin=vmin,
-                             vmax=vmax, shading="nearest")
-            if nfault > 1:
-                y = pu.fault_y(par, ift)
-                a.text(0.01, z.max() + zoff[ift], f"f{ift}" +
-                       (f" y={y:g}km" if y is not None else ""),
-                       transform=a.get_yaxis_transform(which="grid"),
-                       fontsize=8, va="bottom", ha="left", clip_on=False)
+        arr = np.asarray(v[key])
+        arr = (np.log10(np.maximum(arr, 1e-30)) if scale == "log"
+               else arr / scale)
+        m = a.pcolormesh(x, z, arr, cmap=cmap, vmin=vmin, vmax=vmax,
+                         shading="nearest")
         cb = plt.colorbar(m, ax=a, extend="both", fraction=0.046, pad=0.02)
         cb.set_label(unit, fontsize=11)
         cb.ax.tick_params(labelsize=10)
         a.set_title(title, fontsize=13)
         a.set_xlabel(xlab, fontsize=11)
-        a.set_ylabel(ylab if nfault == 1 else f"{ylab}, faults offset", fontsize=11)
+        a.set_ylabel(ylab, fontsize=11)
         a.tick_params(labelsize=10)
         a.set_aspect("equal")
 
@@ -144,7 +124,7 @@ def plot_fault_snapshot(fname, nfault, par, b, png):
         a.legend(fontsize=10, loc="best")
 
     case = getattr(par, "casename", "")
-    flab = f" | {nfault} faults" if nfault > 1 else ""
+    flab = f" | fault {ift}/{nfault - 1}" if nfault > 1 else ""
     # 3 decimals in days cannot resolve a coseismic snapshot: the whole event
     # here lasts ~1e-4 d and every frame would read t = 0.000 d.
     tlab = f"{tdays:.3f} d" if tdays >= 1e-3 else f"{tdays * 86400.0:.3g} s"
@@ -174,12 +154,14 @@ def process_dir(rdir, outdir):
     with nc.Dataset(snaps[0]) as d:
         nfault = d.dimensions["nid_fault"].size if "nid_fault" in d.dimensions else 1
 
-    frames = []
-    for f in snaps:
-        png = pu.out_path(rdir, os.path.basename(f) + ".png", outdir)
-        plot_fault_snapshot(f, nfault, par, b, png)
-        frames.append(png)
-    generate_gif(frames, pu.out_path(rdir, "on_fault_vars.gif", outdir))
+    for ift in range(nfault):
+        sfx = f".f{ift}" if nfault > 1 else ""
+        frames = []
+        for f in snaps:
+            png = pu.out_path(rdir, os.path.basename(f) + sfx + ".png", outdir)
+            plot_fault_snapshot(f, ift, nfault, par, b, png)
+            frames.append(png)
+        generate_gif(frames, pu.out_path(rdir, f"on_fault_vars{sfx}.gif", outdir))
 
 
 def main():

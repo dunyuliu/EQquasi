@@ -46,7 +46,12 @@ def slab_at_nucleation(rdir, var, ifault):
     td = os.path.join(rdir, "tdyna.txt")
     ref = None
     if os.path.exists(td) and os.path.getsize(td) > 0:
-        tdyna = np.atleast_1d(read_array(td))
+        # tdyna.txt is a single row of two times (rupture start, rupture end),
+        # so read_array hands back shape (1, 2) and tdyna[0] is the whole row,
+        # not the start time. Comparing a column of N times against that row
+        # raised "operands could not be broadcast together" on every case, not
+        # only multi-fault ones -- ravel first and take the start time.
+        tdyna = np.ravel(read_array(td))
         g = np.atleast_2d(read_array(os.path.join(rdir, "global.dat")))
         hit = np.where(g[:, 0] == tdyna[0])[0]
         if hit.size:
@@ -142,7 +147,11 @@ def main():
     ax.legend()
     fig.tight_layout()
 
-    name = f"profile.{args.var}.{args.profile_type}.png"
+    # The fault index has to be in the name. Without it, --fault 1 wrote over
+    # --fault 0's figure: same filename, no warning, and the only surviving
+    # plot was whichever fault happened to be plotted last.
+    sfx = f".f{args.fault}" if args.fault else ""
+    name = f"profile.{args.var}.{args.profile_type}{sfx}.png"
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
         out = os.path.join(args.outdir, name)

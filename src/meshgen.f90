@@ -18,6 +18,7 @@ subroutine meshgen
         edgex1,edgey1,edgez1,edgezn,&
         i,j,k,i1,j1,ift
     real(kind=dp)::dy,dz
+    logical::on_fault_plane
     real(kind=dp)::tmp1,tmp2
     integer (kind=4)::nxuni,nyuni,nzuni    
     real(kind=dp)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
@@ -164,7 +165,37 @@ subroutine meshgen
                 ! Dispatch on iy, not on the sign of ycoor: a fault offset to
                 ! ycoor>0 is not the ymax edge, and the old sign-based
                 ! dispatch would have mis-tagged it as one.
-                if(iy==1.or.iy==nyt.or.any(abs(ycoor-fltxyz(1,2,1:ntotft))<tol)) then
+                !
+                ! A node is on the fault only if it lies inside that fault's
+                ! own x and z extent as well as on its y-plane. Testing y
+                ! alone tagged every node of the plane, right across the
+                ! model, as a fault boundary: id=-5 gives no equation number,
+                ! and a node outside fltxyz is never split into a master and
+                ! slave, so it stayed clamped at u=0 for the whole run. The
+                ! plane became a rigid sheet bisecting the mesh -- 1222 of
+                ! 1528 nodes per plane in the two-fault step-over, all with
+                ! exactly zero displacement while the surrounding material
+                ! moved metres. It manufactured +25 MPa of normal-stress
+                ! change at the fault edges, five times the real step-over
+                ! signal, and ended cycle 2 in STOP 508.
+                !
+                ! Single-fault benchmarks never saw it: BP5's fault spans the
+                ! whole model, so its y-plane is fault everywhere and there is
+                ! nothing outside the extent to clamp. Only a fault that stops
+                ! short of the domain -- which is every multi-fault case --
+                ! exposes it.
+                on_fault_plane = .false.
+                do ift = 1, ntotft
+                    if (abs(ycoor - fltxyz(1,2,ift)) < tol .and. &
+                        xcoor >= fltxyz(1,1,ift) - tol .and. &
+                        xcoor <= fltxyz(2,1,ift) + tol .and. &
+                        zcoor >= fltxyz(1,3,ift) - tol .and. &
+                        zcoor <= fltxyz(2,3,ift) + tol) then
+                        on_fault_plane = .true.
+                        exit
+                    endif
+                enddo
+                if(iy==1.or.iy==nyt.or.on_fault_plane) then
                     if (iy==nyt) then
                         id(1,nnode)=-3  ! ymax, +x vel, right lateral
                         id(2,nnode)=-31 ! ymax, +y vel, extensional

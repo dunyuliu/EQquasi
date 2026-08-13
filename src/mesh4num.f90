@@ -22,6 +22,7 @@ subroutine mesh4num
 	integer(kind=4)::nnode0,nelement0,neq0,ix,iy,iz,&
 		edgex1,edgey1,edgez1,edgezn,&
 		i,j,k,ift
+	logical::on_fault_plane
 
 	integer (kind=4),dimension(ntotft)::nftnd0
 	real(kind=8)::dy,dz
@@ -130,9 +131,24 @@ subroutine mesh4num
 				ycoor=ylinet(iy)
 				zcoor=zlinet(iz)
 				nnode0=nnode0 + 1
-				! No equation number on a domain edge (iy==1/nyt) or on any
-				! fault's own y-plane -- one check per fault, not just y==0.
-				if(iy==1.or.iy==nyt.or.any(abs(ycoor-fltxyz(1,2,1:ntotft))<tol)) then
+				! No equation number on a domain edge (iy==1/nyt) or on a
+				! fault node. A node counts as on the fault only if it lies
+				! inside that fault's x and z extent as well as on its
+				! y-plane -- the same test meshgen.f90 makes, and it must
+				! stay the same or the two passes disagree on neq and the
+				! consistency check in eqquasi.f90 stops the run.
+				on_fault_plane = .false.
+				do ift = 1, ntotft
+					if (abs(ycoor - fltxyz(1,2,ift)) < tol .and. &
+						xcoor >= fltxyz(1,1,ift) - tol .and. &
+						xcoor <= fltxyz(2,1,ift) + tol .and. &
+						zcoor >= fltxyz(1,3,ift) - tol .and. &
+						zcoor <= fltxyz(2,3,ift) + tol) then
+						on_fault_plane = .true.
+						exit
+					endif
+				enddo
+				if(iy==1.or.iy==nyt.or.on_fault_plane) then
 
 				else
 					do i1=1,ndof

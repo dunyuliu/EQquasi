@@ -9,169 +9,89 @@ fix). Do not let this file become the archive.
 
 ---
 
-## 24-HOUR AUTONOMOUS QUEUE — started 2026-08-14, unattended
+## 55-HOUR AUTONOMOUS QUEUE — started 2026-08-14 17:00, user back Monday
 
 Read this first on wake-up. Update in place; close items by deleting them.
 
 ### Standing rules
-- **Read `PROJECT_RULES.md` first, and again before every commit.** It is 16
-  rules with an index at the top; reading the index costs seconds. Every rule
-  broken in this project so far was already written down at the time -- rule
-  14's `git add -A` clause, rule 1's no-new-files clause -- and was broken
-  because it was not consulted, not because it was missing. The answer to "how
-  do I stop breaking the rules" is this file and that one, not new machinery:
-  proposing a new hook or a new test file to enforce rule 1 is itself the
-  rule-1 reflex.
-  At the two moments that matter: before staging (rule 14 -- explicit paths,
-  and is anything here machine-local?) and before adding any file, name, or
-  parameter (rule 1 -- is this necessary, and has the user been told?).
-- Verify the binary before every run: `grep EQQUASI_VERSION src/globalvar.f90`
-  against `strings bin/eqquasi-<v> | grep Welcome`. Rebuild with
-  `MACHINE=utig`, install as `bin/eqquasi-<version>` (no plain `eqquasi`).
-- Background commands inherit a stale cwd. ALWAYS `cd` to an absolute path
-  inside the command; this has broken four launches today.
-- Never `pkill -f <pattern>` where the pattern matches the running command.
-- **Never rebuild the binary while a multi-cycle run is in flight.** run.sh
-  invokes `eqquasi-<version>` afresh each cycle, so a rebuild mid-run splits
-  the dataset: the cycles before it and the cycles after it came from
-  different code under one version number. Done on 2026-08-14 -- the 20-cycle
-  BP1002 run's cycle 0 has the station fix but not the per-fault cplot fix --
-  and the run had to be restarted. Rebuild before launching, or wait.
-- Killed runs leave NFS `.nfs*` files; kill the ranks, sleep, then `rm -rf`.
-- Do not work in the user's home outside this repo. The kink work lives in
-  the worktree `/home/utig5/dliu/eqquasi.kink`, NOT in `~`.
-- No new files or names without need (rule 1). No force-push.
-- **Respect the shared host (rule 15).** This is a 64-core machine other
-  people are using: baseline load was ~50 at handoff with only 6 of those
-  ranks mine. So:
-    * at most TWO of my runs at once, 3 ranks each -- never more;
-    * check `uptime` before launching anything, and if load is above ~56,
-      wait rather than add to it;
-    * never raise HPC_ncpu above 3 for a queue run;
-    * a long run is not more urgent than someone else's interactive session.
-  Serialise the heavy items (5-cycle, e2e full tier) rather than running them
-  together.
+- **Read `PROJECT_RULES.md`'s action card before staging and before adding any
+  file, name or parameter.** Every rule broken here was already written when it
+  was broken. The card is 20 lines at the top of that file.
+- Host is **knox** (64 cores). Check `uptime`; at most 2-3 runs at 3 ranks;
+  wait above load 56. cotopaxi is a different machine and unreachable from here.
+- **Never rebuild while a multi-cycle run is in flight** (rule 9). run.sh
+  invokes `eqquasi-<version>` afresh each cycle, so a mid-run rebuild splits
+  the dataset. Wait for a gap, or bump the version so the filename differs.
+- Background commands inherit a stale cwd. Always `cd` to an absolute path
+  inside the command.
+- Never `pkill -f <pattern>` matching the issuing shell. Kill by PID via
+  `readlink /proc/<pid>/cwd`.
+- `gh` is not on PATH: use `/home/staff/dliu/bin/gh`.
+- Two runs of the same binary are never byte-identical (MPI reduction order,
+  1e-15 to 1e-21). Compare numerically, never by hash.
 
 ### Queue
-1. [x] **5-cycle bp1002 on the new workflow reproduces the science.**
-   All five cycles run, same event sequence, same slips:
 
-   | cycle | steps | peak V | rel diff | slip A | slip B | slip rel diff |
-   |---|---|---|---|---|---|---|
-   | 0 | 3821/3821 | 0.845757 | 2e-15 | 4.99 m | 0.028 m | 0 |
-   | 1 | 4572/4572 | 0.899183 | 8.7e-12 | 0.919 m | 4.876 m | 0 |
-   | 2 | 10000/10000 | 0.347357 | 7.7e-9 | 15.08 m | 15.08 m | 0 |
-   | 3 | 984/984 | 0.022665 | 2.7e-7 | 1.587 m | 0.0002 m | 6.5e-8 |
-   | 4 | 5845/**5846** | 0.370585 | 2.4e-6 | 2.226 m | 5.023 m | 9.5e-8 |
+1. [ ] **Dispatch victor-reyes to cut a release.** Covers v1.14.0..HEAD: the
+   compsets rename and register, PROJECT_RULES cut to 411 lines with an action
+   card, the cohesive-zone precheck, plotRuptureTime contour fix, and the
+   script/testsys rename. Minor bump. Watch CI to conclusion; rule 17 says a
+   red run stops work. NOTE: the release will rebuild, so do it only when no
+   multi-cycle run is mid-cycle, or accept that the running jobs keep the old
+   binary by filename.
 
-   Agreement degrades by roughly a factor of 1000 per cycle, and by cycle 4
-   the run exits one step earlier. That is accumulation, not a defect, and
-   cycle 0 is what proves it: identical inputs, identical binary, only the
-   file paths changed, and it still differs by 2e-15. A single cycle is
-   already nondeterministic at round-off because MPI reduction ordering is
-   not fixed, and each cycle starts from the previous cycle's restart file,
-   so the seed is amplified by a system with a positive Lyapunov exponent.
+2. [ ] **Watch the four runs and report per cycle.** Do not restart any of them.
+   - `work/bp1002_stepover/multicycle_20_knox` — 20 cycles, nstep=30000.
+     Cycles 0-1 match the 1.13.0 baseline exactly; cycle 2 ran 11171 steps and
+     exited on physics at 7.2e-6, where the old nstep=10000 run truncated it.
+     This is the science run. Compare each cycle with
+     `work/bp1002_stepover/compare_cycles.py multicycle_20 <run>`.
+   - `work/liu2020.kink.10cyc` — dx=600, Lambda0/dx=0.94. Produced a coherent
+     rupture (rise to 2.2e-1, then decay) where dx=1200 oscillated. Watch
+     whether later cycles stay coherent or degrade as 1200 did.
+   - `work/kink.dc014.dx1200` — Dc=0.14, Lambda0/dx=6.0. Controlled test: same
+     mesh and geometry as the oscillating run, one parameter changed. Still
+     interseismic at 1.7e-9 after 102 blocks, as expected for the larger
+     nucleation size.
+   - `work/liu2020.kink.10cyc.dx1200` — finished, 10 cycles, oscillating.
+     Kept as the negative control. Do not delete.
 
-   The signature discriminates the two explanations. Accumulated round-off
-   grows smoothly from 1e-15; a broken restart handoff -- a dropped variable,
-   the wrong file, a stale path -- would show as a step change at cycle 1,
-   the first restart, and stay there. Cycle 1 agrees to 8.7e-12. Nothing
-   jumps anywhere.
+3. [ ] **Full e2e tier at HEAD.** Has not run since the compsets rename, the
+   script/testsys rename, or the cohesive-zone precheck. `MACHINE=utig` on
+   cotopaxi, `MACHINE=ubuntu` on knox -- knox has no `utig` branch in
+   install.eqquasi.sh and falls through to no LD_LIBRARY_PATH. ~3h05.
 
-   Do not read this as bit-reproducibility, which this code does not have and
-   would need a fixed reduction order to get. Read it as: the workflow revamp
-   moved no physics.
+4. [ ] **The five broken compsets.** bp1001.fdc.250, bp1001.fdc.rough.250,
+   bp1001.qdc.rough.250, liu2020.fdc.planar.300, liu2020.fdc.rough.250 declare
+   bare module-level variables instead of the `par` object, so `case.setup`
+   dies on `NameError: name 'par' is not defined`. Porting them is safe to
+   attempt ONLY as far as making them run; none has a reference, so a port
+   cannot be verified and must not be blessed. If a port runs, say explicitly
+   that it is unverified.
 
-   **CAVEAT FOUND 2026-08-14, after the fact: cycle 2 is truncated.** It ran
-   exactly 10000 steps -- `par.nstep` -- and exited with max slip rate
-   6.6e-2 m/s, sixty times ABOVE the 1e-3 seismic threshold, still rupturing.
-   Every other cycle exits near 4e-6 m/s, cleanly. So "through-going, 15.08 m
-   on both faults" is a LOWER BOUND on an unfinished event, cycle 3 restarted
-   mid-rupture, and its anomalous shortness (984 steps, 1.59 m) is probably
-   that artefact rather than physics.
+5. [ ] **fric() index revamp** — named constants in one place, applied
+   everywhere, plus an index -> meaning -> unit -> writer table. Must be one
+   pass: naming at some call sites only creates a fourth source of truth on
+   top of rule 5's three. Rule 5 needs rewriting when it lands.
 
-   This does not weaken the reproduction test above, and the distinction is
-   worth keeping straight: both runs used nstep=10000, so both truncated at
-   the same step and the artefact cancels out of the comparison. The test
-   asked "did the revamp move anything" and the answer is still no. It never
-   asked whether the sequence was physically complete.
+6. [ ] **Per-fault peak slip rate.** `global.dat` column 2 is a single maxval
+   over all faults in solveTimeLoopMUMPS.f90. Per-fault peaks need new columns
+   and a re-bless of every reference. DO NOT DO THIS UNATTENDED -- it is an
+   output-format change the user must approve.
 
-   `reference/bp1002` is cycle 0 only, which exits at 4e-6 m/s, so the
-   reference is unaffected.
+7. [ ] **Orthogonal zoning experiment** — needs a new compset (rule 1: flag
+   first), and holding VW fraction fixed vs VW area fixed are two different
+   experiments answering different questions. User's call, not a default.
 
-   Compare with `work/bp1002_stepover/compare_cycles.py <baseline> <run>`.
-   Two traps it now avoids, both of which cost time here:
-   - Peak V is column 2 of global.dat (every step). The max over
-     fault.NNNNN.nc snapshots understates it ~20x -- they are written every
-     1000 steps and step over the peak.
-   - The baseline is `multicycle_20`, NOT `old_5cyc_prefix`, which predates
-     the meshgen fault-plane fix and gives completely different numbers.
-     Comparing against it reads as a total regression when nothing is wrong.
-
-2. [x] **e2e gate green, both tiers.** Fast: 23 passed, 6 skipped, 0 failed.
-   Full: 41 passed, 13 skipped, 2 failed -- both diagnosed and fixed, and the
-   fast tier re-run green afterwards. The full tier takes 3h05 and needs
-   `MACHINE=utig` on this host.
-
-   The two failures were both gate defects, not physics:
-
-   a. `bp5 offfault srfst_strk000st032dp000.txt`: 1 entry of 31381 differing
-      in the 7th printed digit. The station files are written `E21.13,6E15.7`
-      -- seven significant figures -- while the gate demanded rtol=1e-9. That
-      asks the file for digits it never wrote, so MPI reduction-order noise
-      (~2e-14) flipping one rounding boundary failed the suite at random
-      instead of on regressions. `column_printed_rtol()` in testsys/e2e/cases.py
-      now floors each column's rtol at 2 ulp of its own printed precision,
-      read off the file rather than hand-tuned. Verified: the real run passes
-      at 9.9e-17 and a 1e-5 relative perturbation is still caught. Anything
-      below the 7th digit is undetectable in this tier by construction -- the
-      netCDF files carry full double precision and are still compared at 1e-9.
-
-   b. `test_clean_build.py` pointed at `bin/eqquasi`, which stopped existing
-      when binaries became versioned. So `test_built_binary_version_matches_
-      the_source` -- the stale-binary guard added *because* of the 1.7.0 vs
-      1.10.0 incident -- skipped itself with "no binary" on every run while
-      the suite reported green. It now derives `bin/eqquasi-<declared>` and
-      treats a missing binary as a failure, not a skip.
-
-   Earlier note here blamed (b) on "no system MUMPS on this host". Wrong: the
-   test defaults MACHINE to ubuntu, and the ubuntu target looks for
-   dmumps_struc.h where this host does not keep it. The build works fine with
-   MACHINE=utig. The assertion now names MACHINE so the next reader is not
-   sent looking for a missing library.
-
-3. [x] **Revamp committed, released as v1.13.0, pushed, CI green.**
-   Six commits, tagged v1.13.0. CI run 31785517943 SUCCEEDED -- the first
-   green since v1.12.0.
-
-   CI had been red across every push since v1.12.0, and the note that used to
-   sit here calling the only failure "local-only, no MUMPS" was wrong twice:
-   wrong about the local cause, and wrong that remote CI was fine. The
-   workflow's Build step asserted `test -x bin/eqquasi`, the unversioned name
-   that stopped existing when binaries became versioned, so it died at Build
-   before the e2e tier ran at all.
-
-   That is three places one change broke, all found the same day: this, the
-   e2e stale-binary guard, and the contract test's filename split. When a
-   name that appears in build products changes, grep the whole tree for the
-   old one -- tests and CI config included, not just source.
-
-4. [~] **Then work the list below**, cheapest first. Do not start anything in
-   section 1 or 2 (BP8 submission/convergence) unattended -- they need
-   judgement calls on what to submit.
-
-5. [x] **Kink work staged, not merged.** Committed as 7d11983 on
-   `kink-geometry` in the worktree `/home/utig5/dliu/eqquasi.kink`. Not
-   pushed, not merged.
-
-   Read before picking it up: that branch sits at e8327a7 and PREDATES the
-   v1.13.0 workflow revamp, so the compset has never been run against a case
-   with input/, result/, scratch/. It was staged rather than brought forward
-   because rebasing it onto master and re-verifying is real work with a real
-   chance of breaking, and the instruction was not to merge unattended.
-   Geometry is verified in the written file and in the solved mesh; dx=600 m
-   runs, dx=300 m (the paper's) needs a 64-bit-integer MUMPS -- the factors
-   want 5.51e9 reals against a 2^31 ceiling.
+### Known open, not queued
+- GitHub Releases stop at v1.3.2 (2022) while 32 tags exist. Tags are not
+  Releases; cutting them going forward is easy, backfilling 26 means inventing
+  notes.
+- `src/globalvar.f90` has one comment reading `scripts/case.setup`, left stale
+  because correcting it would invalidate the binary three live runs are using.
+- 243 `.DS_Store` files across `$HOME`, none in this repo any more.
+- `test.bp5.qdc.dip90` and `test.stepover.qdc` are regression variants with no
+  e2e row -- orphaned.
 
 ### Landed during the revamp, worth remembering
 - **Implicit interfaces bite character arguments too.** Passing

@@ -264,6 +264,25 @@ def load_par(run_dir, tool=""):
                 sys.path.remove(a)
 
 
+def _depth_label(par, zlo):
+    """"z (km)", saying how far below the fault the domain goes.
+
+    A fault-plane map is drawn to the fault's own extent, so a fault that
+    bottoms out at -20 km looks identical whether the domain below it is
+    20 km deep or 60 km. That matters here: the depth of the domain under
+    the seismogenic zone is what the loading is applied through, and reading
+    these panels as if the model ended at the fault's base is a mistake the
+    axis should not invite.
+
+    Falls back to a plain label when the case declares no domain depth, or
+    when the fault reaches the bottom of it and there is nothing to say.
+    """
+    zdom = getattr(par, "fzmin", None)
+    if zdom is None or zlo is None or zdom >= zlo - 1.0:
+        return "z (km)"
+    return f"z (km)   [domain to {zdom / 1e3:.0f} km]"
+
+
 def fault_coords(par, ndip, nstrike, ift=0):
     """(x, z, xlabel, ylabel) for fault ift's plane, in km.
 
@@ -278,7 +297,7 @@ def fault_coords(par, ndip, nstrike, ift=0):
         xlo, xhi, _ycoor, zlo, zhi = geom[ift]
         return (np.linspace(xlo, xhi, nstrike) / 1e3,
                 np.linspace(zlo, zhi, ndip) / 1e3,
-                "along strike (km)", "z (km)")
+                "along strike (km)", _depth_label(par, zlo))
     try:
         fx, fz = np.asarray(par.fx), np.asarray(par.fz)
         if fx.size == nstrike and fz.size == ndip:

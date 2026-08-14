@@ -76,6 +76,23 @@ Read this first on wake-up. Update in place; close items by deleting them.
    would need a fixed reduction order to get. Read it as: the workflow revamp
    moved no physics.
 
+   **CAVEAT FOUND 2026-08-14, after the fact: cycle 2 is truncated.** It ran
+   exactly 10000 steps -- `par.nstep` -- and exited with max slip rate
+   6.6e-2 m/s, sixty times ABOVE the 1e-3 seismic threshold, still rupturing.
+   Every other cycle exits near 4e-6 m/s, cleanly. So "through-going, 15.08 m
+   on both faults" is a LOWER BOUND on an unfinished event, cycle 3 restarted
+   mid-rupture, and its anomalous shortness (984 steps, 1.59 m) is probably
+   that artefact rather than physics.
+
+   This does not weaken the reproduction test above, and the distinction is
+   worth keeping straight: both runs used nstep=10000, so both truncated at
+   the same step and the artefact cancels out of the comparison. The test
+   asked "did the revamp move anything" and the answer is still no. It never
+   asked whether the sequence was physically complete.
+
+   `reference/bp1002` is cycle 0 only, which exits at 4e-6 m/s, so the
+   reference is unaffected.
+
    Compare with `work/bp1002_stepover/compare_cycles.py <baseline> <run>`.
    Two traps it now avoids, both of which cost time here:
    - Peak V is column 2 of global.dat (every step). The max over

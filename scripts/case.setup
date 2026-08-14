@@ -163,17 +163,24 @@ def create_batch_script():
         # Executable part.
         f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
         f.write("do" + "\n")
-        f.write("  echo $i > currentcycle.txt" + "\n")
-        f.write("  ibrun eqquasi" + "\n")
-        f.write("  mkdir \"./cycle$((i-1))\"" + "\n")
-        # Move only what exists. A bare `mv a* b*` spams "cannot stat" for every
-        # pattern that did not match, which buries real errors. The BP8 section
-        # 4.3 profiles and runInfo.json must be included, or they are stranded in
-        # the case root and overwritten by the next cycle.
-        f.write("  for f in fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \\" + "\n")
-        f.write("           *_strike.dat *_depth.dat runInfo.json; do" + "\n")
-        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./cycle$((i-1))\"" + "\n")
+        # Same scratch workflow as run.sh: the solver writes where it is, so
+        # run it inside tmp/ and package from there. A batch job that dies
+        # part-way otherwise strews half-written output across the case root,
+        # where the inputs live.
+        f.write("  rm -rf tmp && mkdir tmp" + "\n")
+        f.write("  for g in model.txt stations.txt on_fault_vars_input.nc \\" + "\n")
+        f.write("           bFault_Rough_Geometry.txt roughness.nc *.r.nc; do" + "\n")
+        f.write("    [ -e \"$g\" ] && cp \"$g\" tmp/" + "\n")
         f.write("  done" + "\n")
+        f.write("  echo $i > tmp/currentcycle.txt" + "\n")
+        f.write("  (cd tmp && ibrun " + _exe_name() + ")" + "\n")
+        f.write("  mkdir -p \"./cycle$((i-1))\"" + "\n")
+        # Everything the cycle produced is in tmp/, so move the lot: no
+        # pattern list to keep in step with what the solver writes, which is
+        # how the BP8 section 4.3 profiles and runInfo.json were stranded in
+        # the case root before.
+        f.write("  mv tmp/* \"./cycle$((i-1))/\"" + "\n")
+        f.write("  rm -rf tmp" + "\n")
         f.write("  cp \"./cycle$((i-1))/\"*.r.nc ./" + "\n")
         # Post-processing tools live on PATH (source install.eqquasi.sh), not
         # in the case directory; they take the cycle directory as an argument.
@@ -298,7 +305,7 @@ def create_batch_script_cycle():
         f.write("    cp -r fault.dyna.r.nc fault.r.nc"       + "\n")
         f.write("  fi"                                       + "\n")
         f.write("# run eqquasi"                     + "\n")
-        f.write("  ibrun eqquasi"                   + "\n")
+        f.write("  ibrun " + _exe_name()            + "\n")
         f.write("# move results to Q(i-1)"          + "\n")
         f.write("# delete Q(i-1)"                   + "\n")
         f.write("  rm -rf \"cycle$((i-1))\""            + "\n")

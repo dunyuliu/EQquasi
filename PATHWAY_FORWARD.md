@@ -178,6 +178,21 @@ Read this first on wake-up. Update in place; close items by deleting them.
   allocatable dummies -- it applies to character dummies as well.
 
 ### Known open, from today
+- **fric() index revamp — systematic naming and documentation.** `fric(1:100,
+  node, fault)` is indexed by bare integers everywhere: `fric(26,...)` is
+  trial slip rate, `fric(46,...)` V_init, `fric(81:84,...)` the rupture-area
+  block, and nothing in the source says so except trailing comments that only
+  some sites carry. Rule 5 currently *documents* this as the state of affairs
+  and guards additions (pick an unused index, write it in three places); it
+  does not fix it.
+
+  The revamp: named constants in one place, applied everywhere, plus a table
+  mapping index -> meaning -> unit -> which of the three files writes it.
+  It must be done in one pass. Introducing names at some call sites only
+  creates a fourth source of truth on top of the three rule 5 already names
+  (`scripts/defaultParameters.py`, `scripts/case.setup`, `src/netcdf_io.f90`),
+  which is worse than the bare integers. Rule 5 will need rewriting when it
+  lands, since it exists to describe the unnamed state.
 - [FIXED] Multi-fault station output. It was worse than "faults 2+ get
   none": the unopened unit 51 was still *written to*, so Fortran connected it
   to a default `fort.51` and every fault-2+ station appended there,

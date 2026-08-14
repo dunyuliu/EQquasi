@@ -699,7 +699,7 @@ compute host.
   state.
 - **Stage explicit paths, never `git add -A` / `git add .`.** `git add -A`
   has swept another agent's unverified work-in-progress into a commit that
-  wasn't about it, and on 2026-08-02 it swept `.claude/scheduled_tasks.lock`
+  wasn't about it, and on 2026-08-03 it swept `.claude/scheduled_tasks.lock`
   -- a session id, a pid and a process start time -- into a commit about the
   README, and from there into a PUBLIC repo with forks. `git status` before
   staging, then `git add <path> <path>...` for exactly the files your change

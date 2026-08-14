@@ -183,6 +183,27 @@ def create_batch_script():
         f.write("done" + "\n")
         # End excutable part.
 
+def _exe_name():
+    """`eqquasi-<version>`, read from the source the run will be built from.
+
+    Fails loudly rather than falling back to a bare `eqquasi`: a run.sh that
+    names no version is exactly what let a rebuild be picked up mid-run.
+    """
+    import re
+    root = os.environ.get("EQQUASIROOT")
+    if not root:
+        raise SystemExit("case.setup: EQQUASIROOT is not set, so the EQquasi "
+                         "version cannot be read; source install.eqquasi.sh.")
+    gv = os.path.join(root, "src", "globalvar.f90")
+    try:
+        m = re.search(r"EQQUASI_VERSION\s*=\s*'([^']+)'", open(gv).read())
+    except OSError as exc:
+        raise SystemExit(f"case.setup: cannot read {gv} ({exc}).")
+    if not m:
+        raise SystemExit(f"case.setup: no EQQUASI_VERSION in {gv}.")
+    return "eqquasi-" + m.group(1)
+
+
 def create_run_sh():
     # Function to create batch script used by HPC system.
     with open("run.sh", "w") as f:
@@ -194,7 +215,11 @@ def create_run_sh():
         f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
         f.write("do" + "\n")
         f.write("  echo $i > currentcycle.txt" + "\n")
-        f.write("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " eqquasi" +"\n")
+        # Name the binary by version. bin/ holds eqquasi-<version> and
+        # deliberately no plain `eqquasi`, so a case's run.sh records which
+        # build produced it and a rebuild cannot be picked up mid-run by a
+        # loop that relaunches each cycle.
+        f.write("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " " + _exe_name() + "\n")
         # Stop the cycle loop when a cycle fails. Without this, a run that
         # ended in STOP 508 (effective normal stress no longer compressive)
         # was followed by two more cycles, each restarting from the state that

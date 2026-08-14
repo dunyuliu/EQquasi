@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from conftest import ROOT, read
 
@@ -113,26 +114,43 @@ def test_binary_on_disk_is_built_from_the_current_source():
     tier that runs on every push.
     """
     import pytest
-    binary = ROOT / "bin" / "eqquasi"
-    if not binary.exists():
-        pytest.skip("no bin/eqquasi; nothing built yet")
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    from cases import binary_version, declared_version, installed_binary
+
+    declared = declared_version()
+    assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
+    found = installed_binary()
+    if found is None:
+        pytest.skip(f"no bin/eqquasi-{declared}; nothing built yet")
+    binary = Path(found)
 
     # Share the e2e tier's implementation rather than paraphrasing it. The two
     # copies had drifted into different semantics -- one matched the version as
     # a substring, the other tokenised it; one failed on an unreadable binary,
     # the other passed silently -- so "the check passes" meant different things
     # depending on which tier you asked.
-    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
-    from cases import binary_version, declared_version
-
-    declared = declared_version()
-    assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
     try:
         built = binary_version(str(binary))
     except Exception as exc:
         pytest.fail(f"could not read bin/eqquasi's version ({exc}); a binary "
                     f"of unknown provenance cannot be trusted to have been "
                     f"built from this source.")
+    # Source newer than binary: same version string, different code. The
+    # version comparison below cannot see it.
+    src_dir = ROOT / "src"
+    newest = max(((f.stat().st_mtime, f.name) for f in src_dir.iterdir()
+                  if f.suffix in (".f90", ".F90") or f.name == "makefile"),
+                 default=(0.0, ""))
+    if newest[0] and binary.stat().st_mtime < newest[0]:
+        import datetime as dt
+        fmt = lambda t: dt.datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M")
+        pytest.fail(
+            f"bin/eqquasi was built {fmt(binary.stat().st_mtime)} but "
+            f"src/{newest[1]} was modified {fmt(newest[0])}. Both report "
+            f"{declared}, so comparing versions cannot detect this. "
+            f"Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src "
+            f"&& mv src/eqquasi bin/")
+
     assert built == declared, (
         f"bin/eqquasi reports {built}, but src/globalvar.f90 declares "
         f"{declared}. Every result and reference produced from it describes "

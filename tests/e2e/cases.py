@@ -125,6 +125,20 @@ def apply_overrides(udp, over):
     open(udp, "w").writelines(out)
 
 
+def installed_binary():
+    """Path to bin/eqquasi-<the version src declares>, or None.
+
+    bin/ holds versioned binaries and deliberately no plain `eqquasi`: one
+    unversioned slot cannot hold two builds, and a run that spans a rebuild
+    picked up the new binary on its next cycle.
+    """
+    v = declared_version()
+    if not v:
+        return None
+    p = os.path.join(str(ROOT), "bin", f"eqquasi-{v}")
+    return p if os.path.exists(p) else None
+
+
 def declared_version():
     """The version src/globalvar.f90 declares, or None if it says nothing."""
     src = os.path.join(str(ROOT), "src", "globalvar.f90")
@@ -178,6 +192,29 @@ def check_binary_is_current(exe):
     except Exception as exc:
         pytest.fail(f"could not read {exe}'s version ({exc}). Refusing to run "
                     f"a benchmark against a binary of unknown provenance.")
+    # The version string alone is not enough. A source edit that does not bump
+    # the version -- which is most of them -- leaves src and bin agreeing on
+    # 1.12.0 while the binary lacks the change: the check passes and the run
+    # tests code that is no longer there. Compare build times too. This is the
+    # same failure as the 1.7.0/1.10.0 skew, one step subtler.
+    newest_src, newest_name = 0.0, ""
+    src_dir = os.path.join(str(ROOT), "src")
+    if os.path.isdir(src_dir):
+        for f in os.listdir(src_dir):
+            if f.endswith((".f90", ".F90")) or f == "makefile":
+                m = os.path.getmtime(os.path.join(src_dir, f))
+                if m > newest_src:
+                    newest_src, newest_name = m, f
+    if newest_src and os.path.getmtime(exe) < newest_src:
+        import datetime as _dt
+        fmt = lambda t: _dt.datetime.fromtimestamp(t).strftime("%Y-%m-%d %H:%M")
+        pytest.fail(
+            f"{exe} is older than src/{newest_name}: binary built "
+            f"{fmt(os.path.getmtime(exe))}, source modified {fmt(newest_src)}. "
+            f"Both report version {declared}, so the version check alone "
+            f"cannot see this. Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> "
+            f"make -C src && mv src/eqquasi bin/   (MACHINE=utig here)")
+
     if declared != built:
         pytest.fail(
             f"bin/eqquasi is {built} but src/globalvar.f90 declares "
@@ -195,14 +232,16 @@ def run_case(compset, over, workdir):
     other run's (rule 19).
     """
     e = env()
-    exe = os.path.join(str(ROOT), "bin", "eqquasi")
-    if not os.path.exists(exe):
+    exe = installed_binary()
+    if exe is None:
         # Not a skip. A skipped benchmark takes the entire e2e gate with it and
         # still reports green -- CI did exactly that: 2 passed, 18 skipped in
         # 8 seconds, having run no benchmark at all. Build first.
-        pytest.fail(f"{exe} does not exist. Build before running the e2e "
-                    "tier: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
-                    "mv src/eqquasi bin/  (or run install.eqquasi.sh)")
+        pytest.fail(
+            f"bin/eqquasi-{declared_version()} does not exist. Build before "
+            f"running the e2e tier: bash install.eqquasi.sh -m <host>, which "
+            f"installs the binary under its own version. There is no plain "
+            f"bin/eqquasi by design.")
 
     check_binary_is_current(exe)
 

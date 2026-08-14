@@ -91,7 +91,23 @@ if [ -n "$MACH" ]; then
         make || { echo "EQquasi build FAILED."; exit 1; }
         cd ..
         mkdir -p bin
-        mv src/eqquasi bin
+        # Install as bin/eqquasi-<version>. There is deliberately no plain
+        # bin/eqquasi and no symlink to one.
+        #
+        # One unversioned slot cannot hold two builds, and that cost twice in
+        # one day: a run spanning a rebuild picked up the new binary on its
+        # next cycle (run.sh launches eqquasi afresh each time), and a source
+        # edit that did not bump the version left src and bin agreeing on a
+        # version string while the code differed. A name that cannot say which
+        # build it is invites both. Every caller must now name the version, so
+        # a case's run.sh records permanently which binary produced it.
+        eqv=$(grep -oP "EQQUASI_VERSION = '\K[^']*" src/globalvar.f90)
+        if [ -z "$eqv" ]; then
+            echo "EQquasi install FAILED: no EQQUASI_VERSION in src/globalvar.f90."
+            exit 1
+        fi
+        mv src/eqquasi "bin/eqquasi-$eqv"
+        echo "Installed bin/eqquasi-$eqv"
     fi
 
     export EQQUASIROOT=$(pwd)

@@ -89,3 +89,13 @@ bug: `G2(t)` ramps the perturbation in over 1 s, so the initial condition is
 symmetric and the solution is not.
 
 Like every reference here, this is a regression lock, not a validation.
+
+
+## Provenance
+
+Blessed at **v1.7.0** (`cycle0/runInfo.json`). Confirmed still reproducible by the full e2e
+tier on 2026-08-14, at the v1.13.0 workflow-revamp commit set.
+
+The version gap is not staleness. These numbers are what current code
+produces, checked every full-tier run; what was missing was any record of
+which version produced them, so a future divergence could not be dated.

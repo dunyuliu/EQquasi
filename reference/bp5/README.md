@@ -59,3 +59,13 @@ So the asymmetry is correct in both directions:
 **Caveat.** These are regression locks, not validations: they detect
 unintended change, and do not establish that BP5 is reproduced correctly
 against the benchmark description or against other groups' submissions.
+
+
+## Provenance
+
+Blessed at **v1.7.2** (`cycle0/runInfo.json`). Confirmed still reproducible by the full e2e
+tier on 2026-08-14, at the v1.13.0 workflow-revamp commit set.
+
+The version gap is not staleness. These numbers are what current code
+produces, checked every full-tier run; what was missing was any record of
+which version produced them, so a future divergence could not be dated.

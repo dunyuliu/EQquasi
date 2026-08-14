@@ -619,3 +619,13 @@ Run `case_input/test.bp8.qdc` with `xi = 0.2`, `nstep = nt_out = 8000`, which
 exits on `fluid_tend` at 30.0 days. Anything less than ~5301 steps is a
 truncated run: the compset default `nstep = 200` reaches only 1.14 days, and
 comparing that against this oracle produces a failure that is not real.
+
+
+## Provenance
+
+Blessed at **v1.6.0** (`runInfo.json`). Confirmed still reproducible by the full e2e
+tier on 2026-08-14, at the v1.13.0 workflow-revamp commit set.
+
+The version gap is not staleness. These numbers are what current code
+produces, checked every full-tier run; what was missing was any record of
+which version produced them, so a future divergence could not be dated.

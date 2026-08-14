@@ -128,3 +128,23 @@ validation. It has not been checked against any independent oracle, and the
 interior tips facing across the step-over are left velocity-weakening and
 untapered, an idealization that drove the effective normal stress to zero by
 cycle 3 in an earlier geometry.
+
+## Provenance
+
+Blessed at **v1.11.0** (`cycle0/runInfo.json`). Confirmed still reproducible
+by v1.13.0 on 2026-08-14: all 19 pre-existing entries compared equal under
+the e2e comparators, no exceptions.
+
+The `fltst_ft2_*` files were added on 2026-08-14 and are the only part of
+this reference not produced at v1.11.0. Until then `output_onfault_st` opened
+a station file only for fault 1, so the three stations this case requests on
+fault 2 wrote to an unnamed `fort.51` and never reached the reference at all;
+the gate walks reference files, so their absence made them silently
+uncompared rather than visibly missing. They were added additively, and only
+after the fault-1 files were confirmed byte-for-byte unchanged, so nothing
+here was re-blessed to accommodate a code change.
+
+In cycle 0 fault 2 barely moves -- these stations record 1e-6 to 1e-4 m of
+slip creeping at ~1e-9 m/s, against fault 1's 1.65 m. That is the point of
+keeping them: the step-over holding is a result, and until now the gate had
+no record of the segment that did not rupture.

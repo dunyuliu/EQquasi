@@ -205,45 +205,66 @@ def _exe_name():
 
 
 def create_run_sh():
-    # Function to create batch script used by HPC system.
+    """Write run.sh: each cycle runs inside a scratch directory, `tmp/`.
+
+    The solver used to run in the case root, and run.sh moved its output into
+    cycleN/ afterwards. A cycle that was killed or that failed therefore left
+    half-written output lying in the root, mixed in with the inputs that must
+    survive a cycle -- model.txt, on_fault_vars_input.nc, the *.r.nc restart
+    pair -- so "delete the leftovers" was never one safe command.
+
+    Now every cycle gets a fresh tmp/, its inputs are COPIED in, and the
+    solver writes only there. On success the whole of tmp/ moves to cycleN/
+    and tmp/ is removed; on failure tmp/ is left as it died and the next
+    attempt starts by deleting it. Either way the case root holds inputs and
+    finished cycles, nothing else, and recovering from a bad cycle is
+    `rm -rf tmp`.
+
+    Inputs are copied rather than linked. Through a symlink the solver's write
+    of fault.r.nc lands on the root file while tmp/ still holds a link, so the
+    restart pair never reaches cycleN/ -- and that only shows from the second
+    cycle on, since the first has nothing to link.
+    """
+    inputs = ("model.txt stations.txt on_fault_vars_input.nc "
+              "bFault_Rough_Geometry.txt roughness.nc *.r.nc")
     with open("run.sh", "w") as f:
+        w = lambda t: f.write(t + "\n")
         # Pin OpenMP threads. Left unset, each MPI rank spawns as many threads
         # as it likes and several ranks oversubscribe a node badly; measured
         # scaling is only 1.24x for 8 ranks, so threads buy nothing here.
-        f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
-        # Executable part.
-        f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
-        f.write("do" + "\n")
-        f.write("  echo $i > currentcycle.txt" + "\n")
+        w("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}")
+        w("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");")
+        w("do")
+        w("  rm -rf tmp && mkdir tmp")
+        w("  for g in " + inputs + "; do")
+        w('    [ -e "$g" ] && cp "$g" tmp/')
+        w("  done")
+        w("  echo $i > tmp/currentcycle.txt")
         # Name the binary by version. bin/ holds eqquasi-<version> and
         # deliberately no plain `eqquasi`, so a case's run.sh records which
         # build produced it and a rebuild cannot be picked up mid-run by a
         # loop that relaunches each cycle.
-        f.write("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " " + _exe_name() + "\n")
+        w("  (cd tmp && mpirun.openmpi -np " + str(par.HPC_ncpu)
+          + " " + _exe_name() + ")")
         # Stop the cycle loop when a cycle fails. Without this, a run that
         # ended in STOP 508 (effective normal stress no longer compressive)
-        # was followed by two more cycles, each restarting from the state that
-        # had just been rejected, each producing a cycleN/ holding one empty
+        # was followed by more cycles, each restarting from the state that had
+        # just been rejected, each producing a cycleN/ holding one empty
         # snapshot and no RUN SUMMARY. Directories that look like results and
         # are not are worse than a loop that stops.
-        f.write("  status=$?" + "\n")
-        f.write("  if [ $status -ne 0 ]; then" + "\n")
-        f.write("    echo \"eqquasi exited $status in cycle $((i-1)); "
-                "stopping the cycle loop.\" >&2" + "\n")
-        f.write("    exit $status" + "\n")
-        f.write("  fi" + "\n")
-        f.write("  mkdir \"./cycle$((i-1))\"" + "\n")
-        # Move only what exists. A bare `mv a* b*` spams "cannot stat" for every
-        # pattern that did not match, which buries real errors. The BP8 section
-        # 4.3 profiles and runInfo.json must be included, or they are stranded in
-        # the case root and overwritten by the next cycle.
-        f.write("  for f in fltst* srfst* tdyna* global* p1* p2* disp.* fault.* cplot* \\" + "\n")
-        f.write("           *_strike.dat *_depth.dat runInfo.json; do" + "\n")
-        f.write("    [ -e \"$f\" ] && mv \"$f\" \"./cycle$((i-1))\"" + "\n")
-        f.write("  done" + "\n")
-        f.write("  cp \"./cycle$((i-1))/\"*.r.nc ./" + "\n")
-        f.write("done" + "\n")
-        # End excutable part.
+        w("  status=$?")
+        w("  if [ $status -ne 0 ]; then")
+        w('    echo "eqquasi exited $status in cycle $((i-1)); output left in '
+          'tmp/ for inspection; it is deleted when you retry." >&2')
+        w("    exit $status")
+        w("  fi")
+        w('  mkdir -p "./cycle$((i-1))"')
+        w('  mv tmp/* "./cycle$((i-1))/"')
+        w("  rm -rf tmp")
+        # The restart pair must be back in the root to seed the next cycle.
+        w('  cp "./cycle$((i-1))/"*.r.nc ./')
+        w("done")
+
 
 def create_batch_script_cycle():
     # Function to create batch script - batch.cycle.hpc - for cycle simulations used by HPC system.

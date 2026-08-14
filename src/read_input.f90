@@ -142,6 +142,15 @@ subroutine readmodel
             read(1002,*) dtmax
             read(1002,*,iostat=ios) fric_pc_L
         endif
+        ! Effective normal stress caps, Pa. Read with iostat so a model.txt
+        ! written before these existed still loads; the defaults set in
+        ! globalvar then stand, which are the values that used to be literals
+        ! in faulting.f90, so no existing case changes behaviour.
+        read(1002,*,iostat=ios) min_norm, max_norm
+        if (ios /= 0) then
+            min_norm = -10.0d6
+            max_norm = -40.0d6
+        endif
         ! Optional per-fault geometry block, one line per fault:
         !   xlo xhi ycoor zlo zhi   (meters)
         ! Appended after the bp8 block and read with iostat so a model.txt

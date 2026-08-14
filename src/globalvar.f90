@@ -77,7 +77,11 @@ MODULE globalvar
     real (kind=dp) :: mat0(1,3), ksi, minDc, slipr_thres, ttheta=10.0d0, far_load_rate, far_norm_load_vel, load_slip_rate, pma, sliprmax
     real (kind=dp) :: init_norm ! initial effective normal stress on the fault, MPa.
     real (kind=dp) :: critt0 ! critical time for the nucleation to occur.
-    real (kind=dp) :: min_norm, max_norm ! minimum and maximum effective normal stress caps on the fault, MPa. 
+    ! Effective normal stress caps, Pa (negative = compressive). Read from
+    ! model.txt (scripts/case.setup writes par.min_norm/par.max_norm); these
+    ! defaults are the values that were literals in faulting.f90 before, so a
+    ! model.txt predating them leaves every existing case unchanged.
+    real (kind=dp) :: min_norm = -10.0d6, max_norm = -40.0d6
     ! parameters for friction laws.
     real (kind=dp) :: fric_sw_fs,       fric_sw_fd,      fric_sw_D0, &
         fric_rsf_a,       fric_rsf_b,      fric_rsf_Dc, &

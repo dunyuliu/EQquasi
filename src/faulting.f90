@@ -165,11 +165,12 @@ do ift = 1, ntotft
                 endif
                 
                 ! If non-planar fault geometry and elastic material, enforce normal stress caps.
+                ! min_norm/max_norm now come from model.txt (par.min_norm,
+                ! par.max_norm), defaulting to the -10/-40 MPa that used to be
+                ! hardcoded here. They were literals no compset could see, and
+                ! they silently overrode the initial condition of every case
+                ! that reached this branch -- see the guard in eqquasi.f90.
                 if (rough_fault == 1 .and. C_elastic == 1) then
-                    !tnrm0 = min(min_norm, tnrm0) ! Maintain a minimum normal stress level.
-                    max_norm      = -40.0d6
-                    min_norm      = -10.0d6
-                
                     if (tnrm0>=min_norm) then 
                         tnrm0 = min_norm
                     elseif (tnrm0<=max_norm) then

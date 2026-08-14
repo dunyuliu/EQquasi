@@ -131,10 +131,21 @@ def plot(case_dir, x, z, surface):
 
 
 def main():
-    case_dir = sys.argv[1] if len(sys.argv) > 1 else "."
-    sys.path.insert(0, os.path.abspath(case_dir))
+    # The argument is where the geometry is WRITTEN -- input/ in a case laid
+    # out by create.newcase. user_defined_params.py is not there: it lives in
+    # the case root, one level up, and tool/ holds what it imports. Python
+    # puts this script's own directory on sys.path, not the caller's, so
+    # running `python3 input/generateKinkGeometry.py input` from the case root
+    # failed with ModuleNotFoundError until both were added explicitly.
+    out_dir = sys.argv[1] if len(sys.argv) > 1 else "."
+    case_dir = sys.argv[2] if len(sys.argv) > 2 else (
+        os.path.dirname(os.path.abspath(out_dir)) or ".")
+    for d in (case_dir, os.path.join(case_dir, "tool"), os.path.abspath(out_dir)):
+        if os.path.isdir(d):
+            sys.path.insert(0, os.path.abspath(d))
     import user_defined_params as udp
     par = udp.par
+    case_dir = out_dir
 
     nx = int(round((par.fxmax - par.fxmin) / par.dx)) + 1
     nz = int(round((par.fzmax - par.fzmin) / par.dz)) + 1

@@ -106,6 +106,61 @@ subroutine setRunDate
     write(runDate,'(i4.4,A,i2.2,A,i2.2)') dtvals(1), '/', dtvals(2), '/', dtvals(3)
 end subroutine setRunDate
 
+subroutine checkNormalStressCaps
+    ! Stop if the initial normal stress lies outside the caps that will be
+    ! applied to it.
+    !
+    ! The caps only act when rough_fault == 1 .and. C_elastic == 1. When they
+    ! do, they clamp fric(7,...) on the first evaluation -- but the initial
+    ! SHEAR stress was computed by the compset from the uncapped normal
+    ! stress, and nothing recomputes it. The initial condition is then no
+    ! longer at steady state: tau/sigma_bar is too high by exactly the ratio
+    ! the clamp introduced, and rate-and-state turns that into slip rate
+    ! exponentially. liu2020.kink.qdc sets -50 MPa against a -40 MPa cap, a
+    ! 25 per cent overshoot, and reached 2e-1 m/s on step 2 from a 1e-9 m/s
+    ! start -- exp(0.15/0.007) ~ 2e9, which is what a = 0.007 does with it.
+    !
+    ! Silently clamping is the wrong answer here: the run continues and
+    ! produces numbers. Refuse instead, and say which cap and by how much.
+    use globalvar
+    implicit none
+    integer (kind = 4) :: ift, i
+    real (kind = dp)   :: lo, hi
+
+    if (.not. (rough_fault == 1 .and. C_elastic == 1)) return
+
+    lo = min(min_norm, max_norm)      ! most compressive allowed, e.g. -40 MPa
+    hi = max(min_norm, max_norm)      ! least compressive allowed, e.g. -10 MPa
+
+    do ift = 1, ntotft
+        do i = 1, nftnd(ift)
+            if (fric(7,i,ift) < lo .or. fric(7,i,ift) > hi) then
+                write(*,*) '====================================================='
+                write(*,*) '= Initial normal stress lies outside the caps       ='
+                write(*,*) '=                                                   ='
+                write(*,'(A,E12.4,A)') ' =   initial sigma_n : ', fric(7,i,ift), ' Pa'
+                write(*,'(A,E12.4,A)') ' =   cap range       : ', lo, ' Pa (most compressive)'
+                write(*,'(A,E12.4,A)') ' =                     ', hi, ' Pa (least compressive)'
+                write(*,'(A,I0,A,I0)') ' =   first at fault ', ift, ', node ', i
+                write(*,*) '=                                                   ='
+                write(*,*) '= The caps would clamp this on the first step while ='
+                write(*,*) '= the initial SHEAR stress stays as the compset      ='
+                write(*,*) '= computed it, so the initial condition would no     ='
+                write(*,*) '= longer be steady state and slip rate would run     ='
+                write(*,*) '= away exponentially. Refusing rather than running.  ='
+                write(*,*) '=                                                   ='
+                write(*,*) '= Fix: widen par.min_norm/par.max_norm to cover the ='
+                write(*,*) '= initial stress, or lower par.init_norm into range. ='
+                write(*,*) '= The caps act only when rough_fault=1 and           ='
+                write(*,*) '= C_elastic=1; most cases never reach them.          ='
+                write(*,*) '====================================================='
+                stop 7
+            endif
+        enddo
+    enddo
+
+end subroutine checkNormalStressCaps
+
 subroutine checkAndReport(currentProcID)
     use globalvar
     implicit none 
@@ -126,6 +181,7 @@ subroutine checkAndReport(currentProcID)
         ! path with 22 bytes of adjacent memory appended.
         filenametmp = trim(inputDir)//"on_fault_vars_input.nc"
         call netcdf_read_on_fault(filenametmp)
+        call checkNormalStressCaps
     else
         INQUIRE(FILE=trim(inputDir)//"on_fault_vars_input.nc", EXIST=file_exists)
             if (.not. file_exists) then

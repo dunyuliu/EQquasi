@@ -72,6 +72,12 @@ def create_model_input_file():
         f.write(str(par.fluid_Swell) + "  " + str(par.fluid_rwell) + "\n")
         f.write(str(par.dtmax) + "\n")
         f.write(str(par.fric_pc_L) + "\n")
+        # Effective normal stress caps. Appended to the scalar section, ahead of
+        # the optional faultgeom block: read_input.f90 reads this with iostat,
+        # so a model.txt written before this existed still loads and the solver
+        # keeps its defaults. Cannot go after faultgeom -- 13 of 16 compsets do
+        # not write that block, and their faultgeom read would swallow this line.
+        f.write(str(par.min_norm) + "  " + str(par.max_norm) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the
         # attribute defaults to None) keeps every existing compset's

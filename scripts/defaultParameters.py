@@ -163,6 +163,15 @@ class parameters:
     #   0.0 : default. No state; use the instantaneous effective normal stress.
     #  > 0  : relax the normal-stress state over this slip distance.
     fric_pc_L    = 0.0
+    # Effective normal stress caps, Pa (negative = compressive). Applied only
+    # when the fault is non-planar (rough_fault = 1) AND the material is
+    # elastic (C_elastic = 1): on a bent or rough fault, normal stress can run
+    # away at geometric asperities, and in the real Earth off-fault inelastic
+    # deformation limits it. Previously these were the literals -10e6/-40e6 in
+    # src/faulting.f90, invisible to every compset that they silently acted on.
+    # Liu, Duan & Luo (2020) section 3.5 uses -10e6/-100e6.
+    min_norm     = -10.0e6
+    max_norm     = -40.0e6
 
     ####################################
     ##### HPC resource allocation ######

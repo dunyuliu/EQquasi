@@ -2,14 +2,41 @@
 """
 Script to setup the case via user_defined_params.py.
 """
+import os
+import sys
+
+# The case root holds only user_defined_params.py and this script; the modules
+# they import (defaultParameters.py, lib.py) live under tool/, and the files
+# this script writes go to input/ or log/. Keeping the root to two files makes
+# "what did I change?" answerable at a glance.
+_CASE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_CASE, "tool"))
+# Keep __pycache__ out of the case root: importing user_defined_params.py from
+# the root would otherwise leave a directory there, and the root is meant to
+# show two files.
+sys.pycache_prefix = os.path.join(_CASE, "tool", "__pycache__")
+
 from user_defined_params import par
 import netCDF4 as nc
 import numpy as np
-import os
+
+INPUT = "input"
+LOG = "log"
+
+
+def inp(name):
+    """Path of a file a cycle consumes -- and only those.
+
+    run.sh copies the whole of input/ into scratch/ before each cycle, and
+    whatever is there ends up in result/cycleN. So input/ holds solver inputs
+    and nothing else: the batch scripts are things you submit, not things a
+    cycle reads, and they go in the case root with run.sh and case.submit."""
+    os.makedirs(INPUT, exist_ok=True)
+    return os.path.join(INPUT, name)
 
 def create_model_input_file():
     # Function to create model.txt used by EQquasi.
-    with open('model.txt', 'w') as f:
+    with open(inp('model.txt'), 'w') as f:
         f.write(str(par.fxmin) + "  " + str(par.fxmax) + "\n")
         f.write(str(par.fymin) + "  " + str(par.fymax) + "\n")
         f.write(str(par.fzmin) + "  " + str(par.fzmax) + "\n")
@@ -64,7 +91,7 @@ def create_station_input_file():
     # separated by a blank line). There is no per-fault station list yet, so
     # every fault is given the same st_coor_on_fault list; for ntotft == 1
     # this reduces to exactly the previous single-block format.
-    with open('stations.txt', 'w') as f:
+    with open(inp('stations.txt'), 'w') as f:
         f.write(str(par.n_off_fault) + "\n")
         f.write("  ".join([str(par.n_on_fault)] * par.ntotft) + "\n")
         for ift in range(par.ntotft):
@@ -88,7 +115,7 @@ def netcdf_write_on_fault_vars():
   #     fault's own (dip, strike) slab lands contiguously.
   # The layout is detected from array rank, never from par.ntotft, so the
   # reader and writer share one detection rule.
-  ds = nc.Dataset("on_fault_vars_input.nc", "w", format="NETCDF4")
+  ds = nc.Dataset(inp("on_fault_vars_input.nc"), "w", format="NETCDF4")
   ovars = par.on_fault_vars
 
   if ovars.ndim == 3:
@@ -212,64 +239,57 @@ def _exe_name():
 
 
 def create_run_sh():
-    """Write run.sh: each cycle runs inside a scratch directory, `tmp/`.
+    """Write run.sh into the case root: the one thing a user runs.
 
-    The solver used to run in the case root, and run.sh moved its output into
-    cycleN/ afterwards. A cycle that was killed or that failed therefore left
-    half-written output lying in the root, mixed in with the inputs that must
-    survive a cycle -- model.txt, on_fault_vars_input.nc, the *.r.nc restart
-    pair -- so "delete the leftovers" was never one safe command.
+    Each cycle runs inside scratch/ and is packaged into result/cycleN/ only
+    after it succeeds. The solver takes no output path -- it writes to its
+    working directory -- so `cd scratch` is what redirects it.
 
-    Now every cycle gets a fresh tmp/, its inputs are COPIED in, and the
-    solver writes only there. On success the whole of tmp/ moves to cycleN/
-    and tmp/ is removed; on failure tmp/ is left as it died and the next
-    attempt starts by deleting it. Either way the case root holds inputs and
-    finished cycles, nothing else, and recovering from a bad cycle is
-    `rm -rf tmp`.
-
-    Inputs are copied rather than linked. Through a symlink the solver's write
-    of fault.r.nc lands on the root file while tmp/ still holds a link, so the
-    restart pair never reaches cycleN/ -- and that only shows from the second
-    cycle on, since the first has nothing to link.
+    Failure leaves scratch/ untouched and creates no result/cycleN, so a
+    half-written cycle can never be mistaken for a finished one. Recovery is
+    `rm -rf scratch`; a full reset is `rm -rf scratch result`.
     """
-    inputs = ("model.txt stations.txt on_fault_vars_input.nc "
-              "bFault_Rough_Geometry.txt roughness.nc *.r.nc")
     with open("run.sh", "w") as f:
         w = lambda t: f.write(t + "\n")
         # Pin OpenMP threads. Left unset, each MPI rank spawns as many threads
         # as it likes and several ranks oversubscribe a node badly; measured
         # scaling is only 1.24x for 8 ranks, so threads buy nothing here.
         w("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}")
+        w("mkdir -p result log")
         w("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");")
         w("do")
-        w("  rm -rf tmp && mkdir tmp")
-        w("  for g in " + inputs + "; do")
-        w('    [ -e "$g" ] && cp "$g" tmp/')
-        w("  done")
-        w("  echo $i > tmp/currentcycle.txt")
+        w("  rm -rf scratch && mkdir scratch")
+        # No copying. The solver reads input/ and writes scratch/ directly --
+        # one copy of every input, whatever its size, and nothing of the
+        # layout duplicated per cycle. It runs at the case root, and stops
+        # with stop 6 if either directory is missing rather than falling back
+        # to the current directory.
+        w("  echo $i > scratch/currentcycle.txt")
+        # The restart pair is per-cycle state, not a case input: it comes from
+        # the cycle just finished. Staged into scratch/ so the solver reads it
+        # where it reads currentcycle.txt, and so input/ stays exactly what
+        # case.setup wrote -- frozen once the case has run.
+        w('  prev="result/cycle$((i-2))"')
+        w('  if [ -d "$prev" ]; then')
+        w('    for g in "$prev"/*.r.nc; do [ -e "$g" ] && cp "$g" scratch/; done')
+        w("  fi")
         # Name the binary by version. bin/ holds eqquasi-<version> and
-        # deliberately no plain `eqquasi`, so a case's run.sh records which
-        # build produced it and a rebuild cannot be picked up mid-run by a
-        # loop that relaunches each cycle.
-        w("  (cd tmp && mpirun.openmpi -np " + str(par.HPC_ncpu)
-          + " " + _exe_name() + ")")
-        # Stop the cycle loop when a cycle fails. Without this, a run that
-        # ended in STOP 508 (effective normal stress no longer compressive)
-        # was followed by more cycles, each restarting from the state that had
-        # just been rejected, each producing a cycleN/ holding one empty
-        # snapshot and no RUN SUMMARY. Directories that look like results and
-        # are not are worse than a loop that stops.
+        # deliberately no plain `eqquasi`, so a case records which build
+        # produced it and a rebuild cannot be picked up mid-run by a loop
+        # that relaunches each cycle.
+        w("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " " + _exe_name())
         w("  status=$?")
         w("  if [ $status -ne 0 ]; then")
         w('    echo "eqquasi exited $status in cycle $((i-1)); output left in '
-          'tmp/ for inspection; it is deleted when you retry." >&2')
+          'scratch/ for inspection; it is deleted when you retry." >&2')
         w("    exit $status")
         w("  fi")
-        w('  mkdir -p "./cycle$((i-1))"')
-        w('  mv tmp/* "./cycle$((i-1))/"')
-        w("  rm -rf tmp")
-        # The restart pair must be back in the root to seed the next cycle.
-        w('  cp "./cycle$((i-1))/"*.r.nc ./')
+        w('  mkdir -p "result/cycle$((i-1))"')
+        w('  mv scratch/* "result/cycle$((i-1))/"')
+        w("  rm -rf scratch")
+        # Nothing to copy back: the next cycle fetches the restart pair from
+        # result/cycle$((i-1)) directly, so there is one copy of it and input/
+        # is never written to after case.setup.
         w("done")
 
 
@@ -345,7 +365,39 @@ def estimate_HPC_resource():
     print("Estimated number of computing nodes to be requested is " + str(estimate_nnode))
     print("Estimated number of CPUs to be requested is " + str(estimate_ncpu))
 
+def refuse_if_case_has_run():
+    """Refuse to regenerate input/ once the case has produced anything.
+
+    case.setup rewrites model.txt, stations.txt and on_fault_vars_input.nc
+    from user_defined_params.py. Doing that between cycles of a multi-cycle
+    run would silently hand later cycles different inputs from earlier ones,
+    and nothing downstream would show the two halves were not comparable.
+
+    So setup is a one-way door: once result/ holds a cycle, or scratch/ holds
+    a cycle in progress, the inputs are frozen. Changing parameters means a new
+    case, which is cheap. Pass --force to override, for the case where you know
+    the regenerated inputs are identical (fixing a typo in a comment, say).
+    """
+    import sys as _sys
+    if "--force" in _sys.argv:
+        return
+    done = sorted(d for d in os.listdir("result")) if os.path.isdir("result") else []
+    running = os.path.isdir("scratch") and os.listdir("scratch")
+    if not done and not running:
+        return
+    what = (f"result/ holds {', '.join(done[:4])}"
+            + (" ..." if len(done) > 4 else "")) if done else "scratch/ is not empty"
+    raise SystemExit(
+        "case.setup: this case has already run -- " + what + ".\n"
+        "Regenerating input/ now would give later cycles different inputs "
+        "from the ones already used, and each result/cycleN keeps the inputs "
+        "that produced it, so the halves would not be comparable.\n"
+        "Start a new case for changed parameters, or pass --force if you are "
+        "certain the regenerated inputs are identical.")
+
+
 def _main_func(description):
+  refuse_if_case_has_run()
   create_model_input_file()
   create_batch_script()
   create_batch_script_cycle()

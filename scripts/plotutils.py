@@ -121,9 +121,12 @@ def resolve_results_dirs(path, patterns, tool=""):
     if ok(path):
         return [("", path)]
     qs = []
-    # run.sh writes cycle0, cycle1, ... Older cases used Q0, Q1 -- accept both
-    # so existing output stays readable.
-    for d in glob.glob(os.path.join(path, "cycle[0-9]*")) + \
+    # Cycles live under result/ since the case gained input/, result/,
+    # scratch/, tool/ and log/. Older cases kept them at case level, and older
+    # still called them Q0, Q1 -- accept all three so existing output stays
+    # readable rather than needing every case regenerated.
+    for d in glob.glob(os.path.join(path, "result", "cycle[0-9]*")) + \
+             glob.glob(os.path.join(path, "cycle[0-9]*")) + \
              glob.glob(os.path.join(path, "Q[0-9]*")):
         m = re.fullmatch(r"(?:cycle|Q)(\d+)", os.path.basename(d))
         if m and os.path.isdir(d) and ok(d):
@@ -131,9 +134,10 @@ def resolve_results_dirs(path, patterns, tool=""):
     if qs:
         return [(os.path.basename(d), d) for _, d in sorted(qs)]
     die(f"{tag}found none of the required files ({', '.join(patterns)}) in "
-        f"{path} or in any {os.path.join(path, 'Q*')} cycle directory.\n"
-        "Point me at a results directory, or at a case directory whose Q* "
-        "cycle folders contain the run output.")
+        f"{path}, in {os.path.join(path, 'result', 'cycle*')}, or in any "
+        f"cycle*/Q* directory beside it.\n"
+        "Point me at a cycle directory, or at a case directory whose "
+        "result/cycle* folders hold the run output.")
 
 
 def resolve_targets(tokens, patterns, tool=""):
@@ -153,13 +157,17 @@ def resolve_targets(tokens, patterns, tool=""):
         cand = t
         if not os.path.isdir(cand):
             m = re.fullmatch(r"(?:cycle|Q)?(\d+)", t)
-            hit = next((f"{pre}{int(m.group(1))}" for pre in ("cycle", "Q")
-                        if m and os.path.isdir(f"{pre}{int(m.group(1))}")), None)
+            hit = next((c for c in
+                        (f"result/cycle{int(m.group(1))}" if m else "",
+                         f"cycle{int(m.group(1))}" if m else "",
+                         f"Q{int(m.group(1))}" if m else "")
+                        if c and os.path.isdir(c)), None)
             if hit:
                 cand = hit
             else:
                 have = sorted(os.path.basename(d)
-                              for d in glob.glob("cycle[0-9]*") + glob.glob("Q[0-9]*")
+                              for d in glob.glob("result/cycle[0-9]*")
+                              + glob.glob("cycle[0-9]*") + glob.glob("Q[0-9]*")
                               if os.path.isdir(d))
                 die(f"{tag}no such directory or cycle: {t}"
                     + (f" (cycles here: {', '.join(have)})" if have else ""))
@@ -211,24 +219,28 @@ output:
 
 
 def load_par(run_dir, tool=""):
-    """The `par` object from user_defined_params.py in run_dir or its parent.
+    """The `par` object from user_defined_params.py at or above run_dir.
 
-    A Q<i> cycle folder holds output only; the parameters live one level up in
-    the case root. Loads by explicit path (never via cwd or PYTHONPATH), with
-    scripts/ temporarily on sys.path for `from defaultParameters import ...`.
+    A cycle folder holds output only; the parameters live in the case root,
+    which is two levels up now that cycles sit in result/cycleN (one level for
+    older cases with cycleN at case level). Loads by explicit path -- never via
+    cwd or PYTHONPATH -- with the case's tool/ and scripts/ on sys.path for
+    `from defaultParameters import ...`.
     """
     import importlib.util
     tag = f"{tool}: " if tool else ""
     run_dir = os.path.abspath(run_dir or ".")
-    for d in (run_dir, os.path.dirname(run_dir)):
+    up1 = os.path.dirname(run_dir)
+    for d in (run_dir, up1, os.path.dirname(up1)):
         p = os.path.join(d, "user_defined_params.py")
         if os.path.isfile(p):
             break
     else:
-        die(f"{tag}no user_defined_params.py in {run_dir} or its parent; "
-            "this tool needs the case parameters (point it at the case or "
-            "cycle directory).")
-    added = [os.path.dirname(os.path.abspath(__file__)),
+        die(f"{tag}no user_defined_params.py in {run_dir} or the two "
+            "directories above it; this tool needs the case parameters "
+            "(point it at the case or cycle directory).")
+    added = [os.path.join(d, "tool"),
+             os.path.dirname(os.path.abspath(__file__)),
              os.path.dirname(p)]
     sys.path[:0] = added
     stale = sys.modules.pop("user_defined_params", None)

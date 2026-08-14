@@ -43,6 +43,24 @@ program eqquasi3d
     call mesh4num
     call allocAndInit
     call meshgen
+
+    ! A requested station that matches no fault node used to vanish without a
+    ! word. BP1002 asked for three and got one: two sat at x = +-2.0 km and
+    ! z = -2.0/-18.0 km, none of which is a multiple of dx = 2500 m, so they
+    ! matched nothing and the run reported three requested, one written, and
+    ! no discrepancy. The reference was blessed from it.
+    if (me == 0 .and. sum(nonfs) > 0 .and. n4onf < sum(nonfs)) then
+        write(*,*) '====================================================='
+        write(*,*) '= ON-FAULT STATIONS REQUESTED BUT NOT FOUND         ='
+        write(*,*) '=   requested (stations.txt) =', sum(nonfs)
+        write(*,*) '=   matched to a fault node  =', n4onf
+        write(*,*) '= A station only exists if its (x, z) lands on a    ='
+        write(*,*) '= node: both must be multiples of dx, measured from ='
+        write(*,*) '= the fault corner. Fix par.st_coor_on_fault in     ='
+        write(*,*) '= user_defined_params.py and rerun case.setup.      ='
+        write(*,*) '====================================================='
+    endif
+
     call checkAndReport(me)
 
     if(n4out>0) then 

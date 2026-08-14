@@ -31,6 +31,12 @@ Read this first on wake-up. Update in place; close items by deleting them.
 - Background commands inherit a stale cwd. ALWAYS `cd` to an absolute path
   inside the command; this has broken four launches today.
 - Never `pkill -f <pattern>` where the pattern matches the running command.
+- **Never rebuild the binary while a multi-cycle run is in flight.** run.sh
+  invokes `eqquasi-<version>` afresh each cycle, so a rebuild mid-run splits
+  the dataset: the cycles before it and the cycles after it came from
+  different code under one version number. Done on 2026-08-14 -- the 20-cycle
+  BP1002 run's cycle 0 has the station fix but not the per-fault cplot fix --
+  and the run had to be restarted. Rebuild before launching, or wait.
 - Killed runs leave NFS `.nfs*` files; kill the ranks, sleep, then `rm -rf`.
 - Do not work in the user's home outside this repo. The kink work lives in
   the worktree `/home/utig5/dliu/eqquasi.kink`, NOT in `~`.

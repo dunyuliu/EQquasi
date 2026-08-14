@@ -26,7 +26,10 @@ def model_txt_write_count():
 def model_txt_read_count():
     """Number of records src/read_input.f90 reads from unit 1002."""
     src = strip_fortran_comments(read("src/read_input.f90"))
-    body = src.split("file = 'model.txt'")[1].split("close(1002)")[0]
+    # Anchor on the unit, not the filename: read_input.f90 opens
+    # trim(inputDir)//'model.txt' since the solver reads from input/, and a
+    # literal-filename split silently matched nothing after that change.
+    body = src.split("unit = 1002")[1].split("close(1002)")[0]
     return len(re.findall(r"read\(1002,\*", body))
 
 

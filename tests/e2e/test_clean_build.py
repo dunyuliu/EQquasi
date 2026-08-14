@@ -20,14 +20,30 @@ import subprocess
 
 import pytest
 
+import cases as C
 from conftest import ROOT
 
 pytestmark = [pytest.mark.e2e, pytest.mark.e2e_fast]
 
 INSTALL = ROOT / "install.eqquasi.sh"
-BIN = ROOT / "bin" / "eqquasi"
 
 BUILD_TIMEOUT_S = 1800
+
+
+def expected_binary():
+    """Where install.eqquasi.sh will put the binary it is about to build.
+
+    bin/ holds versioned binaries and no plain `eqquasi`, so this has to be
+    derived from the version src declares rather than hard-coded. It was
+    hard-coded to bin/eqquasi, and after the switch to versioned names that
+    path stopped existing -- which made the version-skew test below skip
+    itself with "no binary" on every run. A guard against stale binaries that
+    quietly does not run is worse than no guard, because the suite still
+    reports green.
+    """
+    v = C.declared_version()
+    assert v, "EQQUASI_VERSION not found in src/globalvar.f90"
+    return ROOT / "bin" / f"eqquasi-{v}"
 
 
 @pytest.mark.skipif(not INSTALL.exists(), reason="no install.eqquasi.sh")
@@ -41,6 +57,7 @@ def test_install_script_produces_a_working_binary():
     # Keep the existing binary: if the build fails we restore it rather than
     # leaving the tree without one, which would cascade into every other e2e
     # test skipping and the failure looking like "nothing ran".
+    BIN = expected_binary()
     saved = None
     if BIN.exists():
         saved = str(BIN) + ".pretest"
@@ -54,8 +71,14 @@ def test_install_script_produces_a_working_binary():
         r = subprocess.run(["bash", str(INSTALL), "-m", machine],
                            cwd=str(ROOT), env=env, capture_output=True,
                            text=True, timeout=BUILD_TIMEOUT_S)
+        # Name MACHINE in the message: the default is `ubuntu` because that is
+        # what CI runs, but on a host whose MUMPS headers sit elsewhere the
+        # build dies on a missing dmumps_struc.h, which reads as a code
+        # failure rather than as "you did not say which machine this is".
         assert r.returncode == 0, (
-            f"install.eqquasi.sh -m {machine} failed (exit {r.returncode}).\n"
+            f"install.eqquasi.sh -m {machine} failed (exit {r.returncode}). "
+            f"MACHINE was {'set' if 'MACHINE' in os.environ else 'unset, so it defaulted'} "
+            f"to {machine}; set MACHINE=<host> if that is the wrong target.\n"
             f"stdout tail:\n{r.stdout[-3000:]}\n"
             f"stderr tail:\n{r.stderr[-3000:]}")
         assert BIN.exists(), f"build reported success but {BIN} is missing"
@@ -85,21 +108,17 @@ def test_built_binary_version_matches_the_source():
     A stale binary is the quiet way an e2e suite tests last week's code: every
     comparison passes because the oracle was frozen from the same stale build.
     """
-    if not BIN.exists():
-        pytest.skip("no binary; test_install_script_produces_a_working_binary "
-                    "covers building one")
-    src = (ROOT / "src" / "globalvar.f90").read_text()
-    declared = None
-    for line in src.splitlines():
-        if "EQQUASI_VERSION" in line and "=" in line:
-            declared = line.split("'")[1] if "'" in line else None
-            break
+    declared = C.declared_version()
     assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
+    BIN = expected_binary()
+    assert BIN.exists(), (
+        f"src declares {declared} but {BIN.name} is not in bin/. Every e2e "
+        f"comparison below would be running some other version. Rebuild: "
+        f"EQQUASIROOT=$(pwd) MACHINE=<host> bash install.eqquasi.sh -m <host>")
 
     r = subprocess.run([str(BIN)], cwd=str(ROOT), capture_output=True,
                        text=True, timeout=120)
     out = r.stdout + r.stderr
     assert declared in out, (
-        f"bin/eqquasi reports a different version than src declares "
-        f"({declared}). Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> "
-        f"make -C src && mv src/eqquasi bin/")
+        f"{BIN.name} reports a different version than src declares "
+        f"({declared}); the file name is not evidence of what is inside it.")

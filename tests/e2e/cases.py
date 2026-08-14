@@ -281,7 +281,8 @@ def run_case(compset, over, workdir):
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)
     step(["./case.setup"], workdir)
 
-    with open(os.path.join(workdir, "run.log"), "w") as log:
+    os.makedirs(os.path.join(workdir, "log"), exist_ok=True)
+    with open(os.path.join(workdir, "log", "run.log"), "w") as log:
         proc = subprocess.Popen(["bash", "run.sh"], cwd=workdir, env=e,
                                 stdout=log, stderr=subprocess.STDOUT,
                                 start_new_session=True)
@@ -297,14 +298,21 @@ def run_case(compset, over, workdir):
         # instruction nobody can follow: BP8 failed this way on GitHub for two
         # releases running and the only evidence available was the exit code.
         try:
-            tail = open(os.path.join(workdir, "run.log")).read()[-4000:]
+            tail = open(os.path.join(workdir, "log", "run.log")).read()[-4000:]
         except OSError as exc:
             tail = f"(run.log unreadable: {exc})"
         pytest.fail(f"run.sh exited {proc.returncode} for {compset}.\n"
-                    f"--- tail of {workdir}/run.log ---\n{tail}")
+                    f"--- tail of {workdir}/log/run.log ---\n{tail}")
 
-    cyc = os.path.join(workdir, "cycle0")
-    assert os.path.isdir(cyc), f"run.sh produced no cycle0/ for {compset}"
+    # Cycles live under result/ since the case layout gained input/, result/,
+    # scratch/, tool/ and log/. A run that failed leaves scratch/ and no
+    # result/cycle0 at all, which is the point of the split.
+    cyc = os.path.join(workdir, "result", "cycle0")
+    assert os.path.isdir(cyc), (
+        f"run.sh produced no result/cycle0/ for {compset}"
+        + (f"; scratch/ is present with {len(os.listdir(os.path.join(workdir, 'scratch')))}"
+           " files, so the cycle started and did not finish"
+           if os.path.isdir(os.path.join(workdir, "scratch")) else ""))
 
     # A directory is not a result. When BP1002 hit STOP 508 in cycle 2, the
     # loop carried on and left two more cycleN/ directories behind, each with
@@ -533,6 +541,58 @@ def sibling_component_scale(path, ncols):
     return best or None
 
 
+def column_printed_rtol(path, ncols, rtol):
+    """Per-column relative tolerance, floored at the file's own printed precision.
+
+    A text table can only resolve differences it has the digits to express.
+    The station files are written `E21.13,6E15.7`: seven significant digits in
+    every column but the first. Two runs that differ by MPI reduction ordering
+    (~2e-14 relative) print identical text almost everywhere, but a value
+    sitting on a rounding boundary flips its last digit -- 1.383710E-05 against
+    1.383711E-05, one entry in 31381. Demanding rtol=1e-9 of a column carrying
+    1e-7 of precision asks the file for digits it never wrote, so the gate
+    fails at random on reruns rather than on regressions.
+
+    So the floor is read off the file: `d` significant digits give one unit in
+    the last place of 10**-(d-1) relative, doubled for the case where a value
+    rounds away from its neighbour rather than toward it. Nothing is loosened
+    beyond what the text cannot say -- the netCDF files carry full double
+    precision and are still compared at 1e-9, and a regression too small to
+    change the seventh digit of a station file is not one this tier could ever
+    have detected.
+
+    Only exponential-notation tokens are measured. A plain "1.0" would read as
+    two significant digits and floor the column at 1e-1, which would be a real
+    loosening; columns without exponential tokens keep the caller's rtol.
+    """
+    import numpy as _np
+    import re as _re
+    tok = _re.compile(r"^[+-]?(\d*)\.?(\d*)[EeDd][+-]?\d+$")
+    digits = [None] * ncols
+    try:
+        with open(path) as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) != ncols:
+                    continue
+                for j, p in enumerate(parts):
+                    m = tok.match(p)
+                    if not m:
+                        continue
+                    sig = (m.group(1) + m.group(2)).lstrip("0")
+                    n = len(sig)
+                    if n and (digits[j] is None or n < digits[j]):
+                        digits[j] = n          # least precise token wins
+    except OSError:
+        return _np.full(ncols, float(rtol))
+
+    out = _np.full(ncols, float(rtol))
+    for j, d in enumerate(digits):
+        if d:
+            out[j] = max(out[j], min(2.0 * 10.0 ** -(d - 1), 1e-5))
+    return out
+
+
 def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
     """(ok, message) for two numeric tables. Full array, not sampled.
 
@@ -557,10 +617,20 @@ def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
     sib = sibling_component_scale(gpath, g.shape[1])
     if sib is not None:
         scale = _np.maximum(scale, sib)
-    ok, nbad, idx, worst = compare_arrays(g, r, rtol, floor_rtol, scale=scale)
+    # A log10 column was exponentiated above, so its printed precision no
+    # longer describes the numbers being compared; measure before that and it
+    # would be wrong, so those columns simply keep the caller's rtol.
+    col_rtol = column_printed_rtol(gpath, g.shape[1], rtol)
+    if header:
+        for j, name in enumerate(header):
+            if name in LOG10_COLUMNS:
+                col_rtol[j] = rtol
+
+    ok, nbad, idx, worst = compare_arrays(g, r, col_rtol, floor_rtol, scale=scale)
     if not ok:
         i, j = idx
-        return False, (f"{nbad} of {g.size} entries outside rtol={rtol:g}; "
+        return False, (f"{nbad} of {g.size} entries outside "
+                       f"rtol={col_rtol[j]:g}; "
                        f"worst at row {i}, column {j+1}: "
                        f"{r[i, j]:.8g} vs {g[i, j]:.8g}")
     return True, (f"{g.shape[0]} rows x {g.shape[1]} cols, "

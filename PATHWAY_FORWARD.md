@@ -163,13 +163,11 @@ Read this first on wake-up. Update in place; close items by deleting them.
   already takes `--fault`.)
 - [FIXED] `plotOnFaultVars`' depth axis now names the domain floor when the
   fault does not reach it.
-- Reference version skew, from each `cycle0/runInfo.json`: bp1002 **1.11.0**
-  (not 1.12.0, as this line said before), bp5 1.7.2, bp7 1.7.0, bp8 1.6.0.
-  Note what this does and does not mean: the full e2e tier passes against all
-  of them, so current code *reproduces* them and they are not stale data. The
-  gap is provenance -- no README records which version produced the numbers,
-  or when they were last confirmed still reproducible. Worth a line in each
-  README rather than a re-run.
+- [FIXED] Reference provenance. Each README now records the version that
+  produced its numbers (bp1002 1.11.0, bp5 1.7.2, bp7 1.7.0, bp8 1.6.0) and
+  the date current code was confirmed to reproduce them. The version gap was
+  never staleness -- the full tier passes against all of them -- it was the
+  absence of a record, which is what makes a future divergence datable.
 - Every pre-existing case in `work/` can no longer RESUME: the solver
   hard-stops without `input/` and `scratch/`. Deliberate, and narrower than
   it sounds -- verified 2026-08-14 that the utilities still READ the old flat
@@ -324,22 +322,23 @@ Adding `time` and `slips`/`slipd` to the restart file, restored when
 
 - `porepressure.f90` indexes `nftnd(1)` — no fluid injection on a multi-fault
   model, so BP8-style problems remain single-fault.
-- `case.setup` writes one station list to every fault, and
-  `library_output.f90:11` writes stations only under `if (j==1)` — faults 2
-  and beyond get no station output at all. Not aliasing: they do not exist.
+- `case.setup` writes one station list to every fault, so a multi-fault case
+  gets the same station coordinates on each. Fault 2+ stations DO exist now
+  (v1.13.0); they are named `fltst_ft<N>_*` because the coordinates are
+  fault-local and would otherwise collide.
 - The post-processing utilities report the **global** peak slip rate, so
-  which segment ruptured is invisible in `peak_slip_rate_vs_time` and
-  `accumulatedSlip`. On a step-over that is the question being asked.
-- `plotOnFaultVars`' depth axis is the fault's own extent with no indication
-  of the domain's, which reads as "the model stops at 20 km" for bp1002.
-- Reference version skew, from each `cycle0/runInfo.json`: bp1002 **1.11.0**
-  (not 1.12.0, as this line said before), bp5 1.7.2, bp7 1.7.0, bp8 1.6.0.
-  Note what this does and does not mean: the full e2e tier passes against all
-  of them, so current code *reproduces* them and they are not stale data. The
-  gap is provenance -- no README records which version produced the numbers,
-  or when they were last confirmed still reproducible. Worth a line in each
-  README rather than a re-run. No
-  two are same-binary comparable (rule 11).
+  which segment ruptured is invisible in `peak_slip_rate_vs_time`. On a
+  step-over that is the question being asked. Not fixable in the plotting:
+  `global.dat` column 2 is a single `maxval` over all faults
+  (`solveTimeLoopMUMPS.f90`), so it needs new columns and a re-bless of every
+  reference. (`plotAccumulated` already takes `--fault`.)
+- ~~`plotOnFaultVars`' depth axis gives no indication of the domain's~~
+  FIXED v1.13.0: the label names the domain floor when the fault stops short.
+- The references were blessed at four different versions (bp1002 1.11.0,
+  bp5 1.7.2, bp7 1.7.0, bp8 1.6.0), so no two are same-binary comparable
+  (rule 11). Each README now records its version and the date current code
+  was confirmed to reproduce it; the gap was never staleness, since the full
+  tier passes against all of them.
 - A kink (bent-fault) compset for Liu et al. (2020) is paused in the worktree
   `/home/utig5/dliu/eqquasi.kink`, branch `kink-geometry`, uncommitted. The
   geometry generator is verified in the file and in the solved mesh; dx = 300 m

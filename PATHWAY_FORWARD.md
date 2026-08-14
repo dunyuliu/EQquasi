@@ -79,13 +79,6 @@ existed: the fault plane clamped across the whole model
 plane frozen), and two of three requested stations silently matching no node.
 Both were invisible to every single-fault benchmark.
 
-## 4. The x and z belts carry the bug we just fixed in y
-
-`fltx1 = minval(fltxyz(1,1,:))` is the x belt origin, and other faults' `xlo`
-are never checked for commensurability with `dx`. Same in z. v1.7.0 guards only
-the fault-normal direction. `bp1002.qdc.2500` happens to be x-commensurate, so
-nothing exercises it today. Same refuse-guard, small change.
-
 ## 5. Step-over science — answered, and the answer is conditional
 
 Run and re-run. The result moved three times, which is itself the finding:
@@ -121,11 +114,6 @@ them. A clean experiment defines VW relative to each segment.
 
 Also open on this case:
 
-- `on_fault_vars[..., 20] = Dc / creep_slip_rate` uses the global creep rate
-  while the shear line beside it uses the node's own `[..., 46]`. BP5's
-  prescription is `theta = Dc / V_node`. Byte-identical since the case was
-  written, so it explains nothing that has happened — resolve before the next
-  reference.
 - The interior tips facing across the step-over are velocity-weakening and
   untapered. That drove effective normal stress to zero and STOP 508 by cycle
   3 in the pre-v1.11.0 geometry. It has not recurred in five cycles of the

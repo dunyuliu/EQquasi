@@ -371,6 +371,57 @@ def estimate_HPC_resource():
     print("Estimated number of computing nodes to be requested is " + str(estimate_nnode))
     print("Estimated number of CPUs to be requested is " + str(estimate_ncpu))
 
+# Below this the adaptive time step goes into a limit cycle rather than
+# resolving a rupture. Calibrated against runs, not taken from a paper: BP5 at
+# dx = 2000 m sits at 1.32 and behaves; the kink case at dx = 1200 m sits at
+# 0.47 and its slip rate oscillates between 1e-1 and 1e-6 for thousands of
+# steps inside what should be one event.
+COHESIVE_ZONE_MIN = 1.0
+
+
+def report_cohesive_zone():
+    """Cohesive-zone width against cell size, printed before the run.
+
+    Lambda_0 = C1 * mu* * Dc / (b * sigma_n) is the width of the zone behind
+    the rupture front over which strength drops. If a cell is wider than it,
+    no mesh point sits inside the front and the solution is set by the
+    discretization rather than the friction law.
+
+    This is the cheapest possible check -- five parameters and no run -- for a
+    failure that otherwise costs hours and looks like physics: a fault that
+    "ruptures" repeatedly, normal stress that never evolves, and cycles that
+    end after a day.
+
+    Reported, not enforced. The test.* compsets are deliberately coarse, and a
+    convergence study needs to run the under-resolved cases on purpose. What
+    it must never do is let one pass unremarked.
+    """
+    need = ("fric_rsf_Dc", "fric_rsf_b", "init_norm", "vs", "rou", "dx")
+    missing = [n for n in need if getattr(par, n, None) in (None, 0)]
+    if missing:
+        print(f"  cohesive zone: not computed, {', '.join(missing)} unset")
+        return
+
+    mu_star = par.rou * par.vs ** 2          # shear modulus, Pa
+    c1 = 9.0 * 3.141592653589793 / 32.0      # Lapusta & Liu (2009), mode III
+    lam = c1 * mu_star * par.fric_rsf_Dc / (par.fric_rsf_b * abs(par.init_norm))
+    ratio = lam / par.dx
+
+    print(f"  cohesive zone Lambda_0 = {lam:.0f} m, dx = {par.dx:.0f} m, "
+          f"Lambda_0/dx = {ratio:.2f}")
+    if ratio < COHESIVE_ZONE_MIN:
+        print("  " + "!" * 68)
+        print(f"  ! UNDER-RESOLVED: Lambda_0/dx = {ratio:.2f} < "
+              f"{COHESIVE_ZONE_MIN}. For reference BP5 runs at 1.32.")
+        print(f"  ! At {ratio:.2f} the adaptive time step (dt ~ ksi*Dc/V) can")
+        print( "  ! enter a limit cycle: V falls, dt grows, the larger step")
+        print( "  ! overshoots, V climbs, and the pair oscillate instead of")
+        print( "  ! resolving one rupture. The output still looks like events.")
+        print(f"  ! dx <= {lam / COHESIVE_ZONE_MIN:.0f} m would clear it, or a")
+        print( "  ! larger Dc. Proceeding -- this is a warning, not a gate.")
+        print("  " + "!" * 68)
+
+
 def refuse_if_case_has_run():
     """Refuse to regenerate input/ once the case has produced anything.
 
@@ -410,6 +461,7 @@ def _main_func(description):
   create_run_sh()
   create_station_input_file()
   estimate_HPC_resource()
+  report_cohesive_zone()
   netcdf_write_on_fault_vars()
   if par.insertFaultType>0:
       # Check the exit status. This used to be ignored, so when

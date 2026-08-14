@@ -114,12 +114,20 @@ def process_dir(rdir, outdir, interval, ift=0):
     # is shorter than one interval: BP7 ruptures over 1.1 s against BP5's 117,
     # so at 5 s the only levels are 0 and 5 and neither lies inside the data.
     # Fall back to a round interval giving ~8 lines, and say so on the figure.
-    auto = False
+    # Too MANY contours is as unreadable as too few. A quasi-dynamic rupture
+    # can last 5e5 s, and at the 5 s default that is 100,000 lines -- the
+    # figure comes out solid black. Widen the interval to land near 20 lines.
+    auto = ""
+    if (hi - lo) / step > 40.0:
+        raw = max(hi - lo, 1e-12) / 20.0
+        mag = 10.0 ** np.floor(np.log10(raw))
+        step = next(m * mag for m in (1, 2, 2.5, 5, 10) if raw <= m * mag)
+        auto = "auto: event far longer than the 5 s default"
     if (hi - lo) / step < 3.0:
         raw = max(hi - lo, 1e-12) / 8.0
         mag = 10.0 ** np.floor(np.log10(raw))
         step = next(m * mag for m in (1, 2, 2.5, 5, 10) if raw <= m * mag)
-        auto = True
+        auto = "auto: event shorter than the 5 s default"
     clev = np.arange(np.floor(lo / step) * step, hi + step, step)
 
     # Labelled contour lines carry the times, so a colourbar repeats what the
@@ -127,7 +135,11 @@ def process_dir(rdir, outdir, interval, ift=0):
     # fill only to show the front's shape.
     fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
     cs = ax.contour(xk, zk, grid, levels=clev, colors="k", linewidths=1.1)
-    ax.clabel(cs, inline=True, fontsize=11, fmt="%g")
+    # Label every other level once there are many: on a coarse mesh the
+    # contours sit within a few hundred metres of each other and a label on
+    # each one is an unreadable smear.
+    lab = cs.levels[::2] if len(cs.levels) > 8 else cs.levels
+    ax.clabel(cs, levels=lab, inline=True, fontsize=9, fmt="%g")
     ax.set_xlabel("along strike (km)")
     ax.tick_params()
     # Column 2 of cplot_EQquasi.txt is -zcoor, so negate it back and plot the
@@ -149,7 +161,7 @@ def process_dir(rdir, outdir, interval, ift=0):
     # in the title they crowd out the one thing a reader needs, which is what
     # the figure shows and which run it came from.
     ax.set_title(f"Rupture time since nucleation, contours every {step:g} s"
-                 f"{' (auto: event shorter than the 5 s default)' if auto else ''}\n"
+                 f"{f' ({auto})' if auto else ''}\n"
                  f"{os.path.basename(os.path.abspath(rdir))}"
                  f"  (nucleated at {onset:.6g} s)  fault {ift}")
     name = "rupture_time.png" if ift == 0 else f"rupture_time.f{ift}.png"

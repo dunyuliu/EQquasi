@@ -148,3 +148,35 @@ In cycle 0 fault 2 barely moves -- these stations record 1e-6 to 1e-4 m of
 slip creeping at ~1e-9 m/s, against fault 1's 1.65 m. That is the point of
 keeping them: the step-over holding is a result, and until now the gate had
 no record of the segment that did not rupture.
+
+## How entangled the zoning and the geometry are
+
+Zoning is written in the model's global |x|, so a segment's frictional
+makeup depends on where it sits, not on what it is. Measured on the nodes
+each run actually meshed:
+
+| run / segment | VW | VS | non-RSF |
+|---|---|---|---|
+| current, A (−60 → +2.5 km) | 36.3% | 48.3% | 15.4% |
+| current, B (−2.5 → +60 km) | 36.3% | 48.3% | 15.4% |
+| `ab_newzone_olddom`, A (−42.5 → −2.5 km) | 49.0% | 51.0% | 0% |
+| `ab_newzone_olddom`, B (−7.5 → +32.5 km) | 55.6% | 44.4% | 0% |
+
+Two things follow, and the second was not previously stated.
+
+The current geometry is symmetric about x = 0, so both segments receive
+*identical* zoning. Whatever decides which one ruptures, it is not a zoning
+difference between them.
+
+The A/B experiment is a different matter. It was read as isolating segment
+length, and it does not: shortening the segments also raised VW from 36% to
+49–56% and removed the non-rate-and-state creeping ends entirely. Worse, its
+two segments are not zoned alike — B carries 6.6 points more VW than A —
+because that geometry is not symmetric about the step-over. So "the VS margin
+decides cycle-0 crossing" remains supported but not isolated, and the
+asymmetry means which fault went first in that run was partly a zoning
+choice.
+
+Making it isolated needs VW defined in each segment's own along-strike
+coordinate, holding VW fraction and non-RSF fraction fixed while segment
+length varies. That is a new compset, not a parameter change.

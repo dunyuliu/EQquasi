@@ -30,23 +30,26 @@ load-bearing.
 
 **Part II — Project-specific rules**
 
-1. [Minimal changes; no new files until necessary](#1-minimal-changes-no-new-files-until-necessary) (G1)
-2. [No silent fallbacks, swallowed errors, or placeholder data](#2-no-silent-fallbacks-swallowed-errors-or-placeholder-data) (G2)
-3. [The regression gate is the release gate — four benchmarks, real exit codes, the right configuration](#3-the-regression-gate-is-the-release-gate--four-benchmarks-real-exit-codes-the-right-configuration) (G3)
-4. [model.txt is a positional contract — never insert, always append](#4-modeltxt-is-a-positional-contract--never-insert-always-append) (G4)
-5. [fric()/on_fault_vars magic indices have one authoritative source per direction](#5-fricon_fault_vars-magic-indices-have-one-authoritative-source-per-direction) (G5)
-6. [New bp values are additive branches, never edits to existing bp branches](#6-new-bp-values-are-additive-branches-never-edits-to-existing-bp-branches) (G6)
-7. [New compsets: naming, placement, and registration](#7-new-compsets-naming-placement-and-registration) (G7)
-12. [The regression gate must include a multi-fault case](#12-the-regression-gate-must-include-a-multi-fault-case) (G7)
-8. [Reference results are read-only, only grow, and every file has a reader](#8-reference-results-are-read-only-only-grow-and-every-file-has-a-reader) (G8)
-9. [Build/environment claims must be verified on the target host, not assumed](#9-buildenvironment-claims-must-be-verified-on-the-target-host-not-assumed) (G9)
-10. [Docs move with the code, in the same change](#10-docs-move-with-the-code-in-the-same-change) (G10)
-11. [Compare like with like: pin the version, vary one thing, stress the assumption](#11-compare-like-with-like-pin-the-version-vary-one-thing-stress-the-assumption) (G11)
-13. [Known Fortran landmines in this codebase must not recur](#13-known-fortran-landmines-in-this-codebase-must-not-recur) (G12, and 13a also instantiates G6)
-14. [Shared-checkout discipline: worktrees, not branches; explicit paths, not `-A`](#14-shared-checkout-discipline-worktrees-not-branches-explicit-paths-not--a) (G13)
-15. [Operational safety on the shared compute host](#15-operational-safety-on-the-shared-compute-host) (G14)
-16. [A subagent's or audit's finding is a hypothesis until checked against source](#16-a-subagents-or-audits-finding-is-a-hypothesis-until-checked-against-source) (G15)
-20. ["Plot" means a fixed set of five figures, in a fixed order](#20-plot-means-a-fixed-set-of-five-figures-in-a-fixed-order) (G3)
+1. [Minimal changes; no new files until necessary](#1-minimal-changes-no-new-files-until-necessary)
+2. [No silent fallbacks, swallowed errors, or placeholder data](#2-no-silent-fallbacks-swallowed-errors-or-placeholder-data)
+3. [The regression gate is the release gate — four benchmarks, real exit codes, the right configuration](#3-the-regression-gate-is-the-release-gate--four-benchmarks-real-exit-codes-the-right-configuration)
+4. [model.txt is a positional contract — never insert, always append](#4-modeltxt-is-a-positional-contract--never-insert-always-append)
+5. [fric()/on_fault_vars magic indices have one authoritative source per direction](#5-friconfaultvars-magic-indices-have-one-authoritative-source-per-direction)
+6. [New bp values are additive branches, never edits to existing bp branches](#6-new-bp-values-are-additive-branches-never-edits-to-existing-bp-branches)
+7. [New compsets: naming, placement, and registration](#7-new-compsets-naming-placement-and-registration)
+8. [Reference results are read-only, only grow, and every file has a reader](#8-reference-results-are-read-only-only-grow-and-every-file-has-a-reader)
+9. [Build/environment claims must be verified on the target host, not assumed](#9-buildenvironment-claims-must-be-verified-on-the-target-host-not-assumed)
+10. [Docs move with the code, in the same change](#10-docs-move-with-the-code-in-the-same-change)
+11. [Compare like with like: pin the version, vary one thing, stress the assumption](#11-compare-like-with-like-pin-the-version-vary-one-thing-stress-the-assumption)
+12. [The regression gate must include a multi-fault case](#12-the-regression-gate-must-include-a-multi-fault-case)
+13. [Known Fortran landmines in this codebase must not recur](#13-known-fortran-landmines-in-this-codebase-must-not-recur)
+14. [Shared-checkout discipline: worktrees, not branches; explicit paths, not `-A`](#14-shared-checkout-discipline-worktrees-not-branches-explicit-paths-not--a)
+15. [Operational safety on the shared compute host](#15-operational-safety-on-the-shared-compute-host)
+16. [A subagent's or audit's finding is a hypothesis until checked against source](#16-a-subagents-or-audits-finding-is-a-hypothesis-until-checked-against-source)
+17. [CI is the gate, not the local suite](#17-ci-is-the-gate-not-the-local-suite)
+18. [The whole workflow must work for every example](#18-the-whole-workflow-must-work-for-every-example)
+19. [Drive runs through the workflow, never the binary directly](#19-drive-runs-through-the-workflow-never-the-binary-directly)
+20. ["Plot" means a fixed set of five figures, in a fixed order](#20-plot-means-a-fixed-set-of-five-figures-in-a-fixed-order)
 
 Rule numbers are cited in commits, reports, and the test suite itself
 (`tests/contract/test_reference_gold_is_referenced.py` cites 8a,
@@ -238,6 +241,31 @@ this file.
 
 Each rule below states, in one line, which Part I principle it instantiates,
 then gets specific: the file, the incident, the command that checks it.
+
+## How these rules overlap
+
+Five rules are one family and are cited separately only because they were
+learned separately. When they seem to say the same thing, they do; the
+distinction is what each one is the authority on:
+
+| rule | the authority on |
+|---|---|
+| 3 | what the gate consists of, and at what configuration |
+| 12 | that the gate must contain a multi-fault case |
+| 17 | that CI, not the local suite, is the verdict |
+| 18 | that the whole workflow must run, not just the solver |
+| 19 | that a run must go through the workflow, not the binary |
+
+Rules 4 and 5 are also a pair: both are "a contract with one authoritative
+source", 4 for a positional file format and 5 for magic indices.
+
+Numbers are never reused or reassigned. They are cited from `tests/` (11
+files), `scripts/defaultParameters.py`, `src/read_input.f90` and 16 commit
+messages, all as prose that no test would catch going stale -- so a
+renumbering would rot silently. A rule that is superseded says so in place
+and keeps its number.
+
+---
 
 ## 1. Minimal changes; no new files until necessary
 
@@ -507,40 +535,6 @@ present → `sophia-okafor`.
 
 ---
 
-## 12. The regression gate must include a multi-fault case
-
-**Instantiates**: G7, together with rule 7 above — a registry that never
-grows a multi-fault entry is the other half of this principle failing.
-
-BP5, BP5-dip90, BP7 and BP8's regression compsets (`test.bp5.qdc`,
-`test.bp5.qdc.dip90`, `test.bp7.qdc`, `test.bp8.qdc`) all have `ntotft = 1`.
-Three multi-fault bugs in this project's history were found by running a new
-case by hand; none were caught by the gate, because nothing in it ever
-exercised `ntotft > 1`. `case_input/bp1002.qdc.2500` is the two-fault
-step-over that now carries this: it has a reference under
-`reference/bp1002/cycle0/`, a row in `tests/e2e/cases.py`, and a physical
-invariant in `tests/unit/test_physical_invariants.py` asserting the seed
-lands on fault 0 and only fault 0.
-
-It sits in the **full** tier, not the every-push fast tier, because the event
-is 3821 steps and ~2600 s on 3 ranks. So every-push CI still has no
-`ntotft > 1` case. That is a known, costed gap, recorded in the CASES table
-beside the row — not an oversight.
-
-**How to apply**: keep a multi-fault case in the gate with a regenerable
-reference and at least one assertion that distinguishes the faults from each
-other, so a fault-aliased or misrouted read fails rather than merely moving a
-number.
-
-**Tier**: mechanical —
-`python3 -m pytest tests/unit/test_physical_invariants.py -k multifault`.
-The earlier citation here pointed at
-`tests/contract/test_gate_set_has_multifault.py`, deleted in 2ccafe4; a rule
-whose stated check does not exist is unenforceable, which is the failure mode
-rule 12 is itself about.
-
----
-
 ## 8. Reference results are read-only, only grow, and every file has a reader
 
 **Instantiates**: G8.
@@ -655,6 +649,40 @@ are already mechanically produced and checked for internal consistency by
 `test_repo_hygiene.py`, but *using* them to validate a specific comparison
 between two runs is a discipline, not a static repo invariant, and cannot be
 generically automated.
+
+---
+
+## 12. The regression gate must include a multi-fault case
+
+**Instantiates**: G7, together with rule 7 above — a registry that never
+grows a multi-fault entry is the other half of this principle failing.
+
+BP5, BP5-dip90, BP7 and BP8's regression compsets (`test.bp5.qdc`,
+`test.bp5.qdc.dip90`, `test.bp7.qdc`, `test.bp8.qdc`) all have `ntotft = 1`.
+Three multi-fault bugs in this project's history were found by running a new
+case by hand; none were caught by the gate, because nothing in it ever
+exercised `ntotft > 1`. `case_input/bp1002.qdc.2500` is the two-fault
+step-over that now carries this: it has a reference under
+`reference/bp1002/cycle0/`, a row in `tests/e2e/cases.py`, and a physical
+invariant in `tests/unit/test_physical_invariants.py` asserting the seed
+lands on fault 0 and only fault 0.
+
+It sits in the **full** tier, not the every-push fast tier, because the event
+is 3821 steps and ~2600 s on 3 ranks. So every-push CI still has no
+`ntotft > 1` case. That is a known, costed gap, recorded in the CASES table
+beside the row — not an oversight.
+
+**How to apply**: keep a multi-fault case in the gate with a regenerable
+reference and at least one assertion that distinguishes the faults from each
+other, so a fault-aliased or misrouted read fails rather than merely moving a
+number.
+
+**Tier**: mechanical —
+`python3 -m pytest tests/unit/test_physical_invariants.py -k multifault`.
+The earlier citation here pointed at
+`tests/contract/test_gate_set_has_multifault.py`, deleted in 2ccafe4; a rule
+whose stated check does not exist is unenforceable, which is the failure mode
+rule 12 is itself about.
 
 ---
 
@@ -792,132 +820,6 @@ exactly the failure mode this rule is about.
 
 ---
 
-## 18. The whole workflow must work for every example
-
-**Instantiates: G7** (a configuration doesn't exist to the safety net until it's
-registered where the net looks) and **G3** (a gate is only real if it runs and
-fails loud).
-
-Create the case, run it, post-process it. All three steps must work for **every**
-compset in `case_input/`, and above all for the runs frozen under `reference/`.
-A gold reference nobody can regenerate or plot is a file, not a reference.
-
-Concretely, for each example:
-
-- `create.newcase <dir> <compset>` succeeds and `./case.setup` produces a
-  runnable case;
-- the solver runs it to its own exit criterion, not a step cap;
-- **every post-processing utility runs on the result** and produces a figure,
-  or says clearly why it does not (BP8 is aseismic, so an empty rupture-time
-  plot is the correct answer -- that is a message, not a traceback).
-
-*Incidents, 2026-08-12, all found by pointing a tool at a benchmark it had never
-been run against.* `plotOnFaultVars` failed on BP8 because it read `global.dat`
-with `np.loadtxt`, which chokes on the section 4.2 field-name line that BP5 does
-not have -- four utilities had the same defect and now all route through
-`seasio.read_array`. `plotStations.py` was written against the BP8 column layout
-and mislabelled the 9-column BP5/BP7 one throughout: slip rate is **linear**
-there, not log10, and column 7 is effective normal stress, not pore pressure.
-`plotOnFaultInitals` had never run at all. `plotAccumulated` and `plotProfiles`
-were broken by a missing helper and a dead `pdf2image` import.
-
-None of these were caught by a test, because the tests exercised one benchmark
-each. The cheap guard is to run the utilities across all of them: differences in
-column count, file extension (`.txt` against `.dat`), header presence and cycle
-layout are exactly what a single-benchmark test cannot see.
-
-Related: rule 8a (every reference file has a reader) covers whether a gold file
-is *read*; this rule covers whether the pipeline that produced it still *works*.
-
----
-
-## 20. "Plot" means a fixed set of five figures, in a fixed order
-
-**Instantiates: G3** — a result you look at is a gate, and a gate that varies
-run to run is not one.
-
-When the user says **"plot"**, with no further qualification, produce these
-five, in this order, and show them:
-
-| # | tool | what it answers |
-|---|---|---|
-| 1 | `plotRuptureTime.py` | where and when the front went |
-| 2 | `plotPeakSliprateTime.py` | when the events were |
-| 3 | `plotOnFaultVars` | the full state on the fault plane |
-| 4 | `plotAccumulated` | slip built up over cycles |
-| 5 | `plotStations.py` | time series at the named stations |
-
-**Scope.** Per cycle for 1, 3 and 5 — those describe one event, and merging
-cycles into them destroys the thing they show. Across the whole set for 2 and
-4 — those exist to be read as a history, and one cycle of either is nearly
-information-free. On a multi-fault case, every tool that takes `--fault` is
-run once per fault, and both figures are shown; a single-fault figure from a
-two-fault model is a claim that half the model did nothing, and it must be
-made explicitly, not by omission.
-
-**Why fixed.** Choosing which figures to show after seeing the numbers is how
-a result gets talked into existence. Fixing the set in advance means the same
-five are produced whether they support the story or not.
-
-**Do not silently substitute.** If a tool in the list cannot answer for part
-of the model, say so with the figure rather than showing the part that works.
-As of 2026-08-14 that applies to #1: `library_output.f90` writes
-`cplot_EQquasi.txt` from `nftnd(1)` / `fnft(i,1)`, hardcoded to fault 1, so
-fault 2's rupture times are never written to disk and every BP1002
-rupture-time figure is fault A only. No `--fault` flag can fix that; the data
-is not in the file. Until the solver writes a per-fault cplot, that figure is
-captioned as fault A only.
-
-**Tier**: judgment. It governs what gets shown to a person, which no test can
-check.
-
-## 19. Drive runs through the workflow, never the binary directly
-
-**Instantiates: G3** (a gate is only real if it runs at the right
-configuration) and **G18** (the whole workflow must work for every example).
-
-To change what a run does, change `user_defined_params.py`, then `./case.setup`,
-then `bash run.sh`. Do not invoke `mpirun ... bin/eqquasi` by hand.
-
-`run.sh` is not a convenience wrapper. It owns the cycle loop: it writes
-`currentcycle.txt`, moves each cycle's output into `cycle<i>/`, copies the
-restart files back to the case root between cycles, and invokes the
-post-processing. Calling the solver directly silently skips all of it.
-
-*Incident, 2026-08-12.* The BP5 full-cycle gold was produced by running the
-binary directly. Its output therefore landed flat in the case root instead of in
-`cycle0/`, so it did not look like any other run; `plotOnFaultVars` then failed
-on it because `user_defined_params.py` was not where a cycle directory would
-have had it, and the file had to be copied in by hand to make the gold
-plottable at all. Every conclusion drawn from that run was still valid -- but
-the artifact was shaped unlike anything the workflow produces, which is the
-opposite of what a reference should be.
-
-The same applies to the parameters: edit the compset, do not hand-edit the
-generated `model.txt` or `run.sh`. `./case.setup` regenerates both, so an edit
-to either is discarded the next time anyone runs it (see rule 15).
-
-**One parameter scheme, not two.** Every compset inherits from
-`scripts/defaultParameters.py`, and the default must cover every case the code
-supports -- otherwise a compset that needs something the default lacks builds it
-by hand, and there are two ways to express the same thing.
-
-*Open example.* `defaultParameters` carries `ntotft` and `faultgeom`, so it is
-multi-fault aware, but allocates `on_fault_vars` as a single-fault
-`(nfz, nfx, 100)`. `test.stepover.qdc` and `bp1002.qdc.2500` therefore allocate
-their own 4-D `(ntotft, nfzMax, nfxMax, 100)` and fill it themselves. Two
-schemes for one thing. The fix is the same `ntotft`-neutrality already required
-of the Fortran (rule 13): allocate 4-D always, with `ntotft = 1` the degenerate
-case.
-
-**Run what the workflow puts on PATH, and know which binary that is.**
-`install.eqquasi.sh` prepends `bin/` to PATH, but a stale EQquasi installation
-elsewhere on PATH will shadow it and fail confusingly -- on this machine
-`which -a eqquasi` finds a second copy under a different home directory that is
-missing `libdmumps-5.4.so`, so `run.sh` dies with a shared-library error that
-says nothing about the real cause. Check `which -a eqquasi` before concluding a
-run is broken.
-
 ## 17. CI is the gate, not the local suite
 
 **Instantiates: G3** (a gate is only real if it runs, fails loud, and is
@@ -1006,3 +908,129 @@ Starter-set rules not carried over at original seed time: rule 9 (cheap
 targeted check before expensive run) and the provenance/benchmark starter
 rule were folded into rule 3 rather than kept generic, since this repo's
 expensive-run hazard (regenerating gold references) already has a named gate.
+
+## 18. The whole workflow must work for every example
+
+**Instantiates: G7** (a configuration doesn't exist to the safety net until it's
+registered where the net looks) and **G3** (a gate is only real if it runs and
+fails loud).
+
+Create the case, run it, post-process it. All three steps must work for **every**
+compset in `case_input/`, and above all for the runs frozen under `reference/`.
+A gold reference nobody can regenerate or plot is a file, not a reference.
+
+Concretely, for each example:
+
+- `create.newcase <dir> <compset>` succeeds and `./case.setup` produces a
+  runnable case;
+- the solver runs it to its own exit criterion, not a step cap;
+- **every post-processing utility runs on the result** and produces a figure,
+  or says clearly why it does not (BP8 is aseismic, so an empty rupture-time
+  plot is the correct answer -- that is a message, not a traceback).
+
+*Incidents, 2026-08-12, all found by pointing a tool at a benchmark it had never
+been run against.* `plotOnFaultVars` failed on BP8 because it read `global.dat`
+with `np.loadtxt`, which chokes on the section 4.2 field-name line that BP5 does
+not have -- four utilities had the same defect and now all route through
+`seasio.read_array`. `plotStations.py` was written against the BP8 column layout
+and mislabelled the 9-column BP5/BP7 one throughout: slip rate is **linear**
+there, not log10, and column 7 is effective normal stress, not pore pressure.
+`plotOnFaultInitals` had never run at all. `plotAccumulated` and `plotProfiles`
+were broken by a missing helper and a dead `pdf2image` import.
+
+None of these were caught by a test, because the tests exercised one benchmark
+each. The cheap guard is to run the utilities across all of them: differences in
+column count, file extension (`.txt` against `.dat`), header presence and cycle
+layout are exactly what a single-benchmark test cannot see.
+
+Related: rule 8a (every reference file has a reader) covers whether a gold file
+is *read*; this rule covers whether the pipeline that produced it still *works*.
+
+---
+
+## 19. Drive runs through the workflow, never the binary directly
+
+**Instantiates: G3** (a gate is only real if it runs at the right
+configuration) and **G18** (the whole workflow must work for every example).
+
+To change what a run does, change `user_defined_params.py`, then `./case.setup`,
+then `bash run.sh`. Do not invoke `mpirun ... bin/eqquasi` by hand.
+
+`run.sh` is not a convenience wrapper. It owns the cycle loop: it writes
+`currentcycle.txt`, moves each cycle's output into `cycle<i>/`, copies the
+restart files back to the case root between cycles, and invokes the
+post-processing. Calling the solver directly silently skips all of it.
+
+*Incident, 2026-08-12.* The BP5 full-cycle gold was produced by running the
+binary directly. Its output therefore landed flat in the case root instead of in
+`cycle0/`, so it did not look like any other run; `plotOnFaultVars` then failed
+on it because `user_defined_params.py` was not where a cycle directory would
+have had it, and the file had to be copied in by hand to make the gold
+plottable at all. Every conclusion drawn from that run was still valid -- but
+the artifact was shaped unlike anything the workflow produces, which is the
+opposite of what a reference should be.
+
+The same applies to the parameters: edit the compset, do not hand-edit the
+generated `model.txt` or `run.sh`. `./case.setup` regenerates both, so an edit
+to either is discarded the next time anyone runs it (see rule 15).
+
+**One parameter scheme, not two.** Every compset inherits from
+`scripts/defaultParameters.py`, and the default must cover every case the code
+supports -- otherwise a compset that needs something the default lacks builds it
+by hand, and there are two ways to express the same thing.
+
+*Open example.* `defaultParameters` carries `ntotft` and `faultgeom`, so it is
+multi-fault aware, but allocates `on_fault_vars` as a single-fault
+`(nfz, nfx, 100)`. `test.stepover.qdc` and `bp1002.qdc.2500` therefore allocate
+their own 4-D `(ntotft, nfzMax, nfxMax, 100)` and fill it themselves. Two
+schemes for one thing. The fix is the same `ntotft`-neutrality already required
+of the Fortran (rule 13): allocate 4-D always, with `ntotft = 1` the degenerate
+case.
+
+**Run what the workflow puts on PATH, and know which binary that is.**
+`install.eqquasi.sh` prepends `bin/` to PATH, but a stale EQquasi installation
+elsewhere on PATH will shadow it and fail confusingly -- on this machine
+`which -a eqquasi` finds a second copy under a different home directory that is
+missing `libdmumps-5.4.so`, so `run.sh` dies with a shared-library error that
+says nothing about the real cause. Check `which -a eqquasi` before concluding a
+run is broken.
+
+## 20. "Plot" means a fixed set of five figures, in a fixed order
+
+**Instantiates: G3** — a result you look at is a gate, and a gate that varies
+run to run is not one.
+
+When the user says **"plot"**, with no further qualification, produce these
+five, in this order, and show them:
+
+| # | tool | what it answers |
+|---|---|---|
+| 1 | `plotRuptureTime.py` | where and when the front went |
+| 2 | `plotPeakSliprateTime.py` | when the events were |
+| 3 | `plotOnFaultVars` | the full state on the fault plane |
+| 4 | `plotAccumulated` | slip built up over cycles |
+| 5 | `plotStations.py` | time series at the named stations |
+
+**Scope.** Per cycle for 1, 3 and 5 — those describe one event, and merging
+cycles into them destroys the thing they show. Across the whole set for 2 and
+4 — those exist to be read as a history, and one cycle of either is nearly
+information-free. On a multi-fault case, every tool that takes `--fault` is
+run once per fault, and both figures are shown; a single-fault figure from a
+two-fault model is a claim that half the model did nothing, and it must be
+made explicitly, not by omission.
+
+**Why fixed.** Choosing which figures to show after seeing the numbers is how
+a result gets talked into existence. Fixing the set in advance means the same
+five are produced whether they support the story or not.
+
+**Do not silently substitute.** If a tool in the list cannot answer for part
+of the model, say so with the figure rather than showing the part that works.
+As of 2026-08-14 that applies to #1: `library_output.f90` writes
+`cplot_EQquasi.txt` from `nftnd(1)` / `fnft(i,1)`, hardcoded to fault 1, so
+fault 2's rupture times are never written to disk and every BP1002
+rupture-time figure is fault A only. No `--fault` flag can fix that; the data
+is not in the file. Until the solver writes a per-fault cplot, that figure is
+captioned as fault A only.
+
+**Tier**: judgment. It governs what gets shown to a person, which no test can
+check.

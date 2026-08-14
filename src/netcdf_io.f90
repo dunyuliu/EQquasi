@@ -72,7 +72,8 @@ subroutine netcdf_write(outfile, outtype)
     lat_index = (/ (i, i = 1, nlat) /)
     lon_index = (/ (i, i = 1, nlon) /)
     ! Create the netCDF file.
-    call check(nf90_create(outfile, NF90_CLOBBER, ncid))
+    lastNcPath = outfile
+    call check(nf90_create(trim(outfile), NF90_CLOBBER, ncid))
     
     ! Define the dimensions.
     call check(nf90_def_dim(ncid, lat_name, nlat, lat_dimid))
@@ -210,7 +211,8 @@ subroutine netcdf_write_on_fault(outfile)
         enddo
     enddo
     ! Create the netCDF file.
-    call check(nf90_create(outfile, NF90_CLOBBER, ncid))
+    lastNcPath = outfile
+    call check(nf90_create(trim(outfile), NF90_CLOBBER, ncid))
 
     ! Define the dimensions.
     call check(nf90_def_dim(ncid, lat_name, nlat, lat_dimid))
@@ -304,7 +306,8 @@ subroutine netcdf_write_roughness(outfile)
         enddo 
     enddo 
     ! Create the netCDF file.
-    call check(nf90_create(outfile, NF90_CLOBBER, ncid))
+    lastNcPath = outfile
+    call check(nf90_create(trim(outfile), NF90_CLOBBER, ncid))
     
     ! Define the dimensions.
     call check(nf90_def_dim(ncid, lat_name, nlat, lat_dimid))
@@ -398,7 +401,8 @@ subroutine netcdf_read_on_fault(infile)
     on_fault_vars = 0.0d0
 
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
-    call check( nf90_open(infile, NF90_NOWRITE, ncid))
+    lastNcPath = infile
+    call check( nf90_open(trim(infile), NF90_NOWRITE, ncid))
 
     ! Get the varid of the data variables, based on their names.
     call check( nf90_inq_varid(ncid, "a",  var_id(1)))
@@ -532,7 +536,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     on_fault_vars = 0.0d0
 
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
-    call check( nf90_open(infile1, NF90_NOWRITE, ncid))
+    lastNcPath = infile1
+    call check( nf90_open(trim(infile1), NF90_NOWRITE, ncid))
 
     ! Get the varid of the data variables, based on their names.
     call check( nf90_inq_varid(ncid, "a",  var_id(1)))
@@ -606,7 +611,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     nvar = 12
     allocate(on_fault_vars4(nfxMax,nfzMax,nvar,ntotft))
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
-    call check( nf90_open(infile2, NF90_NOWRITE, ncid))
+    lastNcPath = infile2
+    call check( nf90_open(trim(infile2), NF90_NOWRITE, ncid))
 
     ! Get the varid of the data variables, based on their names.
     ! 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs'
@@ -657,10 +663,12 @@ end subroutine netcdf_read_on_fault_restart
 
 subroutine check(status)
     use netcdf
+    use globalvar, only: lastNcPath
     integer, intent ( in) :: status
     
     if(status /= nf90_noerr) then 
-      print *, nf90_strerror(status)
+      print *, 'netCDF error: ', trim(nf90_strerror(status))
+      print *, 'while handling: ', trim(lastNcPath)
       stop "Stopped"
     end if
 end subroutine check  

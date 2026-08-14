@@ -266,14 +266,26 @@ def main():
     # the last cycle drawn. On BP1002 fault A that made the 10.4 m peak at
     # x = -30 km read as cycle 4, which added 0.000 m there -- cycle 2 put up
     # 5.712 m of it and cycle 0 the rest.
+    # Dashes cycle with the colour, so where two cycles' curves coincide the
+    # one underneath shows through the gaps instead of being erased. Colour
+    # alone cannot show a coincidence; a reader has no way to tell "cycle 4
+    # added nothing here" from "cycle 4 is the only cycle here".
+    # Width decreases with cycle number as well, so an earlier cycle drawn on
+    # top of a later one is still visibly wider rather than merely a different
+    # colour -- and the two cues survive being printed in greyscale.
+    dashes = [(None, None), (6, 2), (2, 2), (6, 2, 2, 2), (1, 1.5)]
+    n = len(cycle_spans)
     for index, (name, lo, hi) in reversed(list(enumerate(cycle_spans))):
         colour = colours(index % 10)
+        dash = dashes[index % len(dashes)]
+        width = 2.0 - 1.2 * (index / max(n - 1, 1))
         for column in range(lo, hi):
-            line = (ax.plot(stacked[:, column], color=colour, lw=0.7)
-                    if xaxis is None else
-                    ax.plot(xaxis, stacked[:, column], color=colour, lw=0.7))
+            xs = range(stacked.shape[0]) if xaxis is None else xaxis
+            line, = ax.plot(xs, stacked[:, column], color=colour, lw=width)
+            if dash[0] is not None:
+                line.set_dashes(list(dash))
             if column == lo:
-                line[0].set_label(name)
+                line.set_label(name)
     if len(cycle_spans) > 1:
         # Drawing order is reversed; the legend is not. Read it as cycle 0
         # first regardless of what was painted when.

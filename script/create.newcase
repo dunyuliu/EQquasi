@@ -1,0 +1,109 @@
+#! /usr/bin/env python3
+"""Stage a case directory: the two files you touch, and four folders.
+
+    <case>/
+        user_defined_params.py   the only file you edit
+        case.setup  case.submit  run.sh    what you run
+        input/                   everything a cycle consumes
+        result/                  cycle0/ ... cycleN/, one per completed cycle
+        scratch/                 the cycle that is running, and nothing else
+        tool/                    machinery the case imports, not for editing
+        log/                     setup.log, run.log
+
+Everything else the case needs is filed under one of those, so the case root
+stays readable and "what did I change?" is answerable at a glance.
+
+The split that matters is scratch/ against result/. The solver writes to its
+working directory, so a cycle runs inside scratch/ and is packaged into
+result/cycleN/ only once it has succeeded. A cycle that is killed or that
+fails leaves scratch/ exactly as it died and creates no result directory, so
+half-written output can never be mistaken for a finished cycle, and recovery
+is `rm -rf scratch`. Before this, a killed cycle strewed its output across the
+case root among the inputs, where deleting the leftovers was not one safe
+command.
+
+Post-processing tools are deliberately NOT copied here. They live once in
+script/, reach the case on PATH via install.eqquasi.sh, and take a cycle
+directory as an argument. A copied tool freezes at the vintage the case was
+created with, which is how three separate nid_fault breakages went unnoticed.
+case.setup is copied, because a case must stay runnable on its own; note that
+it therefore also freezes, and a case being updated in place needs
+`cp $EQQUASIROOT/script/case.setup .` first.
+"""
+
+import os
+import shutil
+import sys
+
+# Run from inside the case, so they sit in the case root alongside run.sh,
+# which case.setup writes. The root is what you edit and what you run.
+CASE_ROOT_FILES = ["case.setup", "case.submit"]
+
+# Imported by user_defined_params.py (-> defaultParameters.py -> lib.py) and
+# by case.setup. Machinery, not knobs: filed under tool/ so the root shows
+# only what a person edits or runs.
+CASE_TOOL_FILES = ["defaultParameters.py", "lib.py"]
+
+# Written by hand into the compset and consumed by a cycle rather than edited.
+# Anything else the compset ships (geometry tables, roughness) is input too.
+COMPSET_ROOT_FILES = ["user_defined_params.py"]
+
+SUBDIRS = ["input", "result", "scratch", "tool", "log"]
+
+
+def copy_files(src, dst, only=None, skip=None):
+    """Copy plain files from src to dst.
+
+    Directories are skipped rather than raising: a stray __pycache__/ in
+    compsets or scripts is otherwise enough to abort case creation.
+    """
+    for f in sorted(os.listdir(src)):
+        s = os.path.join(src, f)
+        if os.path.isdir(s):
+            continue
+        if only is not None and f not in only:
+            continue
+        if skip is not None and f in skip:
+            continue
+        shutil.copy(s, dst)
+
+
+def _main_func(description):
+    if len(sys.argv) < 3:
+        raise SystemExit("usage: create.newcase <case dir> <compset>")
+    case_path, compset = sys.argv[1], sys.argv[2]
+
+    root = os.environ.get("EQQUASIROOT")
+    if not root:
+        raise SystemExit("create.newcase: EQQUASIROOT is not set; "
+                         "source install.eqquasi.sh first.")
+    compset_path = os.path.join(root, "compsets", compset)
+    if not os.path.isdir(compset_path):
+        raise SystemExit(f"create.newcase: no compset {compset} in "
+                         f"{os.path.join(root, 'compsets')}.")
+    scripts_path = os.path.join(root, "script")
+
+    shutil.rmtree(case_path, ignore_errors=True)
+    os.makedirs(case_path)
+    for d in SUBDIRS:
+        os.makedirs(os.path.join(case_path, d))
+
+    # From the compset: the parameter file in the root, everything else it
+    # ships (rough-fault geometry tables and the like) as input.
+    copy_files(compset_path, case_path, only=COMPSET_ROOT_FILES)
+    copy_files(compset_path, os.path.join(case_path, "input"),
+               skip=COMPSET_ROOT_FILES)
+
+    # From script/: case.setup in the root because it is run from there,
+    # the rest under tool/ because it is imported, not invoked.
+    copy_files(scripts_path, case_path, only=CASE_ROOT_FILES)
+    copy_files(scripts_path, os.path.join(case_path, "tool"),
+               only=CASE_TOOL_FILES)
+
+    print(f"{case_path}  {compset}")
+    print(f"  root:  {' '.join(COMPSET_ROOT_FILES + CASE_ROOT_FILES)}")
+    print(f"  dirs:  {' '.join(SUBDIRS)}")
+
+
+if __name__ == "__main__":
+    _main_func(__doc__)

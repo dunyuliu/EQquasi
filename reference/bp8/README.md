@@ -203,8 +203,8 @@ setsid nohup mpirun -np 1 $EQQUASIROOT/bin/eqquasi > r.log 2> t.log < /dev/null 
 Then package for the CRESCENT DET platform:
 
 ```
-python3 scripts/resampleBP8Profiles.py work/mycase work/mysub   # only needed if dx > 10 m
-python3 scripts/checkBP8Submission work/mysub --zip auto
+python3 script/resampleBP8Profiles.py work/mycase work/mysub   # only needed if dx > 10 m
+python3 script/checkBP8Submission work/mysub --zip auto
 ```
 
 Points that are easy to get wrong, each of which cost real time here:
@@ -307,7 +307,7 @@ both compared stations.
 
 The gold result is frozen in `reference/bp8/` (v1.4.7, `work/bp8.sub147`,
 dx = 50 m, aging law, 30 days) and is the oracle for
-`tests/e2e/test_bp8_against_gold.py`:
+`testsys/e2e/test_bp8_against_gold.py`:
 
 | quantity | ours | `taehoKim_ref` |
 |----------|------|----------------|
@@ -333,7 +333,7 @@ nodes; at dx = 50 m there are 17. `checkBP8Submission` rejects it with 20 errors
 for that reason, which is correct -- Table 1 specifies `Delta z` = 10 m and only
 the dx = 10 m run can be uploaded.
 
-`scripts/plotICReadings.py` overlays the three (`work/ic_readings.png`). Two
+`script/plotICReadings.py` overlays the three (`work/ic_readings.png`). Two
 things are visible there that the endpoint numbers hide:
 
   - **The readings differ only in the first ~4 days.** Shear stress and state at
@@ -353,7 +353,7 @@ what the cases ship, because it takes Table 1 and section 3's eq. (29) at face
 value. Reading B satisfies both equations of section 3 and adjusts only a Table 1
 number, and it is the one that matches the `taehoKim_ref` comparison (~21 mm,
 with the slip-rate maximum near `t_off` rather than at 0.8 d). This has been
-raised with the benchmark authors; until they resolve it, `tests/
+raised with the benchmark authors; until they resolve it, `testsys/
 test_initial_conditions.py` pins reading A and records the size of the
 inconsistency so it cannot drift unnoticed.
 
@@ -515,18 +515,18 @@ max\|diff\| across every file — an artifact of the gold writer, not the solver
 
 ## How it is checked
 
-`tests/e2e/test_bp8_against_gold.py` rebuilds, reruns `test.bp8.qdc` at this
+`testsys/e2e/test_bp8_against_gold.py` rebuilds, reruns `test.bp8.qdc` at this
 configuration, and diffs **every file whole** to 10⁻⁶ — not sampled. Named
 scalar assertions sit alongside the full diffs because they say *which* quantity
 moved; the full diffs exist because seven scalars out of ~58 000 entries per
 station left most of every curve unguarded, including columns nothing sampled
 (`slip_3`, both Darcy velocities). The run must also pass
-`scripts/checkBP8Submission`.
+`script/checkBP8Submission`.
 
 Quick check without the suite:
 
 ```
-python3 scripts/plotAgainstGold.py bp8 <run_dir>
+python3 script/plotAgainstGold.py bp8 <run_dir>
 ```
 
 ## What this does not establish

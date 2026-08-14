@@ -51,7 +51,7 @@ Inheriting a code path also inherits whatever has never executed in it.
 
 ## 3. Three contracts you must not break
 
-Each now has a guard in `tests/test_io_contracts.py`.
+Each now has a guard in `testsys/test_io_contracts.py`.
 
 ### 3.1 `model.txt` is positional
 
@@ -114,8 +114,8 @@ All additive and guarded on `bp == 8` (rule 6); BP5/BP7 paths byte-identical.
 | `src/solveTimeLoopMUMPS.f90` | init + update calls; `dtmax` cap; time-based exit |
 | `src/library_output.f90` | 11-field station files, BP8 `global.dat`, signed-metre names |
 | `src/eqquasi.f90` | `fltsta` 10 → 14 |
-| `scripts/defaultParameters.py` | fluid parameters, all defaulting to off |
-| `scripts/case.setup` | append the six lines |
+| `script/defaultParameters.py` | fluid parameters, all defaulting to off |
+| `script/case.setup` | append the six lines |
 | `compsets/bp8.qdc.gs.10/` | production compset, 10 m |
 | `compsets/test.bp8.qdc/` | smoke compset, 50 m |
 
@@ -183,7 +183,7 @@ the code reports **6.55e-11**.
 > started at `V = 6.5e-11 m/s`, 65× `V_init`, on a fault 1.67 MPa weaker than
 > specified. Reproducing a number you derived from the same wrong inputs proves
 > only that the arithmetic is consistent. Fixed in v1.4.6; guarded by
-> `tests/test_initial_conditions.py`.
+> `testsys/test_initial_conditions.py`.
 
 **Known bias, first order in `dx`.** Check 2 matches the *discrete* area
 `(17·50)² = 722 500 m²`, not the continuum `800² = 640 000 m²`. Pressure lives

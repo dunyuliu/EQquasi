@@ -1,7 +1,7 @@
 # EQquasi Project Rules
 
 Twenty rules, each earned by an incident in this repository. Rule numbers are
-cited from `tests/`, `scripts/defaultParameters.py`, `src/read_input.f90` and
+cited from `testsys/`, `script/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
 ## Before you act
@@ -78,7 +78,7 @@ same change.
 
 The same applies to **names**. A new variable, parameter or constant is a new
 thing to keep consistent: reuse one, or inline the value, before inventing a
-name. `par` carries a schema (`scripts/defaultParameters.py`); a key not in
+name. `par` carries a schema (`script/defaultParameters.py`); a key not in
 that schema is not a parameter however well it reads.
 
 *Incidents.* A pore-pressure feature that also reorganized `globalvar.f90`
@@ -104,7 +104,7 @@ run produces numbers.
 
 *Incident.* `install.eqquasi.sh`'s malformed `[ $MACHINE == "local"]` test and
 a workflow line that discarded `pytest -m e2e`'s exit code both made a broken
-branch look green. Both fixed; `tests/contract/test_release_gate.py` now
+branch look green. Both fixed; `testsys/contract/test_release_gate.py` now
 guards the exit-code path.
 
 ---
@@ -113,11 +113,11 @@ guards the exit-code path.
 
 `reference/bp5/`, `reference/bp5.dip90/`, `reference/bp7/`, `reference/bp8/`
 and `reference/bp1002/` are the safety net. Before merging any change to
-`src/*.f90` or `scripts/defaultParameters.py`/`case.setup`:
+`src/*.f90` or `script/defaultParameters.py`/`case.setup`:
 
 ```
-python3 -m pytest tests/          # unit + contract + regression, ~1 min
-python3 -m pytest -m e2e tests/   # builds and runs the benchmarks, ~3 h
+python3 -m pytest testsys/          # unit + contract + regression, ~1 min
+python3 -m pytest -m e2e testsys/   # builds and runs the benchmarks, ~3 h
 ```
 
 A gate only counts if it **stops** the commit. Chaining the test run with `;`
@@ -139,7 +139,7 @@ Optional trailing blocks (per-fault `faultgeom`) are read with `iostat`, so
 append scalars **before** them: 13 of 16 compsets write no faultgeom, and their
 faultgeom read would swallow a scalar placed after it.
 
-**Check**: `tests/contract/test_io_contracts.py` counts writes against reads.
+**Check**: `testsys/contract/test_io_contracts.py` counts writes against reads.
 
 ---
 
@@ -147,7 +147,7 @@ faultgeom read would swallow a scalar placed after it.
 
 `fric(1:100, node, fault)` is indexed by bare integers. The same indices are
 duplicated in three places that must never disagree:
-`scripts/defaultParameters.py`, `scripts/case.setup`
+`script/defaultParameters.py`, `script/case.setup`
 (`netcdf_write_on_fault_vars`), and `src/netcdf_io.f90`.
 
 - **Pick an unused index.** Grep `fric(<N>,` across `src/*.f90` first.
@@ -181,7 +181,7 @@ blocks.
 - **Production**: `compsets/<benchmark>.<mode>.<res>/`, plus a row in the
   register table in `compsets/README.md`.
 - **CI regression**: a smaller `test.<benchmark>.<mode>/`, added to
-  `tests/e2e/cases.py`, with its reference under `reference/<benchmark>/`.
+  `testsys/e2e/cases.py`, with its reference under `reference/<benchmark>/`.
 
 `create.newcase` does **not** validate the name — it does `os.listdir` and
 `shutil.copy`. The register is documentation, not an allowlist, so keep it
@@ -202,7 +202,7 @@ unverified and must say so.
 
 **8a. Every reference artifact needs a test that reads it.** Gold nothing
 asserts on is dead weight masquerading as a safety net.
-`tests/contract/test_reference_gold_is_referenced.py` enforces this.
+`testsys/contract/test_reference_gold_is_referenced.py` enforces this.
 
 ---
 
@@ -255,13 +255,13 @@ physical invariant asserting the seed lands on fault 0 only.
 
 It sits in the **full** tier, not every-push, because the event is 3821 steps
 and ~2600 s on 3 ranks. So every-push CI still has no multi-fault case — a
-known, costed gap recorded beside the row in `tests/e2e/cases.py`.
+known, costed gap recorded beside the row in `testsys/e2e/cases.py`.
 
 ---
 
 ## 13. Known Fortran landmines must not recur
 
-Guarded by `tests/regression/test_code_convention_landmines.py`:
+Guarded by `testsys/regression/test_code_convention_landmines.py`:
 
 - **13a. No `if (ntotft == 1) ... else ...` branching.** The fault-node engine
   was made `ntotft`-neutral so that `ntotft = 1` exercises the identical path
@@ -360,7 +360,7 @@ A gold reference nobody can regenerate or plot is a file, not a reference.
 - every post-processing utility runs and produces a figure, or says clearly
   why not (BP8 is aseismic; an empty rupture-time plot is the right answer)
 
-**Check**: `tests/contract/test_utilities_run_on_every_reference.py`.
+**Check**: `testsys/contract/test_utilities_run_on_every_reference.py`.
 
 ---
 

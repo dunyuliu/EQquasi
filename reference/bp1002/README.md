@@ -91,7 +91,7 @@ routing of on-fault input, and three multi-fault bugs in this project's
 history were found by hand for that reason (`PROJECT_RULES.md`, rule 12).
 `case.setup` writes a `(ntotft, nfz, nfx, nvar)` array,
 `netcdf_read_on_fault` reads it back with an explicit fault dimension, and
-`tests/unit/test_physical_invariants.py` asserts the seed lands on fault 0
+`testsys/unit/test_physical_invariants.py` asserts the seed lands on fault 0
 and only fault 0.
 
 ## Two things that bit, recorded so they do not again
@@ -121,7 +121,7 @@ The fault-normal offset is 5000 m and the mesher (`src/func_lib.f90`,
 `cycle0/` — the complete event, **full** tier only. Not in every-push CI:
 3821 steps and ~2600 s on 3 ranks of a 64-core host, against a GitHub
 runner's four cores. That leaves the fast tier with no `ntotft > 1` case; the
-gap is costed and recorded in `tests/e2e/cases.py`, not an oversight.
+gap is costed and recorded in `testsys/e2e/cases.py`, not an oversight.
 
 **Caveat.** First reference for this benchmark — a regression lock, not a
 validation. It has not been checked against any independent oracle, and the

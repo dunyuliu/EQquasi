@@ -4,7 +4,7 @@ A compset is one directory holding a `user_defined_params.py`, plus any static
 input it ships (a rough-geometry table, a fault-geometry generator).
 `create.newcase <dir> <name>` copies it into a case.
 
-**This table is the register.** `tests/contract/test_compsets.py` asserts it
+**This table is the register.** `testsys/contract/test_compsets.py` asserts it
 matches the directories on disk, so it cannot drift silently. Each
 `user_defined_params.py` repeats its own row in a header comment, so the status
 is visible where you are editing.
@@ -19,7 +19,7 @@ is visible where you are editing.
 
 Durable facts only. Gate status is deliberately *not* in the name: it changes
 as the suite evolves, and a name that encodes a changing fact is a rename
-waiting to happen — with `reference/` paths, `tests/e2e/cases.py` and every
+waiting to happen — with `reference/` paths, `testsys/e2e/cases.py` and every
 existing case to update each time.
 
 `test.` prefixes a regression variant. That *is* durable: small, cut `nstep`,
@@ -116,6 +116,6 @@ Two things block reproduction, both tracked in `PATHWAY_FORWARD.md`:
 ## Adding one
 
 Rule 7: a production compset gets a directory and a row above; a CI variant
-gets `test.<benchmark>.<mode>/`, a row in `tests/e2e/cases.py`, and a reference
+gets `test.<benchmark>.<mode>/`, a row in `testsys/e2e/cases.py`, and a reference
 under `reference/<benchmark>/`. Put the same status in the file's own header.
 The contract test fails if the register and the directories disagree.

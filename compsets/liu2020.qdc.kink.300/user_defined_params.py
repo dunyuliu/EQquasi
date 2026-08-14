@@ -41,7 +41,7 @@ value read per (x, z) from bFault_Rough_Geometry.txt, which is how the rough
 (x - kinkX)*tan(kinkAngleDeg) right of it.
 
 So the geometry comes from generateKinkGeometry.py in this directory, NOT
-from scripts/generateFaultInterface, which only knows planar (1) and fractal
+from script/generateFaultInterface, which only knows planar (1) and fractal
 (2) surfaces. par.insertFaultType is therefore 0 -- case.setup must not call
 generateFaultInterface and overwrite the kink -- while par.rough_fault is 1,
 which is what the solver reads to decide whether to displace y at all.
@@ -66,7 +66,7 @@ par.iend = 1
 par.mode = 1           # quasi-dynamic. The paper's model is mode 2 via EQsimu.
 
 # The kink, as module-level constants rather than attributes on par:
-# par carries the solver's own parameter schema (scripts/defaultParameters.py)
+# par carries the solver's own parameter schema (script/defaultParameters.py)
 # and nothing here is read by the solver. generateKinkGeometry.py imports this
 # module and reads these directly, the way bp1002 exposes FAULT_A/FAULT_B.
 KINK_ANGLE_DEG = 10.0   # paper's bend angle; 0 recovers the planar model

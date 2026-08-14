@@ -13,7 +13,7 @@ Setup of computing environment
   - netCDF <br/>
   - pip <br/>
     - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
-    - netCDF4 (```scripts/case.setup``` imports it to write on_fault_vars_input.nc)
+    - netCDF4 (```script/case.setup``` imports it to write on_fault_vars_input.nc)
 
 For post-processing, additional Python packages are needed:
   - xarray
@@ -91,7 +91,7 @@ or manually add the paths to .bashrc:
 ```
 export EQQUASIROOT=$(pwd)
 export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/scripts:$PATH
+export PATH=$(pwd)/script:$PATH
 ```
 where $(pwd) is the root path for your *```EQquasi```* installation. <br/>
 <br/>
@@ -227,9 +227,9 @@ reference files only -- no MPI, no MUMPS, seconds. The `e2e` tiers build the
 code and run benchmarks.
 
 ```
-python3 -m pytest tests/              # unit + contract + regression, ~1 min
-python3 -m pytest tests/ -m e2e_fast  # what CI runs on every push, ~20 min
-python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
+python3 -m pytest testsys/              # unit + contract + regression, ~1 min
+python3 -m pytest testsys/ -m e2e_fast  # what CI runs on every push, ~20 min
+python3 -m pytest testsys/ -m e2e       # adds the full BP5 cycle, ~75 min
 ```
 
 | tier | checks | cost |
@@ -246,7 +246,7 @@ python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
 file: `reference/bp5/cycle0/` is a full earthquake cycle,
 `reference/bp5/cycle0-step101-fast/` the same case stopped at step 101.
 
-`tests/e2e/cases.py` holds the case table and the single runner; a new
+`testsys/e2e/cases.py` holds the case table and the single runner; a new
 benchmark is a row there plus a reference directory. What gets compared is
 decided by what the reference contains -- fault snapshots per fault, station
 and profile series in full, and the scalars each `summary.json` names.

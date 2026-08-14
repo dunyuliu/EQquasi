@@ -120,7 +120,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
       -- seven significant figures -- while the gate demanded rtol=1e-9. That
       asks the file for digits it never wrote, so MPI reduction-order noise
       (~2e-14) flipping one rounding boundary failed the suite at random
-      instead of on regressions. `column_printed_rtol()` in tests/e2e/cases.py
+      instead of on regressions. `column_printed_rtol()` in testsys/e2e/cases.py
       now floors each column's rtol at 2 ulp of its own printed precision,
       read off the file rather than hand-tuned. Verified: the real run passes
       at 9.9e-17 and a 1e-5 relative perturbation is still caught. Anything
@@ -263,7 +263,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
   mapping index -> meaning -> unit -> which of the three files writes it.
   It must be done in one pass. Introducing names at some call sites only
   creates a fourth source of truth on top of the three rule 5 already names
-  (`scripts/defaultParameters.py`, `scripts/case.setup`, `src/netcdf_io.f90`),
+  (`script/defaultParameters.py`, `script/case.setup`, `src/netcdf_io.f90`),
   which is worse than the bare integers. Rule 5 will need rewriting when it
   lands, since it exists to describe the unnamed state.
 - [FIXED] Multi-fault station output. It was worse than "faults 2+ get
@@ -342,7 +342,7 @@ converged in domain size.
 
 Ship the coarse pair for a quick platform view, with the convergence caveat
 stated. Steps: resample profiles onto the 81-node 10 m grid required by section
-4.3 (`scripts/resampleBP8Profiles.py`), validate (`scripts/checkBP8Submission`),
+4.3 (`script/resampleBP8Profiles.py`), validate (`script/checkBP8Submission`),
 package as `dliu_eqquasi-<version>-50m.zip`.
 
 The 10 m production entry waits on item 2. There is no point spending 25 hours
@@ -378,8 +378,8 @@ needs finding first.
 ## 3. Multi-fault in the gate set — DONE (v1.11.0/v1.12.0)
 
 `bp1002.qdc.2500` has a reference (`reference/bp1002/cycle0/`), a row in
-`tests/e2e/cases.py`, and a physical invariant in
-`tests/unit/test_physical_invariants.py` asserting the seed lands on fault 0
+`testsys/e2e/cases.py`, and a physical invariant in
+`testsys/unit/test_physical_invariants.py` asserting the seed lands on fault 0
 and only fault 0. `PROJECT_RULES.md` rule 12 cites a check that exists.
 
 It sits in the **full** tier, not every-push CI: 3821 steps, ~2600 s on 3

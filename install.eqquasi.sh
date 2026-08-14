@@ -112,7 +112,7 @@ if [ -n "$MACH" ]; then
 
     export EQQUASIROOT=$(pwd)
     export PATH=$(pwd)/bin:$PATH
-    export PATH=$(pwd)/scripts:$PATH
+    export PATH=$(pwd)/script:$PATH
     
     echo EQQUASIROOT
     echo PATH 
@@ -122,7 +122,7 @@ fi
 
 export EQQUASIROOT=$(pwd)
 export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/scripts:$PATH
+export PATH=$(pwd)/script:$PATH
 
 echo EQQUASIROOT
 echo PATH 

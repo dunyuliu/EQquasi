@@ -26,6 +26,6 @@ machine where MUMPS memory becomes the binding constraint -- this is the startin
 point, and it is known to have run rather than being a sketch.
 
 `AZTEC_OPTIONS` deliberately stays in `src/globalvar.f90` and `src/read_input.f90`:
-`model.txt` is a *positional* file written by `scripts/case.setup`, so removing
+`model.txt` is a *positional* file written by `script/case.setup`, so removing
 the field would shift every value after it and silently corrupt the parameters of
 every case. It costs one integer.

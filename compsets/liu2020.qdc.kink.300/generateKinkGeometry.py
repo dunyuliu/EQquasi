@@ -9,7 +9,7 @@ expressed that way. The rough-fault path can express it. insert_rough_fault
 bFault_Rough_Geometry.txt, so any single-valued y(x, z) is available -- a
 fractal surface in the rough case, and here a piecewise-linear kink.
 
-The file is the same one scripts/generateFaultInterface writes, and the
+The file is the same one script/generateFaultInterface writes, and the
 format is fixed by read_fault_rough_geometry (src/read_input.f90):
 
     line 1        nx   nz   0
@@ -37,7 +37,7 @@ Usage
 Reads par from the case's user_defined_params.py (fxmin, fzmin, dx, nfx,
 nfz, and the kink parameters below), writes bFault_Rough_Geometry.txt and a
 PNG of the resulting trace beside it. case.setup calls
-scripts/generateFaultInterface, not this script, so a compset that wants a
+script/generateFaultInterface, not this script, so a compset that wants a
 kink sets par.insertFaultType = 0 and runs this instead -- see the compset's
 own comment.
 

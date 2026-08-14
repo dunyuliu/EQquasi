@@ -14,6 +14,17 @@ fix). Do not let this file become the archive.
 Read this first on wake-up. Update in place; close items by deleting them.
 
 ### Standing rules
+- **Read `PROJECT_RULES.md` first, and again before every commit.** It is 16
+  rules with an index at the top; reading the index costs seconds. Every rule
+  broken in this project so far was already written down at the time -- rule
+  14's `git add -A` clause, rule 1's no-new-files clause -- and was broken
+  because it was not consulted, not because it was missing. The answer to "how
+  do I stop breaking the rules" is this file and that one, not new machinery:
+  proposing a new hook or a new test file to enforce rule 1 is itself the
+  rule-1 reflex.
+  At the two moments that matter: before staging (rule 14 -- explicit paths,
+  and is anything here machine-local?) and before adding any file, name, or
+  parameter (rule 1 -- is this necessary, and has the user been told?).
 - Verify the binary before every run: `grep EQQUASI_VERSION src/globalvar.f90`
   against `strings bin/eqquasi-<v> | grep Welcome`. Rebuild with
   `MACHINE=utig`, install as `bin/eqquasi-<version>` (no plain `eqquasi`).

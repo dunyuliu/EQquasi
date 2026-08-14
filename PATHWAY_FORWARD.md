@@ -184,6 +184,60 @@ Read this first on wake-up. Update in place; close items by deleting them.
   allocatable dummies -- it applies to character dummies as well.
 
 ### Known open, from today
+- **Hardcoded normal-stress caps in `src/faulting.f90:169-177`.** Known, not
+  being fixed now.
+
+      max_norm = -40.0d6
+      min_norm = -10.0d6
+
+  active whenever `rough_fault == 1 .and. C_elastic == 1`. Liu, Duan & Luo
+  (2020) §3.5 states the caps as **-100 to -10 MPa**; the -10 matches, the
+  -40 does not. At -40 the solver clamps that paper's own -50 MPa initial
+  normal stress on the first step, and Fig. 6's excursion to -100 MPa at the
+  bend cannot be represented at all.
+
+  Neither number is a parameter -- both are literals, in no compset and no
+  docstring. Five compsets reach this branch (bp1001.fdc.250,
+  bp1001.fdc.rough.250, bp1001.qdc.rough.250, liu2020.fdc.rough.250,
+  liu2020.kink.qdc), so the values cannot simply be changed: they need
+  parameterising with -10/-40 as the default so existing cases are untouched,
+  and -10/-100 set for the kink compset. Hardcoded physics thresholds that
+  silently override a compset's stated initial condition are the wider
+  problem; this is one instance.
+
+- **Reproducing Liu, Duan & Luo (2020), EQquasi half.** Paper at
+  `work/liu2020.kink/paper/Liu_Duan_Luo_2020_GJI.pdf`. Read pp. 1-8; the
+  appendix and switch criterion (pp. 9-12) matter only for the coupled EQsimu
+  loop, not the EQquasi-only compset.
+
+  Table 1: FS 60 km, FD 30 km, VW ~45 km long x 11.4 km wide, V_min 1e-12,
+  Vs 3464, Vp 6000, rho 2670, V0 1e-6, mu0 0.6, b 0.011, a 0.007, sigma_n
+  -50 MPa, tau 30 MPa, L 11 mm, dx 300 m, dt_min 0.025 s.
+
+  §3.5 initial stress: uniform regional field sigma_1 = -80 MPa, sigma_3 =
+  -20 MPa at 45 deg to the left segment, giving shear 30 MPa / normal -50 MPa
+  there; the right segment, rotated 10 deg, gets normal -60.26 MPa and shear
+  set to 33 MPa for consistency. Starts from uniform slip rate 1e-9 m/s at
+  steady state.
+
+  §3.3 friction: a, b depth-dependent multilinear per Lapusta & Liu (2009);
+  b reduced where |x| > 23 km and where |z| > 17.5 km or |z| < 4 km; L = 11 mm
+  rising linearly to 27 mm between 4 km depth and the free surface.
+
+  §3.2 EQquasi domain: x, y -30..30 km, z -30..0 km (NOT EQdyna's 120x120x60);
+  y boundaries driven at +/-9.513e-10 m/s giving ~1e-9 m/s creep; other faces
+  free; dx 300 m uniform in x, z, enlarged 1.3x in y beyond 1.2 km.
+
+  **§3.4 resolution, and why a coarse run is meaningless here.** The paper
+  requires `h*/W_seis < 1` and `Lambda_0/dx > 2.3`, and reports 0.8674 and
+  2.5163 at dx = 300 m. Lambda_0/dx scales as 1/dx, so 600 m gives 1.26 and
+  1200 m gives 0.63 -- both below the criterion. A 1200 m smoke test of this
+  compset reached a final max slip rate of 3.9e4 m/s: not the cap, not a bug,
+  just an unresolved cohesive zone. This problem cannot be run coarse.
+
+  BLOCKER: dx = 300 m is not optional, and there the MUMPS factors want
+  ~5.51e9 reals against a 2^31 ceiling, so full reproduction needs a
+  64-bit-integer MUMPS build.
 - **fric() index revamp — systematic naming and documentation.** `fric(1:100,
   node, fault)` is indexed by bare integers everywhere: `fric(26,...)` is
   trial slip rate, `fric(46,...)` V_init, `fric(81:84,...)` the rupture-area

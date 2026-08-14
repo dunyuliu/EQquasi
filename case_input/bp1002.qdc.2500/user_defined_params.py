@@ -1,27 +1,33 @@
 #! /usr/bin/env python3
 """BP1002: two-fault step-over, BP5 parameters, geometry changed only.
 
-Segment A: x in [-42.5, -2.5] km, y = 0 km      (the "cuts through the model" side is x = -42.5 km)
-Segment B: x in [-7.5, 32.5] km,  y = -5.0 km    (the "cuts through the model" side is x = +32.5 km)
+Segment A: x in [-60.0,  2.5] km, y =  0.0 km   (cuts the model at x = -60 km)
+Segment B: x in [ -2.5, 60.0] km, y = -5.0 km   (cuts the model at x = +60 km)
 Both z in [-20, 0] km, dx = 2500 m, right-lateral, releasing step-over.
+Each segment is 62.5 km long, they overlap by 5 km along strike, and they are
+offset by 5 km across strike. The along-strike extent of the model is BP5's,
+120 km, and each segment runs the full distance from its own outer boundary
+to 2.5 km past the model centre, so both keep cutting through the mesh edge.
 
 dx = 2500 m, not BP5's production 2000 m: the fault-normal offset between the
 two segments is 5000 m, and EQquasi's mesh (src/func_lib.f90,
 build_yline_belt) requires that offset to be an integer multiple of dy = dx --
 it refuses to mesh, rather than silently produce a fault with zero nodes,
-otherwise. 5000 / 2000 = 2.5 (refused); 5000 / 2500 = 2 (meshes). The x-extents
-of the two segments happen to be commensurate at 2500 m too (offsets of
-35000 m and 75000 m between their x-ranges, both exact multiples of 2500).
+otherwise. 5000 / 2000 = 2.5 (refused); 5000 / 2500 = 2 (meshes). The segment ends are
+commensurate at 2500 m too: -60000, -2500, 2500 and 60000 are all exact
+multiples of it.
 
-Creeping (velocity-strengthening, a-b > 0) is assigned on:
-  - the side of each segment that reaches the model's own x boundary (the
-    fault "cuts through the model" there),
-  - the bottom (z near -20 km) and a band at the top (z near 0) of both
-    segments.
+Frictional zoning follows BP5's, in the model's own x:
+  - |x| > 50 km   non-rate-and-state, fixed creep (par.xminc/xmaxc),
+  - |x| >= 40 km  velocity-strengthening,
+  - |x| <= 38 km  velocity-weakening where 4 <= |z| <= 16 km,
+  - 2 km transitions, as BP5 uses.
 The interior tips that face each other across the step-over (segment A's
-+x end at -2.5 km, segment B's -x end at -7.5 km) are left
++x end at +2.5 km, segment B's -x end at -2.5 km) are left
 velocity-weakening -- an idealization the project owner ruled acceptable
-for this case; a real step-over would taper these too.
+for this case; a real step-over would taper these too. It is not free: in a
+10-cycle run of the earlier geometry the effective normal stress reached zero
+at one of these tips in cycle 3 and the run stopped there (STOP 508).
 
 This is the deliverable for on-fault-input multi-fault support: proof that
 netcdf_read_on_fault (src/netcdf_io.f90) and case.setup's
@@ -42,21 +48,39 @@ par.mode = 1  # quasi-dynamic
 
 # Two-fault geometry: (xlo, xhi, ycoor, zlo, zhi) per fault, meters.
 par.ntotft = 2
-FAULT_A = (-42.5e3, -2.5e3, 0.0, -20.0e3, 0.0)
-FAULT_B = (-7.5e3, 32.5e3, -5.0e3, -20.0e3, 0.0)
+FAULT_A = (-60.0e3,  2.5e3,  0.0, -20.0e3, 0.0)
+FAULT_B = ( -2.5e3, 60.0e3, -5.0e3, -20.0e3, 0.0)
 par.faultgeom = [FAULT_A, FAULT_B]
 
-# Model domain: x, z bound the union of both faults; y spans both fault
-# planes (0 and -5 km) with comparable far-field margin on each side.
-par.fxmin, par.fxmax = -42.5e3, 32.5e3
-par.fymin, par.fymax = -35.0e3, 30.0e3
-par.fzmin, par.fzmax = -20.0e3, 0.0e3
+# Model domain.
+#
+# x is not free: each segment cuts through the model at its outer end, by
+# design, so the lateral bounds ARE the union of the two segments. At BP5's
+# 120 km along strike, two segments overlapping by 5 km are 62.5 km each.
+# The creeping (velocity-strengthening) band at each outer end is what
+# represents the fault continuing beyond the mesh.
+#
+# y and z do follow BP5, and this is the part that was wrong before. The
+# earlier version put fzmin at -20 km, the faults' own base, so each fault
+# met the mesh boundary in two directions at once and its corner had no
+# elastic volume to relax into. BP5 keeps 40 km of material below a fault
+# that bottoms at 20 km; that margin is reproduced here.
+par.fxmin, par.fxmax = -60.0e3, 60.0e3
+par.fymin, par.fymax = -50.0e3, 50.0e3
+par.fzmin, par.fzmax = -60.0e3, 0.0e3
 
 # The hard RSF/non-RSF cutoff (faulting.f90) is a single global box, not
 # per-fault, so it is set to the union of both faults' extents: every fault
 # node is inside it, and the a-b sign (assigned below, per fault) alone
 # controls which nodes creep.
-par.xminc, par.xmaxc, par.zminc = par.fxmin, par.fxmax, par.fzmin
+# Tracks the faults, never the domain: tying it to fxmin/fzmin is what put
+# the rate-and-state box on the mesh boundary before.
+# BP5's non-rate-and-state margin, reproduced: outside this box faulting.f90
+# drives the fault at a fixed creep rate rather than by rate and state, so
+# the outer 10 km of each segment is a kinematic boundary, exactly as BP5's
+# |x| > 50 km is. zminc is the fault base here because these segments only
+# reach -20 km, so there is nothing below them to exclude.
+par.xminc, par.xmaxc, par.zminc = -50.0e3, 50.0e3, -20.0e3
 
 par.dx = 2500.0e0
 par.dy = par.dx
@@ -128,25 +152,42 @@ for ift, (xlo, xhi, ycoor, zlo, zhi) in enumerate(par.faultgeom):
     fx = np.linspace(xlo, xhi, nfx[ift])
     fz = np.linspace(zlo, zhi, nfz[ift])
     for ix, xcoor in enumerate(fx):
-        # Distance from this segment's "cuts through the model" (creeping)
-        # edge: fault A's is xlo, fault B's is xhi.
-        d_creep_edge = (xcoor - xlo) if ift == 0 else (xhi - xcoor)
         for iz, zcoor in enumerate(fz):
-            if abs(zcoor) >= 18e3 or abs(zcoor) <= 2e3 or d_creep_edge <= 2e3:
+            # BP5's zoning, in the model's own x rather than per-segment.
+            #
+            # BP5 wraps an 868 km^2 velocity-weakening patch in 3416 km^2 of
+            # velocity-strengthening and 3280 km^2 of non-rate-and-state
+            # creep -- nearly 4:1 -- and that margin is what arrests its
+            # rupture. The earlier bp1002 zoning measured everything from
+            # each segment's own cutting edge and left ~51 % of every segment
+            # velocity-weakening, so rupture ran end to end and slipped 9.5 m.
+            # The same three zones are used here, at BP5's widths:
+            #
+            #   |x| >  50 km   non-RSF, fixed creep (set by xminc/xmaxc)
+            #   |x| >= 40 km   velocity-strengthening
+            #   38 < |x| < 40  transition, 2 km as in BP5
+            #   |x| <= 38 km   velocity-weakening, if z also allows
+            #
+            # z is BP5's unchanged: VW for 4 <= |z| <= 16 km, VS beyond 18 km
+            # and above 2 km, 2 km transitions between.
+            #
+            # The step-over sits at x = 0, so the interior tips facing each
+            # other stay velocity-weakening -- that is the question the case
+            # asks and it must not be tapered away.
+            if abs(zcoor) >= 18e3 or abs(zcoor) <= 2e3 or abs(xcoor) >= 40e3:
                 a = par.fric_rsf_a + par.fric_rsf_deltaa  # creeping (VS)
-            elif 4e3 <= abs(zcoor) <= 16e3 and d_creep_edge >= 4e3:
-                a = par.fric_rsf_a  # locked (VW) -- includes the interior tip
+            elif 4e3 <= abs(zcoor) <= 16e3 and abs(xcoor) <= 38e3:
+                a = par.fric_rsf_a  # locked (VW) -- includes the interior tips
             else:
                 tmp1 = (abs(abs(zcoor) - 10e3) - 6e3) / 2e3
-                tmp2 = (4e3 - d_creep_edge) / 2e3
+                tmp2 = (abs(xcoor) - 38e3) / 2e3
                 a = par.fric_rsf_a + max(tmp1, tmp2) * par.fric_rsf_deltaa
 
-            # Nucleation patch, BP5's, placed on fault A's x-minus end only:
-            # low Dc plus a high initial slip rate, 12 km along strike starting
-            # just inside the velocity-weakening region, z in [-16, -4] km.
+            # Nucleation patch, BP5's 12 km, on fault A only and inside its
+            # velocity-weakening region: low Dc plus a high initial slip rate.
             # Fault B has no patch -- whether it ruptures is the question this
             # case asks, so it must not be seeded.
-            nucleate = (ift == 0 and -38.5e3 <= xcoor <= -26.5e3
+            nucleate = (ift == 0 and -36.0e3 <= xcoor <= -24.0e3
                         and -16e3 <= zcoor <= -4e3)
 
             par.on_fault_vars[ift, iz, ix, 9]  = a
@@ -197,7 +238,21 @@ par.HPC_email = "dliu@ig.utexas.edu"
 # Same (x, z) list is written for every fault (case.setup does not yet
 # support per-fault station lists), so pick points that fall inside BOTH
 # segments' along-strike range: the intersection is x in [-7.5, -2.5] km.
-par.st_coor_on_fault = [[-7.0, -2.0], [-5.0, -10.0], [-3.0, -18.0]]
+# The same (x, z) list is written for every fault, so the points must lie
+# inside BOTH segments' along-strike range: the intersection is the 5 km
+# overlap, x in [-2.5, 2.5] km.
+#
+# They must also land ON mesh nodes. dx = 2500 m and the segment ends are
+# multiples of it, so the admissible x are -2.5, 0 and 2.5 km and the
+# admissible z are multiples of 2.5 km. An earlier version asked for
+# x = +-2.0 km and z = -2.0/-18.0 km, none of which is a node: those two
+# stations were dropped with no message at all, leaving one station where
+# three were requested.
+#
+# Note that only fault 1 gets station output -- src/library_output.f90
+# writes them under `if (j==1)` and never reaches fault 2 -- so these are
+# fault 1's stations regardless of the list being duplicated per fault.
+par.st_coor_on_fault = [[-2.5, -2.5], [0.0, -10.0], [2.5, -17.5]]
 par.st_coor_off_fault = [[0, 5, 0], [0, 5, -10], [-10, 10, 0]]
 par.n_on_fault = len(par.st_coor_on_fault)
 par.n_off_fault = len(par.st_coor_off_fault)

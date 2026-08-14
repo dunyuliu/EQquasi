@@ -72,8 +72,18 @@ def main():
     # all belong to the case in cwd) each becomes one line.
     tokens = args.dirs or [""]
     case_dirs = []
-    bare = [t for t in tokens if t and not os.path.isdir(t)
-            and os.path.isdir(f"Q{t.lstrip('Q')}")]
+    # A cycle of the case in cwd, named either way. The test used to be
+    # `isdir("Q" + t.lstrip("Q"))`, which only recognised the old Q<N> naming;
+    # under result/cycleN every `cycle2`-style token failed it, fell through to
+    # the loop below, and became a separate CASE. The cycles were then drawn as
+    # independent lines each starting at t = 0 instead of one concatenated
+    # history -- five overlaid curves that look like five different models.
+    import re as _re
+    is_cycle = _re.compile(r"^(?:Q|cycle)\d+$").match
+    bare = [t for t in tokens
+            if t and (os.path.isdir(f"Q{t.lstrip('Q')}")
+                      or (os.path.isdir(t) and is_cycle(os.path.basename(
+                          t.rstrip(os.sep)))))]
     if bare:                      # named cycles of the case in cwd: one line
         case_dirs.append((os.path.basename(os.getcwd()), bare))
         tokens = [t for t in tokens if t not in bare]

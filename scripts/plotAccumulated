@@ -42,8 +42,9 @@ def cycle_profiles(rdir, mode, ninterval, nwindow, ifault):
             v = np.asarray(pu.fault_slab(d.variables["slips"][:], ifault,
                                          "slips", f), float)
         line = v[:, v.shape[1] // 2] if mode == 1 else v[(v.shape[0] // 4) * 3, :]
+        shape = v.shape
         cols.append(boxcar_average(line, min(nwindow, len(line))))
-    return np.array(cols).T
+    return np.array(cols).T, shape
 
 
 def main():
@@ -65,16 +66,38 @@ def main():
     data = None
     for label, rdir in targets:
         print(f"processing {label or rdir} ({rdir})")
-        tmp = cycle_profiles(rdir, args.mode, args.ninterval, args.nwindow,
-                             args.fault)
+        tmp, profile_shape = cycle_profiles(rdir, args.mode, args.ninterval,
+                                            args.nwindow, args.fault)
         data = tmp if data is None else np.concatenate(
             (data, tmp + data[:, -1, np.newaxis]), axis=1)
 
-    orient, xlabel = (("Vertical", "node # down dip") if args.mode == 1
-                      else ("Horizontal", "node # along strike"))
+    # Physical axis, not node numbers. boxcar_average is a valid-mode
+    # convolution, so a 26-node profile smoothed over 10 comes back with 17
+    # points; the coordinates have to be trimmed to match, symmetrically,
+    # because each smoothed value sits at the centre of its window. Getting
+    # this wrong is why the axis read "node #" and a step-over plot could not
+    # be told where along strike anything happened.
+    par = pu.load_par(targets[0][1])
+    ndip, nstrike = profile_shape
+    orient = "Vertical" if args.mode == 1 else "Horizontal"
+    xaxis, xlabel = None, ("node # down dip" if args.mode == 1
+                           else "node # along strike")
+    if par is not None:
+        xkm, zkm, strike_lab, dip_lab = pu.fault_coords(par, ndip, nstrike,
+                                                        args.fault)
+        full = zkm if args.mode == 1 else xkm
+        cut = len(full) - data.shape[0]
+        if cut >= 0:
+            lo = cut // 2
+            xaxis = full[lo:lo + data.shape[0]]
+            xlabel = dip_lab if args.mode == 1 else strike_lab
+
     fig, ax = plt.subplots(figsize=(8, 6))
     for i in range(data.shape[1]):
-        ax.plot(data[:, i], color="black", lw=0.7)
+        if xaxis is None:
+            ax.plot(data[:, i], color="black", lw=0.7)
+        else:
+            ax.plot(xaxis, data[:, i], color="black", lw=0.7)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("accumulated slip (m)")
     ax.set_title(f"Accumulated slip — {orient.lower()} profile — "

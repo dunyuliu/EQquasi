@@ -71,9 +71,19 @@ OFF_FAULT = [(1, "horizontal disp (m)"), (2, "horizontal vel (m/s)"),
 
 
 def station_files(rdir, off):
-    prefix = "srfst_strk" if off else "fltst_strk"
-    hits = [f for f in sorted(os.listdir(rdir))
-            if f.startswith(prefix) and f.endswith((".txt", ".dat"))]
+    """Every station file, including faults 2+.
+
+    The pattern allows an optional ft<N>_ between the family prefix and
+    'strk'. Faults 2 and beyond write fltst_ft2_strk..., and matching the
+    literal prefix 'fltst_strk' skipped them entirely -- so on BP1002, which
+    asks for three stations on each of two faults, this drew three and said
+    nothing about the other three. A tool that silently halves a multi-fault
+    model is worse than one that fails.
+    """
+    import re as _re
+    family = "srfst" if off else "fltst"
+    pat = _re.compile(rf"^{family}_(?:ft\d+_)?strk.*\.(?:txt|dat)$")
+    hits = [f for f in sorted(os.listdir(rdir)) if pat.match(f)]
     return [os.path.join(rdir, f) for f in hits]
 
 
@@ -86,11 +96,20 @@ def panels_for(ncol, off):
 
 
 def station_label(path):
-    """'strk000dp000' out of the filename -- the coordinates, without noise."""
+    """'strk000dp000' out of the filename -- the coordinates, without noise.
+
+    An ft<N>_ tag is kept and moved to the front as 'fN ', because station
+    coordinates are fault-local: fault 1 and fault 2 both have a strk000dp010,
+    and two identically-labelled curves on one axes are worse than no label.
+    """
     b = os.path.basename(path)
     for ext in (".txt", ".dat"):
         b = b.replace(ext, "")
-    return b.replace("fltst_", "").replace("srfst_", "")
+    b = b.replace("fltst_", "").replace("srfst_", "")
+    if b.startswith("ft"):
+        tag, _, rest = b.partition("_")
+        return f"f{tag[2:]} {rest}"
+    return b
 
 
 def plot(rdir, outdir, off, tunit):

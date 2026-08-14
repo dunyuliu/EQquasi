@@ -151,10 +151,18 @@ Read this first on wake-up. Update in place; close items by deleting them.
   and holds only fault-1 stations. The e2e gate walks reference files, so the
   new `ft2` files are simply not compared -- the reference is incomplete, not
   wrong, and re-blessing bp1002 would close the gap.
-- Utilities report the GLOBAL peak, so which segment ruptured is invisible in
-  `peak_slip_rate_vs_time` and `accumulatedSlip`.
-- `plotOnFaultVars`' depth axis is the fault's extent with no hint of the
-  domain's.
+- Utilities report the GLOBAL peak in `peak_slip_rate_vs_time`, so which
+  segment ruptured is invisible. NOT a plotting fix: `global.dat` column 2 is
+  a single `maxval` over all faults, computed in `solveTimeLoopMUMPS.f90`.
+  Per-fault peaks mean writing per-fault columns, and columns 5-7 of
+  global.dat are currently zeros that every benchmark reference has recorded
+  -- filling them fails the e2e comparison for bp5, bp7 and bp1002 until all
+  of them are re-blessed. That is a judgement call on an output format, so it
+  is left for the user rather than done unattended.
+  (The `accumulatedSlip` half of this item was stale: `plotAccumulated`
+  already takes `--fault`.)
+- [FIXED] `plotOnFaultVars`' depth axis now names the domain floor when the
+  fault does not reach it.
 - Reference version skew: bp1002 1.12.0, bp5 1.7.2, bp7 1.7.0, bp8 1.6.0.
 - Every pre-existing case in `work/` is now unrunnable: the solver hard-stops
   without `input/` and `scratch/`. Deliberate. `multicycle_20` cannot resume;

@@ -699,16 +699,28 @@ compute host.
   state.
 - **Stage explicit paths, never `git add -A` / `git add .`.** `git add -A`
   has swept another agent's unverified work-in-progress into a commit that
-  wasn't about it. `git status` before staging, then `git add <path>
-  <path>...` for exactly the files your change touches.
+  wasn't about it, and on 2026-08-02 it swept `.claude/scheduled_tasks.lock`
+  -- a session id, a pid and a process start time -- into a commit about the
+  README, and from there into a PUBLIC repo with forks. `git status` before
+  staging, then `git add <path> <path>...` for exactly the files your change
+  touches.
+- **Read the file list in the commit you are about to make.** `git commit`
+  prints what it staged and `git show --stat` shows it afterwards; a path you
+  did not intend to touch is the signal. The README commit above named its
+  stray file on screen and it was not read.
+- **Machine-local state belongs in `.gitignore`, not in discipline.** The
+  `-A` rule is judgment and will be broken again; an ignore entry cannot be.
+  Anything written by a tool rather than by a person -- editor state, agent
+  session locks, caches -- gets an entry the first time it appears.
 
 **Route**: a commit found to contain unrelated staged changes → the agent who
 made the commit, to split it; if that's not tractable, `victor-reyes` for a
 broader audit of what else landed unintentionally.
 
-**Tier**: judgment — both are about what an agent chooses to run, not a
-static property of the tree, so neither is mechanically preventable from
-inside the repo. (A `pre-commit` hook rejecting `git commit` when the branch
+**Tier**: judgment for the first two — they are about what an agent chooses
+to run, not a static property of the tree. The third is mechanical and is the
+reason it was added: `.gitignore` enforces itself, so the class of mistake
+that produced the leak cannot recur even when the judgment rules are broken. (A `pre-commit` hook rejecting `git commit` when the branch
 under `.git/HEAD` differs from the worktree the agent was assigned is a
 theoretical mechanical version of the first; not implemented, and it would
 need agent-identity information this repo has no way to obtain.)

@@ -67,16 +67,12 @@ CASES = [
     # BP1002 is deliberately NOT in the fast tier. It is the only ntotft > 1
     # case, so it is the only row that exercises per-fault routing of on-fault
     # input, and leaving it out of every-push CI is a known gap (PROJECT_RULES
-    # rule 7) -- not an oversight.
+    # rule 12) -- not an oversight.
     #
-    # The reason is cost. It ran the whole event in ~220 s while its domain
-    # was the faults' own extent, but that geometry put both faults' corners
-    # on the mesh boundary and manufactured +25 MPa of normal-stress change
-    # against a ~5 MPa real step-over signal (see the compset). The elastic
-    # buffer that fixes it takes the mesh from 5.8k to 49k elements: ~70 s for
-    # 101 steps and ~28 min for the event, on 64 cores. A GitHub runner has
-    # two. It stays in the full tier until either the mesh is cheaper or CI
-    # runs somewhere that can afford it.
+    # The reason is cost: 41472 elements, 3821 steps, ~2600 s on 3 ranks of a
+    # 64-core host. A GitHub runner has four cores. It stays in the full tier
+    # until either the mesh is cheaper or CI runs somewhere that can afford
+    # it.
 
     # full: -m e2e only.
     ("bp5",       "test.bp5.qdc",

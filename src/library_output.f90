@@ -29,9 +29,9 @@ subroutine output_onfault_st
                 ! confirmed against its processed_files listing. .txt is
                 ! silently ignored.
                 if (bp == 8) then
-                    open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.dat',status='unknown')
+                    open(51,file=trim(outDir)//'fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.dat',status='unknown')
                 else
-                    open(51,file='fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
+                    open(51,file=trim(outDir)//'fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
                 endif
             endif
             !write(51,*) '# This is the file header'
@@ -187,7 +187,7 @@ subroutine output_offfault_st
                 write(sttmp,'(i4.3)')   int(x4nds(1,an4nds(1,i))/1000.d0)
                 write(dptmp,'(i4.3)')   int(x4nds(3,an4nds(1,i))/1000.d0)
             endif
-            open(51,file='srfst_strk'//trim(adjustl(sttmp))//'st'//trim(adjustl(bodytmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
+            open(51,file=trim(outDir)//'srfst_strk'//trim(adjustl(sttmp))//'st'//trim(adjustl(bodytmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
 
             !write(51,*) '# This is the file header'
             !write(51,*) '# problem = San-Ti'
@@ -223,7 +223,7 @@ subroutine output_onfault_transfer
     integer (kind = 4) :: i
     
     if(nftnd(1) > 0) then
-        open(unit=1111,file='cplot_EQquasi.txt',status='unknown')    !rupture time
+        open(unit=1111,file=trim(outDir)//'cplot_EQquasi.txt',status='unknown')    !rupture time
         ! write(1111,*) '# This is the file header:'
         ! write(1111,*) '# problem = San-Ti'
         ! write(1111,*) '# author = sophon'
@@ -250,7 +250,7 @@ subroutine output_timedy
     use globalvar
     implicit none
     
-    open(1112,file='tdyna.txt',form = 'formatted', status = 'unknown')
+    open(1112,file=trim(outDir)//'tdyna.txt',form = 'formatted', status = 'unknown')
         write(1112,'(2e32.21e4)') tdynastart, tdynaend
     close(1112)
 
@@ -264,7 +264,7 @@ subroutine output_globaldat
     
     if (bp == 8) then
         ! SEAS BP8 source parameter time series, see section 4.2.
-        open(1113,file='global.dat',form='formatted',status='unknown')
+        open(1113,file=trim(outDir)//'global.dat',form='formatted',status='unknown')
             write(1113,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
             write(1113,'(A)') '# code=EQquasi'
             write(1113,'(A)') '# version='//EQQUASI_VERSION
@@ -296,7 +296,7 @@ subroutine output_globaldat
         return
     endif
 
-    open(1113,file='global.dat',form='formatted',status='unknown')
+    open(1113,file=trim(outDir)//'global.dat',form='formatted',status='unknown')
         write(1113,'(7e32.21e4)') (globaldat(1,i), &
             globaldat(2,i), &
             globaldat(3,i), &
@@ -319,13 +319,13 @@ subroutine output_prof
     ift = 1 
     if (bp == 5) then
         if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
-            open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
+            open(9002,file=trim(outDir)//'p1output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=38.0d3.and.abs(x(3,nsmp(1,i,ift) )-(-10.0d3))<0.01d0) then
                         write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
                     endif
                 enddo
-            open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
+            open(9003,file=trim(outDir)//'p2output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0.and.abs(x(3,nsmp(1,i,ift) ))<=40.0d3) then
                         write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
@@ -336,13 +336,13 @@ subroutine output_prof
 
     if (bp == 7) then
         if (((status1==0.and.itag==1).and.(mod(it,20)==1)).or.((status1==1.and.itag==1).and.(mod(it,10)==0))) then 
-            open(9002,file='p1output.txt',form='formatted',status='unknown',position='append')
+            open(9002,file=trim(outDir)//'p1output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(3,nsmp(1,i,ift) )-0.0d3)<0.01d0) then
                         write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
                     endif
                 enddo
-            open(9003,file='p2output.txt',form='formatted',status='unknown',position='append')
+            open(9003,file=trim(outDir)//'p2output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0) then
                         write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
@@ -360,7 +360,7 @@ subroutine output_ruptarea_trac_slip
     integer (kind = 4) :: i, j 
     
     if(nftnd(1) > 0) then
-        open(unit=1114,file='cplot_ruptarea_trac_slip.txt',status='unknown')    !rupture time
+        open(unit=1114,file=trim(outDir)//'cplot_ruptarea_trac_slip.txt',status='unknown')    !rupture time
         ! 1,    2,     3,     4
         !fric(81,i),fric(82,i),fric(83,i),fric(84,i)   
         !Ruptured area, total slip, tract at the beginning, tract at the end.
@@ -418,7 +418,7 @@ subroutine write_one_profile(fname, colDesc, fieldName, axisName, iline, n, dat)
         allocate(coord(n)); coord = xProfDepth
     endif
 
-    open(9101, file = trim(fname), form = 'formatted', status = 'unknown')
+    open(9101, file = trim(outDir)//trim(fname), form = 'formatted', status = 'unknown')
         write(9101,'(A)') '# problem=SEAS Benchmark BP8-QD-'//trim(adjustl(bp8tag))
         write(9101,'(A)') '# author=D.Liu'
         write(9101,'(A)') '# date='//trim(adjustl(runDate))
@@ -534,7 +534,7 @@ subroutine output_run_metadata(solverTime, factorTime)
         if (ios /= 0) nThreads = 0
     endif
 
-    open(9302, file = 'runInfo.json', form = 'formatted', status = 'unknown')
+    open(9302, file = trim(outDir)//'runInfo.json', form = 'formatted', status = 'unknown')
         write(9302,'(A)') '{'
         write(9302,'(A)')      '  "code": "EQquasi",'
         write(9302,'(A)')      '  "version": "'//EQQUASI_VERSION//'",'

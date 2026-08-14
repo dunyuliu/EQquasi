@@ -184,20 +184,20 @@ subroutine solveTimeLoopMUMPS
             
             if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1) .or. (it==nstep)) then 
                 write(proc_str,'(I5.5)') it
-                netcdf_outfile = 'disp.'//trim(proc_str)//'.nc'
+                netcdf_outfile = trim(outDir)//'disp.'//trim(proc_str)//'.nc'
                 output_type = 'disp'
                 call netcdf_write(netcdf_outfile, output_type)
                 
-                netcdf_outfile = 'fault.'//trim(proc_str)//'.nc'
+                netcdf_outfile = trim(outDir)//'fault.'//trim(proc_str)//'.nc'
                 call netcdf_write_on_fault(netcdf_outfile)
             endif
             ! If exiting, write again the restart files.
             if ((stoptag == 1) .or. (it==nstep)) then
-                netcdf_outfile = 'disp.r.nc'
+                netcdf_outfile = trim(outDir)//'disp.r.nc'
                 output_type = 'disp'
                 call netcdf_write(netcdf_outfile, output_type)
                 
-                netcdf_outfile = 'fault.r.nc'
+                netcdf_outfile = trim(outDir)//'fault.r.nc'
                 call netcdf_write_on_fault(netcdf_outfile)
             endif
         endif

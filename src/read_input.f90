@@ -1,9 +1,75 @@
+! #0 set_io_dirs ---------------------------------------------------------
+subroutine set_io_dirs
+    ! The solver reads from input/ and writes to scratch/, both required.
+    !
+    ! A case laid out by create.newcase runs the solver at the case root, with
+    ! every input in input/ and every output in scratch/. The output goes to
+    ! scratch/ so that a cycle which is killed cannot leave half-written files
+    ! among the inputs, which is what used to happen and made "delete the
+    ! leftovers" impossible to do in one safe command.
+    !
+    ! Neither is optional and there is no fallback to bare filenames. A
+    ! fallback would let the solver run in a directory that is not a case,
+    ! silently write its output wherever it happened to be, and produce a
+    ! result nobody could trace back to inputs -- the silent degradation
+    ! PROJECT_RULES rule 2 exists to forbid. Run it through run.sh.
+    use globalvar
+    implicit none
+    logical :: ok, haveOne
+    integer (kind = 4) :: k
+    character (len = 40) :: required(4)
+
+    ! Every input the solver opens unconditionally. Checked here, together,
+    ! rather than letting each open() fail on its own: a missing file reported
+    ! by name at startup is one fix, whereas the same file discovered halfway
+    ! through setup is a Fortran runtime error with a unit number.
+    required(1) = 'input/model.txt'
+    required(2) = 'input/stations.txt'
+    required(3) = 'input/on_fault_vars_input.nc'
+    required(4) = 'scratch/currentcycle.txt'
+
+    ok = .true.
+    do k = 1, 4
+        inquire(file = trim(required(k)), exist = haveOne)
+        if (.not. haveOne) ok = .false.
+    enddo
+
+    if (.not. ok) then
+        write(*,*) '====================================================='
+        write(*,*) '= EQquasi must be run from a prepared case          ='
+        write(*,*) '=                                                   ='
+        do k = 1, 4
+            inquire(file = trim(required(k)), exist = haveOne)
+            if (haveOne) then
+                write(*,*) '=   found   : ', trim(required(k))
+            else
+                write(*,*) '=   MISSING : ', trim(required(k))
+            endif
+        enddo
+        write(*,*) '=                                                   ='
+        write(*,*) '= It reads input/ and writes scratch/, and runs     ='
+        write(*,*) '= nowhere else -- no fallback to the current        ='
+        write(*,*) '= directory, which would put results somewhere no   ='
+        write(*,*) '= one could trace back to inputs.                   ='
+        write(*,*) '=                                                   ='
+        write(*,*) '= Run through run.sh, which stages both. To build a ='
+        write(*,*) '= case: create.newcase <dir> <compset>, edit        ='
+        write(*,*) '= user_defined_params.py, then ./case.setup         ='
+        write(*,*) '====================================================='
+        stop 6
+    endif
+
+    inputDir = 'input/'
+    outDir   = 'scratch/'
+
+end subroutine set_io_dirs
+
 subroutine readcurrentcycle
 
     use globalvar
     implicit none
     
-    open(1,file ='currentcycle.txt', form = 'formatted', status = 'old')
+    open(1,file = trim(outDir)//'currentcycle.txt', form = 'formatted', status = 'old')
     read(1,*) icstart
     close(1)
 
@@ -23,21 +89,21 @@ subroutine readmodel
     logical :: fltGeomFromFile
 
     if (me == 0) then 
-        INQUIRE(FILE="model.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"model.txt", EXIST=file_exists)
         !write(*,*) 'Checking FE_Model_Geometry.txt by the master procs', me
         if (.not. file_exists) then
             write(*,*) 'model.txt is required but missing ...'
         endif 
     endif 
     if (me == 0) then 
-        INQUIRE(FILE="model.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"model.txt", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'model.txt is still missing, so exiting EQdyna'
             stop
         endif 
     endif     
     
-    open(unit = 1002, file = 'model.txt', form = 'formatted', status = 'old')
+    open(unit = 1002, file = trim(inputDir)//'model.txt', form = 'formatted', status = 'old')
         read(1002,*) xmin, xmax
         read(1002,*) ymin, ymax
         read(1002,*) zmin, zmax
@@ -175,21 +241,21 @@ subroutine readfric
     integer(kind=4):: i, j 
     
     if (me == 0) then 
-        INQUIRE(FILE="fric.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"fric.txt", EXIST=file_exists)
         !write(*,*) 'Checking FE_Fric.txt by the master procs', me
         if (.not. file_exists) then
             write(*,*) 'fric.txt is required but missing ...'
         endif 
     endif 
     if (me == 0) then 
-        INQUIRE(FILE="fric.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"fric.txt", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'fric.txt is still missing, so exiting EQdyna'
             stop
         endif 
     endif     
     
-    open(unit = 1005, file = 'fric.txt', form = 'formatted', status = 'old')
+    open(unit = 1005, file = trim(inputDir)//'fric.txt', form = 'formatted', status = 'old')
     if (friclaw == 1) then ! slip-weakening
         read(1005,*) fric_sw_fs
         read(1005,*) fric_sw_fd
@@ -273,21 +339,21 @@ subroutine readstations1
     integer(kind=4):: i, j 
     
     if (me == 0) then 
-        INQUIRE(FILE="stations.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"stations.txt", EXIST=file_exists)
         !write(*,*) 'Checking stations.txt by the master procs', me
         if (.not. file_exists) then
             write(*,*) 'stations.txt is required but missing ...'
         endif 
     endif 
     if (me == 0) then 
-        INQUIRE(FILE="stations.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"stations.txt", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'stations.txt is still missing, so exiting EQdyna'
             stop
         endif 
     endif     
     
-    open(unit = 1006, file = 'stations.txt', form = 'formatted', status = 'old')
+    open(unit = 1006, file = trim(inputDir)//'stations.txt', form = 'formatted', status = 'old')
         read(1006,*) n4nds
         read(1006,*) (nonfs(i), i = 1, ntotft)
         !write(*,*) 'n4nds,nonfs',n4nds, (nonfs(i), i = 1, ntotft), me
@@ -304,21 +370,21 @@ subroutine readstations2
     integer(kind=4):: i, j 
     
     if (me == 0) then 
-        INQUIRE(FILE="stations.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"stations.txt", EXIST=file_exists)
         !write(*,*) 'Checking stations.txt by the master procs', me
         if (.not. file_exists) then
             write(*,*) 'stations.txt is required but missing ...'
         endif 
     endif 
     if (me == 0) then 
-        INQUIRE(FILE="stations.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"stations.txt", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'stations.txt is still missing, so exiting EQdyna'
             stop
         endif 
     endif     
     
-    open(unit = 1006, file = 'stations.txt', form = 'formatted', status = 'old')
+    open(unit = 1006, file = trim(inputDir)//'stations.txt', form = 'formatted', status = 'old')
         read(1006,*) 
         read(1006,*) 
         read(1006,*)
@@ -353,14 +419,14 @@ subroutine read_fault_rough_geometry
     real (kind=dp)::n1Tmp,n2Tmp
     
     if (me == 0) then 
-        INQUIRE(FILE="bFault_Rough_Geometry.txt", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"bFault_Rough_Geometry.txt", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'bFault_Rough_Geometry.txt is missing, so exiting EQquasi'
             stop
         endif 
     endif     
     
-    open(unit = 1008, file = 'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
+    open(unit = 1008, file = trim(inputDir)//'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
         read(1008,*) n1Tmp, n2Tmp ! nums of grids along strike by dip, and nums of grids to pick a data point.
         read(1008,*) dxtmp, rough_fx_min, rough_fz_min 
     close(1008)
@@ -371,7 +437,7 @@ subroutine read_fault_rough_geometry
     write(*,*) 'nnx, nnz, rough_fx_max, rough_fx_min = ', nnx, nnz, rough_fx_max, rough_fx_min
     allocate(rough_geo(3,nnx*nnz))
     
-    open(unit = 1008, file = 'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
+    open(unit = 1008, file = trim(inputDir)//'bFault_Rough_Geometry.txt', form = 'formatted', status = 'old')
         read(1008,*)
         read(1008,*)
         do i = 1, nnx*nnz 

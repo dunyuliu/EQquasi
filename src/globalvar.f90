@@ -9,6 +9,16 @@ MODULE globalvar
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
     character (len = *), parameter :: EQQUASI_VERSION = '1.12.0'
 
+    ! Where the solver reads inputs from and writes outputs to, relative to
+    ! its working directory. A case laid out by create.newcase runs the solver
+    ! at the case root, with inputs in input/ and every output going to
+    ! scratch/ so that a killed cycle cannot leave half-written files among the
+    ! inputs. Both are resolved at startup by set_io_dirs (read_input.f90) and
+    ! fall back to '' so the solver still runs standalone in a flat directory.
+    character (len = 16) :: inputDir = '', outDir = ''
+    ! Last netCDF path handed to check(), so a failure names the file.
+    character (len = 120) :: lastNcPath = ''
+
     integer, parameter :: dp = selected_real_kind(15,307) ! precision of double precision
     real (kind=dp) :: pi = 3.14159265358979323846d0
     character (len = 30) :: sttmp, dptmp, proc_str 

@@ -33,6 +33,7 @@ program eqquasi3d
     endif 
     
     call setRunDate
+    call set_io_dirs
     call readcurrentcycle 
     call readmodel
     call readstations1
@@ -109,43 +110,51 @@ subroutine checkAndReport(currentProcID)
     use globalvar
     implicit none 
     logical :: file_exists
-    character (len = 50) :: filenametmp, output_type
+    character (len = 50) :: filenametmp, filenametmp2, output_type
     
     integer (kind = 4) :: currentProcID
     if (icstart == 1) then
-    INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
+    INQUIRE(FILE=trim(inputDir)//"on_fault_vars_input.nc", EXIST=file_exists)
         if (.not. file_exists) then
             write(*,*) 'on_fault_vars_input.nc is required but missing ...'
         endif 
     
-        call netcdf_read_on_fault("on_fault_vars_input.nc")
+        ! Assign into a fixed-length local before the call. These are
+        ! external subroutines with implicit interfaces, so an expression
+        ! argument passes a temporary whose length the callee does not know --
+        ! it declares character(len=50) and reads past the end, producing a
+        ! path with 22 bytes of adjacent memory appended.
+        filenametmp = trim(inputDir)//"on_fault_vars_input.nc"
+        call netcdf_read_on_fault(filenametmp)
     else
-        INQUIRE(FILE="on_fault_vars_input.nc", EXIST=file_exists)
+        INQUIRE(FILE=trim(inputDir)//"on_fault_vars_input.nc", EXIST=file_exists)
             if (.not. file_exists) then
                 write(*,*) 'on_fault_vars_input.nc is required but missing ...'
             endif 
         
-        INQUIRE(FILE="fault.r.nc", EXIST=file_exists)
+        INQUIRE(FILE=trim(outDir)//"fault.r.nc", EXIST=file_exists)
             if (.not. file_exists) then
                 write(*,*) 'icstart>1, fault.r.nc is required but missing ...'
             endif
         
-        call netcdf_read_on_fault_restart("on_fault_vars_input.nc", "fault.r.nc")
+        filenametmp = trim(inputDir)//"on_fault_vars_input.nc"
+        filenametmp2 = trim(outDir)//"fault.r.nc"
+        call netcdf_read_on_fault_restart(filenametmp, filenametmp2)
     endif 
     
     if (currentProcID == 0) then 
         write(*,'(X,A,40X,i7,4X,A)') '= Total nodes = ',numnp,'='            
         write(*,'(X,A,40X,i7,4X,A)') '= Total elems = ',numel,'='            
         
-        filenametmp = 'eqquasi.mesh.coor.nc'
+        filenametmp = trim(outDir)//'eqquasi.mesh.coor.nc'
         output_type = 'coor'
         call netcdf_write(filenametmp, output_type)
         
-        filenametmp = 'eqquasi.mesh.ien.nc'
+        filenametmp = trim(outDir)//'eqquasi.mesh.ien.nc'
         output_type = 'ien'
         call netcdf_write(filenametmp, output_type)
         
-        filenametmp = 'eqquasi.mesh.nsmp.nc'
+        filenametmp = trim(outDir)//'eqquasi.mesh.nsmp.nc'
         output_type = 'nsmp'
         call netcdf_write(filenametmp, output_type)
      

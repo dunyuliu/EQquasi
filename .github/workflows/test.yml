@@ -41,7 +41,12 @@ jobs:
         bash make.scripts.executable.sh
         export EQQUASIROOT=$(pwd)
         bash install.eqquasi.sh -m ubuntu
-        test -x bin/eqquasi
+        # bin/ holds versioned binaries and deliberately no plain `eqquasi`,
+        # so the check has to ask src which version it just built. Left as
+        # `test -x bin/eqquasi` it fails every run, which is what took CI red
+        # from v1.12.0 onward.
+        eqv=$(grep -oP "EQQUASI_VERSION = '\K[^']*" src/globalvar.f90)
+        test -x "bin/eqquasi-$eqv"
 
     - name: End-to-end (fast tier)
       run: |

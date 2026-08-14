@@ -10,3 +10,5 @@ testRunLog.txt
 src/eqquasi
 src/eqquasi.O0
 .claude/
+resume_claude.sh
+.pytest_cache/

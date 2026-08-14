@@ -3,36 +3,51 @@ subroutine output_onfault_st
     use globalvar
     implicit none
     
-    integer (kind = 4) :: i, j, k
+    integer (kind = 4) :: i, j, k, ift
     real (kind = dp)   :: dtStaMin, dtStaMax
+    character (len = 8) :: fttmp
 
     if(n4onf > 0) then
         do i = 1,n4onf
-            j = anonfs(3,i)
-            if (j==1) then  !main fault stations
-                sttmp = '      '
-                dptmp = '      '
-                if (bp == 8) then
-                    ! SEAS BP8 names stations in metres with an explicit sign,
-                    ! e.g. fltst_strk+000dp-200.
-                    write(sttmp,'(SP,i4.3)') int(xonfs(1,anonfs(2,i),j))
-                    write(dptmp,'(SP,i4.3)') int(-xonfs(2,anonfs(2,i),j))
-                elseif (bp == 7) then
-                    write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j))
-                    write(dptmp,'(i4.3)') int(-xonfs(2,anonfs(2,i),j))
-                else
-                    write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),j)/1000.d0)
-                    write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),j))/1000.d0)
-                endif
-                ! The CRESCENT DET platform routes on filename and processes
-                ! .dat for every file type, station time series included --
-                ! confirmed against its processed_files listing. .txt is
-                ! silently ignored.
-                if (bp == 8) then
-                    open(51,file=trim(outDir)//'fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.dat',status='unknown')
-                else
-                    open(51,file=trim(outDir)//'fltst_strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
-                endif
+            ift = anonfs(3,i)
+            ! Every station gets a file, on whichever fault it sits.
+            !
+            ! This used to open one only when j==1. Stations on faults 2+ then
+            ! wrote to unit 51 after it had been closed, so Fortran connected
+            ! it to a default `fort.51` in the launch directory and every one
+            ! of them appended to that single unnamed file, interleaved. A
+            ! two-fault case asking for `nonfs = 3 3` requests six stations
+            ! and got three, with the other three unusable -- and fort.51 was
+            ! also the debris that kept appearing in case roots.
+            !
+            ! Fault 1 keeps the plain SEAS name so existing references and
+            ! reference data still match; faults 2+ take an ft<N> tag, which
+            ! they need anyway because station coordinates are fault-local and
+            ! would otherwise collide with fault 1's.
+            fttmp = ''
+            if (ntotft > 1 .and. ift > 1) write(fttmp,'(A,I0,A)') 'ft', ift, '_'
+            sttmp = '      '
+            dptmp = '      '
+            if (bp == 8) then
+                ! SEAS BP8 names stations in metres with an explicit sign,
+                ! e.g. fltst_strk+000dp-200.
+                write(sttmp,'(SP,i4.3)') int(xonfs(1,anonfs(2,i),ift))
+                write(dptmp,'(SP,i4.3)') int(-xonfs(2,anonfs(2,i),ift))
+            elseif (bp == 7) then
+                write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),ift))
+                write(dptmp,'(i4.3)') int(-xonfs(2,anonfs(2,i),ift))
+            else
+                write(sttmp,'(i4.3)') int(xonfs(1,anonfs(2,i),ift)/1000.d0)
+                write(dptmp,'(i4.3)') int((-xonfs(2,anonfs(2,i),ift))/1000.d0)
+            endif
+            ! The CRESCENT DET platform routes on filename and processes
+            ! .dat for every file type, station time series included --
+            ! confirmed against its processed_files listing. .txt is
+            ! silently ignored.
+            if (bp == 8) then
+                open(51,file=trim(outDir)//'fltst_'//trim(fttmp)//'strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.dat',status='unknown')
+            else
+                open(51,file=trim(outDir)//'fltst_'//trim(fttmp)//'strk'//trim(adjustl(sttmp))//'dp'//trim(adjustl(dptmp))//'.txt',status='unknown')
             endif
             !write(51,*) '# This is the file header'
             !write(51,*) '# problem = San-Ti'
@@ -53,9 +68,9 @@ subroutine output_onfault_st
                 ! merge() suppresses negative zero: -xonfs is -0.0 for the
                 ! centre station, which prints as "-0.0" and reads oddly.
                 write(51,'(A,F9.1,A,F9.1,A)') '# location= on fault, x2 =', &
-                    merge(0.0d0, xonfs(1,anonfs(2,i),j),  xonfs(1,anonfs(2,i),j) == 0.0d0), &
+                    merge(0.0d0, xonfs(1,anonfs(2,i),ift),  xonfs(1,anonfs(2,i),ift) == 0.0d0), &
                     ' m, x3 =', &
-                    merge(0.0d0, -xonfs(2,anonfs(2,i),j), xonfs(2,anonfs(2,i),j) == 0.0d0), ' m'
+                    merge(0.0d0, -xonfs(2,anonfs(2,i),ift), xonfs(2,anonfs(2,i),ift) == 0.0d0), ' m'
                 ! Optional per section 4.1, but present in its example, so the
                 ! platform may parse them. Derived from the recorded times
                 ! rather than from dtmax, so they describe the run as it ran.
@@ -84,9 +99,9 @@ subroutine output_onfault_st
                 k = anonfs(1,i)
                 write(51,'(E22.14,10E15.7)') 0.0d0,        & ! t
                     0.0d0, 0.0d0,                          & ! slip_2, slip_3
-                    dlog10(max(fric(46,k,1), 1.0d-30)),    & ! log10 V_init
+                    dlog10(max(fric(46,k,ift), 1.0d-30)),    & ! log10 V_init
                     dlog10(1.0d-20),                       & ! log10 V_zero
-                    fric(8,k,1)/1.d6, 0.0d0,               & ! tau^0, tau_3
+                    fric(8,k,ift)/1.d6, 0.0d0,               & ! tau^0, tau_3
                     0.0d0, 0.0d0, 0.0d0,                   & ! p, q_2, q_3
                     ! fric(48) is the snapshot of the initial state taken in
                     ! netcdf_read_on_fault. Do not read fric(20) here: this block
@@ -96,7 +111,7 @@ subroutine output_onfault_st
                     ! is only the initial state when tau^0 happens to be the
                     ! steady-state stress at V_init, and it hides an
                     ! over-determined initial condition when it is not.
-                    dlog10(max(fric(48,k,1), 1.0d-30))
+                    dlog10(max(fric(48,k,ift), 1.0d-30))
                 do j = 1,it-1
                     write(51,'(E22.14,10E15.7)') fltsta(1,j,i),   & ! Time in sec
                         fltsta(5,j,i),                            & ! slip_2, along strike

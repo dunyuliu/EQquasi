@@ -9,3 +9,4 @@ __pycache__/
 testRunLog.txt
 src/eqquasi
 src/eqquasi.O0
+.claude/

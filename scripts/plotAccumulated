@@ -198,11 +198,18 @@ def main():
     par = pu.load_par(targets[0][1])
 
     stacked, slab_shape = None, None
+    # Which columns of `stacked` belong to which cycle. Every line used to be
+    # black, so a five-cycle figure could not answer "which cycle is that?" --
+    # the one question a stacked-slip plot exists to be asked.
+    cycle_spans = []
     for label, cycle_dir in targets:
         print(f"processing {label or cycle_dir} ({cycle_dir})")
         block, shape = cycle_profiles(cycle_dir, args.profile, args.ninterval,
                                       args.nwindow, args.fault, args.depth_km,
                                       par)
+        start = 0 if stacked is None else stacked.shape[1]
+        cycle_spans.append((label or os.path.basename(cycle_dir.rstrip(os.sep)),
+                            start, start + block.shape[1]))
         # Every cycle of a run shares one mesh, so the shapes agree; say so
         # rather than silently keeping whichever came last.
         if slab_shape is not None and shape != slab_shape:
@@ -220,11 +227,20 @@ def main():
     dpi = max(150.0, MIN_PRINT_DPI * k)
     fig, ax = plt.subplots(figsize=(canvas_in, canvas_in * 0.72),
                            constrained_layout=True)
-    for column in range(stacked.shape[1]):
-        if xaxis is None:
-            ax.plot(stacked[:, column], color="black", lw=0.7)
-        else:
-            ax.plot(xaxis, stacked[:, column], color="black", lw=0.7)
+    # One colour per cycle, one legend entry per cycle rather than per
+    # snapshot -- a 17-snapshot figure would otherwise carry a 17-item legend
+    # of the same five colours. tab10 is categorical; cycles are categories.
+    colours = plt.get_cmap("tab10")
+    for index, (name, lo, hi) in enumerate(cycle_spans):
+        colour = colours(index % 10)
+        for column in range(lo, hi):
+            line = (ax.plot(stacked[:, column], color=colour, lw=0.7)
+                    if xaxis is None else
+                    ax.plot(xaxis, stacked[:, column], color=colour, lw=0.7))
+            if column == lo:
+                line[0].set_label(name)
+    if len(cycle_spans) > 1:
+        ax.legend(frameon=False, ncol=min(len(cycle_spans), 5))
     ax.set_xlabel(xlabel)
     ax.set_ylabel("accumulated slip (m)")
     if args.ylim:

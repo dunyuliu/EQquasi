@@ -37,35 +37,11 @@ import sys
 import numpy as np
 
 
-# One place for figure style, applied on import so every utility that uses this
-# module gets the same look. Sizes are chosen for figures printed at roughly
-# 8 x 6 inches: readable in a talk or a paper column without rescaling, which
-# the matplotlib defaults (10 pt on a 6.4 x 4.8 in figure) are not.
-def apply_style():
-    import matplotlib
-    matplotlib.rcParams.update({
-        "figure.dpi": 150,
-        "savefig.dpi": 150,
-        "font.size": 14,
-        "axes.titlesize": 16,
-        "axes.labelsize": 15,
-        "xtick.labelsize": 13,
-        "ytick.labelsize": 13,
-        "legend.fontsize": 13,
-        "figure.titlesize": 17,
-        "axes.linewidth": 1.1,
-        "lines.linewidth": 2.2,
-        "lines.markersize": 8,
-        "xtick.major.width": 1.1,
-        "ytick.major.width": 1.1,
-        "xtick.major.size": 5.5,
-        "ytick.major.size": 5.5,
-        "grid.alpha": 0.25,
-        "savefig.bbox": "tight",
-    })
-
-
-apply_style()
+# Figure style lives once, at the bottom of this file under "aesthetics", and
+# is applied on import. There used to be a second apply_style() up here: the
+# module-level call ran THIS one, the later def rebound the name, and every
+# utility's explicit pu.apply_style() then partially overrode it -- so the
+# style actually in force was a merge of the two that neither one stated.
 
 
 def die(msg):
@@ -320,9 +296,20 @@ def fault_y(par, ift):
 # ----------------------------------------------------------------- aesthetics
 
 def apply_style():
+    """The one figure style. Values are what was already in force.
+
+    These are not a redesign: they are the merge the two former definitions
+    produced between them, read off matplotlib.rcParams and written down, so
+    that consolidating them changed no figure. Font sizes suit a canvas at
+    roughly print size; a script that renders larger than it prints must scale
+    them by k = canvas width / print width itself, because a point size is
+    only meaningful against the width the figure is reproduced at.
+    """
     import matplotlib
     matplotlib.use("Agg")
     matplotlib.rcParams.update({
+        "figure.dpi": 150,
+        "savefig.dpi": 150,
         "font.size": 10,
         "axes.titlesize": 11,
         "axes.labelsize": 10,
@@ -330,8 +317,20 @@ def apply_style():
         "ytick.labelsize": 9,
         "legend.fontsize": 9,
         "figure.titlesize": 13,
+        "axes.linewidth": 1.1,
+        "lines.linewidth": 2.2,
+        "lines.markersize": 8,
+        "xtick.major.width": 1.1,
+        "ytick.major.width": 1.1,
+        "xtick.major.size": 5.5,
+        "ytick.major.size": 5.5,
+        "grid.alpha": 0.25,
         "axes.grid": False,
+        "savefig.bbox": "tight",
     })
+
+
+apply_style()
 
 
 def save(fig, path, dpi=150):

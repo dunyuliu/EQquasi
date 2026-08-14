@@ -27,7 +27,7 @@ the dpi is chosen to clear 300 dpi at that width. The script prints k and the
 effective printed sizes so the claim can be checked rather than trusted.
 
 Reads:  fault.NNNNN.nc from every selected cycle
-Writes: accumulatedSlip.{along-strike,down-dip}.png into the case directory
+Writes: accumulatedSlip.{horizontal,vertical}.png into the case directory
         (cwd for a flat run)
 """
 
@@ -167,7 +167,7 @@ def scale_fonts(canvas_in, print_mm):
 
 def main():
     ap = pu.make_parser(__doc__, "plotAccumulated",
-                        "accumulatedSlip.{along-strike,down-dip}.png, all "
+                        "accumulatedSlip.{horizontal,vertical}.png, all "
                         "cycles stacked in one figure.", PATTERNS)
     ap.add_argument("--profile", choices=[ALONG_STRIKE, DOWN_DIP],
                     default=ALONG_STRIKE,
@@ -234,7 +234,11 @@ def main():
                  + (f" — fault {args.fault}" if args.fault else ""))
     ax.grid(alpha=0.3)
 
-    orient = args.profile
+    # The flag is --profile along-strike|down-dip, but the FILENAMES stay
+    # horizontal/vertical. Renaming an output breaks every reference to it --
+    # tests, slides, scripts that glob for it -- and buys nothing the flag has
+    # not already bought.
+    orient = "vertical" if args.profile == DOWN_DIP else "horizontal"
     name = f"accumulatedSlip.{orient}.png"
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)

@@ -57,11 +57,35 @@ MIN_PRINT_DPI = 300.0
 
 
 def snapshot_paths(cycle_dir, ninterval):
-    """The fault.NNNNN.nc snapshots of one cycle, in step order."""
+    """The fault.NNNNN.nc snapshots of one cycle, in step order.
+
+    The cycle's END STATE is always the last column, taken from fault.r.nc --
+    the restart file, which is the state the next cycle actually begins from
+    and is written whether or not the final step happened to fall on a
+    snapshot. Subsampling with [::n] otherwise drops the last snapshot
+    whenever the count is not congruent to 1 mod n: BP1002 cycle 3 is 984
+    steps and has exactly two snapshots, so at --ninterval 2 only step 1
+    survived and the cycle contributed 0.001 m in place of its real slip,
+    shifting every later cycle down with it. A thinning option may drop
+    intermediate frames; it must not drop the result.
+
+    Falls back to the numbered snapshots when there is no fault.r.nc, so a
+    part-finished or hand-assembled cycle directory still plots.
+    """
     snaps = pu.sort_nicely([f for f in glob.glob(os.path.join(cycle_dir,
                                                               "fault.*.nc"))
                             if pu.step_of(f) is not None])
-    return snaps[::ninterval]
+    if not snaps:
+        return snaps
+    kept = snaps[::ninterval]
+    restart = os.path.join(cycle_dir, "fault.r.nc")
+    if os.path.exists(restart):
+        if pu.step_of(kept[-1]) == pu.step_of(snaps[-1]):
+            kept = kept[:-1]        # same state, written twice; keep one
+        kept.append(restart)
+    elif kept[-1] != snaps[-1]:
+        kept.append(snaps[-1])
+    return kept
 
 
 def depth_row(ndip, depth_km, par, ift):

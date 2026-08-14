@@ -1,3 +1,20 @@
+! The per-fault filename tag: '' for fault 1, 'ft2_' onward.
+!
+! Fault 1 keeps the plain name so existing references, reference data and the
+! SEAS station convention still match; later faults are tagged. Written once
+! because it is now needed by three writers -- stations, cplot_EQquasi and
+! cplot_ruptarea_trac_slip -- and three copies of a naming convention is how
+! two of them end up disagreeing.
+function faultTag(ift) result(tag)
+    use globalvar, only: ntotft
+    implicit none
+    integer (kind = 4), intent(in) :: ift
+    character (len = 8) :: tag
+
+    tag = ''
+    if (ntotft > 1 .and. ift > 1) write(tag,'(A,I0,A)') 'ft', ift, '_'
+end function faultTag
+
 subroutine output_onfault_st
 
     use globalvar
@@ -5,7 +22,7 @@ subroutine output_onfault_st
     
     integer (kind = 4) :: i, j, k, ift
     real (kind = dp)   :: dtStaMin, dtStaMax
-    character (len = 8) :: fttmp
+    character (len = 8) :: fttmp, faultTag
 
     if(n4onf > 0) then
         do i = 1,n4onf
@@ -24,8 +41,7 @@ subroutine output_onfault_st
             ! reference data still match; faults 2+ take an ft<N> tag, which
             ! they need anyway because station coordinates are fault-local and
             ! would otherwise collide with fault 1's.
-            fttmp = ''
-            if (ntotft > 1 .and. ift > 1) write(fttmp,'(A,I0,A)') 'ft', ift, '_'
+            fttmp = faultTag(ift)
             sttmp = '      '
             dptmp = '      '
             if (bp == 8) then
@@ -235,29 +251,42 @@ subroutine output_onfault_transfer
     use globalvar
     implicit none
     
-    integer (kind = 4) :: i
-    
-    if(nftnd(1) > 0) then
-        open(unit=1111,file=trim(outDir)//'cplot_EQquasi.txt',status='unknown')    !rupture time
+    integer (kind = 4) :: i, ift
+    character (len = 8) :: fttmp, faultTag
+
+    ! One file per fault. This wrote fault 1 only -- nftnd(1), fric(...,1),
+    ! fnft(i,1) -- so on a two-fault model the rupture times of every fault
+    ! but the first were never written to disk at all. plotRuptureTime reads
+    ! this file, so every BP1002 rupture-time figure was fault A only, and the
+    ! cycles whose event was on fault B reported "nothing ruptured" and were
+    ! believed. Same hardcoded-index bug the station output had.
+    !
+    ! Fault 1 keeps the plain name so existing references and reference data
+    ! still match; faults 2+ take an ft<N> tag.
+    do ift = 1, ntotft
+    fttmp = faultTag(ift)
+    if(nftnd(ift) > 0) then
+        open(unit=1111,file=trim(outDir)//'cplot_'//trim(fttmp)//'EQquasi.txt',status='unknown')    !rupture time
         ! write(1111,*) '# This is the file header:'
         ! write(1111,*) '# problem = San-Ti'
         ! write(1111,*) '# author = sophon'
         ! write(1111,*) '# date = 2424/01/01'
         ! write(1111,*) '# code = Qquasi'
         ! write(1111,*) '# version = 1.x'
-        write(1111,'(1x,16e32.21e4)') (x(1,nsmp(1,i,1)), -x(3,nsmp(1,i,1)), & ! xcoor, -zcoor
-            fric(26,i,1), & ! trial slip rate magnitude, m/s;
-            fric(20,i,1), & ! state variable in RSF;
-            fric(28,i,1), & ! shear stress along strike, Pa;
-            fric(29,i,1), & ! shear stress along dip, Pa;
-            fric(30,i,1), & ! effective normal stress, Pa;
-            fric(31,i,1), fric(32,i,1), fric(33,i,1), & ! master node nodal velocity along x, y, z; master node on y+ side of the fault. 
-            fric(34,i,1), fric(35,i,1), fric(36,i,1), & ! slave node nodal velocity along x, y, z; slave node on the y- side of the fault. 
-            fric(44,i,1), fric(45,i,1), & ! empty for now. 
-            fnft(i,1), & ! rupture time at this loc.
-                i = 1,nftnd(1))    
+        write(1111,'(1x,16e32.21e4)') (x(1,nsmp(1,i,ift)), -x(3,nsmp(1,i,ift)), & ! xcoor, -zcoor
+            fric(26,i,ift), & ! trial slip rate magnitude, m/s;
+            fric(20,i,ift), & ! state variable in RSF;
+            fric(28,i,ift), & ! shear stress along strike, Pa;
+            fric(29,i,ift), & ! shear stress along dip, Pa;
+            fric(30,i,ift), & ! effective normal stress, Pa;
+            fric(31,i,ift), fric(32,i,ift), fric(33,i,ift), & ! master node nodal velocity along x, y, z; master node on y+ side of the fault. 
+            fric(34,i,ift), fric(35,i,ift), fric(36,i,ift), & ! slave node nodal velocity along x, y, z; slave node on the y- side of the fault. 
+            fric(44,i,ift), fric(45,i,ift), & ! empty for now. 
+            fnft(i,ift), & ! rupture time at this loc.
+                i = 1,nftnd(ift))    
         close(1111)
     endif
+    enddo
     
 end subroutine output_onfault_transfer
 
@@ -372,16 +401,21 @@ subroutine output_ruptarea_trac_slip
     use globalvar
     implicit none
     
-    integer (kind = 4) :: i, j 
-    
-    if(nftnd(1) > 0) then
-        open(unit=1114,file=trim(outDir)//'cplot_ruptarea_trac_slip.txt',status='unknown')    !rupture time
+    integer (kind = 4) :: i, j, ift
+    character (len = 8) :: fttmp, faultTag
+
+    ! Per fault, for the same reason as cplot_EQquasi.txt above.
+    do ift = 1, ntotft
+    fttmp = faultTag(ift)
+    if(nftnd(ift) > 0) then
+        open(unit=1114,file=trim(outDir)//'cplot_'//trim(fttmp)//'ruptarea_trac_slip.txt',status='unknown')    !rupture time
         ! 1,    2,     3,     4
         !fric(81,i),fric(82,i),fric(83,i),fric(84,i)   
         !Ruptured area, total slip, tract at the beginning, tract at the end.
-        write(1114,'(1x,4e32.21e4)') (fric(81,i,1),fric(82,i,1),fric(83,i,1),fric(84,i,1), i=1,nftnd(1))    
+        write(1114,'(1x,4e32.21e4)') (fric(81,i,ift),fric(82,i,ift),fric(83,i,ift),fric(84,i,ift), i=1,nftnd(ift))    
         close(1114)
     endif
+    enddo
     
 end subroutine output_ruptarea_trac_slip
 

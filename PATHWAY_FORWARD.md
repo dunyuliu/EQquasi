@@ -147,10 +147,10 @@ Read this first on wake-up. Update in place; close items by deleting them.
   to a default `fort.51` and every fault-2+ station appended there,
   interleaved. BP1002 asks for six stations and three produced nothing
   usable. Fault 1 keeps the plain SEAS name; faults 2+ take an `ft<N>_` tag.
-  CONSEQUENCE STILL OPEN: `reference/bp1002` was blessed with the buggy code
-  and holds only fault-1 stations. The e2e gate walks reference files, so the
-  new `ft2` files are simply not compared -- the reference is incomplete, not
-  wrong, and re-blessing bp1002 would close the gap.
+  CONSEQUENCE CLOSED 2026-08-14: `reference/bp1002` now carries the three
+  `fltst_ft2_*` files. Added additively after all 19 pre-existing entries
+  compared equal at v1.13.0, so nothing was re-blessed to accommodate the
+  fix.
 - Utilities report the GLOBAL peak in `peak_slip_rate_vs_time`, so which
   segment ruptured is invisible. NOT a plotting fix: `global.dat` column 2 is
   a single `maxval` over all faults, computed in `solveTimeLoopMUMPS.f90`.

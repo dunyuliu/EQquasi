@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: bp8.qdc.gs.10
+# gate   : e2e fast (via test.bp8.qdc)
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : SEAS BP8, Gaussian source. Submitted to CRESCENT DET.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 # SCEC SEAS benchmark BP8-QD-GS (aging law), 10 m on-fault resolution.
 # Quasi-dynamic fluid injection in 3D: a planar fault in a homogeneous whole

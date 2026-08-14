@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: bp7.qdc.a.10
+# gate   : e2e fast (via test.bp7.qdc)
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : SEAS BP7, variant a.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 from defaultParameters import parameters
 import numpy as np

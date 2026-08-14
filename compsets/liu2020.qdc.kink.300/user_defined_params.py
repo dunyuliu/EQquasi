@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: liu2020.qdc.kink.300
+# gate   : none
+# changed: 2026-08-14   (content; see git log for the full history)
+# note   : Liu et al. 2020 GJI, EQquasi half. TODO: needs 64-bit MUMPS for dx=300.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 """Liu, Duan & Luo (2020, GJI 220, 598-609): strike-slip fault with a kink.
 
 Quasi-dynamic (EQquasi alone). The paper's model is fully dynamic, EQquasi

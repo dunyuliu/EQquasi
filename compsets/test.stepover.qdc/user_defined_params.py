@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: test.stepover.qdc
+# gate   : TODO: orphaned
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : Regression variant with no e2e row.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 """Two-fault step-over, BP5 parameters, geometry changed only.
 
 Segment A: x in [-42.5, -2.5] km, y = 0 km      (the "cuts through the model" side is x = -42.5 km)

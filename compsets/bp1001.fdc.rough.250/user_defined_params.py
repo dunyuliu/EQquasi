@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: bp1001.fdc.rough.250
+# gate   : TODO: broken
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : Legacy bare-variable format; case.setup dies on NameError: par.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 import numpy as np
 from math import *

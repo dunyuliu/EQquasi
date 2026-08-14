@@ -116,9 +116,10 @@ Currently supported compsets, with what gates each one, are in
   - bp1001.fdc.rough.250
   - bp1001.qdc.rough.250
   - bp1002.qdc.2500 (two-fault step-over; the only `ntotft > 1` compset)
-  - liu2020.fdc.planar
+  - liu2020.qdc.kink.300
+  - liu2020.fdc.planar.300
   - liu2020.fdc.rough.250
-  - das.cycle
+  - das.qdc.10
 
 In addition, ```test.*``` compsets (```test.bp5.qdc```,
 ```test.bp5.qdc.dip90```, ```test.bp7.qdc```, ```test.bp8.qdc```,

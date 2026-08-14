@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: test.bp8.qdc
+# gate   : e2e fast
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : Regression variant. Not for science.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 # SCEC SEAS benchmark BP8-QD-GS (aging law), 50 m, +/-500 m cube.
 #

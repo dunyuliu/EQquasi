@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: test.bp5.qdc.dip90
+# gate   : TODO: orphaned
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : Regression variant with no e2e row.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 from defaultParameters import parameters
 import numpy as np

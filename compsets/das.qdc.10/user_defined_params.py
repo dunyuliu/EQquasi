@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: das.qdc.10
+# gate   : none
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : Legacy, but on the par schema.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 from defaultParameters import parameters
 import numpy as np

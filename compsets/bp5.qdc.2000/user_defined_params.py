@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: bp5.qdc.2000
+# gate   : e2e full (via test.bp5.qdc)
+# changed: 2026-08-12   (content; see git log for the full history)
+# note   : SEAS BP5. Published: Jiang et al. 2022 JGR.
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 
 from defaultParameters import parameters
 import numpy as np

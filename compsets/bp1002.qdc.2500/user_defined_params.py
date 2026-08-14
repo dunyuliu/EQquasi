@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: bp1002.qdc.2500
+# gate   : e2e full, run directly
+# changed: 2026-08-13   (content; see git log for the full history)
+# note   : Two-fault step-over; the only ntotft > 1 case (rule 12).
+# Status is mirrored in compsets/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 """BP1002: two-fault step-over, BP5 parameters, geometry changed only.
 
 Segment A: x in [-60.0,  2.5] km, y =  0.0 km   (cuts the model at x = -60 km)

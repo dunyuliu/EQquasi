@@ -228,12 +228,25 @@ Read this first on wake-up. Update in place; close items by deleting them.
   y boundaries driven at +/-9.513e-10 m/s giving ~1e-9 m/s creep; other faces
   free; dx 300 m uniform in x, z, enlarged 1.3x in y beyond 1.2 km.
 
-  **§3.4 resolution, and why a coarse run is meaningless here.** The paper
-  requires `h*/W_seis < 1` and `Lambda_0/dx > 2.3`, and reports 0.8674 and
-  2.5163 at dx = 300 m. Lambda_0/dx scales as 1/dx, so 600 m gives 1.26 and
-  1200 m gives 0.63 -- both below the criterion. A 1200 m smoke test of this
-  compset reached a final max slip rate of 3.9e4 m/s: not the cap, not a bug,
-  just an unresolved cohesive zone. This problem cannot be run coarse.
+  **§3.4 resolution.** The paper requires `h*/W_seis < 1` and
+  `Lambda_0/dx > 2.3`, and reports 0.8674 and 2.5163 at dx = 300 m.
+  Lambda_0/dx scales as 1/dx, so 600 m gives 1.26 and 1200 m gives 0.63 --
+  both below the criterion. Real, and it would matter for a rupture front.
+
+  **It is NOT what made the smoke test blow up.** An earlier version of this
+  note blamed resolution; that was wrong. The trace says otherwise: step 1 is
+  correct at 1.17e-9 m/s, step 2 jumps 14 orders of magnitude in moment rate,
+  and time then freezes -- a one-step instability from a steady creeping
+  initial condition, which under-resolution does not produce.
+
+  The caps do. `user_defined_params.py` computes initial shear from
+  `shear_steady_state()` at sigma_n = -50 MPa; `faulting.f90` then clamps
+  sigma_n to -40 MPa on the first evaluation and never recomputes shear. The
+  first snapshot shows effective normal stress spanning exactly 40.00 to
+  50.00 MPa and tau/sigma reaching 0.785 against mu0 = 0.6. With a = 0.007,
+  RSF turns that into V/V_ss = exp(0.15/0.007) ~ 2e9, which takes 1e-9 m/s to
+  ~2 m/s in one step -- exactly what step 2 did. The caps do not merely
+  disagree with the paper; they destroy the compset's own initial condition.
 
   BLOCKER: dx = 300 m is not optional, and there the MUMPS factors want
   ~5.51e9 reals against a 2^31 ceiling, so full reproduction needs a

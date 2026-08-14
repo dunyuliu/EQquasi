@@ -1,6 +1,6 @@
 # Pathway forward
 
-Working plan, ordered by what blocks what. Updated 2026-08-13, at v1.12.0.
+Working plan, ordered by what blocks what. Updated 2026-08-14, at v1.13.0.
 
 This is a live document: close items by deleting them, and record what was
 learned in the place that will be read again (`PROJECT_RULES.md` for a rule,
@@ -74,19 +74,6 @@ Read this first on wake-up. Update in place; close items by deleting them.
      the meshgen fault-plane fix and gives completely different numbers.
      Comparing against it reads as a total regression when nothing is wrong.
 
-   Baseline from the old layout, same binary and compset:
-
-   | cycle | peak V | slip A | slip B |
-   |---|---|---|---|
-   | 0 | 0.846 | 4.99 m | 0.03 m |
-   | 1 | 0.899 | 0.92 m | 4.88 m |
-   | 2 | 0.347 | 15.08 m | 15.08 m |
-   | 3 | 0.023 | 1.59 m | 0.00 m |
-   | 4 | 0.371 | 2.23 m | 5.02 m |
-
-   Only directory plumbing changed, so these must match to round-off. If they
-   do not, the revamp broke something -- find it, do not re-bless.
-
 2. [x] **e2e gate green, both tiers.** Fast: 23 passed, 6 skipped, 0 failed.
    Full: 41 passed, 13 skipped, 2 failed -- both diagnosed and fixed, and the
    fast tier re-run green afterwards. The full tier takes 3h05 and needs
@@ -119,14 +106,23 @@ Read this first on wake-up. Update in place; close items by deleting them.
    MACHINE=utig. The assertion now names MACHINE so the next reader is not
    sent looking for a missing library.
 
-3. [ ] **Commit the revamp in separable pieces, release, push, watch CI.**
-   Suggested split: (a) solver input/scratch paths + hard-stop guard,
-   (b) create.newcase layout, (c) case.setup input//log/ + freeze guard,
-   (d) run.sh no-copy + restart-from-previous-cycle, (e) utilities and test
-   harness following result/. Version: minor -- workflow and solver behaviour
-   change, results unchanged.
+3. [x] **Revamp committed, released as v1.13.0, pushed, CI green.**
+   Six commits, tagged v1.13.0. CI run 31785517943 SUCCEEDED -- the first
+   green since v1.12.0.
 
-4. [ ] **Then work the list below**, cheapest first. Do not start anything in
+   CI had been red across every push since v1.12.0, and the note that used to
+   sit here calling the only failure "local-only, no MUMPS" was wrong twice:
+   wrong about the local cause, and wrong that remote CI was fine. The
+   workflow's Build step asserted `test -x bin/eqquasi`, the unversioned name
+   that stopped existing when binaries became versioned, so it died at Build
+   before the e2e tier ran at all.
+
+   That is three places one change broke, all found the same day: this, the
+   e2e stale-binary guard, and the contract test's filename split. When a
+   name that appears in build products changes, grep the whole tree for the
+   old one -- tests and CI config included, not just source.
+
+4. [~] **Then work the list below**, cheapest first. Do not start anything in
    section 1 or 2 (BP8 submission/convergence) unattended -- they need
    judgement calls on what to submit.
 
@@ -146,9 +142,15 @@ Read this first on wake-up. Update in place; close items by deleting them.
   allocatable dummies -- it applies to character dummies as well.
 
 ### Known open, from today
-- Multi-fault station output unimplemented: `library_output.f90` writes
-  stations under `if (j==1)`, so faults 2+ get none, and the unopened unit 51
-  leaves a stray `fort.51` in the case root.
+- [FIXED] Multi-fault station output. It was worse than "faults 2+ get
+  none": the unopened unit 51 was still *written to*, so Fortran connected it
+  to a default `fort.51` and every fault-2+ station appended there,
+  interleaved. BP1002 asks for six stations and three produced nothing
+  usable. Fault 1 keeps the plain SEAS name; faults 2+ take an `ft<N>_` tag.
+  CONSEQUENCE STILL OPEN: `reference/bp1002` was blessed with the buggy code
+  and holds only fault-1 stations. The e2e gate walks reference files, so the
+  new `ft2` files are simply not compared -- the reference is incomplete, not
+  wrong, and re-blessing bp1002 would close the gap.
 - Utilities report the GLOBAL peak, so which segment ruptured is invisible in
   `peak_slip_rate_vs_time` and `accumulatedSlip`.
 - `plotOnFaultVars`' depth axis is the fault's extent with no hint of the

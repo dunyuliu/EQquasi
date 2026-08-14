@@ -140,9 +140,12 @@ def main():
                 label=label or os.path.basename(os.path.abspath(rdir)))
     ax.set_xlabel(f"node # along {args.profile_type} profile")
     ax.set_ylabel(f"{args.var} ({unit})")
+    # Always name the fault: `if args.fault` is falsy for fault 0, so fault
+    # 0's figure carried no label and, next to fault 1's, read as the combined
+    # or un-faulted case. (The FILENAME suffix below stays conditional --
+    # renaming fault 0's output would break every existing reference to it.)
     ax.set_title(f"{args.var} — {args.profile_type} profile — "
-                 f"{os.path.basename(args.file)}"
-                 + (f" — fault {args.fault}" if args.fault else ""))
+                 f"{os.path.basename(args.file)} — fault {args.fault}")
     ax.grid(alpha=0.3)
     ax.legend()
     fig.tight_layout()

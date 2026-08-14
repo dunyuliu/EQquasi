@@ -245,9 +245,11 @@ def main():
     ax.set_ylabel("accumulated slip (m)")
     if args.ylim:
         ax.set_ylim(*args.ylim)
+    # Always name the fault. This used to be `if args.fault`, which is falsy
+    # for fault 0 -- so fault 0's figure carried no fault label at all and,
+    # placed beside fault 1's, looked like the un-faulted or combined case.
     ax.set_title(f"Accumulated slip — {args.profile} — {len(targets)} "
-                 f"cycle(s), {stacked.shape[1]} snapshots"
-                 + (f" — fault {args.fault}" if args.fault else ""))
+                 f"cycle(s), {stacked.shape[1]} snapshots — fault {args.fault}")
     ax.grid(alpha=0.3)
 
     # The flag is --profile along-strike|down-dip, but the FILENAMES stay

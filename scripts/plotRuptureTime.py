@@ -87,6 +87,14 @@ def process_dir(rdir, outdir, interval):
     # spaced lines mean a slow front, widely spaced a fast one. A count-based
     # interval would change meaning between runs and make them incomparable.
     step = interval
+    # Contour SECONDS SINCE THIS EVENT NUCLEATED, not absolute simulation
+    # time. fnft is stamped on the cycle's own clock, so in a multi-cycle run
+    # it carries the interseismic period too: cycle 2 of BP1002 nucleates at
+    # 1.5e10 s, and 5-second contours drawn on that baseline all label as
+    # "1.50757e+10" and overprint each other into a smear. Shifting also makes
+    # cycles comparable, which absolute times never were.
+    onset = float(np.nanmin(grid))
+    grid = grid - onset
     lo, hi = float(np.nanmin(grid)), float(np.nanmax(grid))
     # A fixed interval keeps runs comparable, but draws nothing when the event
     # is shorter than one interval: BP7 ruptures over 1.1 s against BP5's 117,
@@ -126,9 +134,10 @@ def process_dir(rdir, outdir, interval):
     # The node count and time range are diagnostics, already printed to stdout;
     # in the title they crowd out the one thing a reader needs, which is what
     # the figure shows and which run it came from.
-    ax.set_title(f"Rupture time, contours every {step:g} s"
+    ax.set_title(f"Rupture time since nucleation, contours every {step:g} s"
                  f"{' (auto: event shorter than the 5 s default)' if auto else ''}\n"
-                 f"{os.path.basename(os.path.abspath(rdir))}")
+                 f"{os.path.basename(os.path.abspath(rdir))}"
+                 f"  (nucleated at {onset:.6g} s)")
     pu.save(fig, pu.out_path(rdir, "rupture_time.png", outdir), dpi=150)
 
 

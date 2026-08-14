@@ -48,6 +48,47 @@ subroutine mesh4num
 	fltz1=minval(fltxyz(1,3,:))
 	fltz2=maxval(fltxyz(2,3,:))
 
+	! Every fault's x and z bounds must be an integer number of dx steps from
+	! the belt origin, exactly as build_yline_belt already requires of y. The
+	! uniform grid starts at fltx1/fltz1 and steps by dx, so a bound that is
+	! not commensurate falls between node lines -- and a fault edge that falls
+	! between node lines meshes with fewer nodes than intended, or none at
+	! all, silently. v1.7.0 added this guard for the fault-normal direction
+	! only; x and z carried the same hole. mesh4num runs before meshgen, so
+	! stopping here stops before any mesh is built.
+	do ift = 1, ntotft
+		do k = 1, 2
+			if (abs(fltxyz(k,1,ift) - fltx1 - &
+			    dnint((fltxyz(k,1,ift) - fltx1)/dx)*dx) > dx/100.d0) then
+				write(*,*) '====================================================='
+				write(*,*) '= A fault x bound is not an integer multiple of dx  ='
+				write(*,*) '= from the mesh belt origin, so it falls between    ='
+				write(*,*) '= node lines and would mesh with too few nodes.     ='
+				write(*,'(X,A,I4,A,I2)') '=   fault ', ift, ', bound ', k
+				write(*,*) '=   x bound     =', fltxyz(k,1,ift)
+				write(*,*) '=   belt origin =', fltx1
+				write(*,*) '=   dx          =', dx
+				write(*,*) '= Fix par.faultgeom or par.dx and rerun case.setup. ='
+				write(*,*) '====================================================='
+				stop 5
+			endif
+			if (abs(fltxyz(k,3,ift) - fltz1 - &
+			    dnint((fltxyz(k,3,ift) - fltz1)/dx)*dx) > dx/100.d0) then
+				write(*,*) '====================================================='
+				write(*,*) '= A fault z bound is not an integer multiple of dx  ='
+				write(*,*) '= from the mesh belt origin, so it falls between    ='
+				write(*,*) '= node lines and would mesh with too few nodes.     ='
+				write(*,'(X,A,I4,A,I2)') '=   fault ', ift, ', bound ', k
+				write(*,*) '=   z bound     =', fltxyz(k,3,ift)
+				write(*,*) '=   belt origin =', fltz1
+				write(*,*) '=   dx          =', dx
+				write(*,*) '= Fix par.faultgeom or par.dx and rerun case.setup. ='
+				write(*,*) '====================================================='
+				stop 5
+			endif
+		enddo
+	enddo
+
 	nxuni=(fltx2-fltx1-2.0d0*dx)/dx+1
 	xstep=dx
 	xcoor=fltx1+dx

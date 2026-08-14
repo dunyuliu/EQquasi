@@ -46,6 +46,7 @@ load-bearing.
 14. [Shared-checkout discipline: worktrees, not branches; explicit paths, not `-A`](#14-shared-checkout-discipline-worktrees-not-branches-explicit-paths-not--a) (G13)
 15. [Operational safety on the shared compute host](#15-operational-safety-on-the-shared-compute-host) (G14)
 16. [A subagent's or audit's finding is a hypothesis until checked against source](#16-a-subagents-or-audits-finding-is-a-hypothesis-until-checked-against-source) (G15)
+20. ["Plot" means a fixed set of five figures, in a fixed order](#20-plot-means-a-fixed-set-of-five-figures-in-a-fixed-order) (G3)
 
 Rule numbers are cited in commits, reports, and the test suite itself
 (`tests/contract/test_reference_gold_is_referenced.py` cites 8a,
@@ -827,6 +828,48 @@ layout are exactly what a single-benchmark test cannot see.
 
 Related: rule 8a (every reference file has a reader) covers whether a gold file
 is *read*; this rule covers whether the pipeline that produced it still *works*.
+
+---
+
+## 20. "Plot" means a fixed set of five figures, in a fixed order
+
+**Instantiates: G3** — a result you look at is a gate, and a gate that varies
+run to run is not one.
+
+When the user says **"plot"**, with no further qualification, produce these
+five, in this order, and show them:
+
+| # | tool | what it answers |
+|---|---|---|
+| 1 | `plotRuptureTime.py` | where and when the front went |
+| 2 | `plotPeakSliprateTime.py` | when the events were |
+| 3 | `plotOnFaultVars` | the full state on the fault plane |
+| 4 | `plotAccumulated` | slip built up over cycles |
+| 5 | `plotStations.py` | time series at the named stations |
+
+**Scope.** Per cycle for 1, 3 and 5 — those describe one event, and merging
+cycles into them destroys the thing they show. Across the whole set for 2 and
+4 — those exist to be read as a history, and one cycle of either is nearly
+information-free. On a multi-fault case, every tool that takes `--fault` is
+run once per fault, and both figures are shown; a single-fault figure from a
+two-fault model is a claim that half the model did nothing, and it must be
+made explicitly, not by omission.
+
+**Why fixed.** Choosing which figures to show after seeing the numbers is how
+a result gets talked into existence. Fixing the set in advance means the same
+five are produced whether they support the story or not.
+
+**Do not silently substitute.** If a tool in the list cannot answer for part
+of the model, say so with the figure rather than showing the part that works.
+As of 2026-08-14 that applies to #1: `library_output.f90` writes
+`cplot_EQquasi.txt` from `nftnd(1)` / `fnft(i,1)`, hardcoded to fault 1, so
+fault 2's rupture times are never written to disk and every BP1002
+rupture-time figure is fault A only. No `--fault` flag can fix that; the data
+is not in the file. Until the solver writes a per-fault cplot, that figure is
+captioned as fault A only.
+
+**Tier**: judgment. It governs what gets shown to a person, which no test can
+check.
 
 ## 19. Drive runs through the workflow, never the binary directly
 

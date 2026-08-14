@@ -126,10 +126,18 @@ Read this first on wake-up. Update in place; close items by deleting them.
    section 1 or 2 (BP8 submission/convergence) unattended -- they need
    judgement calls on what to submit.
 
-5. [ ] **Only if 1-4 are all done**: stage the kink work in the worktree
-   `/home/utig5/dliu/eqquasi.kink`. It is uncommitted there. The compset and
-   generator are verified; dx=300 m needs a 64-bit-integer MUMPS, dx=600 m
-   runs. Do not merge it to master unattended.
+5. [x] **Kink work staged, not merged.** Committed as 7d11983 on
+   `kink-geometry` in the worktree `/home/utig5/dliu/eqquasi.kink`. Not
+   pushed, not merged.
+
+   Read before picking it up: that branch sits at e8327a7 and PREDATES the
+   v1.13.0 workflow revamp, so the compset has never been run against a case
+   with input/, result/, scratch/. It was staged rather than brought forward
+   because rebasing it onto master and re-verifying is real work with a real
+   chance of breaking, and the instruction was not to merge unattended.
+   Geometry is verified in the written file and in the solved mesh; dx=600 m
+   runs, dx=300 m (the paper's) needs a 64-bit-integer MUMPS -- the factors
+   want 5.51e9 reals against a 2^31 ceiling.
 
 ### Landed during the revamp, worth remembering
 - **Implicit interfaces bite character arguments too.** Passing

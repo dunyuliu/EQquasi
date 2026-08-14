@@ -5,8 +5,11 @@ Walks the selected cycles in order, extracts the slip profile from every
 fault.NNNNN.nc snapshot (mode 1: vertical at mid-strike; mode 2: horizontal at
 3/4 of the model depth), offsets each cycle by the final slip of the previous
 one, and draws them all on one axes -- the classic stacked-slip-history plot.
-Lines are boxcar-smoothed over --nwindow nodes; every --ninterval-th snapshot
-is drawn.
+Every --ninterval-th snapshot is drawn. Smoothing is off by default: it used
+to default to a 10-node boxcar, which on BP1002's 26-node segments is 25 km
+and silently deleted ~12 km from each end of the profile -- including the
+step-over, which is the thing the case exists to show. Ask for it with
+--nwindow when a profile is noisy enough to need it.
 
 Multi-fault runs: --fault selects the fault whose plane is profiled
 (default 0).
@@ -58,8 +61,10 @@ def main():
                     help="fault index for multi-fault runs (default 0)")
     ap.add_argument("--ninterval", type=int, default=1,
                     help="draw every Nth snapshot (default 1: all)")
-    ap.add_argument("--nwindow", type=int, default=10,
-                    help="boxcar smoothing window in nodes (default 10)")
+    ap.add_argument("--nwindow", type=int, default=1,
+                    help="boxcar smoothing window in nodes (default 1: off). "
+                         "Smoothing is valid-mode, so a window of N removes "
+                         "N-1 nodes -- half from each end of the profile")
     args = ap.parse_args()
 
     targets = pu.resolve_targets(args.dirs, PATTERNS, "plotAccumulated")

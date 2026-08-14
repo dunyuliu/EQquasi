@@ -252,10 +252,26 @@ unrelated code in the same change.
 `globalvar.f90` made the diff impossible to bisect against the regression
 gate (rule 3).
 
+The same applies to names, not just files. A new variable, parameter or
+constant is a new thing to maintain and to keep consistent, so it gets the
+same scrutiny: reuse an existing one, or write the value inline, before
+inventing a name. In particular `par` carries a defined schema
+(`scripts/defaultParameters.py`); a key that is not in that schema is not a
+parameter, however well it reads. Compset-local geometry belongs at module
+level, as `FAULT_A`/`FAULT_B` do in `case_input/bp1002.qdc.2500`.
+
+**Incident**: the Liu et al. (2020) kink compset was written with
+`par.kinkAngleDeg` and `par.kinkX` hung off `par` and several new
+module-level constants, none of them flagged. They worked only because the
+generator read them with `getattr(..., default)` -- the schema never knew
+about them.
+
 **How to apply**: before adding a file, grep for whether an existing file
 already owns that concern (`src/faulting.f90` owns fault-node physics,
 `src/library_output.f90` owns benchmark-format output, `scripts/lib.py` owns
-shared Python helpers).
+shared Python helpers). Before adding a file OR a name, say so and get
+agreement first; do not introduce either as a side effect of doing something
+else.
 
 **Tier**: judgment (2).
 
@@ -337,9 +353,13 @@ pattern, and `pytest -m e2e`'s exit code being discarded by `|| true` — are bo
 gone from `.github/workflows/test.yml` (now `set -o pipefail`, an explicit
 `grep -qE 'FAIL'` check, and a `CHECK SUMMARY` completion check), and are
 themselves guarded by `tests/contract/test_release_gate.py`. `tests/e2e/test_benchmarks.py`
-still owns the BP5/BP5-dip90/BP7 comparison at `rtol=atol=1e-3`
-(`tests/e2e/test_benchmarks.py`:35,58`, `compare_nc_files`/`compare_txt_files`) — **this
-tolerance is still not bit-exact**, see Unenforceable rules.
+owns every benchmark's comparison through `tests/e2e/cases.py`'s
+`compare_series`/`compare_netcdf`, at `rtol = 1e-9` with a floor scaled to
+each quantity's own vector (`floor_rtol = 1e-9`). The earlier text here
+described `compare_nc_files`/`compare_txt_files` at `rtol=atol=1e-3`; those
+functions no longer exist and the figure was six orders of magnitude off the
+gate as it now runs, so anyone sizing a change against the rule book was
+reasoning from a number the code had abandoned.
 `reference/bp8/summary.json` plus `tests/e2e/test_bp8_against_gold.py`
 own BP8's, at tolerances near round-off (`RTOL_SLIP = 1e-4`, exact for the
 fault-plane snapshot).
@@ -502,7 +522,7 @@ invariant in `tests/unit/test_physical_invariants.py` asserting the seed
 lands on fault 0 and only fault 0.
 
 It sits in the **full** tier, not the every-push fast tier, because the event
-is 7417 steps and ~700 s on 3 ranks. So every-push CI still has no
+is 3821 steps and ~2600 s on 3 ranks. So every-push CI still has no
 `ntotft > 1` case. That is a known, costed gap, recorded in the CASES table
 beside the row — not an oversight.
 
@@ -877,7 +897,7 @@ before reshaping and refuses outright when they differ.
 
 | Rule | Why it can't be checked today | What would fix it |
 |---|---|---|
-| 3 (bit-exact BP5/BP5-dip90/BP7 tolerance) | `tests/e2e/test_benchmarks.py` uses `rtol=atol=1e-3` (verified 2026-08-12, still true); nothing in the repo asserts the stronger "zero difference" property BP8's e2e tier already holds itself to | Tighten `tests/e2e/test_benchmarks.py`'s threshold (or add a second, stricter mode) to match BP8's `max|diff| = 0.0` bar |
+| 3 (bit-exact tolerance) | RESOLVED 2026-08-13. `tests/e2e/cases.py` compares at `rtol = 1e-9` for every benchmark, netCDF included. Bit-exactness is deliberately NOT the bar: two runs of the same case, same binary, same host differ by ~2e-14 from MPI reduction ordering alone, so `max\|diff\| = 0` fails on noise it cannot distinguish from a regression | — |
 | 4 (model.txt positional contract) | No schema file pairs `case.setup` writes with `read_input.f90` reads — verifying order-correctness means manually diffing two files | A generated/shared schema (YAML or a Python list of `(name, type)`) consumed by both a `case.setup` codegen step and a Fortran read-order check |
 | 6 (additive-only bp branches) | No script maps byte ranges of `if (bp == N)` blocks to a diff and rejects edits inside them | An AST/regex-based check scoped to `src/faulting.f90`, `src/library_output.f90`, `src/solveTimeLoopMUMPS.f90` |
 | 7 (compsets.txt registration) | `compsets.txt` is not read by any script — it can drift from `case_input/` silently | `diff` the compset directory listing against `compsets.txt` in CI |

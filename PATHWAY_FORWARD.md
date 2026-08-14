@@ -180,9 +180,21 @@ Read this first on wake-up. Update in place; close items by deleting them.
   `case.setup` + copying the last cycle's `*.r.nc` pair into `scratch/` with
   the right `currentcycle.txt`, and a script for that would be a new file
   (rule 1) standing between the user and three commands they can check.
-- The orthogonal zoning experiment (VW defined per segment, not in global
-  |x|) is still the thing that would make the step-over margin claim
-  isolated rather than merely supported.
+- The orthogonal zoning experiment (VW per segment, not global |x|) is still
+  the thing that would make the step-over margin claim isolated rather than
+  merely supported. QUANTIFIED 2026-08-14 -- see reference/bp1002/README.md.
+  The current geometry is symmetric about x = 0, so both segments get
+  identical zoning (36.3% VW each); whatever selects the rupturing segment is
+  not a zoning difference between them. But the A/B experiment confounds
+  three variables at once: shortening 62.5 -> 40 km also took VW from 36% to
+  49-56% and removed the non-RSF ends (15.4% -> 0%), and its two segments are
+  not even zoned alike (A 49.0%, B 55.6%) because that geometry is not
+  symmetric about the step-over.
+
+  NOT STARTED: it needs a new compset (rule 1 -- flag before creating), and
+  the design decision is what to hold fixed. Holding VW *fraction* fixed and
+  holding VW *area* fixed are different experiments and answer different
+  questions; that is the user's call, not a default.
 
 ---
 

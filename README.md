@@ -136,10 +136,69 @@ reference/     # committed reference results; never wiped
 bin/           # gitignored build product
 ```
 
-A case run through ```run.sh``` keeps each cycle's output in ```cycle0/```,
-```cycle1/```, ... The post-processing utilities discover those automatically:
-from inside a case, ```plotRuptureTime.py``` with no arguments processes every
-cycle.
+A case created by ```create.newcase``` holds two files you touch and five
+folders:
+
+```
+<case>/
+    user_defined_params.py   the only file you edit
+    case.setup  case.submit  run.sh    what you run
+    input/                   everything a cycle consumes; frozen once a cycle has run
+    result/                  cycle0/ ... cycleN/, one per completed cycle
+    scratch/                 the cycle currently running, and nothing else
+    tool/                    machinery the case imports, not for editing
+    log/                     setup.log, run.log
+```
+
+The solver reads ```input/``` and writes ```scratch/```; ```run.sh``` moves
+```scratch/``` into ```result/cycleN``` only once the cycle has succeeded, so a
+killed cycle can never be mistaken for a finished one and recovery is
+```rm -rf scratch```. The post-processing utilities discover cycles
+automatically, under ```result/cycle*``` or, for cases predating v1.13.0,
+```cycle*``` or ```Q*```.
+
+Post-processing
+---------------------
+Five utilities cover a run. From inside a case, each takes cycle directories
+as arguments, or none to process every cycle:
+
+| tool | writes | scope |
+|---|---|---|
+| ```plotRuptureTime.py``` | ```rupture_time.png``` | per cycle |
+| ```plotPeakSliprateTime.py``` | ```peak_slip_rate_vs_time.png``` | all cycles, concatenated |
+| ```plotOnFaultVars``` | ```fault.NNNNN.nc[.fN].png``` + gif | per cycle |
+| ```plotAccumulated``` | ```accumulatedSlip.{horizontal,vertical}.png``` | all cycles, stacked |
+| ```plotStations.py``` | on-/off-fault station time series | per cycle |
+
+```
+plotRuptureTime.py result/cycle2
+plotPeakSliprateTime.py result/cycle0 result/cycle1 result/cycle2
+plotAccumulated --fault 1 --depth-km -10 --ylim 0 18 result/cycle0 result/cycle2
+plotStations.py result/cycle2
+```
+
+**Multi-fault runs.** ```plotAccumulated``` takes ```--fault N``` and draws one
+fault per figure; pass the same ```--ylim``` to both so the two are comparable,
+since autoscaling otherwise invents a difference. ```plotOnFaultVars``` loops
+the faults itself and tags output ```.f0```, ```.f1```. ```plotStations.py```
+finds the ```fltst_ft<N>_*``` files faults 2+ write. ```plotRuptureTime.py```
+reads ```cplot_ft<N>_EQquasi.txt```, so it needs output from v1.13.0 or later;
+earlier runs wrote fault 1 only and the tool will report "nothing ruptured"
+for a cycle whose event was on another fault.
+```plotPeakSliprateTime.py``` is global by construction -- ```global.dat```
+records one peak slip rate for the whole model, not one per fault.
+
+**Reading accumulated slip.** The profile crosses the velocity-weakening zone,
+the velocity-strengthening margins and the non-rate-and-state creep region, so
+a plane-wide maximum is not the earthquake: on BP1002 the largest number in
+the file is the imposed creep at |x| > 50 km. Restrict to VW before quoting a
+coseismic slip. Each cycle's curves start from the sum of all previous cycles,
+so a cycle that adds nothing traces the previous total exactly -- that
+coincidence is the inherited initial state, not a duplicate.
+
+```plotAccumulated``` takes each cycle's end state from ```fault.r.nc```, so
+its totals do not depend on ```--ninterval```; thinning changes how many
+intermediate lines are drawn and nothing else.
 
 Example
 ---------------------

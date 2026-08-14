@@ -1,70 +1,130 @@
 # BP1002 — two-fault step-over
 
-BP5 parameters, geometry changed only: two right-lateral segments offset
-across strike, so this is the gate's **only `ntotft > 1` case**.
+BP5 parameters and BP5's frictional zoning, geometry changed only: two
+right-lateral segments offset across strike. This is the gate's **only
+`ntotft > 1` case**.
 
 | | |
 |---|---|
-| Segment A | `x ∈ [-42.5, -2.5]` km at `y = 0` km |
-| Segment B | `x ∈ [-7.5, 32.5]` km at `y = -5` km |
-| Both | `z ∈ [-20, 0]` km, `dx = 2500` m |
+| Segment A | `x ∈ [-60, 2.5]` km at `y = 0` km, cuts the mesh at `x = -60` km |
+| Segment B | `x ∈ [-2.5, 60]` km at `y = -5` km, cuts the mesh at `x = +60` km |
+| Both | `z ∈ [-20, 0]` km, `dx = 2500` m, 234 nodes each |
+| Overlap | 5 km along strike, `x ∈ [-2.5, 2.5]` km |
+| Domain | `x ±60`, `y ±50`, `z -60…0` km — BP5's box |
 
-The segments **overlap** along strike by 5 km: B's near end sits alongside A,
-not beyond its tip. Cycle 0 nucleates on A and, after a delay, jumps — B
-nucleates around step 3000 and peaks near step 6000 as A arrests, and both
-faults end up slipping their full length (9.49 m and 9.41 m, 153/153 nodes
-each, global peak 1.19 m/s).
+Each segment is 62.5 km long and they overlap by 5 km, so the along-strike
+extent of the model is BP5's 120 km and both segments run to a lateral
+boundary.
 
-An earlier version of this reference reported the opposite — B locked in a
-stress shadow, never rupturing. That was an artifact of `meshgen.f90` /
-`mesh4num.f90` tagging **every** node on a fault's y-plane as a fault
-boundary, on the y coordinate alone. Nodes outside the fault's own x-z extent
-got no equation number and were never split, so 1222 of the 1528 nodes on each
-plane sat clamped at exactly zero displacement while the material around them
-moved metres. The rigid sheet manufactured +25 MPa of normal-stress change at
-the fault edges against a ~7 MPa real signal, and killed the run in later
-cycles with STOP 508. Single-fault benchmarks never exposed it, because their
-fault spans the whole model and the plane is fault everywhere.
+## Zoning, and why it decides the answer
+
+BP5's, expressed in the model's own `x`:
+
+| zone | extent | area |
+|---|---|---|
+| non-rate-and-state, fixed creep | `\|x\| > 50` km | 450 km² |
+| velocity strengthening | `\|x\| ≥ 40` km | 1412 km² |
+| velocity weakening | `\|x\| ≤ 38` km and `4 ≤ \|z\| ≤ 16` km | 1062 km² |
+
+with 2 km transitions, as BP5 uses. For scale, BP5 itself has 868 km² of VW
+inside 3416 km² of VS — a 4:1 margin — and its rupture arrests after breaking
+22% of its fault nodes.
+
+**In cycle 0, the margin decides whether rupture crosses — not the
+step-over.** Holding this zoning fixed and shortening the segments to 40 km —
+which raises VW from 36% to 49–56% of each segment while leaving the total VW
+area almost unchanged, 1000 vs 1062 km² — makes the first rupture cross:
+fault B takes 12.03 m on all 153 nodes, peak 2.394 m/s. With 62.5 km segments
+it does not.
+
+Read that as a statement about the first event only. The multicycle sequence
+below shows the same 62.5 km geometry producing a through-going rupture in
+cycle 2, so the margin sets what the *initial* stress state can drive across,
+not whether the step-over is passable at all.
+
+A caveat on that comparison: the zoning is written in global `|x|`, so zoning
+and segment geometry are not independent variables — moving the segments
+changes what the rule does to them. An experiment that separated the two
+cleanly would define the VW extent relative to each segment.
+
+## What cycle 0 does
+
+Fault 0 nucleates from the seeded patch, ruptures its velocity-weakening
+region, and arrests inside its own segment — the outer ~20 km never slips.
+Fault 1 does not rupture: 0.03 m on 10 of its 234 nodes, creep-level.
+
+| | fault 0 | fault 1 |
+|---|---|---|
+| max slip | 4.99 m | 0.03 m |
+| nodes > 1 cm | 169/234 | 10/234 |
+| peak slip rate (global) | 0.846 m/s | |
+| Δσ̄ | +2.97 … −0.06 MPa | |
+
+3821 steps, ~2600 s on 3 ranks, 41472 elements.
+
+**Cycle 0 is not representative, and a single-cycle reference cannot show
+it.** A 5-cycle run of the same compset gives a mixed sequence:
+
+| cycle | interval | peak V (m/s) | slip A | slip B | |
+|---|---|---|---|---|---|
+| 0 | — | 0.846 | 4.99 m | 0.03 m | A alone |
+| 1 | 0.06 yr | 0.899 | 0.92 m | 4.88 m | B alone |
+| 2 | **478 yr** | 0.347 | **15.08 m** | **15.08 m** | **both — through-going** |
+| 3 | 0.003 yr | 0.023 | 1.59 m | 0.00 m | small, A only |
+| 4 | 54 yr | 0.371 | 2.23 m | 5.02 m | B-dominated |
+
+Cycle 2 crosses: after 478 years of loading both segments slip 15.08 m,
+equal to two decimals, on 196 and 194 of their 234 nodes. That is one rupture
+spanning both faults, not two events.
+
+So the step-over is a conditional barrier, not an absolute one. It stops a
+rupture that arrives with cycle 0's stress state and does not stop one that
+arrives after a long interseismic period. Any statement drawn from cycle 0
+alone -- including the margin comparison above, which is also a cycle-0
+comparison -- describes the first event from an artificial initial condition,
+not the system's behaviour.
 
 ## Why this case is in the gate
 
-Every other benchmark here has `ntotft = 1`. Nothing in the gate exercised
-per-fault routing of on-fault input, and three multi-fault bugs in this
-project's history were found by hand for exactly that reason
-(`PROJECT_RULES.md`, rule 7). This case is the fix: `case.setup` writes a
-`(ntotft, nfz, nfx, nvar)` array, `netcdf_read_on_fault` reads it back with
-an explicit fault dimension, and the reference locks the result.
+Every other benchmark has `ntotft = 1`, so nothing else exercises per-fault
+routing of on-fault input, and three multi-fault bugs in this project's
+history were found by hand for that reason (`PROJECT_RULES.md`, rule 12).
+`case.setup` writes a `(ntotft, nfz, nfx, nvar)` array,
+`netcdf_read_on_fault` reads it back with an explicit fault dimension, and
+`tests/unit/test_physical_invariants.py` asserts the seed lands on fault 0
+and only fault 0.
 
-The seed is on **fault 0 only** — fault 1 starts flat at the creep rate and
-has to be brought to failure by the elastic interaction alone. A routing bug
-that swapped or aliased the faults changes which fault carries the seed, which
-is the point.
+## Two things that bit, recorded so they do not again
+
+**The fault plane was clamped.** `meshgen.f90`/`mesh4num.f90` tagged every
+node on a fault's y-plane as a fault boundary on the y coordinate alone, so
+1222 of the 1528 nodes on each plane sat frozen at zero displacement while
+the surrounding material moved metres. It manufactured +25 MPa of
+normal-stress change and inverted the physics. Fixed in v1.11.0; any bp1002
+result from before that is superseded.
+
+**Two stations vanished.** An earlier version of this compset asked for
+stations at `x = ±2.0` km and `z = -2.0/-18.0` km, none of which is a
+multiple of `dx = 2500` m. They matched no node and were dropped with no
+message, leaving one station where three were requested — and the reference
+was blessed from it. `src/eqquasi.f90` now reports the mismatch, and the
+coordinates here are on-grid.
 
 ## Why dx = 2500 m and not BP5's 2000 m
 
-The fault-normal offset between the segments is 5000 m, and the mesher
-(`src/func_lib.f90`, `build_yline_belt`) requires that offset to be an integer
-multiple of `dy = dx`. It refuses to mesh otherwise rather than silently
-producing a fault with zero nodes: `5000/2000 = 2.5` is refused,
-`5000/2500 = 2` meshes.
-
-## The initial condition this case got wrong once
-
-The compset builds each node's initial shear as the steady state for **that
-node's own** initial slip rate, `on_fault_vars[..., 46]`. It once passed
-`creep_slip_rate` for every node including the nucleation patch, whose initial
-slip rate is 0.03 m/s. The patch then started 1.86 MPa short of the stress its
-own slip rate needs; the Newton solve sided with the stress, `V` collapsed to
-the creep rate at step 1, and `dtev = xi*Dc/V` jumped `dt` from 0.065 s to
-~2e6 s, flattening both faults. See the commit "Seed the step-over with shear
-its own slip rate can sustain".
+The fault-normal offset is 5000 m and the mesher (`src/func_lib.f90`,
+`build_yline_belt`) requires it to be an integer multiple of `dy = dx`:
+`5000/2000 = 2.5` is refused, `5000/2500 = 2` meshes.
 
 ## Tier
 
-`cycle0/` — the complete event, in the **full** tier only. It is not in the
-every-push fast tier, which leaves the gate with no `ntotft > 1` case; that
-gap is deliberate and recorded in `tests/e2e/cases.py`, not an oversight.
-The event is 7417 steps and ~700 s on 3 ranks.
+`cycle0/` — the complete event, **full** tier only. Not in every-push CI:
+3821 steps and ~2600 s on 3 ranks of a 64-core host, against a GitHub
+runner's four cores. That leaves the fast tier with no `ntotft > 1` case; the
+gap is costed and recorded in `tests/e2e/cases.py`, not an oversight.
 
 **Caveat.** First reference for this benchmark — a regression lock, not a
-validation. It has not been checked against any prior oracle.
+validation. It has not been checked against any independent oracle, and the
+interior tips facing across the step-over are left velocity-weakening and
+untapered, an idealization that drove the effective normal stress to zero by
+cycle 3 in an earlier geometry.

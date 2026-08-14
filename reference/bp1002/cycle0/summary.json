@@ -1,27 +1,27 @@
 {
  "benchmark": "BP1002",
  "compset": "bp1002.qdc.2500",
- "oracle_kind": "the compset's own complete cycle 0 -- nucleation on fault 0 through arrest of both faults",
+ "oracle_kind": "the compset's own cycle 0 -- nucleation on fault 0 through arrest",
  "element_size_m": 2500.0,
  "ntotft": 2,
  "run": {
-  "steps": 7417,
-  "simulated_time_s": 102522.36499999992,
-  "wall_seconds_time_loop": 703.0,
+  "steps": 3821,
+  "simulated_time_s": 101730.365,
+  "wall_seconds_time_loop": 2615.0,
   "mpi_ranks": 3,
-  "nodes": 7281,
-  "elements": 5760,
-  "fault_nodes_per_fault": 153
+  "nodes": 45793,
+  "elements": 41472,
+  "fault_nodes_per_fault": 234
  },
  "event": {
-  "peak_Vmax_m_s": 1.1868,
-  "max_slip_m_fault0": 9.488,
-  "max_slip_m_fault1": 9.405,
-  "nodes_slipped_over_1cm_fault0": 153,
-  "nodes_slipped_over_1cm_fault1": 153,
-  "effective_normal_change_max_MPa": 7.45,
-  "effective_normal_change_min_MPa": -0.41,
-  "note": "Rupture nucleates on fault 0, and after a delay jumps the 5 km step-over: fault 1 nucleates around step 3000 and reaches its own peak near step 6000 as fault 0 arrests. Both faults slip their full length."
+  "peak_Vmax_m_s": 0.8458,
+  "max_slip_m_fault0": 4.988,
+  "max_slip_m_fault1": 0.028,
+  "nodes_slipped_over_1cm_fault0": 169,
+  "nodes_slipped_over_1cm_fault1": 10,
+  "effective_normal_change_max_MPa": 2.97,
+  "effective_normal_change_min_MPa": -0.06,
+  "note": "Fault 0 nucleates from the seeded patch, ruptures its velocity-weakening region and arrests inside its own segment; the outer ~20 km never slips. Fault 1 does NOT rupture in this cycle -- 0.03 m on 10 of 234 nodes, creep-level. That is a property of THIS cycle only: in a 5-cycle run the segments alternate, and cycle 2 is a through-going event in which both slip 15.08 m after a 478 yr interseismic period. The step-over is a conditional barrier, not an absolute one. See reference/bp1002/README.md."
  },
  "files": {
   "fault_snapshots": [
@@ -29,23 +29,19 @@
    "fault.01001.nc",
    "fault.02001.nc",
    "fault.03001.nc",
-   "fault.04001.nc",
-   "fault.05001.nc",
-   "fault.06001.nc",
-   "fault.07001.nc",
-   "fault.07417.nc",
+   "fault.03821.nc",
    "fault.r.nc"
   ],
-  "on_fault_stations": 1,
+  "on_fault_stations": 3,
   "off_fault_stations": 3,
-  "note": "disp.*.nc omitted: no comparison reads them (rule 8a)."
+  "note": "disp.*.nc omitted: no comparison reads them (rule 8a). user_defined_params.py is kept so the gold can be replotted (rules 18/19)."
  },
  "provenance": {
-  "run_dir": "work/mfix",
+  "run_dir": "work/bp1002.ref",
   "date": "2026-08-13",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "binary_version_verified": true,
-  "note": "produced through create.newcase -> case.setup -> run.sh (rule 19), on a binary checked against src/globalvar.f90 immediately beforehand. Generated AFTER the meshgen/mesh4num fix that stopped the whole fault y-plane being clamped; any bp1002 result from before that fix is superseded."
+  "note": "create.newcase -> case.setup -> run.sh (rule 19), binary checked against src/globalvar.f90 first."
  },
- "caveat": "First reference for BP1002, not yet independently verified against any prior oracle (rule 8). Regression lock, not a validation."
+ "caveat": "First reference for BP1002; a regression lock, not a validation, not checked against any prior oracle. Cycle 0 is the first event from an artificial initial condition and is not representative of the multicycle behaviour -- see the 5-cycle table in the README before quoting anything from it."
 }

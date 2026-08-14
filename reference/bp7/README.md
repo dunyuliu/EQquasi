@@ -7,7 +7,7 @@ SEAS benchmark problem 7, quasi-dynamic. Description:
 
 This is the thing to know before reading a BP7 result, and it cost time here.
 
-The compset (`case_input/test.bp7.qdc/user_defined_params.py`) looks perfectly
+The compset (`compsets/test.bp7.qdc/user_defined_params.py`) looks perfectly
 symmetric: a centred velocity-weakening disc, `radii = sqrt(x^2 + z^2) <= rad`,
 uniform `Dc`, uniform initial slip rate, no seeded patch. So a result that
 nucleates at (-50, -40) m rather than the origin looks like the solver breaking

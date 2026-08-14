@@ -55,7 +55,7 @@ def copy_files(src, dst, only=None, skip=None):
     """Copy plain files from src to dst.
 
     Directories are skipped rather than raising: a stray __pycache__/ in
-    case_input or scripts is otherwise enough to abort case creation.
+    compsets or scripts is otherwise enough to abort case creation.
     """
     for f in sorted(os.listdir(src)):
         s = os.path.join(src, f)
@@ -77,10 +77,10 @@ def _main_func(description):
     if not root:
         raise SystemExit("create.newcase: EQQUASIROOT is not set; "
                          "source install.eqquasi.sh first.")
-    compset_path = os.path.join(root, "case_input", compset)
+    compset_path = os.path.join(root, "compsets", compset)
     if not os.path.isdir(compset_path):
         raise SystemExit(f"create.newcase: no compset {compset} in "
-                         f"{os.path.join(root, 'case_input')}.")
+                         f"{os.path.join(root, 'compsets')}.")
     scripts_path = os.path.join(root, "scripts")
 
     shutil.rmtree(case_path, ignore_errors=True)

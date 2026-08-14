@@ -4,7 +4,7 @@ What this is, what it does and does not establish, and how to regenerate it.
 
 ## Configuration
 
-BP8-QD-GS (Gaussian source), aging law, from `case_input/test.bp8.qdc`:
+BP8-QD-GS (Gaussian source), aging law, from `compsets/test.bp8.qdc`:
 
 | | |
 |---|---|
@@ -615,7 +615,7 @@ domains give 36.9 mm and edge/centre 0.53.
 
 ## Regenerating
 
-Run `case_input/test.bp8.qdc` with `xi = 0.2`, `nstep = nt_out = 8000`, which
+Run `compsets/test.bp8.qdc` with `xi = 0.2`, `nstep = nt_out = 8000`, which
 exits on `fluid_tend` at 30.0 days. Anything less than ~5301 steps is a
 truncated run: the compset default `nstep = 200` reaches only 1.14 days, and
 comparing that against this oracle produces a failure that is not real.

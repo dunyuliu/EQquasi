@@ -1,6 +1,6 @@
 # BP5 gold, cycle 0
 
-The first full earthquake cycle of `case_input/test.bp5.qdc` — interseismic
+The first full earthquake cycle of `compsets/test.bp5.qdc` — interseismic
 loading, nucleation, rupture, and postseismic decay — kept alongside the
 step-101 snapshot in the parent directory rather than replacing it.
 

@@ -8,7 +8,7 @@ state-dependent friction with the aging law.
 This is the thing to know before reading the compset, and it looks like a bug
 until you see why it is not.
 
-`case_input/bp5.qdc.2000/user_defined_params.py` seeds a patch — low `Dc`
+`compsets/bp5.qdc.2000/user_defined_params.py` seeds a patch — low `Dc`
 (`par.minDc`) and a high initial slip rate of 0.03 m/s — and then sets three
 quantities per node:
 

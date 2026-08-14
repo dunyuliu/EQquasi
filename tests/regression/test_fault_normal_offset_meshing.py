@@ -15,7 +15,7 @@ build_yline_belt (src/func_lib.f90) refuses at setup, loudly, whenever a
 fault's y-offset from the belt origin is not an integer multiple of dy --
 before any expensive work. The user picks a commensurate dx/dy instead.
 
-BP1002 (case_input/bp1002.qdc.2500) is exactly this: two faults offset by
+BP1002 (compsets/bp1002.qdc.2500) is exactly this: two faults offset by
 5000 m. At dx = 2000 m (5000 / 2000 = 2.5) it must refuse; at dx = 2500 m
 (5000 / 2500 = 2) it must mesh both faults.
 

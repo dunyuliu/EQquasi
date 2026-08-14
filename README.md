@@ -106,8 +106,9 @@ cd directoryForYourCase
 ./case.setup
 bash run.sh
 ```
-Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /case_input. <br/>
-Currently supported compsets are listed in ```case_input/compsets.txt```:
+Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /compsets. <br/>
+Currently supported compsets, with what gates each one, are in
+```compsets/README.md```:
   - bp5.qdc.2000
   - bp7.qdc.a.10
   - bp8.qdc.gs.10
@@ -122,7 +123,7 @@ Currently supported compsets are listed in ```case_input/compsets.txt```:
 In addition, ```test.*``` compsets (```test.bp5.qdc```,
 ```test.bp5.qdc.dip90```, ```test.bp7.qdc```, ```test.bp8.qdc```,
 ```test.stepover.qdc```) are small, fast versions used by the test
-suite and deliberately not listed in ```compsets.txt```.
+suite and deliberately outside the register.
 
 Where things run
 ---------------------

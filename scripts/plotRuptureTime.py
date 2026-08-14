@@ -29,11 +29,14 @@ Applicability, which is worth knowing before you go looking for a front:
                    at the sentinel. An empty plot here is the correct answer,
                    not a failure.
 
-Multi-fault runs: cplot_EQquasi.txt stacks every fault's nodes in one file;
-nodes are regridded from their coordinates, so all faults appear on the one
-map (they occupy disjoint strike ranges).
+Multi-fault runs: --fault selects the fault. Each fault has its OWN file --
+fault 1 writes cplot_EQquasi.txt, later faults cplot_ft<N>_EQquasi.txt -- so
+one figure shows one fault. This docstring used to claim the file stacked
+every fault's nodes together; it never did. Before v1.13.0 the solver wrote
+fault 1 only, and a cycle whose event was on another fault reported "nothing
+ruptured", which was true of the file and false of the model.
 
-Reads:  cplot_EQquasi.txt
+Reads:  cplot_EQquasi.txt, or cplot_ft<N>_EQquasi.txt for --fault > 0
 Writes: rupture_time.png per cycle
 """
 
@@ -54,8 +57,19 @@ UNRUPTURED = -1000.0
 FNFT_COL = 15          # zero-based
 
 
-def process_dir(rdir, outdir, interval):
-    a = np.atleast_2d(read_array(os.path.join(rdir, "cplot_EQquasi.txt")))
+def cplot_path(rdir, ift):
+    """The cplot file for fault index `ift` (0-based)."""
+    tag = "" if ift == 0 else f"ft{ift + 1}_"
+    return os.path.join(rdir, f"cplot_{tag}EQquasi.txt")
+
+
+def process_dir(rdir, outdir, interval, ift=0):
+    path = cplot_path(rdir, ift)
+    if not os.path.exists(path):
+        print(f"  no {os.path.basename(path)} -- this run predates the "
+              f"per-fault cplot (v1.13.0), or has fewer than {ift + 1} faults")
+        return
+    a = np.atleast_2d(read_array(path))
     x, z, fnft = a[:, 0], a[:, 1], a[:, FNFT_COL]
 
     ruptured = fnft > UNRUPTURED / 2.0        # well clear of the sentinel
@@ -137,14 +151,17 @@ def process_dir(rdir, outdir, interval):
     ax.set_title(f"Rupture time since nucleation, contours every {step:g} s"
                  f"{' (auto: event shorter than the 5 s default)' if auto else ''}\n"
                  f"{os.path.basename(os.path.abspath(rdir))}"
-                 f"  (nucleated at {onset:.6g} s)")
-    pu.save(fig, pu.out_path(rdir, "rupture_time.png", outdir), dpi=150)
+                 f"  (nucleated at {onset:.6g} s)  fault {ift}")
+    name = "rupture_time.png" if ift == 0 else f"rupture_time.f{ift}.png"
+    pu.save(fig, pu.out_path(rdir, name, outdir), dpi=150)
 
 
 def main():
     ap = pu.make_parser(__doc__, "plotRuptureTime.py",
                         "rupture_time.png into each cycle's directory "
                         "(empty run: a message, no figure).", PATTERNS)
+    ap.add_argument("--fault", type=int, default=0,
+                    help="fault index for multi-fault runs (default 0)")
     ap.add_argument("--interval", type=float, default=5.0, metavar="SECONDS",
                     help="contour interval in seconds (default 5). Fixed "
                          "rather than a level count, so line spacing means "
@@ -153,7 +170,7 @@ def main():
     for label, rdir in pu.resolve_targets(args.dirs, PATTERNS,
                                           "plotRuptureTime.py"):
         print(f"processing {label or rdir} ({rdir})")
-        process_dir(rdir, args.outdir, args.interval)
+        process_dir(rdir, args.outdir, args.interval, args.fault)
     return 0
 
 

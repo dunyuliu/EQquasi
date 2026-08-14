@@ -1,6 +1,6 @@
 # Pathway forward
 
-Working plan, ordered by what blocks what. Updated 2026-08-12, at v1.7.0.
+Working plan, ordered by what blocks what. Updated 2026-08-13, at v1.12.0.
 
 This is a live document: close items by deleting them, and record what was
 learned in the place that will be read again (`PROJECT_RULES.md` for a rule,
@@ -62,22 +62,22 @@ If ±3000 lands near ±1500, we have a converged answer and the 10 m run is
 worth it. If it keeps drifting, refining is wasted and something structural
 needs finding first.
 
-## 3. Put a multi-fault case in the gate set — highest leverage item here
+## 3. Multi-fault in the gate set — DONE (v1.11.0/v1.12.0)
 
-`BP5`, `BP5.dip90`, `BP7` and `BP8` all have `ntotft = 1`. They prove the
-degenerate path is unchanged and say nothing about two faults. Meanwhile
-`case_input/bp1002.qdc.2500` and `case_input/test.stepover.qdc` both exist,
-both have `ntotft = 2`, and neither is wired into anything.
+`bp1002.qdc.2500` has a reference (`reference/bp1002/cycle0/`), a row in
+`tests/e2e/cases.py`, and a physical invariant in
+`tests/unit/test_physical_invariants.py` asserting the seed lands on fault 0
+and only fault 0. `PROJECT_RULES.md` rule 12 cites a check that exists.
 
-Order matters, so that `master` never goes red:
+It sits in the **full** tier, not every-push CI: 3821 steps, ~2600 s on 3
+ranks against a GitHub runner's four cores. So the fast tier still has no
+`ntotft > 1` case. That gap is costed and recorded, not forgotten.
 
-1. Fix the violations Zofia's checks detect — wire a multi-fault case into the
-   regression/e2e gate, guard `nonfs(i) == 0` in `read_input.f90` /
-   `mesh4num.f90` (same silent-degradation shape as the zero-node fault), and
-   let the gold agent's unreferenced CSVs resolve as it finishes.
-2. *Then* commit `PROJECT_RULES.md` and the three checks
-   (`test_reference_gold_is_referenced.py`, `test_gate_set_has_multifault.py`,
-   `test_code_convention_landmines.py`).
+It earned its place immediately. Two defects surfaced only because this case
+existed: the fault plane clamped across the whole model
+(`meshgen.f90`/`mesh4num.f90` tagging on y alone, 1222 of 1528 nodes per
+plane frozen), and two of three requested stations silently matching no node.
+Both were invisible to every single-fault benchmark.
 
 ## 4. The x and z belts carry the bug we just fixed in y
 
@@ -86,16 +86,50 @@ are never checked for commensurability with `dx`. Same in z. v1.7.0 guards only
 the fault-normal direction. `bp1002.qdc.2500` happens to be x-commensurate, so
 nothing exercises it today. Same refuse-guard, small change.
 
-## 5. Step-over science — the question the case exists to ask
+## 5. Step-over science — answered, and the answer is conditional
 
-Run `bp1002.qdc.2500` for its three cycles and see whether rupture jumps the
-5 km step. BP5 parameters throughout; only the geometry differs, plus a
-one-sided velocity-strengthening taper (the interior step-over tips are left
-velocity-weakening, an idealisation the owner accepted). The nucleation patch —
-BP5's low `Dc` and 0.03 m/s seed — is on fault A's x− end only, so fault B is
-unseeded and whether it ruptures is the result, not the setup.
+Run and re-run. The result moved three times, which is itself the finding:
+the first two answers were artefacts.
 
-Everything before this has been plumbing.
+1. Rupture appeared **not** to cross. Artefact: the clamped fault plane
+   (item 3) manufactured +25 MPa of normal-stress change.
+2. With the mesh fixed, rupture **crossed** in cycle 0, both segments slipping
+   ~9.4 m. But that geometry left ~51 % of each segment velocity-weakening
+   with thin margins.
+3. Rebuilt on BP5's box and BP5's zoning (62.5 km segments, VW 1062 km²
+   against VS 1412 km², near BP5's own ratio), cycle 0 does **not** cross.
+
+The multicycle sequence is what settles it. Five cycles of the v1.12.0
+geometry:
+
+| cycle | interval | peak V | slip A | slip B | |
+|---|---|---|---|---|---|
+| 0 | — | 0.846 | 4.99 m | 0.03 m | A alone |
+| 1 | 0.06 yr | 0.899 | 0.92 m | 4.88 m | B alone |
+| 2 | 478 yr | 0.347 | 15.08 m | 15.08 m | **through-going** |
+| 3 | 0.003 yr | 0.023 | 1.59 m | 0.00 m | small, A only |
+| 4 | 54 yr | 0.371 | 2.23 m | 5.02 m | B-dominated |
+
+**The step-over is a conditional barrier.** It stops a rupture arriving with
+cycle 0's stress state and does not stop one arriving after 478 years of
+loading. Nothing drawn from cycle 0 alone describes the system.
+
+Still open, and the reason the margin claim is supported but not isolated:
+the VW extent is written in global `|x|`, so zoning and segment geometry are
+not independent variables — moving the segments changes what the rule does to
+them. A clean experiment defines VW relative to each segment.
+
+Also open on this case:
+
+- `on_fault_vars[..., 20] = Dc / creep_slip_rate` uses the global creep rate
+  while the shear line beside it uses the node's own `[..., 46]`. BP5's
+  prescription is `theta = Dc / V_node`. Byte-identical since the case was
+  written, so it explains nothing that has happened — resolve before the next
+  reference.
+- The interior tips facing across the step-over are velocity-weakening and
+  untapered. That drove effective normal stress to zero and STOP 508 by cycle
+  3 in the pre-v1.11.0 geometry. It has not recurred in five cycles of the
+  current one, but it is an idealisation, not a result.
 
 ## 5b. Mid-cycle resume is not possible
 
@@ -123,7 +157,21 @@ Adding `time` and `slips`/`slipd` to the restart file, restored when
 
 - `porepressure.f90` indexes `nftnd(1)` — no fluid injection on a multi-fault
   model, so BP8-style problems remain single-fault.
-- `case.setup` writes one station list to every fault.
+- `case.setup` writes one station list to every fault, and
+  `library_output.f90:11` writes stations only under `if (j==1)` — faults 2
+  and beyond get no station output at all. Not aliasing: they do not exist.
+- The post-processing utilities report the **global** peak slip rate, so
+  which segment ruptured is invisible in `peak_slip_rate_vs_time` and
+  `accumulatedSlip`. On a step-over that is the question being asked.
+- `plotOnFaultVars`' depth axis is the fault's own extent with no indication
+  of the domain's, which reads as "the model stops at 20 km" for bp1002.
+- Reference version skew: bp1002 1.12.0, bp5 1.7.2, bp7 1.7.0, bp8 1.6.0. No
+  two are same-binary comparable (rule 11).
+- A kink (bent-fault) compset for Liu et al. (2020) is paused in the worktree
+  `/home/utig5/dliu/eqquasi.kink`, branch `kink-geometry`, uncommitted. The
+  geometry generator is verified in the file and in the solved mesh; dx = 300 m
+  (the paper's) needs a 64-bit-integer MUMPS, since the factors want 5.51e9
+  reals against a 2^31 ceiling. dx = 600 m runs.
 - `func_lib.f90`'s `insert_rough_fault` is single-fault by construction.
 - Kim's state variable sits flat at log₁₀θ ≈ 2.8 where ours grows. The aging
   law cannot produce flat, and with the slip law dropped from BP8 on

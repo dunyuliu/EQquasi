@@ -9,6 +9,160 @@ fix). Do not let this file become the archive.
 
 ---
 
+## 24-HOUR AUTONOMOUS QUEUE — started 2026-08-14, unattended
+
+Read this first on wake-up. Update in place; close items by deleting them.
+
+### Standing rules
+- Verify the binary before every run: `grep EQQUASI_VERSION src/globalvar.f90`
+  against `strings bin/eqquasi-<v> | grep Welcome`. Rebuild with
+  `MACHINE=utig`, install as `bin/eqquasi-<version>` (no plain `eqquasi`).
+- Background commands inherit a stale cwd. ALWAYS `cd` to an absolute path
+  inside the command; this has broken four launches today.
+- Never `pkill -f <pattern>` where the pattern matches the running command.
+- Killed runs leave NFS `.nfs*` files; kill the ranks, sleep, then `rm -rf`.
+- Do not work in the user's home outside this repo. The kink work lives in
+  the worktree `/home/utig5/dliu/eqquasi.kink`, NOT in `~`.
+- No new files or names without need (rule 1). No force-push.
+- **Respect the shared host (rule 15).** This is a 64-core machine other
+  people are using: baseline load was ~50 at handoff with only 6 of those
+  ranks mine. So:
+    * at most TWO of my runs at once, 3 ranks each -- never more;
+    * check `uptime` before launching anything, and if load is above ~56,
+      wait rather than add to it;
+    * never raise HPC_ncpu above 3 for a queue run;
+    * a long run is not more urgent than someone else's interactive session.
+  Serialise the heavy items (5-cycle, e2e full tier) rather than running them
+  together.
+
+### Queue
+1. [x] **5-cycle bp1002 on the new workflow reproduces the science.**
+   All five cycles run, same event sequence, same slips:
+
+   | cycle | steps | peak V | rel diff | slip A | slip B | slip rel diff |
+   |---|---|---|---|---|---|---|
+   | 0 | 3821/3821 | 0.845757 | 2e-15 | 4.99 m | 0.028 m | 0 |
+   | 1 | 4572/4572 | 0.899183 | 8.7e-12 | 0.919 m | 4.876 m | 0 |
+   | 2 | 10000/10000 | 0.347357 | 7.7e-9 | 15.08 m | 15.08 m | 0 |
+   | 3 | 984/984 | 0.022665 | 2.7e-7 | 1.587 m | 0.0002 m | 6.5e-8 |
+   | 4 | 5845/**5846** | 0.370585 | 2.4e-6 | 2.226 m | 5.023 m | 9.5e-8 |
+
+   Agreement degrades by roughly a factor of 1000 per cycle, and by cycle 4
+   the run exits one step earlier. That is accumulation, not a defect, and
+   cycle 0 is what proves it: identical inputs, identical binary, only the
+   file paths changed, and it still differs by 2e-15. A single cycle is
+   already nondeterministic at round-off because MPI reduction ordering is
+   not fixed, and each cycle starts from the previous cycle's restart file,
+   so the seed is amplified by a system with a positive Lyapunov exponent.
+
+   The signature discriminates the two explanations. Accumulated round-off
+   grows smoothly from 1e-15; a broken restart handoff -- a dropped variable,
+   the wrong file, a stale path -- would show as a step change at cycle 1,
+   the first restart, and stay there. Cycle 1 agrees to 8.7e-12. Nothing
+   jumps anywhere.
+
+   Do not read this as bit-reproducibility, which this code does not have and
+   would need a fixed reduction order to get. Read it as: the workflow revamp
+   moved no physics.
+
+   Compare with `work/bp1002_stepover/compare_cycles.py <baseline> <run>`.
+   Two traps it now avoids, both of which cost time here:
+   - Peak V is column 2 of global.dat (every step). The max over
+     fault.NNNNN.nc snapshots understates it ~20x -- they are written every
+     1000 steps and step over the peak.
+   - The baseline is `multicycle_20`, NOT `old_5cyc_prefix`, which predates
+     the meshgen fault-plane fix and gives completely different numbers.
+     Comparing against it reads as a total regression when nothing is wrong.
+
+   Baseline from the old layout, same binary and compset:
+
+   | cycle | peak V | slip A | slip B |
+   |---|---|---|---|
+   | 0 | 0.846 | 4.99 m | 0.03 m |
+   | 1 | 0.899 | 0.92 m | 4.88 m |
+   | 2 | 0.347 | 15.08 m | 15.08 m |
+   | 3 | 0.023 | 1.59 m | 0.00 m |
+   | 4 | 0.371 | 2.23 m | 5.02 m |
+
+   Only directory plumbing changed, so these must match to round-off. If they
+   do not, the revamp broke something -- find it, do not re-bless.
+
+2. [x] **e2e gate green, both tiers.** Fast: 23 passed, 6 skipped, 0 failed.
+   Full: 41 passed, 13 skipped, 2 failed -- both diagnosed and fixed, and the
+   fast tier re-run green afterwards. The full tier takes 3h05 and needs
+   `MACHINE=utig` on this host.
+
+   The two failures were both gate defects, not physics:
+
+   a. `bp5 offfault srfst_strk000st032dp000.txt`: 1 entry of 31381 differing
+      in the 7th printed digit. The station files are written `E21.13,6E15.7`
+      -- seven significant figures -- while the gate demanded rtol=1e-9. That
+      asks the file for digits it never wrote, so MPI reduction-order noise
+      (~2e-14) flipping one rounding boundary failed the suite at random
+      instead of on regressions. `column_printed_rtol()` in tests/e2e/cases.py
+      now floors each column's rtol at 2 ulp of its own printed precision,
+      read off the file rather than hand-tuned. Verified: the real run passes
+      at 9.9e-17 and a 1e-5 relative perturbation is still caught. Anything
+      below the 7th digit is undetectable in this tier by construction -- the
+      netCDF files carry full double precision and are still compared at 1e-9.
+
+   b. `test_clean_build.py` pointed at `bin/eqquasi`, which stopped existing
+      when binaries became versioned. So `test_built_binary_version_matches_
+      the_source` -- the stale-binary guard added *because* of the 1.7.0 vs
+      1.10.0 incident -- skipped itself with "no binary" on every run while
+      the suite reported green. It now derives `bin/eqquasi-<declared>` and
+      treats a missing binary as a failure, not a skip.
+
+   Earlier note here blamed (b) on "no system MUMPS on this host". Wrong: the
+   test defaults MACHINE to ubuntu, and the ubuntu target looks for
+   dmumps_struc.h where this host does not keep it. The build works fine with
+   MACHINE=utig. The assertion now names MACHINE so the next reader is not
+   sent looking for a missing library.
+
+3. [ ] **Commit the revamp in separable pieces, release, push, watch CI.**
+   Suggested split: (a) solver input/scratch paths + hard-stop guard,
+   (b) create.newcase layout, (c) case.setup input//log/ + freeze guard,
+   (d) run.sh no-copy + restart-from-previous-cycle, (e) utilities and test
+   harness following result/. Version: minor -- workflow and solver behaviour
+   change, results unchanged.
+
+4. [ ] **Then work the list below**, cheapest first. Do not start anything in
+   section 1 or 2 (BP8 submission/convergence) unattended -- they need
+   judgement calls on what to submit.
+
+5. [ ] **Only if 1-4 are all done**: stage the kink work in the worktree
+   `/home/utig5/dliu/eqquasi.kink`. It is uncommitted there. The compset and
+   generator are verified; dx=300 m needs a 64-bit-integer MUMPS, dx=600 m
+   runs. Do not merge it to master unattended.
+
+### Landed during the revamp, worth remembering
+- **Implicit interfaces bite character arguments too.** Passing
+  `trim(inputDir)//"name.nc"` to an external subroutine whose dummy is
+  `character(len=50)` hands over a temporary of the expression's own length;
+  with no interface block the callee still reads 50 bytes and appends 22 bytes
+  of adjacent memory to the path. Symptom was a netCDF "No such file or
+  directory" on `input/on_fault_vars_input.nca  0 <junk>`. Assign into a
+  fixed-length local first. The same file already warned about this for
+  allocatable dummies -- it applies to character dummies as well.
+
+### Known open, from today
+- Multi-fault station output unimplemented: `library_output.f90` writes
+  stations under `if (j==1)`, so faults 2+ get none, and the unopened unit 51
+  leaves a stray `fort.51` in the case root.
+- Utilities report the GLOBAL peak, so which segment ruptured is invisible in
+  `peak_slip_rate_vs_time` and `accumulatedSlip`.
+- `plotOnFaultVars`' depth axis is the fault's extent with no hint of the
+  domain's.
+- Reference version skew: bp1002 1.12.0, bp5 1.7.2, bp7 1.7.0, bp8 1.6.0.
+- Every pre-existing case in `work/` is now unrunnable: the solver hard-stops
+  without `input/` and `scratch/`. Deliberate. `multicycle_20` cannot resume;
+  it would need recreating.
+- The orthogonal zoning experiment (VW defined per segment, not in global
+  |x|) is still the thing that would make the step-over margin claim
+  isolated rather than merely supported.
+
+---
+
 ## 0. State of play
 
 Multi-fault support is real but young. The engine, the mesh generator and the

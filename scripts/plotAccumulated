@@ -1,10 +1,14 @@
 #! /usr/bin/env python3
 """Accumulated slip profiles across earthquake cycles, in one figure.
 
-Walks the selected cycles in order, extracts the slip profile from every
-fault.NNNNN.nc snapshot (mode 1: vertical at mid-strike; mode 2: horizontal at
-3/4 of the model depth), offsets each cycle by the final slip of the previous
+Walks the selected cycles in order, takes a slip profile from every
+fault.NNNNN.nc snapshot, offsets each cycle by the final slip of the previous
 one, and draws them all on one axes -- the classic stacked-slip-history plot.
+
+Two profiles are available (--profile):
+  along-strike  a horizontal line at a chosen depth (default)
+  down-dip      a vertical line at mid-strike
+
 Every --ninterval-th snapshot is drawn. Smoothing is off by default: it used
 to default to a 10-node boxcar, which on BP1002's 26-node segments is 25 km
 and silently deleted ~12 km from each end of the profile -- including the
@@ -12,10 +16,18 @@ step-over, which is the thing the case exists to show. Ask for it with
 --nwindow when a profile is noisy enough to need it.
 
 Multi-fault runs: --fault selects the fault whose plane is profiled
-(default 0).
+(default 0). One fault per figure. To compare faults, pass --ylim so both
+figures share a slip axis -- panels meant to be compared must carry identical
+limits or the eye reads a difference that is only autoscaling.
+
+Figures are sized for print: --print-width-mm declares the width the figure
+will occupy on the page (default 146 mm, AGU text width), fonts are scaled by
+k = canvas/print so they land at 9-10 pt for labels and 7-8 pt for ticks, and
+the dpi is chosen to clear 300 dpi at that width. The script prints k and the
+effective printed sizes so the claim can be checked rather than trusted.
 
 Reads:  fault.NNNNN.nc from every selected cycle
-Writes: accumulatedSlip.{vertical,horizontal}.png into the case directory
+Writes: accumulatedSlip.{along-strike,down-dip}.png into the case directory
         (cwd for a flat run)
 """
 
@@ -34,29 +46,137 @@ import netCDF4 as nc
 
 PATTERNS = ["fault.[0-9]*.nc"]
 
+ALONG_STRIKE, DOWN_DIP = "along-strike", "down-dip"
 
-def cycle_profiles(rdir, mode, ninterval, nwindow, ifault):
-    snaps = pu.sort_nicely(
-        [f for f in glob.glob(os.path.join(rdir, "fault.*.nc"))
-         if pu.step_of(f) is not None])[::ninterval]
-    cols = []
-    for f in snaps:
-        with nc.Dataset(f) as d:
-            v = np.asarray(pu.fault_slab(d.variables["slips"][:], ifault,
-                                         "slips", f), float)
-        line = v[:, v.shape[1] // 2] if mode == 1 else v[(v.shape[0] // 4) * 3, :]
-        shape = v.shape
-        cols.append(boxcar_average(line, min(nwindow, len(line))))
-    return np.array(cols).T, shape
+# Printed font sizes, in points, from the uniform figure rules: axis labels
+# 9-10, ticks 7-8, titles 9-11. These are what must be true ON THE PAGE; the
+# rendered canvas is k times wider, so every one is multiplied by k below.
+PRINT_PT = {"label": 10.0, "tick": 8.0, "title": 10.0}
+MM_PER_IN = 25.4
+MIN_PRINT_DPI = 300.0
+
+
+def snapshot_paths(cycle_dir, ninterval):
+    """The fault.NNNNN.nc snapshots of one cycle, in step order."""
+    snaps = pu.sort_nicely([f for f in glob.glob(os.path.join(cycle_dir,
+                                                              "fault.*.nc"))
+                            if pu.step_of(f) is not None])
+    return snaps[::ninterval]
+
+
+def depth_row(ndip, depth_km, par, ift):
+    """Index of the dip row nearest `depth_km`, or the default row.
+
+    The default used to be the bare expression (ndip // 4) * 3, which is 3/4
+    of the way UP from the fault base -- 5 km on a 20 km fault, near the top
+    of BP1002's velocity-weakening zone rather than in its middle. The help
+    text called it "3/4 depth", which reads as 15 km. Naming it and letting
+    --depth-km override it removes both the ambiguity and the need to edit
+    the script to sample somewhere else.
+    """
+    if depth_km is None:
+        return (ndip // 4) * 3
+    _x, zkm, _xl, _zl = pu.fault_coords(par, ndip, 2, ift)
+    if len(zkm) != ndip:                       # no geometry: fall back
+        return (ndip // 4) * 3
+    return int(np.argmin(np.abs(np.asarray(zkm) - depth_km)))
+
+
+def cycle_profiles(cycle_dir, profile, ninterval, nwindow, ift, depth_km, par):
+    """(profiles, slab_shape) for one cycle.
+
+    `profiles` is (n_points, n_snapshots): one column per snapshot, so cycles
+    concatenate along axis 1. slab_shape is returned separately because the
+    caller needs the UNSMOOTHED (ndip, nstrike) to build a coordinate axis.
+    """
+    snaps = snapshot_paths(cycle_dir, ninterval)
+    if not snaps:
+        raise SystemExit(f"plotAccumulated: no fault.NNNNN.nc snapshots in "
+                         f"{cycle_dir} (--ninterval {ninterval} may exceed "
+                         f"the number present).")
+    columns, slab_shape = [], None
+    for path in snaps:
+        with nc.Dataset(path) as ds:
+            slab = np.asarray(pu.fault_slab(ds.variables["slips"][:], ift,
+                                            "slips", path), float)
+        slab_shape = slab.shape
+        ndip, nstrike = slab.shape
+        if profile == DOWN_DIP:
+            line = slab[:, nstrike // 2]
+        else:
+            line = slab[depth_row(ndip, depth_km, par, ift), :]
+        columns.append(boxcar_average(line, min(nwindow, len(line))))
+    return np.array(columns).T, slab_shape
+
+
+def stack_cycles(previous, block):
+    """Append one cycle's profiles, raised onto the previous cycle's total.
+
+    This offset is what makes the plot cumulative: each cycle's slip is
+    measured from zero within the cycle, so without it every cycle would
+    redraw over the last and the figure would show one cycle's worth of slip
+    however many were passed.
+    """
+    if previous is None:
+        return block
+    return np.concatenate((previous, block + previous[:, -1, np.newaxis]),
+                          axis=1)
+
+
+def profile_axis(par, slab_shape, profile, ift, npoints):
+    """(coordinate array, label) in km, or (None, node-index label).
+
+    boxcar_average is a valid-mode convolution, so a window of N returns
+    N-1 fewer points than it was given. Each output value sits at the centre
+    of its window, so the coordinates are trimmed symmetrically to match.
+    Getting this wrong is why the axis used to read "node #", which on a
+    step-over cannot say where along strike anything happened.
+    """
+    fallback = ("node # down dip" if profile == DOWN_DIP
+                else "node # along strike")
+    if par is None or slab_shape is None:
+        return None, fallback
+    ndip, nstrike = slab_shape
+    xkm, zkm, strike_label, dip_label = pu.fault_coords(par, ndip, nstrike, ift)
+    full = zkm if profile == DOWN_DIP else xkm
+    trimmed = len(full) - npoints
+    if trimmed < 0:
+        return None, fallback
+    lo = trimmed // 2
+    return (np.asarray(full)[lo:lo + npoints],
+            dip_label if profile == DOWN_DIP else strike_label)
+
+
+def scale_fonts(canvas_in, print_mm):
+    """Multiply the printed point sizes by k = canvas width / print width.
+
+    A figure is correct only at the width it prints. Setting 10 pt on a canvas
+    1.4x wider than the printed figure yields 7 pt on the page; every "fonts
+    too small" complaint is this arithmetic, not a taste dispute.
+    """
+    k = canvas_in / (print_mm / MM_PER_IN)
+    plt.rcParams.update({
+        "axes.labelsize": PRINT_PT["label"] * k,
+        "axes.titlesize": PRINT_PT["title"] * k,
+        "xtick.labelsize": PRINT_PT["tick"] * k,
+        "ytick.labelsize": PRINT_PT["tick"] * k,
+        "legend.fontsize": PRINT_PT["tick"] * k,
+    })
+    return k
 
 
 def main():
     ap = pu.make_parser(__doc__, "plotAccumulated",
-                        "accumulatedSlip.{vertical,horizontal}.png, all cycles stacked in "
-                        "one figure.", PATTERNS)
-    ap.add_argument("--mode", type=int, choices=[1, 2], default=2,
-                    help="1: vertical profile at mid-strike; "
-                         "2: horizontal profile at 3/4 depth (default)")
+                        "accumulatedSlip.{along-strike,down-dip}.png, all "
+                        "cycles stacked in one figure.", PATTERNS)
+    ap.add_argument("--profile", choices=[ALONG_STRIKE, DOWN_DIP],
+                    default=ALONG_STRIKE,
+                    help="along-strike: horizontal line at --depth-km "
+                         "(default); down-dip: vertical line at mid-strike")
+    ap.add_argument("--depth-km", type=float, default=None,
+                    help="depth of the along-strike profile, km, negative "
+                         "down (default: 3/4 of the way up from the fault "
+                         "base, which is -5 km on a 20 km fault)")
     ap.add_argument("--fault", type=int, default=0,
                     help="fault index for multi-fault runs (default 0)")
     ap.add_argument("--ninterval", type=int, default=1,
@@ -65,53 +185,57 @@ def main():
                     help="boxcar smoothing window in nodes (default 1: off). "
                          "Smoothing is valid-mode, so a window of N removes "
                          "N-1 nodes -- half from each end of the profile")
+    ap.add_argument("--ylim", type=float, nargs=2, default=None,
+                    metavar=("LO", "HI"),
+                    help="slip-axis limits, m. Pass the same pair for every "
+                         "fault when the figures will be compared")
+    ap.add_argument("--print-width-mm", type=float, default=146.0,
+                    help="width this figure will occupy in print, mm "
+                         "(default 146, AGU text width)")
     args = ap.parse_args()
 
     targets = pu.resolve_targets(args.dirs, PATTERNS, "plotAccumulated")
-    data = None
-    for label, rdir in targets:
-        print(f"processing {label or rdir} ({rdir})")
-        tmp, profile_shape = cycle_profiles(rdir, args.mode, args.ninterval,
-                                            args.nwindow, args.fault)
-        data = tmp if data is None else np.concatenate(
-            (data, tmp + data[:, -1, np.newaxis]), axis=1)
-
-    # Physical axis, not node numbers. boxcar_average is a valid-mode
-    # convolution, so a 26-node profile smoothed over 10 comes back with 17
-    # points; the coordinates have to be trimmed to match, symmetrically,
-    # because each smoothed value sits at the centre of its window. Getting
-    # this wrong is why the axis read "node #" and a step-over plot could not
-    # be told where along strike anything happened.
     par = pu.load_par(targets[0][1])
-    ndip, nstrike = profile_shape
-    orient = "Vertical" if args.mode == 1 else "Horizontal"
-    xaxis, xlabel = None, ("node # down dip" if args.mode == 1
-                           else "node # along strike")
-    if par is not None:
-        xkm, zkm, strike_lab, dip_lab = pu.fault_coords(par, ndip, nstrike,
-                                                        args.fault)
-        full = zkm if args.mode == 1 else xkm
-        cut = len(full) - data.shape[0]
-        if cut >= 0:
-            lo = cut // 2
-            xaxis = full[lo:lo + data.shape[0]]
-            xlabel = dip_lab if args.mode == 1 else strike_lab
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    for i in range(data.shape[1]):
+    stacked, slab_shape = None, None
+    for label, cycle_dir in targets:
+        print(f"processing {label or cycle_dir} ({cycle_dir})")
+        block, shape = cycle_profiles(cycle_dir, args.profile, args.ninterval,
+                                      args.nwindow, args.fault, args.depth_km,
+                                      par)
+        # Every cycle of a run shares one mesh, so the shapes agree; say so
+        # rather than silently keeping whichever came last.
+        if slab_shape is not None and shape != slab_shape:
+            raise SystemExit(f"plotAccumulated: {cycle_dir} has fault slab "
+                             f"{shape}, but an earlier cycle had {slab_shape}; "
+                             f"these cycles are not the same mesh.")
+        slab_shape = shape
+        stacked = stack_cycles(stacked, block)
+
+    xaxis, xlabel = profile_axis(par, slab_shape, args.profile, args.fault,
+                                 stacked.shape[0])
+
+    canvas_in = 7.2
+    k = scale_fonts(canvas_in, args.print_width_mm)
+    dpi = max(150.0, MIN_PRINT_DPI * k)
+    fig, ax = plt.subplots(figsize=(canvas_in, canvas_in * 0.72),
+                           constrained_layout=True)
+    for column in range(stacked.shape[1]):
         if xaxis is None:
-            ax.plot(data[:, i], color="black", lw=0.7)
+            ax.plot(stacked[:, column], color="black", lw=0.7)
         else:
-            ax.plot(xaxis, data[:, i], color="black", lw=0.7)
+            ax.plot(xaxis, stacked[:, column], color="black", lw=0.7)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("accumulated slip (m)")
-    ax.set_title(f"Accumulated slip — {orient.lower()} profile — "
-                 f"{len(targets)} cycle(s), {data.shape[1]} snapshots"
+    if args.ylim:
+        ax.set_ylim(*args.ylim)
+    ax.set_title(f"Accumulated slip — {args.profile} — {len(targets)} "
+                 f"cycle(s), {stacked.shape[1]} snapshots"
                  + (f" — fault {args.fault}" if args.fault else ""))
     ax.grid(alpha=0.3)
-    fig.tight_layout()
 
-    name = f"accumulatedSlip.{orient.lower()}.png"
+    orient = args.profile
+    name = f"accumulatedSlip.{orient}.png"
     if args.outdir:
         os.makedirs(args.outdir, exist_ok=True)
         out = os.path.join(args.outdir, name)
@@ -119,7 +243,12 @@ def main():
         out = os.path.join(targets[0][1], name)
     else:
         out = name
-    pu.save(fig, out, dpi=150)
+    pu.save(fig, out, dpi=dpi)
+    print(f"  print width {args.print_width_mm:.0f} mm, canvas "
+          f"{canvas_in:.2f} in, k = {k:.2f}; printed sizes: "
+          f"labels {PRINT_PT['label']:.0f} pt, ticks {PRINT_PT['tick']:.0f} pt; "
+          f"{canvas_in * dpi:.0f} px across = "
+          f"{canvas_in * dpi / (args.print_width_mm / MM_PER_IN):.0f} dpi at print")
     return 0
 
 

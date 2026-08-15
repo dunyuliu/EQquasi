@@ -90,7 +90,11 @@ Read this first on wake-up. Update in place; close items by deleting them.
    cannot be verified and must not be blessed. If a port runs, say explicitly
    that it is unverified.
 
-5. [ ] **fric() index revamp** — named constants in one place, applied
+5. [x] **fric() index revamp DONE** -- 46 named slots in globalvar.f90 +
+   defaultParameters.py, 371 Fortran sites + 9 Python writes renamed, registry
+   table in defaultParameters, rule 5 rewritten. Gated on e2e_fast (23 green)
+   and 218 fast tests; full tier was green immediately before. Was:
+   **fric() index revamp** — named constants in one place, applied
    everywhere, plus an index -> meaning -> unit -> writer table. Must be one
    pass: naming at some call sites only creates a fourth source of truth on
    top of rule 5's three. Rule 5 needs rewriting when it lands.

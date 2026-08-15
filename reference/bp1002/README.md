@@ -180,3 +180,38 @@ choice.
 Making it isolated needs VW defined in each segment's own along-strike
 coordinate, holding VW fraction and non-RSF fraction fixed while segment
 length varies. That is a new compset, not a parameter change.
+
+## The 9-cycle sequence, and how it ends (2026-08-15, v1.14.0 binary)
+
+A 20-cycle run at `nstep = 30000` (`work/bp1002_stepover/multicycle_20_knox`)
+ended at cycle 9 on the non-compressive-normal-stress guard (`STOP 508`):
+sigma_bar reached +0.60 MPa at x = −2.5 km, z = 0 — fault A's interior tip at
+the free surface, facing the step-over — 87 yr into the cycle. Every one of
+the nine completed cycles ended on its own physics, none on the step cap.
+
+| cycle | steps | peak V (m/s) | slip A / B (m) |
+|---|---|---|---|
+| 0 | 3821 | 0.846 | 4.99 / 0.03 |
+| 1 | 4572 | 0.899 | 0.92 / 4.88 |
+| 2 | 11171 | 0.347 | **15.08 / 15.08** |
+| 3 | 5854 | 0.375 | 2.23 / 5.03 |
+| 4 | 11362 | 0.739 | **12.05 / 12.05** |
+| 5 | 6627 | 0.817 | 2.73 / 5.94 |
+| 6 | 10885 | 0.338 | **12.56 / 12.56** |
+| 7 | 8567 | 0.776 | 6.24 / 6.90 |
+| 8 | 8542 | 0.785 | **7.34 / 7.34** |
+
+Two observations the truncated 10000-step baseline could not show:
+
+- **Through-going events alternate with confined ones** (bold rows), and their
+  slip declines monotonically: 15.08 → 12.05 → 12.56 → 7.34 m.
+- **The run's end is the caveat above coming due.** The untapered
+  velocity-weakening interior tips accumulate a normal-stress reduction with
+  every through-going rupture; four of them progressively unclamped the tip
+  until rate-and-state had no solution. The guard stopped the run rather than
+  silently producing NaNs. Whether to taper the tips — which changes the
+  model — is an open scientific decision, not a bug fix.
+
+The old `nstep = 10000` baseline truncated cycle 2 mid-descent, so its
+cycles 3+ (restarted mid-event) are artifacts; this sequence supersedes it
+from cycle 2 onward. Cycles 0–1 match it to 1e-12.

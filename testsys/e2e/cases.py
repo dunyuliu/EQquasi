@@ -277,7 +277,15 @@ def run_case(compset, over, workdir):
             f"holding files open (NFS .nfs* entries). Check with "
             f"`ps -eo pid,cmd | grep eqquasi`, kill them, then remove the "
             f"directory. Leftovers: {leftovers}")
-    step(["create.newcase", workdir, compset], str(ROOT))
+    # Absolute path, never PATH. The user's login environment appends an
+    # OLDER EQquasi checkout's scripts/ to PATH (~/.bashrc EQQUASIROOT
+    # pointing at 0.Dunyu/EQquasi), and a bare "create.newcase" resolved
+    # there -- a copy that still expects case_input/ -- failing every e2e
+    # case with FileNotFoundError while looking like a defect in THIS repo.
+    # The gate must run this repo's tools, not whichever namesake PATH finds
+    # first (rule 3: evaluated at the right configuration).
+    step([str(ROOT / "script" / "create.newcase"), workdir, compset],
+         str(ROOT))
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)
     step(["./case.setup"], workdir)
 

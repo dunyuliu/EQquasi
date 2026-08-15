@@ -80,6 +80,10 @@ CASES = [
     ("bp7",       "test.bp7.qdc",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
     ("bp1002",    "bp1002.qdc.2500",   {},       "cycle0",         "full"),
+    # BP5 dip90 with only the surface kinked 10 deg (user-designed control;
+    # the result it locks: rupture crosses the bend freely under BP5
+    # friction). ~40 min on 3 ranks -- full tier.
+    ("bp5.kink",  "bp5.qdc.kink.2000", {},       "cycle0",         "full"),
 
     # Recreated later, through this mechanism, from a clean run: BP5-dip90.
     # Its old reference was produced ad hoc, before the workflow rule and
@@ -286,6 +290,14 @@ def run_case(compset, over, workdir):
     # first (rule 3: evaluated at the right configuration).
     step([str(ROOT / "script" / "create.newcase"), workdir, compset],
          str(ROOT))
+    # Compsets that ship a geometry generator (the kink family) need it run
+    # between create and setup: it writes input/bFault_Rough_Geometry.txt
+    # from user_defined_params.py. Generic on the filename so the next
+    # generator-bearing compset needs no harness change.
+    import glob as _glob
+    for gen in sorted(_glob.glob(os.path.join(workdir, "input",
+                                              "generate*Geometry.py"))):
+        step(["python3", gen, os.path.join(workdir, "input")], workdir)
     apply_overrides(os.path.join(workdir, "user_defined_params.py"), over)
     step(["./case.setup"], workdir)
 

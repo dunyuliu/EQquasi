@@ -35,6 +35,8 @@ not for science.
 | `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002` | — | 2026-08-13 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
+| `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.kink` | Liu et al. 2020 GJI | 2026-08-15 |
+| `bp5.qdc.kink.2000` | **e2e full** | `reference/bp5.kink` | — | 2026-08-15 |
 | `bp1001.fdc.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.qdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |

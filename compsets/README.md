@@ -35,28 +35,25 @@ not for science.
 | `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002` | — | 2026-08-13 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
-| `bp1001.fdc.250` | **TODO: broken** | — | — | 2026-08-12 |
-| `bp1001.fdc.rough.250` | **TODO: broken** | — | — | 2026-08-12 |
-| `bp1001.qdc.rough.250` | **TODO: broken** | — | — | 2026-08-12 |
-| `liu2020.fdc.planar.300` | **TODO: broken** | — | Liu et al. 2020 GJI | 2026-08-12 |
-| `liu2020.fdc.rough.250` | **TODO: broken** | — | — | 2026-08-12 |
+| `bp1001.fdc.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
+| `bp1001.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
+| `bp1001.qdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
+| `liu2020.fdc.planar.300` | none (ported, UNVERIFIED) | — | Liu et al. 2020 GJI | 2026-08-12 |
+| `liu2020.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 
-### TODO: broken — five compsets in the pre-`par` format
+### Ported 2026-08-15, unverified — the five pre-`par` compsets
 
-`bp1001.*` and `liu2020.fdc.*` declare bare module-level variables
-(`dx = 250.0e0`, `mode = 2`) instead of the `par` object every current script
-reads. `case.setup` dies immediately:
+These declared bare module-level variables (`dx = 250.0e0`) instead of the
+`par` object, and `case.setup` died on `NameError: name 'par'`. Ported
+mechanically on 2026-08-15 — values untouched, names prefixed, the six old
+domain names mapped to `fxmin`-family — and each now passes `case.setup` and
+starts the solver (planar path stepped to 40; the rough path assembled its
+1.55M-node mesh from the shipped table before the smoke timeout).
 
-```
-NameError: name 'par' is not defined
-```
-
-`bp1001.fdc.250` is worse than merely old — it mixes both styles, with bare
-`dx` and `par.ntotft` in the same file, so it never worked in either.
-
-They are not ported here because there is no oracle to port them against:
-none has a `reference/`, so a port would produce a plausible compset nobody
-could check. Tracked in `PATHWAY_FORWARD.md`.
+**Unverified remains the operative word**: none has a `reference/`, so the
+numbers are checked by nothing. The rough compsets' `rough_geo_cycle.txt` was
+renamed to `bFault_Rough_Geometry.txt`, the name the solver actually reads;
+the old name survives only in the legacy HPC batch template.
 
 **"gate: none" is not "broken".** `das.qdc.10` and `liu2020.qdc.kink.300` are
 on the current schema and run; nothing merely checks them.

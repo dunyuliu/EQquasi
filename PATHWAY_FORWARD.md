@@ -184,9 +184,17 @@ Read this first on wake-up. Update in place; close items by deleting them.
   ~2 m/s in one step -- exactly what step 2 did. The caps do not merely
   disagree with the paper; they destroy the compset's own initial condition.
 
-  BLOCKER: dx = 300 m is not optional, and there the MUMPS factors want
-  ~5.51e9 reals against a 2^31 ceiling, so full reproduction needs a
-  64-bit-integer MUMPS build.
+  BLOCKER DEAD (2026-08-15): the 2^31/64-bit-MUMPS claim was a derived
+  estimate never confronted with a solver error. Measured on knox: 32-bit
+  MUMPS factorizes 6.05e9 reals (liu2020.fdc.planar.300) and 6.6e9
+  (bp1001.fdc.250) with INFOG(1)=0 -- MUMPS 5.x uses 8-byte offsets for the
+  real factor array regardless of intsize64. dx = 300 runs today;
+  `work/kink300.sci` (case-local max_norm=-100e6) is the live attempt.
+  dtmax mechanism also closed the same day: the dc014 spikes were 265-day
+  strides x 2.9 MPa/yr = 3.2 a-sigma per stride on a fault perched at
+  tau/sigma = mu_ss(creep); kink600 is safe by construction (Dc-scaled
+  25.5-day ceiling = 0.58 a-sigma). Decision criterion for the dtmax
+  default: taudot * dtmax <~ xi * a*sigma_min (owner's call).
 - [CLOSED — see queue item 5] fric() index revamp landed (46 named slots,
   registry table in defaultParameters.py, rule 5 rewritten).
 - [FIXED] Multi-fault station output. It was worse than "faults 2+ get
@@ -401,8 +409,8 @@ Adding `time` and `slips`/`slipd` to the restart file, restored when
 - A kink (bent-fault) compset for Liu et al. (2020) is paused in the worktree
   `/home/utig5/dliu/eqquasi.kink`, branch `kink-geometry`, uncommitted. The
   geometry generator is verified in the file and in the solved mesh; dx = 300 m
-  (the paper's) needs a 64-bit-integer MUMPS, since the factors want 5.51e9
-  reals against a 2^31 ceiling. dx = 600 m runs.
+  (the paper's) runs -- the 64-bit-MUMPS claim is dead, see the blocker
+  note above. dx = 600 m runs.
 - `func_lib.f90`'s `insert_rough_fault` is single-fault by construction.
 - Kim's state variable sits flat at log₁₀θ ≈ 2.8 where ours grows. The aging
   law cannot produce flat, and with the slip law dropped from BP8 on

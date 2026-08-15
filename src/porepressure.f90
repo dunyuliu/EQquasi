@@ -107,7 +107,7 @@ end subroutine pore_pressure_init
 ! Subroutine #2.
 ! pore_pressure_update advances the pore pressure field by dtstep with an
 ! explicit FTCS scheme, sub-stepping to respect dt <= dx^2/(4*alpha), then
-! stores p in fric(6,:,1) and the Darcy velocity in fric(51:52,:,1).
+! stores p in fric(FR_PORE_DP,:,1) and the Darcy velocity in fric(51:52,:,1).
 subroutine pore_pressure_update(dtstep)
 
     use globalvar
@@ -185,20 +185,20 @@ subroutine pore_pressure_update(dtstep)
 
     deallocate(pnew)
 
-    ! Hand the pore pressure to faulting through the existing fric(6,:,:) slot
+    ! Hand the pore pressure to faulting through the existing fric(FR_PORE_DP,:,:) slot
     ! and record the Darcy velocity q = -(k/eta) grad(p) for benchmark output.
     do i = 1, nftnd(1)
-        fric(6,i,1) = pf(i)
+        fric(FR_PORE_DP,i,1) = pf(i)
 
-        fric(51,i,1) = 0.0d0
-        fric(52,i,1) = 0.0d0
+        fric(FR_DARCY_S,i,1) = 0.0d0
+        fric(FR_DARCY_D,i,1) = 0.0d0
         if (pfActive(i) == 1) then
             call pf_neighbor(i, 3, jm); call pf_neighbor(i, 4, jp)
             if (jm > 0 .and. jp > 0) &
-                fric(51,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
+                fric(FR_DARCY_S,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
             call pf_neighbor(i, 1, jm); call pf_neighbor(i, 2, jp)
             if (jm > 0 .and. jp > 0) &
-                fric(52,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
+                fric(FR_DARCY_D,i,1) = -fluid_perm/fluid_eta * (pf(jp)-pf(jm))/(2.0d0*dx)
         endif
     enddo
 
@@ -306,18 +306,18 @@ subroutine bp8_profile_record
     profVmax(k) = maxSlipRate
 
     do i = 1, nProfStrike
-        profS2s(k,i) =  fric(71, idProfStrike(i), 1)          ! slip along strike, m
-        profS3s(k,i) = -fric(72, idProfStrike(i), 1)          ! slip, positive down
-        profT2s(k,i) =  fric(28, idProfStrike(i), 1)/1.0d6    ! shear stress, MPa
-        profT3s(k,i) = -fric(29, idProfStrike(i), 1)/1.0d6
-        profPs (k,i) =  fric(6,  idProfStrike(i), 1)/1.0d6    ! pore pressure, MPa
+        profS2s(k,i) =  fric(FR_SLIP_S, idProfStrike(i), 1)          ! slip along strike, m
+        profS3s(k,i) = -fric(FR_SLIP_D, idProfStrike(i), 1)          ! slip, positive down
+        profT2s(k,i) =  fric(FR_TSTK, idProfStrike(i), 1)/1.0d6    ! shear stress, MPa
+        profT3s(k,i) = -fric(FR_TDIP, idProfStrike(i), 1)/1.0d6
+        profPs (k,i) =  fric(FR_PORE_DP,  idProfStrike(i), 1)/1.0d6    ! pore pressure, MPa
     enddo
     do i = 1, nProfDepth
-        profS2d(k,i) =  fric(71, idProfDepth(i), 1)
-        profS3d(k,i) = -fric(72, idProfDepth(i), 1)
-        profT2d(k,i) =  fric(28, idProfDepth(i), 1)/1.0d6
-        profT3d(k,i) = -fric(29, idProfDepth(i), 1)/1.0d6
-        profPd (k,i) =  fric(6,  idProfDepth(i), 1)/1.0d6
+        profS2d(k,i) =  fric(FR_SLIP_S, idProfDepth(i), 1)
+        profS3d(k,i) = -fric(FR_SLIP_D, idProfDepth(i), 1)
+        profT2d(k,i) =  fric(FR_TSTK, idProfDepth(i), 1)/1.0d6
+        profT3d(k,i) = -fric(FR_TDIP, idProfDepth(i), 1)/1.0d6
+        profPd (k,i) =  fric(FR_PORE_DP,  idProfDepth(i), 1)/1.0d6
     enddo
 
 end subroutine bp8_profile_record

@@ -40,6 +40,56 @@ MODULE globalvar
         ndout, nen=8, ned=3, nee=24, ndof=3, nint=8, noid=2, &
         ntotft, nnx, nnz, nres, nplpts, nhplt=20, nstep, &
         dis4uniF, dis4uniB, C_farfield = 0, nt_output_stress
+    ! fric(slot, node, fault) named slots. One authoritative list (rule 5);
+    ! the same numbers appear in script/defaultParameters.py (Python side)
+    ! and the full slot -> meaning -> unit -> writer table lives there.
+    ! Slots 1-5 are friction-law-dependent legacy and stay numeric.
+    integer (kind=4), parameter :: FR_PORE_DP = 6  ! pore pressure change [Pa]
+    integer (kind=4), parameter :: FR_TNRM0 = 7  ! initial effective normal stress [Pa]
+    integer (kind=4), parameter :: FR_TSTK0 = 8  ! initial shear stress, strike [Pa]
+    integer (kind=4), parameter :: FR_RSF_A = 9  ! rate-and-state a [-]
+    integer (kind=4), parameter :: FR_RSF_B = 10  ! rate-and-state b [-]
+    integer (kind=4), parameter :: FR_RSF_DC = 11  ! critical slip distance Dc [m]
+    integer (kind=4), parameter :: FR_RSF_V0 = 12  ! reference slip rate V0 [m/s]
+    integer (kind=4), parameter :: FR_RSF_F0 = 13  ! reference friction f0/r0 [-]
+    integer (kind=4), parameter :: FR_VINI_N = 16  ! initial slip rate, normal [m/s]
+    integer (kind=4), parameter :: FR_VINI_S = 17  ! initial slip rate, strike [m/s]
+    integer (kind=4), parameter :: FR_VINI_D = 18  ! initial slip rate, dip [m/s]
+    integer (kind=4), parameter :: FR_VINI_MAG = 19  ! initial slip rate magnitude [m/s]
+    integer (kind=4), parameter :: FR_STATE = 20  ! state variable theta [s]
+    integer (kind=4), parameter :: FR_STATE_TRIAL = 22  ! trial state update [s]
+    integer (kind=4), parameter :: FR_THETA_PC = 23  ! normal-stress state theta_pc [Pa]
+    integer (kind=4), parameter :: FR_THETA_PC_TRIAL = 24  ! trial theta_pc [Pa]
+    integer (kind=4), parameter :: FR_V_TRIAL = 26  ! trial slip rate magnitude [m/s]
+    integer (kind=4), parameter :: FR_TSTK = 28  ! shear stress, strike [Pa]
+    integer (kind=4), parameter :: FR_TDIP = 29  ! shear stress, dip [Pa]
+    integer (kind=4), parameter :: FR_TNRM = 30  ! effective normal stress [Pa]
+    integer (kind=4), parameter :: FR_VXM = 31  ! master node velocity x [m/s]
+    integer (kind=4), parameter :: FR_VYM = 32  ! master node velocity y [m/s]
+    integer (kind=4), parameter :: FR_VZM = 33  ! master node velocity z [m/s]
+    integer (kind=4), parameter :: FR_VXS = 34  ! slave node velocity x [m/s]
+    integer (kind=4), parameter :: FR_VYS = 35  ! slave node velocity y [m/s]
+    integer (kind=4), parameter :: FR_VZS = 36  ! slave node velocity z [m/s]
+    integer (kind=4), parameter :: FR_ABS_KU = 41  ! abs(KU) elastic force magnitude [N]
+    integer (kind=4), parameter :: FR_V_FINAL = 42  ! final-step slip rate [m/s]
+    integer (kind=4), parameter :: FR_SPARE44 = 44  ! spare (written zero) [-]
+    integer (kind=4), parameter :: FR_SPARE45 = 45  ! spare (written zero) [-]
+    integer (kind=4), parameter :: FR_VINIT = 46  ! initial slip rate scalar [m/s]
+    integer (kind=4), parameter :: FR_V_CURRENT = 47  ! current slip rate (dt control) [m/s]
+    integer (kind=4), parameter :: FR_STATE_INIT = 48  ! initial state snapshot [s]
+    integer (kind=4), parameter :: FR_TDIP0 = 49  ! initial shear stress, dip [Pa]
+    integer (kind=4), parameter :: FR_DARCY_S = 51  ! Darcy velocity, strike [m/s]
+    integer (kind=4), parameter :: FR_DARCY_D = 52  ! Darcy velocity, dip [m/s]
+    integer (kind=4), parameter :: FR_SLIP_S = 71  ! accumulated slip, strike [m]
+    integer (kind=4), parameter :: FR_SLIP_D = 72  ! accumulated slip, dip [m]
+    integer (kind=4), parameter :: FR_SLIP_N = 73  ! accumulated slip, normal [m]
+    integer (kind=4), parameter :: FR_VS_FINAL = 74  ! final slip rate, strike [m/s]
+    integer (kind=4), parameter :: FR_VD_FINAL = 75  ! final slip rate, dip [m/s]
+    integer (kind=4), parameter :: FR_V_PEAK = 76  ! running peak slip rate [m/s]
+    integer (kind=4), parameter :: FR_RUPT_AREA = 81  ! ruptured area [m^2]
+    integer (kind=4), parameter :: FR_RUPT_SLIP = 82  ! total slip in rupture [m]
+    integer (kind=4), parameter :: FR_TRACT_START = 83  ! traction at rupture start [Pa]
+    integer (kind=4), parameter :: FR_TRACT_END = 84  ! traction at rupture end [Pa]
     real (kind=dp), allocatable :: x(:,:), mat(:,:), fnft(:,:), &
         arn(:,:), r4nuc(:,:), arn4m(:,:), slp4fri(:,:), &
         globaldat(:,:), cons(:,:), constmp(:,:), consv(:,:), &

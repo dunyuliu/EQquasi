@@ -72,7 +72,7 @@ subroutine solveTimeLoopMUMPS
             time = time + dtev1
 
             ! bp8: advance the along-fault pore pressure to t+dtev1 before
-            ! faulting consumes it through fric(6,:,:).
+            ! faulting consumes it through fric(FR_PORE_DP,:,:).
             if (bp == 8) call pore_pressure_update(dtev1)
 
             if (mod(it,nhplt) == 1 .and. me ==0) then
@@ -304,7 +304,7 @@ subroutine getScalarOnFaultQuant
     integer (kind = 4) :: ift
     maxSlipRate = 0.0d0
     do ift = 1, ntotft
-        if (nftnd(ift) > 0) maxSlipRate = max(maxSlipRate, maxval(fric(47, 1:nftnd(ift), ift)))
+        if (nftnd(ift) > 0) maxSlipRate = max(maxSlipRate, maxval(fric(FR_V_CURRENT, 1:nftnd(ift), ift)))
     enddo
 end subroutine getScalarOnFaultQuant
 
@@ -469,8 +469,8 @@ subroutine initOnFaultKinematics
         if (nftnd(ift) > 0) then !RSF
             do i=1,nftnd(ift)
                 if (icstart == 1) then
-                    consv(1,nsmp(1,i,ift)) =  -fric(46,i,ift)/2.0d0
-                    consv(1,nsmp(2,i,ift)) =  fric(46,i,ift)/2.0d0
+                    consv(1,nsmp(1,i,ift)) =  -fric(FR_VINIT,i,ift)/2.0d0
+                    consv(1,nsmp(2,i,ift)) =  fric(FR_VINIT,i,ift)/2.0d0
                 else
                 consv(1:3,nsmp(1,i,ift)) = fric(34:36,i,ift)
                 consv(1:3,nsmp(2,i,ift)) = fric(31:33,i,ift)

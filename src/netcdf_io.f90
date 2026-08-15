@@ -193,21 +193,21 @@ subroutine netcdf_write_on_fault(outfile)
         do n = 1, nftnd(ift)
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
-            on_fault_vars(i,j,1,ift)  = fric(28, n, ift) ! tstk0
-            on_fault_vars(i,j,2,ift)  = fric(29, n, ift) ! tdip0
-            on_fault_vars(i,j,3,ift)  = fric(30, n, ift) ! tnorm0
-            on_fault_vars(i,j,4,ift)  = fric(26, n, ift) ! sliprate
-            on_fault_vars(i,j,5,ift)  = fric(20, n, ift) ! state
-            on_fault_vars(i,j,6,ift)  = fric(23, n, ift) ! state variable for normal stress, theta_pc
-            on_fault_vars(i,j,7,ift)  = fric(31, n, ift) ! vxm
-            on_fault_vars(i,j,8,ift)  = fric(32, n, ift) ! vym
-            on_fault_vars(i,j,9,ift)  = fric(33, n, ift) ! vzm
-            on_fault_vars(i,j,10,ift) = fric(34, n, ift) ! vxs
-            on_fault_vars(i,j,11,ift) = fric(35, n, ift) ! vys
-            on_fault_vars(i,j,12,ift) = fric(36, n, ift) ! vzs
-            on_fault_vars(i,j,13,ift) = fric(71, n, ift) ! vxs
-            on_fault_vars(i,j,14,ift) = fric(72, n, ift) ! vys
-            on_fault_vars(i,j,15,ift) = fric(73, n, ift) ! vzs
+            on_fault_vars(i,j,1,ift)  = fric(FR_TSTK, n, ift) ! tstk0
+            on_fault_vars(i,j,2,ift)  = fric(FR_TDIP, n, ift) ! tdip0
+            on_fault_vars(i,j,3,ift)  = fric(FR_TNRM, n, ift) ! tnorm0
+            on_fault_vars(i,j,4,ift)  = fric(FR_V_TRIAL, n, ift) ! sliprate
+            on_fault_vars(i,j,5,ift)  = fric(FR_STATE, n, ift) ! state
+            on_fault_vars(i,j,6,ift)  = fric(FR_THETA_PC, n, ift) ! state variable for normal stress, theta_pc
+            on_fault_vars(i,j,7,ift)  = fric(FR_VXM, n, ift) ! vxm
+            on_fault_vars(i,j,8,ift)  = fric(FR_VYM, n, ift) ! vym
+            on_fault_vars(i,j,9,ift)  = fric(FR_VZM, n, ift) ! vzm
+            on_fault_vars(i,j,10,ift) = fric(FR_VXS, n, ift) ! vxs
+            on_fault_vars(i,j,11,ift) = fric(FR_VYS, n, ift) ! vys
+            on_fault_vars(i,j,12,ift) = fric(FR_VZS, n, ift) ! vzs
+            on_fault_vars(i,j,13,ift) = fric(FR_SLIP_S, n, ift) ! vxs
+            on_fault_vars(i,j,14,ift) = fric(FR_SLIP_D, n, ift) ! vys
+            on_fault_vars(i,j,15,ift) = fric(FR_SLIP_N, n, ift) ! vzs
         enddo
     enddo
     ! Create the netCDF file.
@@ -465,15 +465,15 @@ subroutine netcdf_read_on_fault(infile)
         do n = 1, nftnd(ift)
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
-            fric(9,  n, ift) = on_fault_vars(i,j,ift,1) ! a
-            fric(10, n, ift) = on_fault_vars(i,j,ift,2) ! b
-            fric(11, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
-            fric(12, n, ift) = on_fault_vars(i,j,ift,4) ! v0
-            fric(13, n, ift) = on_fault_vars(i,j,ift,5) ! r0
-            fric(46, n, ift) = on_fault_vars(i,j,ift,6) ! init_slip_rate
-            fric(8,  n, ift) = on_fault_vars(i,j,ift,7) ! shear
-            fric(7,  n, ift) = on_fault_vars(i,j,ift,8) ! norm
-            fric(20, n, ift) = on_fault_vars(i,j,ift,9) ! state variable
+            fric(FR_RSF_A,  n, ift) = on_fault_vars(i,j,ift,1) ! a
+            fric(FR_RSF_B, n, ift) = on_fault_vars(i,j,ift,2) ! b
+            fric(FR_RSF_DC, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
+            fric(FR_RSF_V0, n, ift) = on_fault_vars(i,j,ift,4) ! v0
+            fric(FR_RSF_F0, n, ift) = on_fault_vars(i,j,ift,5) ! r0
+            fric(FR_VINIT, n, ift) = on_fault_vars(i,j,ift,6) ! init_slip_rate
+            fric(FR_TSTK0,  n, ift) = on_fault_vars(i,j,ift,7) ! shear
+            fric(FR_TNRM0,  n, ift) = on_fault_vars(i,j,ift,8) ! norm
+            fric(FR_STATE, n, ift) = on_fault_vars(i,j,ift,9) ! state variable
             ! The aging law (friclaw 3) carries theta, a time in seconds. The
             ! slip law (friclaw 4) carries psi = f* + b*ln(V* theta / Dc), which
             ! is dimensionless and of order f*. Compsets specify the initial
@@ -482,17 +482,17 @@ subroutine netcdf_read_on_fault(infile)
             ! exp(psi/a) then overflows and the Newton solve returns NaN on the
             ! very first step.
             if (friclaw == 4) then
-                fric(20, n, ift) = fric(13, n, ift) &
-                    + fric(10, n, ift) * dlog(fric(12, n, ift) &
-                    * on_fault_vars(i,j,ift,9) / fric(11, n, ift))
+                fric(FR_STATE, n, ift) = fric(FR_RSF_F0, n, ift) &
+                    + fric(FR_RSF_B, n, ift) * dlog(fric(FR_RSF_V0, n, ift) &
+                    * on_fault_vars(i,j,ift,9) / fric(FR_RSF_DC, n, ift))
             endif
             ! Snapshot the initial state. The t = 0 row of the station files is
             ! written when the file is created, which happens at the end of the
             ! run, so reading fric(20) there reports the *final* state under the
             ! label t = 0. Keep the initial value so that row is honest.
-            fric(48, n, ift) = fric(20, n, ift) ! initial state
-            fric(47, n, ift) = fric(46, n, ift) ! peak slip rate
-            fric(23, n, ift) = abs(fric(7, n, ift)) ! initialize theta_pc as abs(normal stress)
+            fric(FR_STATE_INIT, n, ift) = fric(FR_STATE, n, ift) ! initial state
+            fric(FR_V_CURRENT, n, ift) = fric(FR_VINIT, n, ift) ! peak slip rate
+            fric(FR_THETA_PC, n, ift) = abs(fric(FR_TNRM0, n, ift)) ! initialize theta_pc as abs(normal stress)
         enddo
     enddo
 
@@ -592,11 +592,11 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
         do n = 1, nftnd(ift)
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
-            fric(9,  n, ift) = on_fault_vars(i,j,ift,1) ! a
-            fric(10, n, ift) = on_fault_vars(i,j,ift,2) ! b
-            fric(11, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
-            fric(12, n, ift) = on_fault_vars(i,j,ift,4) ! v0
-            fric(13, n, ift) = on_fault_vars(i,j,ift,5) ! r0
+            fric(FR_RSF_A,  n, ift) = on_fault_vars(i,j,ift,1) ! a
+            fric(FR_RSF_B, n, ift) = on_fault_vars(i,j,ift,2) ! b
+            fric(FR_RSF_DC, n, ift) = on_fault_vars(i,j,ift,3) ! Dc
+            fric(FR_RSF_V0, n, ift) = on_fault_vars(i,j,ift,4) ! v0
+            fric(FR_RSF_F0, n, ift) = on_fault_vars(i,j,ift,5) ! r0
         enddo
     enddo
     ! Close the file, freeing all resources.
@@ -637,21 +637,21 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
         do n = 1, nftnd(ift)
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
-            fric(8,  n, ift) = on_fault_vars4(i,j,1,ift)! tstk0
-            fric(49, n, ift) = on_fault_vars4(i,j,2,ift)! tdip0
-            fric(7,  n, ift) = on_fault_vars4(i,j,3,ift)! tnorm0
-            fric(46, n, ift) = on_fault_vars4(i,j,4,ift)! sliprate
-            fric(20, n, ift) = on_fault_vars4(i,j,5,ift)! state
-            fric(23, n, ift) = on_fault_vars4(i,j,6,ift)! state_normal
-            fric(31, n, ift) = on_fault_vars4(i,j,7,ift)! vxm
-            fric(32, n, ift) = on_fault_vars4(i,j,8,ift)! vym
-            fric(33, n, ift) = on_fault_vars4(i,j,9,ift)! vzm
-            fric(34, n, ift) = on_fault_vars4(i,j,10,ift)! vxs
-            fric(35, n, ift) = on_fault_vars4(i,j,11,ift)! vys
-            fric(36, n, ift) = on_fault_vars4(i,j,12,ift)! vzs
-            fric(48, n, ift) = fric(20, n, ift)! state at cycle start
-            fric(47, n, ift) = fric(46, n, ift)! peak slip rate
-            !fric(23, n, ift) = abs(fric(7, n, ift))! initialize theta_pc as abs(normal stress)
+            fric(FR_TSTK0,  n, ift) = on_fault_vars4(i,j,1,ift)! tstk0
+            fric(FR_TDIP0, n, ift) = on_fault_vars4(i,j,2,ift)! tdip0
+            fric(FR_TNRM0,  n, ift) = on_fault_vars4(i,j,3,ift)! tnorm0
+            fric(FR_VINIT, n, ift) = on_fault_vars4(i,j,4,ift)! sliprate
+            fric(FR_STATE, n, ift) = on_fault_vars4(i,j,5,ift)! state
+            fric(FR_THETA_PC, n, ift) = on_fault_vars4(i,j,6,ift)! state_normal
+            fric(FR_VXM, n, ift) = on_fault_vars4(i,j,7,ift)! vxm
+            fric(FR_VYM, n, ift) = on_fault_vars4(i,j,8,ift)! vym
+            fric(FR_VZM, n, ift) = on_fault_vars4(i,j,9,ift)! vzm
+            fric(FR_VXS, n, ift) = on_fault_vars4(i,j,10,ift)! vxs
+            fric(FR_VYS, n, ift) = on_fault_vars4(i,j,11,ift)! vys
+            fric(FR_VZS, n, ift) = on_fault_vars4(i,j,12,ift)! vzs
+            fric(FR_STATE_INIT, n, ift) = fric(FR_STATE, n, ift)! state at cycle start
+            fric(FR_V_CURRENT, n, ift) = fric(FR_VINIT, n, ift)! peak slip rate
+            !fric(FR_THETA_PC, n, ift) = abs(fric(FR_TNRM0, n, ift))! initialize theta_pc as abs(normal stress)
         enddo
     enddo
     ! Close the file, freeing all resources.

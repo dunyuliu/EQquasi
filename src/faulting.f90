@@ -54,12 +54,12 @@ slipruptarea_arr = 0.0d0
 dtev1D = huge(1.0d0)
 do ift = 1, ntotft
     do i=1,nftnd(ift)    !just fault nodes
-        fnfault = fric(7,i,ift) !initial forces on the fault node
-        fsfault = fric(8,i,ift) !norm, strike, dip components directly
+        fnfault = fric(FR_TNRM0,i,ift) !initial forces on the fault node
+        fsfault = fric(FR_TSTK0,i,ift) !norm, strike, dip components directly
         if (icstart ==1) then
           fdfault = 0.0d0
         else
-          fdfault = fric(49,i,ift)
+          fdfault = fric(FR_TDIP0,i,ift)
         endif
 
         isn = nsmp(1,i,ift) 
@@ -89,19 +89,19 @@ do ift = 1, ntotft
         slips = fvd(5,2,3) - fvd(5,1,3)
         slipd = fvd(6,2,3) - fvd(6,1,3)
         slip = sqrt(slipn**2 + slips**2 + slipd**2) !slip mag
-        fric(71,i,ift) = slips  !save for final slip output
-        fric(72,i,ift) = slipd
-        fric(73,i,ift) = slipn  !normal should be zero, but still keep to ensure
+        fric(FR_SLIP_S,i,ift) = slips  !save for final slip output
+        fric(FR_SLIP_D,i,ift) = slipd
+        fric(FR_SLIP_N,i,ift) = slipn  !normal should be zero, but still keep to ensure
         
         slipraten = fvd(4,2,2) - fvd(4,1,2)
         sliprates = fvd(5,2,2) - fvd(5,1,2)
         sliprated = fvd(6,2,2) - fvd(6,1,2)
-        fric(74,i,ift) = sliprates  !save for final slip output
-        fric(75,i,ift) = sliprated
+        fric(FR_VS_FINAL,i,ift) = sliprates  !save for final slip output
+        fric(FR_VD_FINAL,i,ift) = sliprated
         sliprate = sqrt(slipraten**2+sliprates**2+sliprated**2)
             sliprate_arr(i,ift) = sliprate
-        if (sliprate>fric(76,i,ift)) then 
-            fric(76,i,ift)=sliprate
+        if (sliprate>fric(FR_V_PEAK,i,ift)) then 
+            fric(FR_V_PEAK,i,ift)=sliprate
         endif
         slipaccn=fvd(4,2,4)-fvd(4,1,4)
         slipaccs=fvd(5,2,4)-fvd(5,1,4)
@@ -155,8 +155,8 @@ do ift = 1, ntotft
                 tnrm0         = (mslav * fvd(4,2,1) - mmast * fvd(4,1,1)) / mtotl + fnfault
 
                 ! sigma_bar = sigma_bar_0 - p. tnrm0 is negative in compression
-                ! and fric(6,:,:) holds p >= 0.
-                if (bp == 8) tnrm0 = tnrm0 + fric(6,i,ift)
+                ! and fric(FR_PORE_DP,:,:) holds p >= 0.
+                if (bp == 8) tnrm0 = tnrm0 + fric(FR_PORE_DP,i,ift)
 
                 ! Nucleation
                 if (bp == 7 .and. icstart == 1) then
@@ -187,27 +187,27 @@ do ift = 1, ntotft
                 ! corrupts every subsequent station, profile and global.dat row.
                 call check_effective_normal(tnrm0, i, ift, isn)
 
-                ! fric(41,i,ift) is abs(KU)
-                fric(41,i,ift)= sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
+                ! fric(FR_ABS_KU,i,ift) is abs(KU)
+                fric(FR_ABS_KU,i,ift)= sqrt((mslav * fvd(5,2,1) - mmast * fvd(5,1,1))**2 + (mslav * fvd(6,2,1) - mmast * fvd(6,1,1))**2) / (mmast + mslav) 
                 ttao0         = sqrt(tstk0 * tstk0 + tdip0 * tdip0)        
                 
 
                 !theta = L/V + (theta - L/V)*dexp(-V*dtev1/L)
                 !- fric(22): theta*
                 !- fric(21): theta_dot
-                !- [fric(11): L],[fric(12,i): V0]
+                !- [fric(11): L],[fric(FR_RSF_V0,i): V0]
     !---3.4.1.3: TO COMPUTE THETA*(t+1) [FRIC(22,:)] FOR ITAG==0, USING [V_TRIAL]=[CONSTRAINV] 
     !----------: THETA**(t+1) [FRIC(22,:)] FOR ITAG==1, , USING [V_TRIAL]={[CONSTRAINV]+[CONSTRAINVTMP]}*0.5    
                 !if (itag == 0) then 
                     v_trial   = sliprate
-                    fric(42,i,ift) = sliprate !Only record the final sliprate in fric(42,i) in the last time step.
-                    ! phi = dlog(fric(12,i,ift) * fric(20,i,ift) / fric(11,i,ift))
-                    ! if (v_trial * dtev1 / fric(11,i,ift) <= 1.0d-6) then 
-                        ! fric(22,i,ift) = dlog(dexp(phi)*(1-v_trial*dtev1/fric(11,i,ift)) + fric(12,i,ift)*dtev1/fric(11,i,ift))
-                        ! fric(22,i,ift) = fric(11,i,ift)/fric(12,i,ift)*dexp(fric(22,i,ift))
-                    ! elseif (v_trial * dtev1 / fric(11,i,ift) > 1.0d-6) then 
-                        ! fric(22,i,ift) = dlog(fric(12,i,ift)/v_trial + (dexp(phi)-fric(12,i,ift)/v_trial)*dexp(-v_trial*dtev1/fric(11,i,ift))) 
-                        ! fric(22,i,ift) = fric(11,i,ift)/fric(12,i,ift)*dexp(fric(22,i,ift))
+                    fric(FR_V_FINAL,i,ift) = sliprate !Only record the final sliprate in fric(FR_V_FINAL,i) in the last time step.
+                    ! phi = dlog(fric(FR_RSF_V0,i,ift) * fric(FR_STATE,i,ift) / fric(FR_RSF_DC,i,ift))
+                    ! if (v_trial * dtev1 / fric(FR_RSF_DC,i,ift) <= 1.0d-6) then 
+                        ! fric(FR_STATE_TRIAL,i,ift) = dlog(dexp(phi)*(1-v_trial*dtev1/fric(FR_RSF_DC,i,ift)) + fric(FR_RSF_V0,i,ift)*dtev1/fric(FR_RSF_DC,i,ift))
+                        ! fric(FR_STATE_TRIAL,i,ift) = fric(FR_RSF_DC,i,ift)/fric(FR_RSF_V0,i,ift)*dexp(fric(FR_STATE_TRIAL,i,ift))
+                    ! elseif (v_trial * dtev1 / fric(FR_RSF_DC,i,ift) > 1.0d-6) then 
+                        ! fric(FR_STATE_TRIAL,i,ift) = dlog(fric(FR_RSF_V0,i,ift)/v_trial + (dexp(phi)-fric(FR_RSF_V0,i,ift)/v_trial)*dexp(-v_trial*dtev1/fric(FR_RSF_DC,i,ift))) 
+                        ! fric(FR_STATE_TRIAL,i,ift) = fric(FR_RSF_DC,i,ift)/fric(FR_RSF_V0,i,ift)*dexp(fric(FR_STATE_TRIAL,i,ift))
                     ! endif
                 ! elseif (itag == 1) then 
                     ! do j=1,2  !1-slave, 2-master
@@ -224,30 +224,30 @@ do ift = 1, ntotft
                     ! sliprates = fvd(5,2,2) - fvd(5,1,2)
                     ! sliprated = fvd(6,2,2) - fvd(6,1,2)
                     ! v_trial = sqrt(slipraten**2+sliprates**2+sliprated**2)        
-                    ! phi = dlog(fric(12,i,ift) * fric(20,i,ift) / fric(11,i,ift))
-                    ! if (v_trial * dtev1 / fric(11,i,ift) <= 1.0d-6) then 
-                        ! fric(22,i,ift) = dlog(dexp(phi)*(1-v_trial*dtev1/fric(11,i,ift)) + fric(12,i,ift)*dtev1/fric(11,i,ift))
-                        ! fric(22,i,ift) = fric(11,i,ift)/fric(12,i,ift)*dexp(fric(22,i,ift))
-                    ! elseif (v_trial * dtev1 / fric(11,i,ift) > 1.0d-6) then 
-                        ! fric(22,i,ift) = dlog(fric(12,i,ift)/v_trial + (dexp(phi)-fric(12,i,ift)/v_trial)*dexp(-v_trial*dtev1/fric(11,i,ift))) 
-                        ! fric(22,i,ift) = fric(11,i,ift)/fric(12,i,ift)*dexp(fric(22,i,ift))
+                    ! phi = dlog(fric(FR_RSF_V0,i,ift) * fric(FR_STATE,i,ift) / fric(FR_RSF_DC,i,ift))
+                    ! if (v_trial * dtev1 / fric(FR_RSF_DC,i,ift) <= 1.0d-6) then 
+                        ! fric(FR_STATE_TRIAL,i,ift) = dlog(dexp(phi)*(1-v_trial*dtev1/fric(FR_RSF_DC,i,ift)) + fric(FR_RSF_V0,i,ift)*dtev1/fric(FR_RSF_DC,i,ift))
+                        ! fric(FR_STATE_TRIAL,i,ift) = fric(FR_RSF_DC,i,ift)/fric(FR_RSF_V0,i,ift)*dexp(fric(FR_STATE_TRIAL,i,ift))
+                    ! elseif (v_trial * dtev1 / fric(FR_RSF_DC,i,ift) > 1.0d-6) then 
+                        ! fric(FR_STATE_TRIAL,i,ift) = dlog(fric(FR_RSF_V0,i,ift)/v_trial + (dexp(phi)-fric(FR_RSF_V0,i,ift)/v_trial)*dexp(-v_trial*dtev1/fric(FR_RSF_DC,i,ift))) 
+                        ! fric(FR_STATE_TRIAL,i,ift) = fric(FR_RSF_DC,i,ift)/fric(FR_RSF_V0,i,ift)*dexp(fric(FR_STATE_TRIAL,i,ift))
                     ! endif        
                 ! endif
                 
                 ! retrieve state_t+1 calculated from the last time step.
-                statetmp = fric(20,i,ift)
-                fric(22,i,ift) = statetmp
+                statetmp = fric(FR_STATE,i,ift)
+                fric(FR_STATE_TRIAL,i,ift) = statetmp
                 ! initialize statetmp for the first Newton-Raphson update.
                 if      (friclaw == 3) then
-                    call rate_state_ageing_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
+                    call rate_state_ageing_law(v_trial,fric(FR_STATE_TRIAL,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
                 elseif  (friclaw == 4) then
-                    call rate_state_slip_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
+                    call rate_state_slip_law(v_trial,fric(FR_STATE_TRIAL,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
                 endif
                 
                 ! retrieve theta_pc_t+1 calculated from the last time step for the state var of effective normal stress.
-                theta_pc_tmp   = fric(23,i,ift)
-                fric(24,i,ift) = theta_pc_tmp
-                call rate_state_normal_stress(v_trial, fric(24,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
+                theta_pc_tmp   = fric(FR_THETA_PC,i,ift)
+                fric(FR_THETA_PC_TRIAL,i,ift) = theta_pc_tmp
+                call rate_state_normal_stress(v_trial, fric(FR_THETA_PC_TRIAL,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
                 
                 eta            = mat0(1,2)*mat0(1,3)/2.0d0 
                 
@@ -257,17 +257,17 @@ do ift = 1, ntotft
                 ! shear_traction = static_shear_traction - eta*v. 
                 ! Use theta_pc, the state variable that accounts for normal stress change for the effective normal stress.
                 do iv = 1,ivmax
-                    fric(22,i,ift) = statetmp 
+                    fric(FR_STATE_TRIAL,i,ift) = statetmp 
                     ! update fric(22) and v_trial for the next time step.
                     if(friclaw == 3) then
-                        call rate_state_ageing_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
+                        call rate_state_ageing_law(v_trial,fric(FR_STATE_TRIAL,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
                     elseif(friclaw == 4) then
-                        call rate_state_slip_law(v_trial,fric(22,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
+                        call rate_state_slip_law(v_trial,fric(FR_STATE_TRIAL,i,ift),fric(1,i,ift),xmu,dxmudv) !RSF
                     endif
                     
-                    fric(24,i,ift) = theta_pc_tmp 
+                    fric(FR_THETA_PC_TRIAL,i,ift) = theta_pc_tmp 
                     ! update fric(24) and v_trial for the next time step.
-                    call rate_state_normal_stress(v_trial, fric(24,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
+                    call rate_state_normal_stress(v_trial, fric(FR_THETA_PC_TRIAL,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
                     
                     ! trial shear traction = xmu * theta_pc_tmp 
                     tau_fric_trial = xmu * theta_pc_tmp ! new frictional traction.
@@ -319,10 +319,10 @@ do ift = 1, ntotft
                 tstk=tau_fric_trial*tstk0/ttao0 ! new shear traction along strike.
                 tdip=tau_fric_trial*tdip0/ttao0 ! new shear traction along dip.
                 ttao=sqrt(tstk**2+tdip**2) ! new total shear traction.
-                fric(26,i,ift)=v_trial 
-                fric(28,i,ift)=tstk
-                fric(29,i,ift)=tdip
-                fric(30,i,ift)=tnrm0
+                fric(FR_V_TRIAL,i,ift)=v_trial 
+                fric(FR_TSTK,i,ift)=tstk
+                fric(FR_TDIP,i,ift)=tdip
+                fric(FR_TNRM,i,ift)=tnrm0
                 
                 ! distribute slip rate to master-slave nodes according to masses to preserve moments. 
                 ! [NOTE]: this is for right-lateral strike-slip fault. How could we make it general?
@@ -350,9 +350,9 @@ do ift = 1, ntotft
                     consvtmp(2,isn)=vys 
                     consvtmp(3,isn)=vzs     
                 elseif (itag == 1) then 
-                    fric(20,i,ift)      = fric(22,i,ift)  ! update state at itag == 1
-                    fric(23,i,ift)      = fric(24,i,ift)  ! update state2 at itag == 1
-                    ma_bar_ku_arr(i,ift)    = (v_trial - fric(42,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(41,i,ift)
+                    fric(FR_STATE,i,ift)      = fric(FR_STATE_TRIAL,i,ift)  ! update state at itag == 1
+                    fric(FR_THETA_PC,i,ift)      = fric(FR_THETA_PC_TRIAL,i,ift)  ! update state2 at itag == 1
+                    ma_bar_ku_arr(i,ift)    = (v_trial - fric(FR_V_FINAL,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(FR_ABS_KU,i,ift)
                     ma_bar_ku_arr(i,ift)    = abs(ma_bar_ku_arr(i,ift))
                     momrate_arr(i,ift)      = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
                                         momRateVW(i,ift)        = 0.0d0
@@ -378,12 +378,12 @@ do ift = 1, ntotft
                     consv(2,isn)=vys 
                     consv(3,isn)=vzs     
                     
-                    fric(31,i,ift) = vxm 
-                    fric(32,i,ift) = vym 
-                    fric(33,i,ift) = vzm 
-                    fric(34,i,ift) = vxs
-                    fric(35,i,ift) = vys 
-                    fric(36,i,ift) = vzs 
+                    fric(FR_VXM,i,ift) = vxm 
+                    fric(FR_VYM,i,ift) = vym 
+                    fric(FR_VZM,i,ift) = vzm 
+                    fric(FR_VXS,i,ift) = vxs
+                    fric(FR_VYS,i,ift) = vys 
+                    fric(FR_VZS,i,ift) = vzs 
                 endif 
         !---3.4.1.6: WHEN ITAG==0, SIMPLY STORE V* INTO [CONSTRAINVTMP]
         !----------: WHEN ITAG==1, DECLARE [FRIC(22,:)] AND FINAL V** INTO [CONSTRAINV]            
@@ -393,7 +393,7 @@ do ift = 1, ntotft
                 !tstk0 = 2.585534683723515d7/2.0d0
                 tdip0 = 0.0d6
                 tnrm = init_norm ! -25.0d6 for bp5. No change for creeping region.
-                tnrm0 = tnrm + fric(6,i,ift)
+                tnrm0 = tnrm + fric(FR_PORE_DP,i,ift)
                 call check_effective_normal(tnrm0, i, ift, isn)
                 ! shear stress tstk0 at steady state.
                 ! NOTE: outside the frictional region this is the steady-state
@@ -405,13 +405,13 @@ do ift = 1, ntotft
                 ! boundary artefact -- do not read it as one. Section 4.3
                 ! profiles span exactly +-400 m, and the branch above takes
                 ! x = +-l_f inclusive, so submitted output never contains it.
-                call rsf_rd(tstk0, tnrm0, fric(9,i,ift), fric(10,i,ift), fric(13,i,ift), fric(12,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
+                call rsf_rd(tstk0, tnrm0, fric(FR_RSF_A,i,ift), fric(FR_RSF_B,i,ift), fric(FR_RSF_F0,i,ift), fric(FR_RSF_V0,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
                 
                 v_trial = load_slip_rate
-                fric(26,i,ift) = v_trial
-                fric(28,i,ift) = tstk0
-                fric(29,i,ift) = tdip0
-                fric(30,i,ift) = tnrm0
+                fric(FR_V_TRIAL,i,ift) = v_trial
+                fric(FR_TSTK,i,ift) = tstk0
+                fric(FR_TDIP,i,ift) = tdip0
+                fric(FR_TNRM,i,ift) = tnrm0
                 slipratemast=(v_trial)*mslav/(mmast+mslav)
                 sliprateslav=-(v_trial)*mslav/(mmast+mslav)
                 v_s_new_mast=slipratemast
@@ -438,16 +438,16 @@ do ift = 1, ntotft
                  consv(1,isn)=vxs
                  consv(2,isn)=vys 
                  consv(3,isn)=vzs     
-                fric(31,i,ift) = vxm 
-                fric(32,i,ift) = vym 
-                fric(33,i,ift) = vzm 
-                fric(34,i,ift) = vxs
-                fric(35,i,ift) = vys 
-                fric(36,i,ift) = vzs
+                fric(FR_VXM,i,ift) = vxm 
+                fric(FR_VYM,i,ift) = vym 
+                fric(FR_VZM,i,ift) = vzm 
+                fric(FR_VXS,i,ift) = vxs
+                fric(FR_VYS,i,ift) = vys 
+                fric(FR_VZS,i,ift) = vzs
             endif
             
             ! update new time step size according to new slip rate v_trial.
-            dtev1D(i,ift) = ksi * fric(11,i,ift)/v_trial
+            dtev1D(i,ift) = ksi * fric(FR_RSF_DC,i,ift)/v_trial
             
             ! [WARNING]: exit the code if time step size is negative.
             if (dtev1D(i,ift) < 0) then
@@ -457,15 +457,15 @@ do ift = 1, ntotft
             endif
             ! Record rupture area, average stress vector, slip
             if (itag==1) then
-                fric(82,i,ift) = sqrt(slips**2 + slipn**2) ! Total slip
-                if (fric(26,i,ift) > 1.0d-3) then 
-                    fric(81,i,ift) = arn(i,ift) ! Record ruptured area
+                fric(FR_RUPT_SLIP,i,ift) = sqrt(slips**2 + slipn**2) ! Total slip
+                if (fric(FR_V_TRIAL,i,ift) > 1.0d-3) then 
+                    fric(FR_RUPT_AREA,i,ift) = arn(i,ift) ! Record ruptured area
                 endif 
                 if (abs(tdynastart-time)<dt/100.0) then 
-                    fric(83,i,ift) = sqrt(fric(28,i,ift)**2 + fric(29,i,ift)**2) !Total shear traction when dyna starts.
+                    fric(FR_TRACT_START,i,ift) = sqrt(fric(FR_TSTK,i,ift)**2 + fric(FR_TDIP,i,ift)**2) !Total shear traction when dyna starts.
                 endif
                 if (abs(tdynaend-time)<dt/100.0) then 
-                    fric(84,i,ift) = sqrt(fric(28,i,ift)**2 + fric(29,i,ift)**2) !Total shear traction when dyna ends.    
+                    fric(FR_TRACT_END,i,ift) = sqrt(fric(FR_TSTK,i,ift)**2 + fric(FR_TDIP,i,ift)**2) !Total shear traction when dyna ends.    
                 endif                    
             endif 
         endif
@@ -477,16 +477,16 @@ do ift = 1, ntotft
                         fltsta(1,it,j)  = time
                         fltsta(2,it,j)  = v_trial
                         fltsta(3,it,j)  = sliprated
-                        fltsta(4,it,j)  = fric(20,i,ift)
+                        fltsta(4,it,j)  = fric(FR_STATE,i,ift)
                         fltsta(5,it,j)  = slips
                         fltsta(6,it,j)  = slipd
                         fltsta(7,it,j)  = slipn
-                        fltsta(8,it,j)  = fric(28,i,ift)!tstk
-                        fltsta(9,it,j)  = fric(29,i,ift)!tdip
+                        fltsta(8,it,j)  = fric(FR_TSTK,i,ift)!tstk
+                        fltsta(9,it,j)  = fric(FR_TDIP,i,ift)!tdip
                         fltsta(10,it,j) = tnrm0
-                        fltsta(11,it,j) = fric(6,i,ift)  ! pore pressure change, Pa
-                        fltsta(12,it,j) = fric(51,i,ift) ! Darcy velocity along strike, m/s
-                        fltsta(13,it,j) = fric(52,i,ift) ! Darcy velocity along dip, m/s
+                        fltsta(11,it,j) = fric(FR_PORE_DP,i,ift)  ! pore pressure change, Pa
+                        fltsta(12,it,j) = fric(FR_DARCY_S,i,ift) ! Darcy velocity along strike, m/s
+                        fltsta(13,it,j) = fric(FR_DARCY_D,i,ift) ! Darcy velocity along dip, m/s
                         fltsta(14,it,j) = sliprates      ! slip rate along strike, m/s
                     endif
                 enddo 
@@ -608,8 +608,8 @@ subroutine check_effective_normal(tnrm0, i, ift, isn)
     write(*,'(X,A,E15.7,A)')  '=   time              = ', time, ' s'
     write(*,'(X,A,2E15.7,A)') '=   node x, z         = ', x(1,isn), x(3,isn), ' m'
     write(*,'(X,A,E15.7,A)')  '=   sigma_bar         = ', tnrm0/1.0d6, ' MPa'
-    write(*,'(X,A,E15.7,A)')  '=   pore pressure p   = ', fric(6,i,ift)/1.0d6, ' MPa'
-    write(*,'(X,A,E15.7,A)')  '=   sigma_bar_0       = ', fric(7,i,ift)/1.0d6, ' MPa'
+    write(*,'(X,A,E15.7,A)')  '=   pore pressure p   = ', fric(FR_PORE_DP,i,ift)/1.0d6, ' MPa'
+    write(*,'(X,A,E15.7,A)')  '=   sigma_bar_0       = ', fric(FR_TNRM0,i,ift)/1.0d6, ' MPa'
     write(*,*) '= Clamping this to zero would return NaN from the Newton solve and  ='
     write(*,*) '= silently corrupt every later output row, so the run stops here.   ='
     write(*,*) '===================================================================='

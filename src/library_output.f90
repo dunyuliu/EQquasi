@@ -115,9 +115,9 @@ subroutine output_onfault_st
                 k = anonfs(1,i)
                 write(51,'(E22.14,10E15.7)') 0.0d0,        & ! t
                     0.0d0, 0.0d0,                          & ! slip_2, slip_3
-                    dlog10(max(fric(46,k,ift), 1.0d-30)),    & ! log10 V_init
+                    dlog10(max(fric(FR_VINIT,k,ift), 1.0d-30)),    & ! log10 V_init
                     dlog10(1.0d-20),                       & ! log10 V_zero
-                    fric(8,k,ift)/1.d6, 0.0d0,               & ! tau^0, tau_3
+                    fric(FR_TSTK0,k,ift)/1.d6, 0.0d0,               & ! tau^0, tau_3
                     0.0d0, 0.0d0, 0.0d0,                   & ! p, q_2, q_3
                     ! fric(48) is the snapshot of the initial state taken in
                     ! netcdf_read_on_fault. Do not read fric(20) here: this block
@@ -127,7 +127,7 @@ subroutine output_onfault_st
                     ! is only the initial state when tau^0 happens to be the
                     ! steady-state stress at V_init, and it hides an
                     ! over-determined initial condition when it is not.
-                    dlog10(max(fric(48,k,ift), 1.0d-30))
+                    dlog10(max(fric(FR_STATE_INIT,k,ift), 1.0d-30))
                 do j = 1,it-1
                     write(51,'(E22.14,10E15.7)') fltsta(1,j,i),   & ! Time in sec
                         fltsta(5,j,i),                            & ! slip_2, along strike
@@ -274,14 +274,14 @@ subroutine output_onfault_transfer
         ! write(1111,*) '# code = Qquasi'
         ! write(1111,*) '# version = 1.x'
         write(1111,'(1x,16e32.21e4)') (x(1,nsmp(1,i,ift)), -x(3,nsmp(1,i,ift)), & ! xcoor, -zcoor
-            fric(26,i,ift), & ! trial slip rate magnitude, m/s;
-            fric(20,i,ift), & ! state variable in RSF;
-            fric(28,i,ift), & ! shear stress along strike, Pa;
-            fric(29,i,ift), & ! shear stress along dip, Pa;
-            fric(30,i,ift), & ! effective normal stress, Pa;
-            fric(31,i,ift), fric(32,i,ift), fric(33,i,ift), & ! master node nodal velocity along x, y, z; master node on y+ side of the fault. 
-            fric(34,i,ift), fric(35,i,ift), fric(36,i,ift), & ! slave node nodal velocity along x, y, z; slave node on the y- side of the fault. 
-            fric(44,i,ift), fric(45,i,ift), & ! empty for now. 
+            fric(FR_V_TRIAL,i,ift), & ! trial slip rate magnitude, m/s;
+            fric(FR_STATE,i,ift), & ! state variable in RSF;
+            fric(FR_TSTK,i,ift), & ! shear stress along strike, Pa;
+            fric(FR_TDIP,i,ift), & ! shear stress along dip, Pa;
+            fric(FR_TNRM,i,ift), & ! effective normal stress, Pa;
+            fric(FR_VXM,i,ift), fric(FR_VYM,i,ift), fric(FR_VZM,i,ift), & ! master node nodal velocity along x, y, z; master node on y+ side of the fault. 
+            fric(FR_VXS,i,ift), fric(FR_VYS,i,ift), fric(FR_VZS,i,ift), & ! slave node nodal velocity along x, y, z; slave node on the y- side of the fault. 
+            fric(FR_SPARE44,i,ift), fric(FR_SPARE45,i,ift), & ! empty for now. 
             fnft(i,ift), & ! rupture time at this loc.
                 i = 1,nftnd(ift))    
         close(1111)
@@ -330,7 +330,7 @@ subroutine output_globaldat
             write(1113,'(A)') '# Here is the time-series data.'
             ! Initial condition at t = 0, as for the station files.
             write(1113,'(E22.14,2E15.7)') 0.0d0, &
-                dlog10(max(maxval(fric(46,1:nftnd(1),1)), 1.0d-30)), 0.0d0
+                dlog10(max(maxval(fric(FR_VINIT,1:nftnd(1),1)), 1.0d-30)), 0.0d0
             do i = 1, it-1
                 write(1113,'(E22.14,2E15.7)') globaldat(1,i), &
                     dlog10(max(globaldat(2,i), 1.0d-30)), &
@@ -366,13 +366,13 @@ subroutine output_prof
             open(9002,file=trim(outDir)//'p1output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=38.0d3.and.abs(x(3,nsmp(1,i,ift) )-(-10.0d3))<0.01d0) then
-                        write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+                        write(9002,'(1x,5e32.21e4)') time,fric(FR_SLIP_S,i,ift),fric(FR_SLIP_D,i,ift),fric(FR_TSTK,i,ift),fric(FR_TDIP,i,ift)
                     endif
                 enddo
             open(9003,file=trim(outDir)//'p2output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0.and.abs(x(3,nsmp(1,i,ift) ))<=40.0d3) then
-                        write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+                        write(9003,'(1x,5e32.21e4)') time,fric(FR_SLIP_S,i,ift),fric(FR_SLIP_D,i,ift),fric(FR_TSTK,i,ift),fric(FR_TDIP,i,ift)
                     endif
                 enddo                
         endif
@@ -383,13 +383,13 @@ subroutine output_prof
             open(9002,file=trim(outDir)//'p1output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(3,nsmp(1,i,ift) )-0.0d3)<0.01d0) then
-                        write(9002,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+                        write(9002,'(1x,5e32.21e4)') time,fric(FR_SLIP_S,i,ift),fric(FR_SLIP_D,i,ift),fric(FR_TSTK,i,ift),fric(FR_TDIP,i,ift)
                     endif
                 enddo
             open(9003,file=trim(outDir)//'p2output.txt',form='formatted',status='unknown',position='append')
                 do i = 1,nftnd(1)
                     if (abs(x(1,nsmp(1,i,ift) ))<=0.01d0) then
-                        write(9003,'(1x,5e32.21e4)') time,fric(71,i,ift),fric(72,i,ift),fric(28,i,ift),fric(29,i,ift)
+                        write(9003,'(1x,5e32.21e4)') time,fric(FR_SLIP_S,i,ift),fric(FR_SLIP_D,i,ift),fric(FR_TSTK,i,ift),fric(FR_TDIP,i,ift)
                     endif
                 enddo                
         endif
@@ -410,9 +410,9 @@ subroutine output_ruptarea_trac_slip
     if(nftnd(ift) > 0) then
         open(unit=1114,file=trim(outDir)//'cplot_'//trim(fttmp)//'ruptarea_trac_slip.txt',status='unknown')    !rupture time
         ! 1,    2,     3,     4
-        !fric(81,i),fric(82,i),fric(83,i),fric(84,i)   
+        !fric(FR_RUPT_AREA,i),fric(FR_RUPT_SLIP,i),fric(FR_TRACT_START,i),fric(FR_TRACT_END,i)   
         !Ruptured area, total slip, tract at the beginning, tract at the end.
-        write(1114,'(1x,4e32.21e4)') (fric(81,i,ift),fric(82,i,ift),fric(83,i,ift),fric(84,i,ift), i=1,nftnd(ift))    
+        write(1114,'(1x,4e32.21e4)') (fric(FR_RUPT_AREA,i,ift),fric(FR_RUPT_SLIP,i,ift),fric(FR_TRACT_START,i,ift),fric(FR_TRACT_END,i,ift), i=1,nftnd(ift))    
         close(1114)
     endif
     enddo

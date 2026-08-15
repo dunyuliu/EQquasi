@@ -111,7 +111,7 @@ subroutine checkNormalStressCaps
     ! applied to it.
     !
     ! The caps only act when rough_fault == 1 .and. C_elastic == 1. When they
-    ! do, they clamp fric(7,...) on the first evaluation -- but the initial
+    ! do, they clamp fric(FR_TNRM0,...) on the first evaluation -- but the initial
     ! SHEAR stress was computed by the compset from the uncapped normal
     ! stress, and nothing recomputes it. The initial condition is then no
     ! longer at steady state: tau/sigma_bar is too high by exactly the ratio
@@ -134,11 +134,11 @@ subroutine checkNormalStressCaps
 
     do ift = 1, ntotft
         do i = 1, nftnd(ift)
-            if (fric(7,i,ift) < lo .or. fric(7,i,ift) > hi) then
+            if (fric(FR_TNRM0,i,ift) < lo .or. fric(FR_TNRM0,i,ift) > hi) then
                 write(*,*) '====================================================='
                 write(*,*) '= Initial normal stress lies outside the caps       ='
                 write(*,*) '=                                                   ='
-                write(*,'(A,E12.4,A)') ' =   initial sigma_n : ', fric(7,i,ift), ' Pa'
+                write(*,'(A,E12.4,A)') ' =   initial sigma_n : ', fric(FR_TNRM0,i,ift), ' Pa'
                 write(*,'(A,E12.4,A)') ' =   cap range       : ', lo, ' Pa (most compressive)'
                 write(*,'(A,E12.4,A)') ' =                     ', hi, ' Pa (least compressive)'
                 write(*,'(A,I0,A,I0)') ' =   first at fault ', ift, ', node ', i
@@ -198,7 +198,7 @@ subroutine checkAndReport(currentProcID)
         filenametmp2 = trim(outDir)//"fault.r.nc"
         call netcdf_read_on_fault_restart(filenametmp, filenametmp2)
     endif
-    ! Both branches above load fric(7,...), so the caps check runs for every
+    ! Both branches above load fric(FR_TNRM0,...), so the caps check runs for every
     ! cycle. It used to sit inside the icstart==1 branch only, which left
     ! cycles 2..N of a multi-cycle run unchecked -- "refuses instead of
     ! silently clamping" held at cold start alone.

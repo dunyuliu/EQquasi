@@ -30,7 +30,15 @@ def model_txt_read_count():
     # trim(inputDir)//'model.txt' since the solver reads from input/, and a
     # literal-filename split silently matched nothing after that change.
     body = src.split("unit = 1002")[1].split("close(1002)")[0]
-    return len(re.findall(r"read\(1002,\*", body))
+    # Count whole-line reads too: the normal-stress caps record is consumed
+    # with read(1002,'(A)') so a pre-caps model.txt can be detected without
+    # eating the faultgeom line that follows (rule 4). It is still exactly
+    # one record against case.setup's one caps write. backspace() would
+    # OVER-count if counted -- it un-reads -- and is deliberately excluded:
+    # the backspace happens only on files where the caps record is absent,
+    # and this contract counts the fully-written modern file.
+    return (len(re.findall(r"read\(1002,\*", body))
+            + len(re.findall(r"read\(1002,'\(A\)'", body)))
 
 
 def test_model_txt_write_and_read_counts_agree():

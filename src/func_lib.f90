@@ -79,7 +79,7 @@ end subroutine rsf_rd
 ! non-integer offset stops the run at setup with a boxed, named error
 ! (fault index, its y, the belt origin, dy, the resulting ratio) rather
 ! than silently producing an unmeshed fault -- pick dy so the offset
-! divides evenly (case_input/bp1002.qdc.2500's 5000 m offset needs dy in
+! divides evenly (compsets/bp1002.qdc.2500's 5000 m offset needs dy in
 ! {1000, 1250, 2500, ...}, not 2000).
 !
 ! nftnd(ift) == 0 is guarded again, independently, in mesh4num.f90 once

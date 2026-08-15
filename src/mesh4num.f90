@@ -245,7 +245,7 @@ subroutine mesh4num
 				write(*,'(X,A,E16.8,A,4X,A)') '=   fault y     = ', fltxyz(1,2,ift), ' m', '='
 				write(*,'(X,A,E16.8,A,4X,A)') '=   dx = dy     = ', dx, ' m', '='
 				write(*,*) '=                                                                    ='
-				write(*,*) '= Check fltxyz (case_input compset faultgeom) against dx/dy and the  ='
+				write(*,*) '= Check fltxyz (compsets faultgeom) against dx/dy and the  ='
 				write(*,*) '= model domain (fymin/fymax).                                        ='
 				write(*,*) '====================================================================='
 			endif

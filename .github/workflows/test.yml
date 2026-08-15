@@ -51,7 +51,7 @@ jobs:
     - name: End-to-end (fast tier)
       run: |
         export EQQUASIROOT=$(pwd)
-        export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
+        export PATH=$(pwd)/bin:$(pwd)/script:$PATH
         set -o pipefail
         python3 -m pytest testsys/ -m e2e_fast -v 2>&1 | tee testRunLog.txt
 

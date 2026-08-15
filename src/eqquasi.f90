@@ -181,22 +181,28 @@ subroutine checkAndReport(currentProcID)
         ! path with 22 bytes of adjacent memory appended.
         filenametmp = trim(inputDir)//"on_fault_vars_input.nc"
         call netcdf_read_on_fault(filenametmp)
-        call checkNormalStressCaps
     else
         INQUIRE(FILE=trim(inputDir)//"on_fault_vars_input.nc", EXIST=file_exists)
             if (.not. file_exists) then
                 write(*,*) 'on_fault_vars_input.nc is required but missing ...'
+                stop 6
             endif 
         
         INQUIRE(FILE=trim(outDir)//"fault.r.nc", EXIST=file_exists)
             if (.not. file_exists) then
                 write(*,*) 'icstart>1, fault.r.nc is required but missing ...'
+                stop 6
             endif
         
         filenametmp = trim(inputDir)//"on_fault_vars_input.nc"
         filenametmp2 = trim(outDir)//"fault.r.nc"
         call netcdf_read_on_fault_restart(filenametmp, filenametmp2)
-    endif 
+    endif
+    ! Both branches above load fric(7,...), so the caps check runs for every
+    ! cycle. It used to sit inside the icstart==1 branch only, which left
+    ! cycles 2..N of a multi-cycle run unchecked -- "refuses instead of
+    ! silently clamping" held at cold start alone.
+    call checkNormalStressCaps 
     
     if (currentProcID == 0) then 
         write(*,'(X,A,40X,i7,4X,A)') '= Total nodes = ',numnp,'='            

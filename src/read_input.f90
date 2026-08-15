@@ -87,6 +87,9 @@ subroutine readmodel
     integer (kind = 4) :: ios
     integer (kind = 4) :: ift
     logical :: fltGeomFromFile
+    character (len = 256) :: capsLine
+    integer (kind = 4) :: iosCaps
+    real (kind = dp) :: capsTmp1, capsTmp2, capsTmp3
 
     if (me == 0) then 
         INQUIRE(FILE=trim(inputDir)//"model.txt", EXIST=file_exists)
@@ -142,14 +145,35 @@ subroutine readmodel
             read(1002,*) dtmax
             read(1002,*,iostat=ios) fric_pc_L
         endif
-        ! Effective normal stress caps, Pa. Read with iostat so a model.txt
-        ! written before these existed still loads; the defaults set in
-        ! globalvar then stand, which are the values that used to be literals
-        ! in faulting.f90, so no existing case changes behaviour.
-        read(1002,*,iostat=ios) min_norm, max_norm
-        if (ios /= 0) then
-            min_norm = -10.0d6
-            max_norm = -40.0d6
+        ! Effective normal stress caps, Pa (rule 4: appended scalar sitting
+        ! BEFORE the optional faultgeom block, so absence must be detected
+        ! without consuming the next record). A list-directed
+        ! read(1002,*) here was wrong twice over: on a pre-caps model.txt
+        ! whose next line is faultgeom it swallowed fault 1's geometry --
+        ! reference/bp1002's file yielded min_norm=-60000, max_norm=2500 Pa
+        ! and desynchronised the whole geometry loop -- and its iostat
+        ! fallback masked malformed lines as if they were absent. Read the
+        ! line whole instead: three numbers parse -> it is faultgeom, put it
+        ! back; exactly two -> caps; anything else non-empty -> stop loudly.
+        min_norm = -10.0d6
+        max_norm = -40.0d6
+        read(1002,'(A)',iostat=ios) capsLine
+        if (ios == 0) then
+            read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2, capsTmp3
+            if (iosCaps == 0) then
+                backspace(1002)          ! faultgeom record, not ours
+            else
+                read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2
+                if (iosCaps == 0) then
+                    min_norm = capsTmp1
+                    max_norm = capsTmp2
+                else
+                    write(*,*) 'model.txt: expected the two normal-stress'
+                    write(*,*) 'caps (min_norm max_norm, Pa) or the faultgeom'
+                    write(*,*) 'block, got: ', trim(capsLine)
+                    stop 8
+                endif
+            endif
         endif
         ! Optional per-fault geometry block, one line per fault:
         !   xlo xhi ycoor zlo zhi   (meters)

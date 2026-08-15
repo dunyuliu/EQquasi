@@ -58,16 +58,22 @@ CASES = [
     ("bp8",       "test.bp8.qdc",
      {"xi": 0.2, "nstep": 8000, "nt_out": 8000, "HPC_ncpu": 2},
      "",                                                            "fast"),
+    # De-orphaned 2026-08-15 (references frozen the same day, UNVERIFIED
+    # numbers, regression locks). stepover is the only ntotft > 1 row cheap
+    # enough for the fast tier: it closes the rule-12 gap by putting
+    # per-fault on-fault-input routing into every-push CI.
+    ("bp5.dip90", "test.bp5.qdc.dip90", {}, "cycle0",               "fast"),
+    ("stepover",  "test.stepover.qdc",  {}, "cycle0",               "fast"),
 
-    # The only ntotft > 1 row, and the reason it exists: every other case in
-    # this list has a single fault, so nothing in the gate exercised per-fault
-    # routing of on-fault input. Three multi-fault bugs in this project's
-    # history were found by hand because of that (PROJECT_RULES rule 7).
+    # The big ntotft > 1 row (the stepover fast row above is the cheap one):
+    # three multi-fault bugs in this project's history were found by hand
+    # because nothing in the gate exercised per-fault routing of on-fault
+    # input (PROJECT_RULES rule 7).
     #
-    # BP1002 is deliberately NOT in the fast tier. It is the only ntotft > 1
-    # case, so it is the only row that exercises per-fault routing of on-fault
-    # input, and leaving it out of every-push CI is a known gap (PROJECT_RULES
-    # rule 12) -- not an oversight.
+    # BP1002 is deliberately NOT in the fast tier. Until 2026-08-15 it was the
+    # only ntotft > 1 case anywhere, so per-fault routing of on-fault input
+    # was absent from every-push CI (the rule-12 gap); the stepover fast row
+    # above now covers it. BP1002 still exercises the bigger mesh.
     #
     # The reason is cost: 41472 elements, 3821 steps, ~2600 s on 3 ranks of a
     # 64-core host. A GitHub runner has four cores. It stays in the full tier
@@ -438,9 +444,24 @@ def _scaled_tol(ref, rtol, floor_rtol, scale):
     rate at all 5302 rows passed with "worst diff = 0.0e+00". Nothing is
     exempted now; a component that vanishes by symmetry is merely judged
     against the component that does not.
+
+    ATOL is the machine-noise floor for the case the sibling rule cannot
+    reach: a quantity group that is zero to machine precision in ref AND run.
+    First hit by stepover's station at the locked VW centre -- after 101
+    steps its slips and rates are +-1e-27 MPI-reduction noise on both sides,
+    the group scale is itself noise, and rtol on noise fails a third of the
+    file. 1e-18 sits ~9 orders above that noise and ~9 below the smallest
+    physical signal any comparison carries (creep, 1e-9 m/s). It cannot mask
+    the BP8 failure mode above: a halved 1e-9-scale signal differs by ~5e-10,
+    twenty-eight orders past this floor.
     """
     import numpy as _np
-    return rtol * _np.abs(ref) + floor_rtol * scale
+    return rtol * _np.abs(ref) + floor_rtol * scale + ATOL_MACHINE_NOISE
+
+
+# Module constant, not a per-call default: every caller should mean the same
+# thing by "zero to machine precision".
+ATOL_MACHINE_NOISE = 1e-18
 
 
 def compare_arrays(ref, run, rtol=1e-9, floor_rtol=1e-9, scale=None):

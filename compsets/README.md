@@ -74,8 +74,8 @@ Small and fast, for the gate, **not for science**. Outside the register.
 | `test.bp5.qdc` | e2e fast | 2026-08-12 |
 | `test.bp7.qdc` | e2e fast | 2026-08-12 |
 | `test.bp8.qdc` | e2e fast | 2026-08-12 |
-| `test.bp5.qdc.dip90` | **TODO: orphaned**, no e2e row | 2026-08-12 |
-| `test.stepover.qdc` | **TODO: orphaned**, no e2e row | 2026-08-12 |
+| `test.bp5.qdc.dip90` | e2e fast | 2026-08-15 |
+| `test.stepover.qdc` | e2e fast (only ntotft > 1 in the fast tier) | 2026-08-15 |
 
 The two-tier design of rule 7: the production compset produces the reference,
 and a smaller `test.*` variant with the same `dx` but a cut `nstep` runs on

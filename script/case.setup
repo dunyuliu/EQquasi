@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(_CASE, "tool"))
 sys.pycache_prefix = os.path.join(_CASE, "tool", "__pycache__")
 
 from user_defined_params import par
+from defaultParameters import (FR_RSF_A, FR_RSF_B, FR_RSF_DC, FR_RSF_V0,
+    FR_RSF_F0, FR_VINIT, FR_TSTK0, FR_TNRM0, FR_STATE)
 import netCDF4 as nc
 import numpy as np
 
@@ -166,15 +168,15 @@ def netcdf_write_on_fault_vars():
   var6.units = 'Pa'
   var7.units = 'Pa'
   var8.units = 'unit'
-  var0[...] = slab(9)
-  var1[...] = slab(10)
-  var2[...] = slab(11)
-  var3[...] = slab(12)
-  var4[...] = slab(13)
-  var5[...] = slab(46)
-  var6[...] = slab(8)
-  var7[...] = slab(7)
-  var8[...] = slab(20)
+  var0[...] = slab(FR_RSF_A)
+  var1[...] = slab(FR_RSF_B)
+  var2[...] = slab(FR_RSF_DC)
+  var3[...] = slab(FR_RSF_V0)
+  var4[...] = slab(FR_RSF_F0)
+  var5[...] = slab(FR_VINIT)
+  var6[...] = slab(FR_TSTK0)
+  var7[...] = slab(FR_TNRM0)
+  var8[...] = slab(FR_STATE)
   ds.close()
   
 def create_batch_script():

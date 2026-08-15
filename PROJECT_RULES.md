@@ -15,7 +15,7 @@ below it is the record of why.
 | 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. |
 | 3 | Before merging `src/*.f90` or `case.setup`: run the fast tiers **and** `-m e2e`. |
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
-| 5 | New `fric()` index: grep it's unused, then write it in **all three** places. |
+| 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
 | 7 | New compset: `compsets/<bench>.<mode>.<res>/` + a row in `compsets/README.md`. |
 | 8 | `reference/` is read-only and only grows. Every gold file needs a reader. |
@@ -143,22 +143,36 @@ faultgeom read would swallow a scalar placed after it.
 
 ---
 
-## 5. fric()/on_fault_vars magic indices have one authoritative source
+## 5. fric()/on_fault_vars slots are named, and the registry is the authority
 
-`fric(1:100, node, fault)` is indexed by bare integers. The same indices are
-duplicated in three places that must never disagree:
-`script/defaultParameters.py`, `script/case.setup`
-(`netcdf_write_on_fault_vars`), and `src/netcdf_io.f90`.
+`fric(slot, node, fault)` slots carry names now, defined twice with the SAME
+names and numbers: `src/globalvar.f90` (Fortran `integer, parameter ::
+FR_RSF_A = 9`, ...) and `script/defaultParameters.py` (Python module level),
+which also holds the full slot -> meaning -> unit -> writer table. Slots 1-5
+stay numeric: their meaning depends on `friclaw`.
 
-- **Pick an unused index.** Grep `fric(<N>,` across `src/*.f90` first.
-- **Write it in exactly three places in the same change.**
-- **Never repurpose an existing index** — it silently corrupts every compset
+- **Adding a slot**: pick an unused number from the table, add the constant to
+  BOTH files and a table row, and use the name at every new site.
+- **Never repurpose a slot number** -- it silently corrupts every compset
   still writing the old meaning.
+- **Compsets may use raw integers** (they are user-facing configuration); the
+  table is what a raw integer is checked against. Do not "helpfully" rename
+  inside compsets as a side effect of other work (rule 1).
+- The netCDF variable-name mapping in `case.setup`'s
+  `netcdf_write_on_fault_vars` and `src/netcdf_io.f90` remains the third
+  surface that must agree; it now reads in names on both sides.
 
-A systematic renaming is queued in `PATHWAY_FORWARD.md`; until it lands, naming
-indices at only some call sites creates a fourth source of truth and makes
-things worse.
+*History*: until 2026-08-15 every slot was a bare integer at ~370 call
+sites; the revamp renamed them in one pass, gated on the full e2e tier
+(references compared at their usual tolerances) precisely because a partial
+renaming would have created a fourth source of truth.
 
+**Route**: a slot added to one file but not the other -> the compiler or
+ImportError catches the named form; a mismatched NUMBER between the two
+constant lists is the dangerous one -> `lars-eriksson`.
+
+**Tier**: judgment for additions; the named form makes drift loud where the
+bare integers were silent.
 ---
 
 ## 6. New bp values are additive branches

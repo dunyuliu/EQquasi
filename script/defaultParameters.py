@@ -4,6 +4,111 @@ import numpy as np
 from math import *
 
 # this default parameters come from compset bp5.qdc.2000.
+
+# ---------------------------------------------------------------------------
+# fric()/on_fault_vars slot registry (rule 5). ONE authoritative list.
+#
+# The same numbers index three things that must agree: par.on_fault_vars'
+# 4th axis here and in the compsets, case.setup's netcdf writer, and
+# src/globalvar.f90's Fortran constants of the SAME NAMES. Slots 1-5 are
+# friction-law-dependent legacy and stay numeric. Compsets may keep raw
+# integers; this table is what they are checked against.
+#
+#  slot  name               meaning                                [unit] writer
+#     6  FR_PORE_DP         pore pressure change                   [Pa]  porepressure.f90
+#     7  FR_TNRM0           initial effective normal stress        [Pa]  netcdf_io (slot 8 of input)
+#     8  FR_TSTK0           initial shear stress, strike           [Pa]  netcdf_io (slot 7)
+#     9  FR_RSF_A           rate-and-state a                       [-]  netcdf_io (slot 1)
+#    10  FR_RSF_B           rate-and-state b                       [-]  netcdf_io (slot 2)
+#    11  FR_RSF_DC          critical slip distance Dc              [m]  netcdf_io (slot 3)
+#    12  FR_RSF_V0          reference slip rate V0                 [m/s]  netcdf_io (slot 4)
+#    13  FR_RSF_F0          reference friction f0/r0               [-]  netcdf_io (slot 5)
+#    16  FR_VINI_N          initial slip rate, normal              [m/s]  meshgen
+#    17  FR_VINI_S          initial slip rate, strike              [m/s]  meshgen
+#    18  FR_VINI_D          initial slip rate, dip                 [m/s]  meshgen
+#    19  FR_VINI_MAG        initial slip rate magnitude            [m/s]  meshgen
+#    20  FR_STATE           state variable theta                   [s]  netcdf_io (slot 9) / faulting
+#    22  FR_STATE_TRIAL     trial state update                     [s]  faulting
+#    23  FR_THETA_PC        normal-stress state theta_pc           [Pa]  netcdf_io/faulting
+#    24  FR_THETA_PC_TRIAL  trial theta_pc                         [Pa]  faulting
+#    26  FR_V_TRIAL         trial slip rate magnitude              [m/s]  faulting
+#    28  FR_TSTK            shear stress, strike                   [Pa]  faulting
+#    29  FR_TDIP            shear stress, dip                      [Pa]  faulting
+#    30  FR_TNRM            effective normal stress                [Pa]  faulting
+#    31  FR_VXM             master node velocity x                 [m/s]  faulting
+#    32  FR_VYM             master node velocity y                 [m/s]  faulting
+#    33  FR_VZM             master node velocity z                 [m/s]  faulting
+#    34  FR_VXS             slave node velocity x                  [m/s]  faulting
+#    35  FR_VYS             slave node velocity y                  [m/s]  faulting
+#    36  FR_VZS             slave node velocity z                  [m/s]  faulting
+#    41  FR_ABS_KU          abs(KU) elastic force magnitude        [N]  faulting
+#    42  FR_V_FINAL         final-step slip rate                   [m/s]  faulting
+#    44  FR_SPARE44         spare (written zero)                   [-]  library_output
+#    45  FR_SPARE45         spare (written zero)                   [-]  library_output
+#    46  FR_VINIT           initial slip rate scalar               [m/s]  netcdf_io (slot 6)
+#    47  FR_V_CURRENT       current slip rate (dt control)         [m/s]  faulting/solveTimeLoop
+#    48  FR_STATE_INIT      initial state snapshot                 [s]  netcdf_io
+#    49  FR_TDIP0           initial shear stress, dip              [Pa]  meshgen
+#    51  FR_DARCY_S         Darcy velocity, strike                 [m/s]  porepressure
+#    52  FR_DARCY_D         Darcy velocity, dip                    [m/s]  porepressure
+#    71  FR_SLIP_S          accumulated slip, strike               [m]  faulting
+#    72  FR_SLIP_D          accumulated slip, dip                  [m]  faulting
+#    73  FR_SLIP_N          accumulated slip, normal               [m]  faulting
+#    74  FR_VS_FINAL        final slip rate, strike                [m/s]  faulting
+#    75  FR_VD_FINAL        final slip rate, dip                   [m/s]  faulting
+#    76  FR_V_PEAK          running peak slip rate                 [m/s]  faulting
+#    81  FR_RUPT_AREA       ruptured area                          [m^2]  faulting
+#    82  FR_RUPT_SLIP       total slip in rupture                  [m]  faulting
+#    83  FR_TRACT_START     traction at rupture start              [Pa]  faulting
+#    84  FR_TRACT_END       traction at rupture end                [Pa]  faulting
+# ---------------------------------------------------------------------------
+FR_PORE_DP = 6
+FR_TNRM0 = 7
+FR_TSTK0 = 8
+FR_RSF_A = 9
+FR_RSF_B = 10
+FR_RSF_DC = 11
+FR_RSF_V0 = 12
+FR_RSF_F0 = 13
+FR_VINI_N = 16
+FR_VINI_S = 17
+FR_VINI_D = 18
+FR_VINI_MAG = 19
+FR_STATE = 20
+FR_STATE_TRIAL = 22
+FR_THETA_PC = 23
+FR_THETA_PC_TRIAL = 24
+FR_V_TRIAL = 26
+FR_TSTK = 28
+FR_TDIP = 29
+FR_TNRM = 30
+FR_VXM = 31
+FR_VYM = 32
+FR_VZM = 33
+FR_VXS = 34
+FR_VYS = 35
+FR_VZS = 36
+FR_ABS_KU = 41
+FR_V_FINAL = 42
+FR_SPARE44 = 44
+FR_SPARE45 = 45
+FR_VINIT = 46
+FR_V_CURRENT = 47
+FR_STATE_INIT = 48
+FR_TDIP0 = 49
+FR_DARCY_S = 51
+FR_DARCY_D = 52
+FR_SLIP_S = 71
+FR_SLIP_D = 72
+FR_SLIP_N = 73
+FR_VS_FINAL = 74
+FR_VD_FINAL = 75
+FR_V_PEAK = 76
+FR_RUPT_AREA = 81
+FR_RUPT_SLIP = 82
+FR_TRACT_START = 83
+FR_TRACT_END = 84
+
 class parameters:
     # cylce id. Simulate quasi-dynamic earthquake cycles from istart to iend.
     istart = 1
@@ -106,32 +211,32 @@ class parameters:
       for iz, zcoor in enumerate(fz):
       # assign a in RSF. a is a 2D distribution.
         if abs(zcoor)>=18e3 or abs(xcoor)>=32e3 or abs(zcoor)<=2e3: 
-          on_fault_vars[0,iz,ix,9] = fric_rsf_a + fric_rsf_deltaa
+          on_fault_vars[0,iz,ix,FR_RSF_A] = fric_rsf_a + fric_rsf_deltaa
         elif abs(zcoor)<=16e3 and abs(zcoor)>=4e3 and abs(xcoor)<=30e3:
-          on_fault_vars[0,iz,ix,9] = fric_rsf_a
+          on_fault_vars[0,iz,ix,FR_RSF_A] = fric_rsf_a
         else:
           tmp1 = (abs(abs(zcoor)-10e3) - 6e3)/2e3
           tmp2 = (abs(xcoor)-30e3)/2e3
-          on_fault_vars[0,iz,ix,9] = fric_rsf_a + max(tmp1,tmp2)*fric_rsf_deltaa
-        on_fault_vars[0,iz,ix,10] = fric_rsf_b # assign b in RSF 
-        on_fault_vars[0,iz,ix,11] = fric_rsf_Dc # assign Dc in RSF.
+          on_fault_vars[0,iz,ix,FR_RSF_A] = fric_rsf_a + max(tmp1,tmp2)*fric_rsf_deltaa
+        on_fault_vars[0,iz,ix,FR_RSF_B] = fric_rsf_b # assign b in RSF 
+        on_fault_vars[0,iz,ix,FR_RSF_DC] = fric_rsf_Dc # assign Dc in RSF.
         if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
-          on_fault_vars[0,iz,ix,11] = minDc # a special Dc zone.
-        on_fault_vars[0,iz,ix,12] = fric_rsf_v0 # initial reference slip rate.
-        on_fault_vars[0,iz,ix,13] = fric_rsf_r0 # initial reference friction.
+          on_fault_vars[0,iz,ix,FR_RSF_DC] = minDc # a special Dc zone.
+        on_fault_vars[0,iz,ix,FR_RSF_V0] = fric_rsf_v0 # initial reference slip rate.
+        on_fault_vars[0,iz,ix,FR_RSF_F0] = fric_rsf_r0 # initial reference friction.
         
-        on_fault_vars[0,iz,ix,46] = creep_slip_rate # initial slip rates
+        on_fault_vars[0,iz,ix,FR_VINIT] = creep_slip_rate # initial slip rates
         if (xcoor<=-18e3 and xcoor>=-30e3 and zcoor<=-4e3 and zcoor>=-16e3):
-          on_fault_vars[0,iz,ix,46] = 0.03 # initial high slip rate patch.
-        on_fault_vars[0,iz,ix,20] = on_fault_vars[0,iz,ix,11]/creep_slip_rate # initial state var.
-        on_fault_vars[0,iz,ix,7] = init_norm # initial normal stress.
-        on_fault_vars[0,iz,ix,8] = shear_steady_state(on_fault_vars[0,iz,ix,9], 
-                                                    on_fault_vars[0,iz,ix,10],
-                                                    on_fault_vars[0,iz,ix,12],
-                                                    on_fault_vars[0,iz,ix,13],
+          on_fault_vars[0,iz,ix,FR_VINIT] = 0.03 # initial high slip rate patch.
+        on_fault_vars[0,iz,ix,FR_STATE] = on_fault_vars[0,iz,ix,FR_RSF_DC]/creep_slip_rate # initial state var.
+        on_fault_vars[0,iz,ix,FR_TNRM0] = init_norm # initial normal stress.
+        on_fault_vars[0,iz,ix,FR_TSTK0] = shear_steady_state(on_fault_vars[0,iz,ix,FR_RSF_A], 
+                                                    on_fault_vars[0,iz,ix,FR_RSF_B],
+                                                    on_fault_vars[0,iz,ix,FR_RSF_V0],
+                                                    on_fault_vars[0,iz,ix,FR_RSF_F0],
                                                     creep_slip_rate,
-                                                    on_fault_vars[0,iz,ix,7],
-                                                    on_fault_vars[0,iz,ix,46],
+                                                    on_fault_vars[0,iz,ix,FR_TNRM0],
+                                                    on_fault_vars[0,iz,ix,FR_VINIT],
                                                     rou,
                                                     vs)
     ###############################################

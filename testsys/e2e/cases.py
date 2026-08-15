@@ -70,10 +70,10 @@ CASES = [
     # routing of on-fault input. Three multi-fault bugs in this project's
     # history were found by hand because of that (PROJECT_RULES rule 7).
     #
-    # BP1002 is deliberately NOT in the fast tier. It is the only ntotft > 1
-    # case, so it is the only row that exercises per-fault routing of on-fault
-    # input, and leaving it out of every-push CI is a known gap (PROJECT_RULES
-    # rule 12) -- not an oversight.
+    # BP1002 is deliberately NOT in the fast tier. Until 2026-08-15 it was the
+    # only ntotft > 1 case anywhere, so per-fault routing of on-fault input
+    # was absent from every-push CI (the rule-12 gap); the stepover fast row
+    # above now covers it. BP1002 still exercises the bigger mesh.
     #
     # The reason is cost: 41472 elements, 3821 steps, ~2600 s on 3 ranks of a
     # 64-core host. A GitHub runner has four cores. It stays in the full tier

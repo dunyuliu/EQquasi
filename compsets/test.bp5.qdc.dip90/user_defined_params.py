@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 # compset: test.bp5.qdc.dip90
-# gate   : TODO: orphaned
+# gate   : e2e fast
 # changed: 2026-08-12   (content; see git log for the full history)
-# note   : Regression variant with no e2e row.
+# note   : Fast-tier row since 2026-08-15; reference/bp5.dip90.
 # Status is mirrored in compsets/README.md, which a contract test checks.
 # ----------------------------------------------------------------------
 

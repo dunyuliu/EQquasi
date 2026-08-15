@@ -43,7 +43,20 @@ Read this first on wake-up. Update in place; close items by deleting them.
    missing restart inputs. Verified live both ways. All four live runs carry
    the caps line; eqquasi-1.14.0 untouched. v1.15.0's tag stands, superseded.
 
-2. [ ] **Watch the four runs and report per cycle.** Do not restart any of them.
+2. [~] **Runs.** bp1002_stepover/multicycle_20_knox ENDED AT 9 OF 20 CYCLES
+   on the stop-508 physics guard: effective normal stress went non-compressive
+   (+0.60 MPa) at x = -2.5 km, z = 0 -- fault A's interior tip at the free
+   surface, facing the step-over -- 87 yr into cycle 9. This is the
+   documented idealization (untapered VW inner tips); four through-going
+   events (c2 15.08 m, c4 12.05, c6 12.56, c8 7.34, declining) progressively
+   unclamped the tip. The 9-cycle dataset STANDS; fixing it means tapering
+   the tips, a model change for the user. Kink dtcap verdict: 5 cycles,
+   1369 yr, flat 1.173e-9 through the epoch where uncapped dtmax=0 spiked to
+   98 m/s -- uncapped adaptive dt manufactured those spikes; a default cap is
+   a solver-behaviour change, USER'S CALL. dip90 control: bend exonerated
+   (3 physical cycles). kink600: c0-c1 coherent, 0 swings, but every cycle
+   hits the nstep=10000 cap; gracefully stopped after the in-flight cycle to
+   free the box for the e2e tier.
    - `work/bp1002_stepover/multicycle_20_knox` — 20 cycles, nstep=30000.
      Cycles 0-1 match the 1.13.0 baseline exactly; cycle 2 ran 11171 steps and
      exited on physics at 7.2e-6, where the old nstep=10000 run truncated it.
@@ -64,7 +77,12 @@ Read this first on wake-up. Update in place; close items by deleting them.
    cotopaxi, `MACHINE=ubuntu` on knox -- knox has no `utig` branch in
    install.eqquasi.sh and falls through to no LD_LIBRARY_PATH. ~3h05.
 
-4. [ ] **The five broken compsets.** bp1001.fdc.250, bp1001.fdc.rough.250,
+4. [x] **Five pre-par compsets ported** (values untouched, dy/dz paired --
+   the contract test caught the old files never set them). UNVERIFIED: no
+   oracle. Surfaced+fixed: generateFaultInterface wrote geometry to the case
+   root while the solver reads input/ (latent since v1.13, ungated because
+   test.bp5.qdc.dip90 is orphaned); rough tables renamed to the read name.
+   Was: **The five broken compsets.** bp1001.fdc.250, bp1001.fdc.rough.250,
    bp1001.qdc.rough.250, liu2020.fdc.planar.300, liu2020.fdc.rough.250 declare
    bare module-level variables instead of the `par` object, so `case.setup`
    dies on `NameError: name 'par' is not defined`. Porting them is safe to

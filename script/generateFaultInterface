@@ -178,7 +178,7 @@ def _main_func(description):
     # <case>/input/, and writing to the case root -- which this did -- left
     # every insertFaultType > 0 case failing at read_fault_rough_geometry
     # with the file sitting one directory up. Ungated because the only
-    # insertFaultType compset in the suite (test.bp5.qdc.dip90) has no e2e
+    # insertFaultType compset in the suite (test.bp5.qdc.dip90.2000) has no e2e
     # row. Falls back to the case root for pre-v1.13 flat cases.
     out_dir = args.case_dir
     if os.path.isdir(os.path.join(args.case_dir, 'input')):

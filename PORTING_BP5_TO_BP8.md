@@ -116,8 +116,8 @@ All additive and guarded on `bp == 8` (rule 6); BP5/BP7 paths byte-identical.
 | `src/eqquasi.f90` | `fltsta` 10 → 14 |
 | `script/defaultParameters.py` | fluid parameters, all defaulting to off |
 | `script/case.setup` | append the six lines |
-| `compsets/bp8.qdc.gs.10/` | production compset, 10 m |
-| `compsets/test.bp8.qdc/` | smoke compset, 50 m |
+| `compset/bp8.qdc.gs.10/` | production compset, 10 m |
+| `compset/test.bp8.qdc.gs.10/` | smoke compset, 50 m |
 
 Plus one **shared-code bug fix** that was not BP8-specific: `src/meshgen.f90`.
 See §7.
@@ -176,7 +176,7 @@ the code reports **6.55e-11**.
 > verified the solver against an input that was itself wrong. `τ⁰`, `V_init`
 > and `θ⁰` are not independent; eq. (9) ties them together, so a case may
 > prescribe **two**. The BP5 case sets `θ⁰ = Dc/V_init` and *computes* `τ⁰`
-> from it (`shear_steady_state()`, `compsets/bp5.qdc.2000/
+> from it (`shear_steady_state()`, `compset/bp5.qdc.2000/
 > user_defined_params.py:103-108`). Porting to BP8 we kept BP5's `θ⁰` line and
 > swapped its computed `τ⁰` for Table 1's 14.6 MPa. Each line looks right in
 > isolation; together they over-determine the state and the solver silently
@@ -221,7 +221,7 @@ The reusable part of this document.
    `dymax = min(12·dx, 3 km)`, so a ±500 m model at `dx = 50 m` gets a 1200 m
    band against a 500 m half-width. BP5 never sees it (`dymax` saturates at
    3 km against ±50 km). **This blocked both BP7 and BP8.**
-2. **BP7 could not run.** `compsets/bp7.qdc.a.10` set `par.xmin/...` but
+2. **BP7 could not run.** `compset/bp7.qdc.a.10` set `par.xmin/...` but
    `case.setup` reads `par.fxmin/...`. The assignment silently created unused
    attributes, so BP7 inherited BP5's 120×100×60 km domain — at `dx = 10 m`.
    Also affected `bp5.qdc.2000` (masked, values coincide with defaults) and
@@ -230,7 +230,7 @@ The reusable part of this document.
    survived. The only BP7 compset was a 35-hour, 20-CPU production run.
 4. **The release gate could not fail.** `check.test.py` printed `FAIL ` while CI
    grepped for `error|failed|fatal|abort` — no match — all under `|| true`.
-5. **Five compsets** (`bp1001.*`, `liu2020.*`) do not use the `par` object at
+5. **Five compset** (`bp1001.*`, `liu2020.*`) do not use the `par` object at
    all and fail on import. Predates the current convention. Still open.
 6. `install.eqquasi.sh`'s `local` branch was dead code (two malformed bash
    tests); the `local` makefile target linked a system ScaLAPACK that cannot

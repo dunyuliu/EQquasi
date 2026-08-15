@@ -56,7 +56,7 @@ runit() {   # dir label np
 say "--- phase 3b: xi sweep at the 500 m box"
 for XI in 0.05 0.1 0.2; do
   D=$R/work/c3.xi$XI
-  rm -rf "$D"; cd $R && create.newcase "$D" test.bp8.qdc > /dev/null
+  rm -rf "$D"; cd $R && create.newcase "$D" test.bp8.qdc.gs.10 > /dev/null
   cd "$D"
   sed -i "s/^par.xi = .*/par.xi = $XI # swept/" user_defined_params.py
   sed -i "s/^par.nstep       = .*/par.nstep       = 4000/" user_defined_params.py
@@ -66,7 +66,7 @@ done
 
 say "--- phase 2c: 2000 m box confirmation, nstep trimmed since the peak is at 0.84 d"
 D=$R/work/c3.dom2000
-rm -rf "$D"; cd $R && create.newcase "$D" test.bp8.qdc > /dev/null
+rm -rf "$D"; cd $R && create.newcase "$D" test.bp8.qdc.gs.10 > /dev/null
 cd "$D"
 for v in fx fy fz; do
   sed -i "s/^par.${v}min, par.${v}max = .*/par.${v}min, par.${v}max = -2000.0, 2000.0/" user_defined_params.py

@@ -77,7 +77,7 @@ def create_model_input_file():
         # Effective normal stress caps. Appended to the scalar section, ahead of
         # the optional faultgeom block: read_input.f90 reads this with iostat,
         # so a model.txt written before this existed still loads and the solver
-        # keeps its defaults. Cannot go after faultgeom -- 13 of 16 compsets do
+        # keeps its defaults. Cannot go after faultgeom -- 13 of 16 compset do
         # not write that block, and their faultgeom read would swallow this line.
         f.write(str(par.min_norm) + "  " + str(par.max_norm)
                 + "  " + str(par.enforce_norm_caps) + "\n")
@@ -395,7 +395,7 @@ def report_cohesive_zone():
     "ruptures" repeatedly, normal stress that never evolves, and cycles that
     end after a day.
 
-    Reported, not enforced. The test.* compsets are deliberately coarse, and a
+    Reported, not enforced. The test.* compset are deliberately coarse, and a
     convergence study needs to run the under-resolved cases on purpose. What
     it must never do is let one pass unremarked.
     """

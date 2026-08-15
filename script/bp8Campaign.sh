@@ -75,7 +75,7 @@ say "===== BP8 campaign start ====="
 
 # ---------------------------------------------------------------- 1. scaling
 say "--- phase 1: MPI/OpenMP scaling on the 8000-element case"
-mkcase $R/work/camp.scal test.bp8.qdc
+mkcase $R/work/camp.scal test.bp8.qdc.gs.10
 cd $R/work/camp.scal
 sed -i "s/^par.nstep       = .*/par.nstep       = 200/" user_defined_params.py
 ./case.setup > setup.log 2>&1
@@ -89,7 +89,7 @@ done
 # ------------------------------------------------------------ 2. domain sweep
 say "--- phase 2: domain sweep, half-width in x, y and z"
 for H in 500 1000 2000; do
-  mkcase $R/work/camp.dom$H test.bp8.qdc
+  mkcase $R/work/camp.dom$H test.bp8.qdc.gs.10
   cd $R/work/camp.dom$H
   sed -i "s/^par.fxmin, par.fxmax = .*/par.fxmin, par.fxmax = -$H.0, $H.0/" user_defined_params.py
   sed -i "s/^par.fymin, par.fymax = .*/par.fymin, par.fymax = -$H.0, $H.0/" user_defined_params.py
@@ -102,7 +102,7 @@ done
 # ------------------------------------------------------- 3. xi (time step) sweep
 say "--- phase 3: xi sweep at the 1000 m box"
 for XI in 0.05 0.1 0.2; do
-  mkcase $R/work/camp.xi$XI test.bp8.qdc
+  mkcase $R/work/camp.xi$XI test.bp8.qdc.gs.10
   cd $R/work/camp.xi$XI
   sed -i "s/^par.fxmin, par.fxmax = .*/par.fxmin, par.fxmax = -1000.0, 1000.0/" user_defined_params.py
   sed -i "s/^par.fymin, par.fymax = .*/par.fymin, par.fymax = -1000.0, 1000.0/" user_defined_params.py

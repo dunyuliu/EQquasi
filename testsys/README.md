@@ -3,7 +3,7 @@
 ```
 python3 -m pytest testsys/            # default: everything except e2e, ~4 s
 python3 -m pytest -m unit           # numerics only
-python3 -m pytest -m contract       # formats, compsets, build, release gates
+python3 -m pytest -m contract       # formats, compset, build, release gates
 python3 -m pytest -m regression     # one guard per defect that actually happened
 python3 -m pytest -m e2e testsys/     # builds and runs; ~20 min for BP8, longer with BP5/BP7
 ```
@@ -37,7 +37,7 @@ Oracles:
   - BP8 -- `reference/bp8/summary.json`, frozen from v1.4.7.
 
 Note the difference in strength. The BP5/BP7 references are *regression locks*
-on deliberately coarse compsets: they detect change, but they were never checked
+on deliberately coarse compset: they detect change, but they were never checked
 against another code. The BP8 gold is also a regression lock, but it additionally
 agrees with an independent implementation (`taehoKim_ref`) to -2 % on slip at the
 injection point, +5 % at 200 m, and 0.7 % on late-time pore pressure. Only the

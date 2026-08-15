@@ -17,7 +17,7 @@ below it is the record of why.
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
-| 7 | New compset: `compsets/<bench>.<mode>.<res>/` + a row in `compsets/README.md`. |
+| 7 | New compset: `compset/<bench>.<mode>[.<var>].<dx>[.<desc>]/` (test twin: `test.` prefix only) + a row in `compset/README.md`. |
 | 8 | `reference/` is read-only and only grows. Every gold file needs a reader. |
 | 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
 | 10 | Docs move with the code, in the same commit. |
@@ -43,7 +43,7 @@ list a commit prints before pushing it, and re-read this card before staging.
 4. [model.txt is a positional contract](#4-modeltxt-is-a-positional-contract)
 5. [fric()/on_fault_vars magic indices have one authoritative source](#5-friconfaultvars-magic-indices-have-one-authoritative-source)
 6. [New bp values are additive branches](#6-new-bp-values-are-additive-branches)
-7. [New compsets: naming, placement, and registration](#7-new-compsets-naming-placement-and-registration)
+7. [New compset: naming, placement, and registration](#7-new-compset-naming-placement-and-registration)
 8. [Reference results are read-only, only grow, and every file has a reader](#8-reference-results-are-read-only-only-grow-and-every-file-has-a-reader)
 9. [Build/environment claims must be verified on the target host](#9-buildenvironment-claims-must-be-verified-on-the-target-host)
 10. [Docs move with the code, in the same change](#10-docs-move-with-the-code-in-the-same-change)
@@ -136,7 +136,7 @@ sides**, never inserted — an insertion shifts every field after it and both
 sides "succeed" while reading garbage into the wrong variable.
 
 Optional trailing blocks (per-fault `faultgeom`) are read with `iostat`, so
-append scalars **before** them: 13 of 16 compsets write no faultgeom, and their
+append scalars **before** them: 13 of 16 compset write no faultgeom, and their
 faultgeom read would swallow a scalar placed after it.
 
 **Check**: `testsys/contract/test_io_contracts.py` counts writes against reads.
@@ -157,7 +157,7 @@ stay numeric: their meaning depends on `friclaw`.
   still writing the old meaning.
 - **Compsets may use raw integers** (they are user-facing configuration); the
   table is what a raw integer is checked against. Do not "helpfully" rename
-  inside compsets as a side effect of other work (rule 1).
+  inside compset as a side effect of other work (rule 1).
 - The netCDF variable-name mapping in `case.setup`'s
   `netcdf_write_on_fault_vars` and `src/netcdf_io.f90` remains the third
   surface that must agree; it now reads in names on both sides.
@@ -190,12 +190,14 @@ blocks.
 
 ---
 
-## 7. New compsets: naming, placement, and registration
+## 7. New compset: naming, placement, and registration
 
-- **Production**: `compsets/<benchmark>.<mode>.<res>/`, plus a row in the
-  register table in `compsets/README.md`.
-- **CI regression**: a smaller `test.<benchmark>.<mode>/`, added to
-  `testsys/e2e/cases.py`, with its reference under `reference/<benchmark>/`.
+- **Production**: `compset/<benchmark>.<mode>[.<variant>].<dx_m>[.<description>]/`
+  (grammar frozen 2026-08-15, user-approved; full statement in
+  `compset/README.md`), plus a row in the register table there.
+- **CI regression**: same grammar with a `test.` prefix as the ONLY
+  difference (`test.bp5.qdc.2000` ↔ `bp5.qdc.2000`), smaller (cut `nstep`),
+  added to `testsys/e2e/cases.py`, reference under `reference/<benchmark>/`.
 
 `create.newcase` does **not** validate the name — it does `os.listdir` and
 `shutil.copy`. The register is documentation, not an allowlist, so keep it
@@ -373,7 +375,7 @@ binaries became versioned. It died before the e2e tier ran at all.
 ## 18. The whole workflow must work for every example
 
 Create the case, run it, post-process it. All three must work for **every**
-compset in `compsets/`, and above all for the runs frozen under `reference/`.
+compset in `compset/`, and above all for the runs frozen under `reference/`.
 A gold reference nobody can regenerate or plot is a file, not a reference.
 
 - `create.newcase <dir> <compset>` then `./case.setup` produces a runnable case

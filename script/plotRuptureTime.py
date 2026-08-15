@@ -21,7 +21,7 @@ Columns of cplot_EQquasi.txt, in order:
 Applicability, which is worth knowing before you go looking for a front:
 
   BP5, BP5-dip90   seismic; a full cycle produces a real front. The 101-step
-                   test compsets only reach artificial nucleation, so expect a
+                   test compset only reach artificial nucleation, so expect a
                    few tens of ruptured nodes, not a propagating front.
   BP7              seismic, but nucleates later than the test compset runs.
   BP8              aseismic by construction -- velocity-strengthening

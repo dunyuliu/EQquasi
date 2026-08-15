@@ -9,7 +9,7 @@ from math import *
 # fric()/on_fault_vars slot registry (rule 5). ONE authoritative list.
 #
 # The same numbers index three things that must agree: par.on_fault_vars'
-# 4th axis here and in the compsets, case.setup's netcdf writer, and
+# 4th axis here and in the compset, case.setup's netcdf writer, and
 # src/globalvar.f90's Fortran constants of the SAME NAMES. Slots 1-5 are
 # friction-law-dependent legacy and stay numeric. Compsets may keep raw
 # integers; this table is what they are checked against.
@@ -278,7 +278,7 @@ class parameters:
     min_norm     = -10.0e6
     max_norm     = -40.0e6
     # ONE switch: min_norm/max_norm apply iff this is 1. Not coupled to
-    # rough_fault. Kink/rough compsets set 1 (they historically had caps);
+    # rough_fault. Kink/rough compset set 1 (they historically had caps);
     # planar cases may set 1 to bound tip stress (BP1002 variants), the
     # regularisation Liu et al. 2020 section 3.5 applies at a bend.
     enforce_norm_caps = 0

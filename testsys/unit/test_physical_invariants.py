@@ -1,5 +1,5 @@
 """Physical-behaviour invariants that must hold for any correct run of these
-compsets, independent of resolution or step count -- the class of check this
+compset, independent of resolution or step count -- the class of check this
 project's e2e tier was missing. All three multi-fault bugs recorded in
 PROJECT_RULES.md (rule 12) produced a run that *completed* and printed
 plausible-looking numbers; none violated a numeric regression lock on the
@@ -71,7 +71,7 @@ def _col(rows, name):
 def test_effective_normal_stress_stays_compressive(bench):
     """Negative is compressive in this code's convention (par.init_norm is
     negative). A positive (tensile) effective normal stress means the fault
-    has been pulled open, which none of these compsets' physics produces."""
+    has been pulled open, which none of these compset' physics produces."""
     rows = _read_csv(FIELD_GOLD[bench])
     en = _col(rows, "effective_normal")
     assert np.all(en <= 0.0), (

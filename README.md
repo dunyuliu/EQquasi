@@ -106,9 +106,9 @@ cd directoryForYourCase
 ./case.setup
 bash run.sh
 ```
-Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /compsets. <br/>
-Currently supported compsets, with what gates each one, are in
-```compsets/README.md```:
+Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /compset. <br/>
+Currently supported compset, with what gates each one, are in
+```compset/README.md```:
   - bp5.qdc.2000
   - bp7.qdc.a.10
   - bp8.qdc.gs.10
@@ -121,9 +121,9 @@ Currently supported compsets, with what gates each one, are in
   - liu2020.fdc.rough.250
   - das.qdc.10
 
-In addition, ```test.*``` compsets (```test.bp5.qdc```,
-```test.bp5.qdc.dip90```, ```test.bp7.qdc```, ```test.bp8.qdc```,
-```test.stepover.qdc```) are small, fast versions used by the test
+In addition, ```test.*``` compset (```test.bp5.qdc.2000```,
+```test.bp5.qdc.dip90.2000```, ```test.bp7.qdc.a.10```, ```test.bp8.qdc.gs.10```,
+```test.stepover.qdc.1000```) are small, fast versions used by the test
 suite and deliberately outside the register.
 
 Where things run

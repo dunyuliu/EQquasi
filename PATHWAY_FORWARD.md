@@ -32,7 +32,18 @@ Read this first on wake-up. Update in place; close items by deleting them.
 
 ### Queue
 
-1. [ ] **Dispatch victor-reyes to cut a release.** Covers v1.14.0..HEAD: the
+1. [x] **Release: v1.15.1, CI GREEN (run 31858202391).** Recorded honestly:
+   victor cut v1.15.0 on a master that was already red (rule 17 breach -- the
+   workflow PATH still exported the deleted scripts/), and his audit found the
+   caps read violated rule 4: on a pre-caps model.txt with faultgeom it
+   consumed fault 1's geometry line (reference/bp1002's file parsed to
+   min_norm=-60000 Pa). v1.15.1 fixes the PATH, reads the caps record whole
+   (backspace when it is faultgeom, loud stop 8 when malformed), runs
+   checkNormalStressCaps every cycle instead of cold start only, and stops on
+   missing restart inputs. Verified live both ways. All four live runs carry
+   the caps line; eqquasi-1.14.0 untouched. v1.15.0's tag stands, superseded.
+
+1b. [ ] **(was item 1)** Covers v1.14.0..HEAD: the
    compsets rename and register, PROJECT_RULES cut to 411 lines with an action
    card, the cohesive-zone precheck, plotRuptureTime contour fix, and the
    script/testsys rename. Minor bump. Watch CI to conclusion; rule 17 says a

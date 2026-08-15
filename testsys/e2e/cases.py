@@ -64,6 +64,8 @@ CASES = [
     # per-fault on-fault-input routing into every-push CI.
     ("bp5.dip90", "test.bp5.qdc.dip90.2000", {}, "cycle0",               "fast"),
     ("stepover",  "test.stepover.qdc.1000",  {}, "cycle0",               "fast"),
+    # Constraining twin: one flip (far_vel_load sign). Same cost.
+    ("stepover.con", "test.stepover.qdc.con.1000", {}, "cycle0",          "fast"),
 
     # The big ntotft > 1 row (the stepover fast row above is the cheap one):
     # three multi-fault bugs in this project's history were found by hand

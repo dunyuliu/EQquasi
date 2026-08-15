@@ -107,10 +107,25 @@ def test_declared_version_matches_a_git_tag():
         # so there is nothing to check against. Skip rather than claim a defect.
         import pytest
         pytest.skip("no git tags available; shallow clone?")
-    assert v in tags, (
-        f"EQQUASI_VERSION is {v!r} but no matching git tag exists (tags: "
-        f"{sorted(tags)}). Either tag this release, bump the declared version, "
-        f"or mark it {v}-dev while it is unreleased."
+    if v in tags:
+        return
+    # Under the PR flow the tag is created AT merge, so a version-bump branch
+    # necessarily declares a version with no tag yet -- and this assertion
+    # blocked its own release PR (v1.16.0, PR #4). Accept exactly the case
+    # "strictly newer than every existing tag": that is a release in flight.
+    # A declared version that is old, equal-but-mistyped, or between existing
+    # tags still fails, which is the staleness this test exists to catch.
+    def key(t):
+        try:
+            return tuple(int(x) for x in t.split("."))
+        except ValueError:
+            return (0,)
+    newest = max(tags, key=key)
+    assert key(v) > key(newest), (
+        f"EQQUASI_VERSION is {v!r} but no matching git tag exists and it is "
+        f"not newer than the newest tag {newest!r} (tags: {sorted(tags)}). "
+        f"Either tag this release, fix the declared version, or mark it "
+        f"{v}-dev while it is unreleased."
     )
 
 

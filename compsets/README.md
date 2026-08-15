@@ -33,7 +33,7 @@ not for science.
 | `bp7.qdc.a.10` | e2e fast (via `test.bp7.qdc`) | `reference/bp7` | — | 2026-08-12 |
 | `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc`) | `reference/bp8` | CRESCENT DET (submitted) | 2026-08-12 |
 | `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002` | — | 2026-08-13 |
-| `bp1002.qdc.caps.2500` | none — new, UNVERIFIED | — | — | 2026-08-15 |
+| `bp1002.qdc.caps.2500` | none — live-validated: cycle 0 identical to uncapped `bp1002.qdc.2500` | — | — | 2026-08-15 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
 | `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.kink` | Liu et al. 2020 GJI | 2026-08-15 |

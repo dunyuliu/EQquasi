@@ -1,6 +1,6 @@
 # Pathway forward
 
-Working plan, ordered by what blocks what. Updated 2026-08-14, at v1.13.0.
+Working plan, ordered by what blocks what. Updated 2026-08-15, at v1.16.0.
 
 This is a live document: close items by deleting them, and record what was
 learned in the place that will be read again (`PROJECT_RULES.md` for a rule,
@@ -57,20 +57,20 @@ Read this first on wake-up. Update in place; close items by deleting them.
    (3 physical cycles). kink600: c0-c1 coherent, 0 swings, but every cycle
    hits the nstep=10000 cap; gracefully stopped after the in-flight cycle to
    free the box for the e2e tier.
-   - `work/bp1002_stepover/multicycle_20_knox` — 20 cycles, nstep=30000.
-     Cycles 0-1 match the 1.13.0 baseline exactly; cycle 2 ran 11171 steps and
-     exited on physics at 7.2e-6, where the old nstep=10000 run truncated it.
-     This is the science run. Compare each cycle with
-     `work/bp1002_stepover/compare_cycles.py multicycle_20 <run>`.
-   - `work/liu2020.kink.10cyc` — dx=600, Lambda0/dx=0.94. Produced a coherent
-     rupture (rise to 2.2e-1, then decay) where dx=1200 oscillated. Watch
-     whether later cycles stay coherent or degrade as 1200 did.
-   - `work/kink.dc014.dx1200` — Dc=0.14, Lambda0/dx=6.0. Controlled test: same
-     mesh and geometry as the oscillating run, one parameter changed. Still
-     interseismic at 1.7e-9 after 102 blocks, as expected for the larger
-     nucleation size.
-   - `work/liu2020.kink.10cyc.dx1200` — finished, 10 cycles, oscillating.
-     Kept as the negative control. Do not delete.
+   Live science runs as of 2026-08-15 (knox; never restart/stop/rebuild):
+   - `work/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.16.0, nstep=30000,
+     enforce_norm_caps=1. Cycle 0 identical to the uncapped baseline
+     (3820 steps, peak 0.8458) — caps inert while sigma_n stays in
+     [-25.6, -18.7] MPa. THE question: does it pass cycle 9, where the
+     uncapped run died on stop-508 (+0.60 MPa at fault A's tip)?
+   - `work/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0
+     reproduces `reference/bp5.kink` exactly (4875 steps, peak 1.168).
+   - `work/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
+     ~5 h+/cycle. First event nucleated 2026-08-15 midday.
+   Prior knox/cotopaxi datasets that STAND (do not delete):
+   `work/bp1002_stepover/multicycle_20_knox` (9 cycles to stop-508),
+   `work/liu2020.kink.10cyc` (dx=600 coherent), `work/kink.dc014.dx1200`
+   (dtcap control), `work/liu2020.kink.10cyc.dx1200` (negative control).
 
 3. [ ] **Full e2e tier at HEAD.** Has not run since the compsets rename, the
    script/testsys rename, or the cohesive-zone precheck. `MACHINE=utig` on
@@ -129,26 +129,12 @@ Read this first on wake-up. Update in place; close items by deleting them.
   allocatable dummies -- it applies to character dummies as well.
 
 ### Known open, from today
-- **Hardcoded normal-stress caps in `src/faulting.f90:169-177`.** Known, not
-  being fixed now.
-
-      max_norm = -40.0d6
-      min_norm = -10.0d6
-
-  active whenever `rough_fault == 1 .and. C_elastic == 1`. Liu, Duan & Luo
-  (2020) §3.5 states the caps as **-100 to -10 MPa**; the -10 matches, the
-  -40 does not. At -40 the solver clamps that paper's own -50 MPa initial
-  normal stress on the first step, and Fig. 6's excursion to -100 MPa at the
-  bend cannot be represented at all.
-
-  Neither number is a parameter -- both are literals, in no compset and no
-  docstring. Five compsets reach this branch (bp1001.fdc.250,
-  bp1001.fdc.rough.250, bp1001.qdc.rough.250, liu2020.fdc.rough.250,
-  liu2020.kink.qdc), so the values cannot simply be changed: they need
-  parameterising with -10/-40 as the default so existing cases are untouched,
-  and -10/-100 set for the kink compset. Hardcoded physics thresholds that
-  silently override a compset's stated initial condition are the wider
-  problem; this is one instance.
+- [CLOSED v1.16.0] Hardcoded normal-stress caps. Parameterised as
+  `min_norm`/`max_norm` with ONE switch `par.enforce_norm_caps` (default 0 —
+  caps off unless a compset opts in; the old implicit rough_fault coupling is
+  gone, legacy files get a printed NOTE, malformed caps lines stop loudly).
+  Kink compsets set the paper's -100 MPa. History below in the reproduction
+  note stands as written.
 
 - **Reproducing Liu, Duan & Luo (2020), EQquasi half.** Paper at
   `work/liu2020.kink/paper/Liu_Duan_Luo_2020_GJI.pdf`. Read pp. 1-8; the
@@ -196,21 +182,8 @@ Read this first on wake-up. Update in place; close items by deleting them.
   BLOCKER: dx = 300 m is not optional, and there the MUMPS factors want
   ~5.51e9 reals against a 2^31 ceiling, so full reproduction needs a
   64-bit-integer MUMPS build.
-- **fric() index revamp — systematic naming and documentation.** `fric(1:100,
-  node, fault)` is indexed by bare integers everywhere: `fric(26,...)` is
-  trial slip rate, `fric(46,...)` V_init, `fric(81:84,...)` the rupture-area
-  block, and nothing in the source says so except trailing comments that only
-  some sites carry. Rule 5 currently *documents* this as the state of affairs
-  and guards additions (pick an unused index, write it in three places); it
-  does not fix it.
-
-  The revamp: named constants in one place, applied everywhere, plus a table
-  mapping index -> meaning -> unit -> which of the three files writes it.
-  It must be done in one pass. Introducing names at some call sites only
-  creates a fourth source of truth on top of the three rule 5 already names
-  (`script/defaultParameters.py`, `script/case.setup`, `src/netcdf_io.f90`),
-  which is worse than the bare integers. Rule 5 will need rewriting when it
-  lands, since it exists to describe the unnamed state.
+- [CLOSED — see queue item 5] fric() index revamp landed (46 named slots,
+  registry table in defaultParameters.py, rule 5 rewritten).
 - [FIXED] Multi-fault station output. It was worse than "faults 2+ get
   none": the unopened unit 51 was still *written to*, so Fortran connected it
   to a default `fort.51` and every fault-2+ station appended there,

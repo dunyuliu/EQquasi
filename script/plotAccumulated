@@ -88,7 +88,7 @@ def snapshot_paths(cycle_dir, ninterval):
     return kept
 
 
-def depth_row(ndip, depth_km, par, ift):
+def depth_row(ndip, nstrike, depth_km, par, ift):
     """Index of the dip row nearest `depth_km`, or the default row.
 
     The default used to be the bare expression (ndip // 4) * 3, which is 3/4
@@ -100,10 +100,16 @@ def depth_row(ndip, depth_km, par, ift):
     """
     if depth_km is None:
         return (ndip // 4) * 3
-    _x, zkm, _xl, _zl = pu.fault_coords(par, ndip, 2, ift)
-    if len(zkm) != ndip:                       # no geometry: fall back
+    # Pass the REAL nstrike. A dummy value here made fault_coords' par.fx
+    # size check fail, so it returned node indices, and argmin|index-(-10)|
+    # picked row 0 = the fault's bottom edge: the dip90+kink figure showed
+    # uniform creep bands with no earthquakes because it was profiling the
+    # creeping basement at z = -60 km while labelled as 10 km depth.
+    _x, zkm, _xl, zlabel = pu.fault_coords(par, ndip, nstrike, ift)
+    zkm = np.asarray(zkm, float)
+    if len(zkm) != ndip or "node" in zlabel:   # no geometry: indices, not km
         return (ndip // 4) * 3
-    return int(np.argmin(np.abs(np.asarray(zkm) - depth_km)))
+    return int(np.argmin(np.abs(zkm - depth_km)))
 
 
 def cycle_profiles(cycle_dir, profile, ninterval, nwindow, ift, depth_km, par):
@@ -128,7 +134,7 @@ def cycle_profiles(cycle_dir, profile, ninterval, nwindow, ift, depth_km, par):
         if profile == DOWN_DIP:
             line = slab[:, nstrike // 2]
         else:
-            line = slab[depth_row(ndip, depth_km, par, ift), :]
+            line = slab[depth_row(ndip, nstrike, depth_km, par, ift), :]
         columns.append(boxcar_average(line, min(nwindow, len(line))))
     return np.array(columns).T, slab_shape
 

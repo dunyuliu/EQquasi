@@ -444,9 +444,24 @@ def _scaled_tol(ref, rtol, floor_rtol, scale):
     rate at all 5302 rows passed with "worst diff = 0.0e+00". Nothing is
     exempted now; a component that vanishes by symmetry is merely judged
     against the component that does not.
+
+    ATOL is the machine-noise floor for the case the sibling rule cannot
+    reach: a quantity group that is zero to machine precision in ref AND run.
+    First hit by stepover's station at the locked VW centre -- after 101
+    steps its slips and rates are +-1e-27 MPI-reduction noise on both sides,
+    the group scale is itself noise, and rtol on noise fails a third of the
+    file. 1e-18 sits ~9 orders above that noise and ~9 below the smallest
+    physical signal any comparison carries (creep, 1e-9 m/s). It cannot mask
+    the BP8 failure mode above: a halved 1e-9-scale signal differs by ~5e-10,
+    twenty-eight orders past this floor.
     """
     import numpy as _np
-    return rtol * _np.abs(ref) + floor_rtol * scale
+    return rtol * _np.abs(ref) + floor_rtol * scale + ATOL_MACHINE_NOISE
+
+
+# Module constant, not a per-call default: every caller should mean the same
+# thing by "zero to machine precision".
+ATOL_MACHINE_NOISE = 1e-18
 
 
 def compare_arrays(ref, run, rtol=1e-9, floor_rtol=1e-9, scale=None):

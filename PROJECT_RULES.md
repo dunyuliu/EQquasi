@@ -27,7 +27,7 @@ below it is the record of why.
 | 14 | Work in a worktree. Stage explicit paths — **never** `git add -A`. |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. |
-| 17 | CI is the gate. Red CI stops work — do not tag on top of one. |
+| 17 | Branch → PR → `build` check green → merge. Tag only green master. |
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
@@ -346,6 +346,14 @@ mine and wrong, both belonging to the previous release.
 ---
 
 ## 17. CI is the gate, not the local suite
+
+**Mechanical since 2026-08-15**: `master` has branch protection requiring the
+`build` check; force-push and deletion are blocked server-side. Work happens
+on a branch, opens a PR (the workflow runs on `pull_request`), and merges
+only when the check is green. Tags are created only on green master commits.
+Admin pushes can still bypass (enforce_admins is off) -- that is a bypass to
+be used never, not a workflow.
+
 
 A red CI run stops work. Do not commit, tag or release on top of one. Check
 after pushing: `gh run list --limit 5`, and `gh run view <id> --log-failed`

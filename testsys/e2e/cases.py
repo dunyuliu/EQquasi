@@ -58,6 +58,12 @@ CASES = [
     ("bp8",       "test.bp8.qdc",
      {"xi": 0.2, "nstep": 8000, "nt_out": 8000, "HPC_ncpu": 2},
      "",                                                            "fast"),
+    # De-orphaned 2026-08-15 (references frozen the same day, UNVERIFIED
+    # numbers, regression locks). stepover is the only ntotft > 1 row cheap
+    # enough for the fast tier: it closes the rule-12 gap by putting
+    # per-fault on-fault-input routing into every-push CI.
+    ("bp5.dip90", "test.bp5.qdc.dip90", {}, "cycle0",               "fast"),
+    ("stepover",  "test.stepover.qdc",  {}, "cycle0",               "fast"),
 
     # The only ntotft > 1 row, and the reason it exists: every other case in
     # this list has a single fault, so nothing in the gate exercised per-fault

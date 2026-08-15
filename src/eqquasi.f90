@@ -127,7 +127,7 @@ subroutine checkNormalStressCaps
     integer (kind = 4) :: ift, i
     real (kind = dp)   :: lo, hi
 
-    if (.not. (rough_fault == 1 .and. C_elastic == 1)) return
+    if (.not. capsActive) return
 
     lo = min(min_norm, max_norm)      ! most compressive allowed, e.g. -40 MPa
     hi = max(min_norm, max_norm)      ! least compressive allowed, e.g. -10 MPa

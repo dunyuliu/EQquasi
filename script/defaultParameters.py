@@ -277,6 +277,11 @@ class parameters:
     # Liu, Duan & Luo (2020) section 3.5 uses -10e6/-100e6.
     min_norm     = -10.0e6
     max_norm     = -40.0e6
+    # ONE switch: min_norm/max_norm apply iff this is 1. Not coupled to
+    # rough_fault. Kink/rough compsets set 1 (they historically had caps);
+    # planar cases may set 1 to bound tip stress (BP1002 variants), the
+    # regularisation Liu et al. 2020 section 3.5 applies at a bend.
+    enforce_norm_caps = 0
 
     ####################################
     ##### HPC resource allocation ######

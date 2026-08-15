@@ -168,3 +168,6 @@ par.az_tol = 1.0e-7 # tolerance for solution in AZTEC.
 # Kink geometry constants read by generateKinkGeometry.py (paper fig 1b).
 KINK_X = 0.0
 KINK_ANGLE_DEG = 10.0
+
+# Caps were historically implied by rough_fault; the switch is explicit now.
+par.enforce_norm_caps = 1

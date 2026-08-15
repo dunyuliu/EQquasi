@@ -200,3 +200,6 @@ par.st_coor_off_fault = [[0, 5, 0], [0, 5, -10], [-10, 10, 0]]
 par.az_op = 2
 par.az_maxiter = 2000
 par.az_tol = 1.0e-7
+
+# Caps were historically implied by rough_fault; the switch is explicit now.
+par.enforce_norm_caps = 1

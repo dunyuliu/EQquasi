@@ -170,7 +170,7 @@ do ift = 1, ntotft
                 ! hardcoded here. They were literals no compset could see, and
                 ! they silently overrode the initial condition of every case
                 ! that reached this branch -- see the guard in eqquasi.f90.
-                if (rough_fault == 1 .and. C_elastic == 1) then
+                if (capsActive) then
                     if (tnrm0>=min_norm) then 
                         tnrm0 = min_norm
                     elseif (tnrm0<=max_norm) then

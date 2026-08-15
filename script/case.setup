@@ -79,7 +79,8 @@ def create_model_input_file():
         # so a model.txt written before this existed still loads and the solver
         # keeps its defaults. Cannot go after faultgeom -- 13 of 16 compsets do
         # not write that block, and their faultgeom read would swallow this line.
-        f.write(str(par.min_norm) + "  " + str(par.max_norm) + "\n")
+        f.write(str(par.min_norm) + "  " + str(par.max_norm)
+                + "  " + str(par.enforce_norm_caps) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the
         # attribute defaults to None) keeps every existing compset's

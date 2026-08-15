@@ -190,7 +190,13 @@ par.HPC_email = "dliu@ig.utexas.edu"
 # sit at x = 500 mod 1000 m (-42.5 km, -7.5 km), so with dx = 1000 the x
 # coordinates must be half-km values; integer-km stations match nothing
 # (the solver now warns, eqquasi.f90).
-par.st_coor_on_fault = [[-6.5, -2.0], [-5.5, -10.0], [-3.5, -18.0]]
+# And a station must carry SIGNAL to be comparable across machines: a node
+# in the locked VW core produces only MPI-reduction noise in this 101-step
+# window, and its integrated slip columns accumulate that noise to ~1e-16,
+# machine-dependent -- the first CI run of this row failed on exactly that.
+# All three stations therefore sit in creeping/taper zones (|z| <= 3 km or
+# |z| >= 18 km).
+par.st_coor_on_fault = [[-6.5, -2.0], [-5.5, -3.0], [-3.5, -18.0]]
 par.st_coor_off_fault = [[0, 5, 0], [0, 5, -10], [-10, 10, 0]]
 par.n_on_fault = len(par.st_coor_on_fault)
 par.n_off_fault = len(par.st_coor_off_fault)

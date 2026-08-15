@@ -17,7 +17,9 @@ next one.
 - cycle0: 101 steps (nstep cap, by design), interseismic throughout
   (peak Vmax 1.0e-9): the gate locks the creeping stress build-up state,
   including both faults' cplot output and all six station files (three per
-  fault, fault 2 under the `ft2_` tag).
+  fault, fault 2 under the `ft2_` tag; all in creeping/taper zones so every
+  column carries deterministic signal -- see the station comment in the
+  compset for why a locked-core station cannot be a reference point).
 - The compset's original stations matched no node — both fault corners sit
   at x = 500 mod 1000 m, so integer-km x coordinates miss the lattice (the
   exact silent-station failure the eqquasi.f90 warning was written for; here

@@ -75,17 +75,17 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `work/liu2020.kink.10cyc` (dx=600 coherent), `work/kink.dc014.dx1200`
    (dtcap control), `work/liu2020.kink.10cyc.dx1200` (negative control).
 
-3. [ ] **Full e2e tier at HEAD.** Has not run since the compsets rename, the
+3. [ ] **Full e2e tier at HEAD.** Has not run since the compset rename, the
    script/testsys rename, or the cohesive-zone precheck. `MACHINE=utig` on
    cotopaxi, `MACHINE=ubuntu` on knox -- knox has no `utig` branch in
    install.eqquasi.sh and falls through to no LD_LIBRARY_PATH. ~3h05.
 
-4. [x] **Five pre-par compsets ported** (values untouched, dy/dz paired --
+4. [x] **Five pre-par compset ported** (values untouched, dy/dz paired --
    the contract test caught the old files never set them). UNVERIFIED: no
    oracle. Surfaced+fixed: generateFaultInterface wrote geometry to the case
    root while the solver reads input/ (latent since v1.13, ungated because
-   test.bp5.qdc.dip90 is orphaned); rough tables renamed to the read name.
-   Was: **The five broken compsets.** bp1001.fdc.250, bp1001.fdc.rough.250,
+   test.bp5.qdc.dip90.2000 is orphaned); rough tables renamed to the read name.
+   Was: **The five broken compset.** bp1001.fdc.250, bp1001.fdc.rough.250,
    bp1001.qdc.rough.250, liu2020.fdc.planar.300, liu2020.fdc.rough.250 declare
    bare module-level variables instead of the `par` object, so `case.setup`
    dies on `NameError: name 'par' is not defined`. Porting them is safe to
@@ -118,7 +118,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
 - `src/globalvar.f90` has one comment reading `scripts/case.setup`, left stale
   because correcting it would invalidate the binary three live runs are using.
 - 243 `.DS_Store` files across `$HOME`, none in this repo any more.
-- `test.bp5.qdc.dip90` and `test.stepover.qdc` are regression variants with no
+- `test.bp5.qdc.dip90.2000` and `test.stepover.qdc.1000` are regression variants with no
   e2e row -- orphaned.
 
 ### Landed during the revamp, worth remembering
@@ -136,7 +136,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
   `min_norm`/`max_norm` with ONE switch `par.enforce_norm_caps` (default 0 —
   caps off unless a compset opts in; the old implicit rough_fault coupling is
   gone, legacy files get a printed NOTE, malformed caps lines stop loudly).
-  Of the kink compsets only `liu2020.qdc.kink.600` sets the paper's -100 MPa;
+  Of the kink compset only `liu2020.qdc.kink.600` sets the paper's -100 MPa;
   `liu2020.qdc.kink.300` and `bp5.qdc.kink.2000` enable caps but inherit the
   -40 MPa default — flagged for the user, not changed unattended. History
   below in the reproduction note stands as written.

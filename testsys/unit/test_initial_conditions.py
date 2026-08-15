@@ -32,7 +32,7 @@ import pytest
 
 from conftest import load_case_params
 
-BP8_CASES = ["bp8.qdc.gs.10", "test.bp8.qdc"]
+BP8_CASES = ["bp8.qdc.gs.10", "test.bp8.qdc.gs.10"]
 
 # Slip rate spans decades; compare in log space. 1 % of a decade is far tighter
 # than anything physically meaningful and far looser than round-off.
@@ -84,7 +84,7 @@ def test_fault_starts_at_uniform_v_init(case):
             f"  tau^0   = {ofv[iz,ix,8]/1e6:.6f} MPa\n"
             f"  theta_0 = {ofv[iz,ix,20]:.4e} s\n"
             f"Section 3 requires a uniform start at V_init. Derive tau^0 with "
-            f"shear_steady_state(), as the BP5 and BP7 compsets do -- do not "
+            f"shear_steady_state(), as the BP5 and BP7 compset do -- do not "
             f"transcribe Table 1's tau_init."
         )
 

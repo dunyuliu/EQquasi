@@ -18,8 +18,8 @@ def read(relpath):
 
 
 def compset_dirs():
-    """Every compsets/<name>/ directory holding a user_defined_params.py."""
-    base = ROOT / "compsets"
+    """Every compset/<name>/ directory holding a user_defined_params.py."""
+    base = ROOT / "compset"
     return sorted(
         d for d in base.iterdir()
         if d.is_dir() and (d / "user_defined_params.py").is_file()
@@ -64,7 +64,7 @@ def par_attributes_read_by(script_relpath):
 
 
 def load_case_params(case):
-    """Execute compsets/<case>/user_defined_params.py and return its `par`.
+    """Execute compset/<case>/user_defined_params.py and return its `par`.
 
     The case files do `from defaultParameters import parameters`, which lives in
     script/, and they build par.on_fault_vars at import time. Executing rather
@@ -74,7 +74,7 @@ def load_case_params(case):
     import importlib.util
     import sys
 
-    path = ROOT / "compsets" / case / "user_defined_params.py"
+    path = ROOT / "compset" / case / "user_defined_params.py"
     if not path.is_file():
         raise FileNotFoundError(path)
 
@@ -82,7 +82,7 @@ def load_case_params(case):
     sys.path[:0] = added
     # A previously loaded case would otherwise be returned from the cache.
     stale = sys.modules.pop("user_defined_params", None)
-    # Importing must not leave __pycache__/ behind in compsets/<case>/:
+    # Importing must not leave __pycache__/ behind in compset/<case>/:
     # create.newcase copies that directory's contents file by file, so a stray
     # subdirectory there aborts case creation.
     dont_write = sys.dont_write_bytecode

@@ -286,7 +286,7 @@ def fault_coords(par, ndip, nstrike, ift=0):
 
 def fault_y(par, ift):
     """Fault ift's fault-normal offset in km, or None if the case does not
-    declare one (single-fault cases, legacy compsets)."""
+    declare one (single-fault cases, legacy compset)."""
     geom = getattr(par, "faultgeom", None)
     if geom is not None and ift < len(geom):
         return geom[ift][2] / 1e3

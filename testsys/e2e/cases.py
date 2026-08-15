@@ -47,23 +47,23 @@ sys.path.insert(0, os.path.join(str(ROOT), "script"))
 # cycle ~3100 s.
 CASES = [
     # fast: what CI runs on every push.
-    ("bp5",       "test.bp5.qdc",       {}, "cycle0-step101-fast", "fast"),
-    ("bp7",       "test.bp7.qdc",       {}, "cycle0-step101-fast", "fast"),
+    ("bp5",       "test.bp5.qdc.2000",       {}, "cycle0-step101-fast", "fast"),
+    ("bp7",       "test.bp7.qdc.a.10",       {}, "cycle0-step101-fast", "fast"),
     # HPC_ncpu is overridden to 2, matching bp5 and bp7. The compset asks for
     # 20, which is right for the machine it was written for and impossible on
     # a GitHub runner: ubuntu-latest has 4 cores, so `mpirun -np 20` fails
     # before the solver starts. BP8 failed in CI for several releases for this
     # reason alone, passing locally every time on a 64-core host, and the
     # failure was unreadable because run.sh's log was never surfaced.
-    ("bp8",       "test.bp8.qdc",
+    ("bp8",       "test.bp8.qdc.gs.10",
      {"xi": 0.2, "nstep": 8000, "nt_out": 8000, "HPC_ncpu": 2},
      "",                                                            "fast"),
     # De-orphaned 2026-08-15 (references frozen the same day, UNVERIFIED
     # numbers, regression locks). stepover is the only ntotft > 1 row cheap
     # enough for the fast tier: it closes the rule-12 gap by putting
     # per-fault on-fault-input routing into every-push CI.
-    ("bp5.dip90", "test.bp5.qdc.dip90", {}, "cycle0",               "fast"),
-    ("stepover",  "test.stepover.qdc",  {}, "cycle0",               "fast"),
+    ("bp5.dip90", "test.bp5.qdc.dip90.2000", {}, "cycle0",               "fast"),
+    ("stepover",  "test.stepover.qdc.1000",  {}, "cycle0",               "fast"),
 
     # The big ntotft > 1 row (the stepover fast row above is the cheap one):
     # three multi-fault bugs in this project's history were found by hand
@@ -81,9 +81,9 @@ CASES = [
     # it.
 
     # full: -m e2e only.
-    ("bp5",       "test.bp5.qdc",
+    ("bp5",       "test.bp5.qdc.2000",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
-    ("bp7",       "test.bp7.qdc",
+    ("bp7",       "test.bp7.qdc.a.10",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
     ("bp1002",    "bp1002.qdc.2500",   {},       "cycle0",         "full"),
     # BP5 dip90 with only the surface kinked 10 deg (user-designed control;

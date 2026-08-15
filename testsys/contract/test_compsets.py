@@ -1,6 +1,6 @@
 """Guards for compset parameter files.
 
-The defect that motivated most of this file: compsets/bp7.qdc.a.10 sets
+The defect that motivated most of this file: compset/bp7.qdc.a.10 sets
 par.xmin/par.xmax/... but script/case.setup reads par.fxmin/par.fxmax/...
 Assigning the wrong name silently leaves BP5's default 120x100x60 km domain in
 place, so BP7 wrote a mesh many orders of magnitude too large and was
@@ -26,7 +26,7 @@ def compset_ids():
 @pytest.mark.parametrize("name", compset_ids())
 def test_compset_does_not_set_shadow_domain_attributes(name):
     """`par.xmin = ...` creates a new unused attribute; case.setup reads fxmin."""
-    src = strip_python_comments(read(f"compsets/{name}/user_defined_params.py"))
+    src = strip_python_comments(read(f"compset/{name}/user_defined_params.py"))
     import re as _re
     assigned = set()
     for line in src.splitlines():
@@ -51,7 +51,7 @@ def test_compset_sets_dy_and_dz_when_it_overrides_dx(name):
     A compset that overrides par.dx therefore leaves dy/dz at the default 2000,
     which corrupts case.setup's estimate_HPC_resource() (it divides by par.dz).
     """
-    src = strip_python_comments(read(f"compsets/{name}/user_defined_params.py"))
+    src = strip_python_comments(read(f"compset/{name}/user_defined_params.py"))
     if "par.dx" not in src:
         return
     assert "par.dy" in src and "par.dz" in src, (
@@ -85,19 +85,19 @@ def test_case_setup_reads_only_attributes_that_exist_on_the_defaults():
 
 
 def test_compsets_txt_matches_compsets():
-    """The register in compsets/README.md must match the directories (rule 7).
+    """The register in compset/README.md must match the directories (rule 7).
 
-    It replaced compsets.txt, which was a bare list of the same names carrying
+    It replaced compset.txt, which was a bare list of the same names carrying
     no information the filesystem did not already have. The register says what
     gates each compset, what oracle it has and where it was published, so it is
     worth keeping accurate -- and this test is what keeps it so.
     """
     import re as _re
-    rows = _re.findall(r"^\| `([^`]+)` \|", read("compsets/README.md"), _re.M)
+    rows = _re.findall(r"^\| `([^`]+)` \|", read("compset/README.md"), _re.M)
     listed = {r for r in rows if not r.startswith("test.")}
     actual = {d.name for d in compset_dirs() if not d.name.startswith("test.")}
     assert listed == actual, (
-        f"compsets.txt is out of date.\n"
+        f"compset.txt is out of date.\n"
         f"  listed but absent: {sorted(listed - actual)}\n"
         f"  present but unlisted: {sorted(actual - listed)}"
     )
@@ -108,15 +108,15 @@ def test_readme_compset_names_exist():
     readme = read("README.md")
     actual = {d.name for d in compset_dirs()}
     import re
-    # Run directories under work/ are named like compsets but are not ones --
+    # Run directories under work/ are named like compset but are not ones --
     # they are gitignored outputs the README cites as provenance for a number.
     # Strip them before matching so citing a result does not fail this guard.
     body = re.sub(r"`?work/[\w.\-/]+`?", "", readme)
     cited = set(re.findall(r"\b(bp\d[\w.]*|liu2020[\w.]*|test\.bp[\w.]*)\b", body))
-    # Only names shaped like compsets, not prose like "bp5" or "BP5".
+    # Only names shaped like compset, not prose like "bp5" or "BP5".
     cited = {c for c in cited if "." in c}
     unknown = {c for c in cited if c not in actual}
-    assert not unknown, f"README names compsets that do not exist: {sorted(unknown)}"
+    assert not unknown, f"README names compset that do not exist: {sorted(unknown)}"
 
 
 def test_readme_scripts_exist():
@@ -138,7 +138,7 @@ def test_readme_lists_netcdf4_dependency():
 def test_case_setup_checks_the_fault_interface_helper_exit_status():
     """os.system's return code was ignored, so a crashed helper looked like success.
 
-    compsets/test.bp5.qdc.dip90 sets par.insertFaultType = 1, which makes
+    compset/test.bp5.qdc.dip90.2000 sets par.insertFaultType = 1, which makes
     case.setup shell out to generateFaultInterface. That script imports
     matplotlib. On CI the apt-installed matplotlib went to the system Python
     while actions/setup-python provided a different interpreter, so the import

@@ -43,14 +43,6 @@ Read this first on wake-up. Update in place; close items by deleting them.
    missing restart inputs. Verified live both ways. All four live runs carry
    the caps line; eqquasi-1.14.0 untouched. v1.15.0's tag stands, superseded.
 
-1b. [ ] **(was item 1)** Covers v1.14.0..HEAD: the
-   compsets rename and register, PROJECT_RULES cut to 411 lines with an action
-   card, the cohesive-zone precheck, plotRuptureTime contour fix, and the
-   script/testsys rename. Minor bump. Watch CI to conclusion; rule 17 says a
-   red run stops work. NOTE: the release will rebuild, so do it only when no
-   multi-cycle run is mid-cycle, or accept that the running jobs keep the old
-   binary by filename.
-
 2. [ ] **Watch the four runs and report per cycle.** Do not restart any of them.
    - `work/bp1002_stepover/multicycle_20_knox` — 20 cycles, nstep=30000.
      Cycles 0-1 match the 1.13.0 baseline exactly; cycle 2 ran 11171 steps and

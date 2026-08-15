@@ -79,7 +79,8 @@ Small and fast, for the gate, **not for science**. Outside the register.
 | `test.bp7.qdc.a.10` | e2e fast | 2026-08-12 |
 | `test.bp8.qdc.gs.10` | e2e fast | 2026-08-12 |
 | `test.bp5.qdc.dip90.2000` | e2e fast | 2026-08-15 |
-| `test.stepover.qdc.1000` | e2e fast (only ntotft > 1 in the fast tier) | 2026-08-15 |
+| `test.stepover.qdc.1000` | e2e fast (ntotft > 1 in the fast tier) | 2026-08-15 |
+| `test.stepover.qdc.con.1000` | e2e fast | 2026-08-15 |
 
 The two-tier design of rule 7: the production compset produces the reference,
 and a smaller `test.*` variant with the same `dx` but a cut `nstep` runs on

@@ -65,10 +65,10 @@ CASES = [
     ("bp5.dip90", "test.bp5.qdc.dip90", {}, "cycle0",               "fast"),
     ("stepover",  "test.stepover.qdc",  {}, "cycle0",               "fast"),
 
-    # The only ntotft > 1 row, and the reason it exists: every other case in
-    # this list has a single fault, so nothing in the gate exercised per-fault
-    # routing of on-fault input. Three multi-fault bugs in this project's
-    # history were found by hand because of that (PROJECT_RULES rule 7).
+    # The big ntotft > 1 row (the stepover fast row above is the cheap one):
+    # three multi-fault bugs in this project's history were found by hand
+    # because nothing in the gate exercised per-fault routing of on-fault
+    # input (PROJECT_RULES rule 7).
     #
     # BP1002 is deliberately NOT in the fast tier. Until 2026-08-15 it was the
     # only ntotft > 1 case anywhere, so per-fault routing of on-fault input

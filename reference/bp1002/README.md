@@ -215,3 +215,37 @@ Two observations the truncated 10000-step baseline could not show:
 The old `nstep = 10000` baseline truncated cycle 2 mid-descent, so its
 cycles 3+ (restarted mid-event) are artifacts; this sequence supersedes it
 from cycle 2 onward. Cycles 0–1 match it to 1e-12.
+
+### Correction, same day: those are not through-going ruptures
+
+The bold rows above were written from slip totals alone, and the per-fault
+rupture times (available only since v1.13's per-fault `cplot_ft<N>_`) say
+otherwise. Seismic nodes (`fnft` stamped at ≥ 1 mm/s, evaluated every step)
+per cycle:
+
+| cycle | fault A seismic | fault B seismic |
+|---|---|---|
+| 0 | 111/234 | 0 |
+| 1 | 0 | 111/234 |
+| 2 | 59/234 | **0** |
+| 3 | 0 | 68/234 |
+| 4 | 94/234 | **0** |
+| 5 | 0 | 98/234 |
+| 6 | 77/234 | **0** |
+| 7 | 0 | 99/234 |
+| 8 | 99/234 | **0** |
+
+**Rupture never jumps the step-over — nine cycles out of nine.** Seismic slip
+alternates strictly A, B, A, B. In the cycles labelled "through-going", the
+passive fault accumulated its 7–15 m entirely below 1 mm/s (its snapshot
+maximum in cycle 2 is 4.0e-6 m/s): triggered aseismic slip, comparable in
+total to the seismic slip opposite it, in the same cycle. The matching slip
+totals are what misled the earlier reading.
+
+So the corrected statement of this benchmark's result: **the step-over is an
+absolute barrier to seismic rupture here, coupled by afterslip** — the
+neighbouring segment relieves a comparable deficit aseismically, which is
+also what reloads the system into strict alternation. The declining totals
+(15.08 → 12.05 → 12.56 → 7.34 m) and the eventual tip unclamping are
+properties of that coupled aseismic exchange, not of barrier-jumping
+ruptures.

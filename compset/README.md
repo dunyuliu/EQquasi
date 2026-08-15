@@ -110,10 +110,11 @@ shear stress — computed at −50 MPa — no longer at steady state.
 Two things block reproduction, both tracked in `PATHWAY_FORWARD.md`:
 
 - **Resolution.** The paper requires Λ₀/dx > 2.3 and reports 2.5163 at
-  `dx = 300 m`; 600 m gives 1.26 and 1200 m gives 0.63. The paper's 300 m needs
-  a 64-bit-integer MUMPS (factors want ~5.5e9 reals against a 2³¹ ceiling), so
-  today it runs only at resolutions its own paper rejects. The directory is
-  named for the paper's 300 m, not for what currently runs.
+  `dx = 300 m`; 600 m gives 1.26 and 1200 m gives 0.63. The 64-bit-MUMPS
+  blocker for 300 m is DEAD (2026-08-15): the claim was a derived estimate;
+  measured, our 32-bit MUMPS factorizes 6.05e9 reals with INFOG(1)=0 in 65 s
+  (MUMPS 5.x indexes the real factor array with 8-byte offsets regardless of
+  intsize64). dx = 300 runs today; `work/kink300.sci` is the live attempt.
 - **It is quasi-dynamic.** The paper loops EQquasi with EQdyna through EQsimu;
   every rupture in its figures 3–7 is EQdyna's. This is `par.mode = 1`,
   EQquasi alone — interseismic and nucleation only.

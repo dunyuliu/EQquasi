@@ -66,9 +66,11 @@ def cplot_path(rdir, ift):
 def process_dir(rdir, outdir, interval, ift=0):
     path = cplot_path(rdir, ift)
     if not os.path.exists(path):
-        print(f"  no {os.path.basename(path)} -- this run predates the "
-              f"per-fault cplot (v1.13.0), or has fewer than {ift + 1} faults")
-        return
+        # Rule 2: a requested fault that does not exist is an error, not a
+        # note -- exiting 0 here let `--fault 2` on a two-fault run look like
+        # success (caught 2026-08-15 on the de-orphaned stepover case).
+        sys.exit(f"  no {os.path.basename(path)} -- this run predates the "
+                 f"per-fault cplot (v1.13.0), or has fewer than {ift + 1} faults")
     a = np.atleast_2d(read_array(path))
     x, z, fnft = a[:, 0], a[:, 1], a[:, FNFT_COL]
 

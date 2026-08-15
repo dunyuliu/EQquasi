@@ -84,7 +84,7 @@ par.fzmin, par.fzmax = -30.0e3, 0.0e3
 # below, as liu2020.fdc.planar had it.
 par.xminc, par.xmaxc, par.zminc = -25.0e3, 25.0e3, -25.0e3
 
-par.dx = 600.0e0       # 300 m (paper) needs 64-bit MUMPS; Lambda0/dx = 1.26 here vs the 2.3 the paper requires
+par.dx = 600.0e0       # 300 m (paper) runs (MUMPS blocker dead 2026-08-15); Lambda0/dx = 1.26 here vs the 2.3 the paper requires
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 10, 10

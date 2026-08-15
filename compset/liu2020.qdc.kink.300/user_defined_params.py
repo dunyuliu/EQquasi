@@ -2,7 +2,7 @@
 # compset: liu2020.qdc.kink.300
 # gate   : none
 # changed: 2026-08-14   (content; see git log for the full history)
-# note   : Liu et al. 2020 GJI, EQquasi half. TODO: needs 64-bit MUMPS for dx=300.
+# note   : Liu et al. 2020 GJI, EQquasi half. dx=300 runs (MUMPS blocker dead 2026-08-15); set par.max_norm=-100e6.
 # Status is mirrored in compset/README.md, which a contract test checks.
 # ----------------------------------------------------------------------
 """Liu, Duan & Luo (2020, GJI 220, 598-609): strike-slip fault with a kink.

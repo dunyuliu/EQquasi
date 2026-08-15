@@ -3,7 +3,7 @@
 # gate   : e2e fast
 # changed: 2026-08-12   (content; see git log for the full history)
 # note   : Constraining twin of test.stepover.qdc.1000.
-# Status is mirrored in compsets/README.md, which a contract test checks.
+# Status is mirrored in compset/README.md, which a contract test checks.
 # ----------------------------------------------------------------------
 """Two-fault step-over, BP5 parameters, constraining twin.
 
@@ -11,8 +11,16 @@ Segment A: x in [-42.5, -2.5] km, y = 0 km      (the "cuts through the model" si
 Segment B: x in [-7.5, 32.5] km,  y = -5.0 km    (the "cuts through the model" side is x = +32.5 km)
 Both z in [-20, 0] km, dx = 1000 m, LEFT-lateral, constraining step-over:
 the ONE flip from test.stepover.qdc.1000 is the sign of far_vel_load. Identical
-geometry, so the same step that dilates under right-lateral slip is
-compressional here -- tips clamp instead of unclamping (the stop-508 mode).
+geometry, so over cycles the same step is EXPECTED to clamp the tips instead
+of unclamping them (the stop-508 mode of the releasing twin). Not exhibited
+in the 101-step lock: initial shear is magnitude-only, so this window is not
+yet left-lateral (KNOWN FLAG in reference/stepover.con/README.md).
+
+Station placement (lesson carried from the releasing twin): stations must
+land on the node lattice measured from the fault corners (both at
+x = 500 mod 1000 m, so x must be half-km), AND must sit in creeping/taper
+zones -- a locked-core station is machine-noise only and cannot be a
+reference point.
 
 Creeping (velocity-strengthening, a-b > 0) is assigned on:
   - the side of each segment that reaches the model's own x boundary (the
@@ -175,7 +183,7 @@ par.dx_trans = 50
 ####################################
 ##### HPC resource allocation ######
 ####################################
-par.casename = "stepover-qd-1000"
+par.casename = "stepover-con-qd-1000"
 par.HPC_nnode = 1
 par.HPC_ncpu = 2
 par.HPC_queue = "normal"

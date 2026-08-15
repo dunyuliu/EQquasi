@@ -14,7 +14,7 @@ is visible where you are editing.
 `<benchmark>.<mode>[.<variant>].<dx_m>[.<description>]`
 
 - **mode** — `qdc` quasi-dynamic, `fdc` fully dynamic
-- **variant** — optional: `rough`, `kink`, `planar`, `gs`, `a`, `con`
+- **variant** — optional, open list; in use: `rough`, `kink`, `planar`, `gs`, `a`, `con`, `dip90`
 - **dx_m** — on-fault element size in metres, always present
 - **description** — optional free token after resolution (e.g. `leftlateral`)
 

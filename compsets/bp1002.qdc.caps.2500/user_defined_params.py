@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 # compset: bp1002.qdc.caps.2500
-# gate   : none -- live-validated: cycle 0 identical to uncapped bp1002.qdc.2500
+# gate   : none -- UNVERIFIED (live run cycle 0 matches uncapped bp1002.qdc.2500)
 # changed: 2026-08-15
 # note   : bp1002 with normal-stress caps enforced (-40..-10 MPa) so the
 #          untapered interior tips cannot unclamp (stop-508 at cycle 9 of

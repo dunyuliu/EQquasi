@@ -58,15 +58,18 @@ Read this first on wake-up. Update in place; close items by deleting them.
    hits the nstep=10000 cap; gracefully stopped after the in-flight cycle to
    free the box for the e2e tier.
    Live science runs as of 2026-08-15 (knox; never restart/stop/rebuild):
-   - `work/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.16.0, nstep=30000,
-     enforce_norm_caps=1. Cycle 0 identical to the uncapped baseline
-     (3820 steps, peak 0.8458) — caps inert while sigma_n stays in
-     [-25.6, -18.7] MPa. THE question: does it pass cycle 9, where the
-     uncapped run died on stop-508 (+0.60 MPa at fault A's tip)?
-   - `work/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0
-     reproduces `reference/bp5.kink` exactly (4875 steps, peak 1.168).
+   - `work/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.15.1 (launched
+     before the 1.16.0 bump; runInfo.json is authoritative), nstep=30000,
+     enforce_norm_caps=1. Cycle 0 matches the uncapped baseline on step count
+     and peak Vmax to displayed precision (3821 steps, peak 0.8458) — caps
+     inert while sigma_n stays in [-25.6, -18.7] MPa. THE question: does it
+     pass cycle 9, where the uncapped run died on stop-508 (+0.60 MPa at
+     fault A's tip)?
+   - `work/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0 matches
+     `reference/bp5.kink` on step count and peak Vmax to displayed precision
+     (4876 steps, peak 1.168).
    - `work/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
-     ~5 h+/cycle. First event nucleated 2026-08-15 midday.
+     cycle 0 in flight. First event nucleated 2026-08-15 ~10:45.
    Prior knox/cotopaxi datasets that STAND (do not delete):
    `work/bp1002_stepover/multicycle_20_knox` (9 cycles to stop-508),
    `work/liu2020.kink.10cyc` (dx=600 coherent), `work/kink.dc014.dx1200`
@@ -133,8 +136,10 @@ Read this first on wake-up. Update in place; close items by deleting them.
   `min_norm`/`max_norm` with ONE switch `par.enforce_norm_caps` (default 0 —
   caps off unless a compset opts in; the old implicit rough_fault coupling is
   gone, legacy files get a printed NOTE, malformed caps lines stop loudly).
-  Kink compsets set the paper's -100 MPa. History below in the reproduction
-  note stands as written.
+  Of the kink compsets only `liu2020.qdc.kink.600` sets the paper's -100 MPa;
+  `liu2020.qdc.kink.300` and `bp5.qdc.kink.2000` enable caps but inherit the
+  -40 MPa default — flagged for the user, not changed unattended. History
+  below in the reproduction note stands as written.
 
 - **Reproducing Liu, Duan & Luo (2020), EQquasi half.** Paper at
   `work/liu2020.kink/paper/Liu_Duan_Luo_2020_GJI.pdf`. Read pp. 1-8; the

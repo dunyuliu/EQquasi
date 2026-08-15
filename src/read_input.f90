@@ -89,7 +89,7 @@ subroutine readmodel
     logical :: fltGeomFromFile
     character (len = 256) :: capsLine
     integer (kind = 4) :: iosCaps
-    real (kind = dp) :: capsTmp1, capsTmp2, capsTmp3
+    real (kind = dp) :: capsTmp1, capsTmp2, capsTmp3, capsTmp4, capsTmp5
 
     if (me == 0) then 
         INQUIRE(FILE=trim(inputDir)//"model.txt", EXIST=file_exists)
@@ -159,9 +159,17 @@ subroutine readmodel
         max_norm = -40.0d6
         read(1002,'(A)',iostat=ios) capsLine
         if (ios == 0) then
+            read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2, capsTmp3, &
+                capsTmp4, capsTmp5
+            if (iosCaps == 0) then
+                backspace(1002)          ! five numbers: faultgeom, not ours
+            else
             read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2, capsTmp3
             if (iosCaps == 0) then
-                backspace(1002)          ! faultgeom record, not ours
+                ! three numbers: caps plus the enforce flag.
+                min_norm = capsTmp1
+                max_norm = capsTmp2
+                enforce_norm_caps = int(capsTmp3 + 0.5d0)
             else
                 read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2
                 if (iosCaps == 0) then
@@ -173,6 +181,7 @@ subroutine readmodel
                     write(*,*) 'block, got: ', trim(capsLine)
                     stop 8
                 endif
+            endif
             endif
         endif
         ! Optional per-fault geometry block, one line per fault:
@@ -194,6 +203,14 @@ subroutine readmodel
             fltxyz(1,4,ift) = 270.0d0/180.0d0*pi
             fltxyz(2,4,ift) = 90.0d0/180.0d0*pi
         enddo
+    ! One switch, no rough_fault coupling.
+    capsActive = (enforce_norm_caps == 1 .and. C_elastic == 1)
+    if (rough_fault == 1 .and. enforce_norm_caps /= 1 .and. me == 0) then
+        write(*,*) 'NOTE: rough_fault = 1 but normal-stress caps are OFF.'
+        write(*,*) 'Caps no longer follow rough_fault; set'
+        write(*,*) 'par.enforce_norm_caps = 1 if this case expects them.'
+    endif
+
     close(1002)
     
     ! The rate-and-state box must lie inside the model. A bare `stop` here

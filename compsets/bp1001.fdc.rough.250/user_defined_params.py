@@ -153,3 +153,6 @@ par.az_maxiter = 2000 # maximum iteration for AZTEC
 par.az_tol = 1.0e-7 # tolerance for solution in AZTEC.
 
 
+
+# Caps were historically implied by rough_fault; the switch is explicit now.
+par.enforce_norm_caps = 1

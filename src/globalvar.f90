@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.15.1'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.16.0'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -132,6 +132,15 @@ MODULE globalvar
     ! defaults are the values that were literals in faulting.f90 before, so a
     ! model.txt predating them leaves every existing case unchanged.
     real (kind=dp) :: min_norm = -10.0d6, max_norm = -40.0d6
+    ! ONE switch: caps on iff enforce_norm_caps == 1 (and C_elastic == 1).
+    ! No coupling to rough_fault -- compsets that want caps say so
+    ! (par.enforce_norm_caps = 1 in the kink/rough compsets, and in planar
+    ! BP1002 variants to bound tip stress the way Liu et al. 2020 section
+    ! 3.5 does at a bend). Legacy model.txt without the flag = caps OFF, with
+    ! a printed notice when rough_fault = 1 so old rough cases are not
+    ! silently changed.
+    integer (kind=4) :: enforce_norm_caps = 0
+    logical :: capsActive = .false.
     ! parameters for friction laws.
     real (kind=dp) :: fric_sw_fs,       fric_sw_fd,      fric_sw_D0, &
         fric_rsf_a,       fric_rsf_b,      fric_rsf_Dc, &

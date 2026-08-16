@@ -50,7 +50,11 @@ def read_gold_csv(path):
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-FIELD_BENCHMARKS = ("bp5", "bp5.dip90", "bp7", "stepover")
+# Reference directories are named for the compset that produced them
+# (naming freeze 2026-08-15), so these are compset names, not benchmarks.
+FIELD_BENCHMARKS = ("test.bp5.qdc.2000", "test.bp5.qdc.dip90.2000",
+                    "test.bp7.qdc.a.10", "test.stepover.qdc.1000",
+                    "test.stepover.qdc.con.1000")
 SNAPSHOT = "fault.00101.nc"
 
 # Station quantities worth eyeballing, as (column index, label).
@@ -279,7 +283,7 @@ def compare_field(bench, run_dir, out, only=None):
 
 
 def compare_bp8(run_dir, out):
-    g = gold_dir("bp8")
+    g = gold_dir("test.bp8.qdc.gs.10")
     summary = json.load(open(os.path.join(g, "summary.json")))
     stations = [k for k in summary if k.startswith(("+", "-"))]
 
@@ -310,7 +314,7 @@ def compare_bp8(run_dir, out):
         got = run[-1, 1] * 1000
         if abs(got - exp) / exp > 1e-4:
             bad.append(f"{st}: slip {got:.4f} mm vs gold {exp:.4f} mm")
-    fig.suptitle(f"BP8: {run_dir} against reference/bp8", fontsize=11)
+    fig.suptitle(f"BP8: {run_dir} against reference/test.bp8.qdc.gs.10", fontsize=11)
     fig.tight_layout()
     fig.savefig(f"{out}_bp8.png", dpi=110)
     print(f"wrote {out}_bp8.png")
@@ -322,11 +326,11 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="examples:\n"
-               "  cd <case> && plotAgainstGold.py bp5      compare this case\n"
-               "  plotAgainstGold.py bp5 work/mycase       from anywhere\n"
+               "  cd <case> && plotAgainstGold.py test.bp5.qdc.2000\n"
+               "  plotAgainstGold.py test.bp5.qdc.2000 work/mycase\n"
                "The field snapshot (fault.00101.nc) is searched recursively, "
                "so Q* cycle folders are found automatically.")
-    ap.add_argument("benchmark", choices=list(FIELD_BENCHMARKS) + ["bp8"],
+    ap.add_argument("benchmark", choices=list(FIELD_BENCHMARKS) + ["test.bp8.qdc.gs.10"],
                     help="which frozen gold under reference/ to compare "
                          "against")
     ap.add_argument("run_dir", nargs="?", default=".",
@@ -338,7 +342,7 @@ def main():
     args = ap.parse_args()
     out = args.out or os.path.join(args.run_dir, "vs_gold")
 
-    if args.benchmark == "bp8":
+    if args.benchmark == "test.bp8.qdc.gs.10":
         bad = compare_bp8(args.run_dir, out)
     else:
         bad = compare_field(args.benchmark, args.run_dir, out, args.variable)

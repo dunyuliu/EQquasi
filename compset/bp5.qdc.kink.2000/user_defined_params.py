@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 # compset: bp5.qdc.kink.2000
-# gate   : e2e full + reference/bp5.kink
+# gate   : e2e full + reference/bp5.qdc.kink.2000
 # changed: 2026-08-15
 # note   : BP5 dip90 friction, only the surface kinked 10 deg at x=0. Rupture crosses the bend freely.
 # Status is mirrored in compset/README.md, which a contract test checks.

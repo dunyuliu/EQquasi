@@ -243,8 +243,8 @@ python3 -m pytest testsys/ -m e2e       # adds the full BP5 cycle, ~75 min
 ### References
 
 `reference/<benchmark>/` holds frozen results. A reference is a **run**, not a
-file: `reference/bp5/cycle0/` is a full earthquake cycle,
-`reference/bp5/cycle0-step101-fast/` the same case stopped at step 101.
+file: `reference/test.bp5.qdc.2000/cycle0/` is a full earthquake cycle,
+`reference/test.bp5.qdc.2000/cycle0-step101-fast/` the same case stopped at step 101.
 
 `testsys/e2e/cases.py` holds the case table and the single runner; a new
 benchmark is a row there plus a reference directory. What gets compared is
@@ -269,13 +269,13 @@ FAIL    global.dat: 12 of 8964 entries outside rtol=1e-09; worst at row 40, colu
 
 References are **regression locks, not validations**. They detect unintended
 change; they do not establish that a benchmark is reproduced correctly. See
-`reference/bp8/README.md` for what BP8's does and does not establish.
+`reference/test.bp8.qdc.gs.10/README.md` for what BP8's does and does not establish.
 
 ### BP8
 
 BP8-specific findings -- pore-pressure solver convergence, the domain-size
 sweep, the time-step study, the initial condition, and how to run and package a
-submission -- are in `reference/bp8/README.md` and `reference/bp8/`. They are
+submission -- are in `reference/test.bp8.qdc.gs.10/README.md` and `reference/test.bp8.qdc.gs.10/`. They are
 kept there because they belong with the reference they describe, and because
 they change as the benchmark does.
 

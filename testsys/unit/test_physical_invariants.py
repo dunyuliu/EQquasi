@@ -45,13 +45,13 @@ def _field_references():
 
 FIELD_GOLD = _field_references()
 
-BP8_SNAPSHOT = ROOT / "reference" / "bp8" /  "fault.05301.csv"
-# reference/stepover/ never existed under that name; the two-fault case is
+BP8_SNAPSHOT = ROOT / "reference" / "test.bp8.qdc.gs.10" /  "fault.05301.csv"
+# reference/test.stepover.qdc.1000/ never existed under that name; the two-fault case is
 # BP1002, and its snapshots are netCDF, not CSV. The constant sat here unused
 # and unreachable, so nothing noticed.
-STEPOVER_SNAPSHOT = ROOT / "reference" / "bp1002" / "cycle0" / "fault.00001.nc"
+STEPOVER_SNAPSHOT = ROOT / "reference" / "bp1002.qdc.2500" / "cycle0" / "fault.00001.nc"
 
-BP8_GOLD_DIR = ROOT / "reference" / "bp8" 
+BP8_GOLD_DIR = ROOT / "reference" / "test.bp8.qdc.gs.10" 
 BP8_STATIONS = [f"{s:+04d}dp{d:+04d}" for s in (-200, 0, 200) for d in (-200, 0, 200)]
 T_OFF_S = 100 * 3600.0  # BP8 Table 1: injection turns off at 100 hours
 

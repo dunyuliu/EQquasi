@@ -18,7 +18,7 @@ below it is the record of why.
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
 | 7 | New compset: `compset/<bench>.<mode>[.<var>].<dx>[.<desc>]/` (test twin: `test.` prefix only) + a row in `compset/README.md`. |
-| 8 | `reference/` is read-only and only grows. Every gold file needs a reader. |
+| 8 | `reference/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
 | 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
 | 10 | Docs move with the code, in the same commit. |
 | 11 | Comparing two runs? Check both `runInfo.json` versions first. |
@@ -111,8 +111,8 @@ guards the exit-code path.
 
 ## 3. The regression gate is the release gate
 
-`reference/bp5/`, `reference/bp5.dip90/`, `reference/bp7/`, `reference/bp8/`
-and `reference/bp1002/` are the safety net. Before merging any change to
+`reference/test.bp5.qdc.2000/`, `reference/test.bp5.qdc.dip90.2000/`, `reference/test.bp7.qdc.a.10/`, `reference/test.bp8.qdc.gs.10/`
+and `reference/bp1002.qdc.2500/` are the safety net. Before merging any change to
 `src/*.f90` or `script/defaultParameters.py`/`case.setup`:
 
 ```
@@ -197,7 +197,8 @@ blocks.
   `compset/README.md`), plus a row in the register table there.
 - **CI regression**: same grammar with a `test.` prefix as the ONLY
   difference (`test.bp5.qdc.2000` ↔ `bp5.qdc.2000`), smaller (cut `nstep`),
-  added to `testsys/e2e/cases.py`, reference under `reference/<benchmark>/`.
+  added to `testsys/e2e/cases.py`, reference under `reference/<compset name>/`
+  (reference dirs are named for the compset that produced them).
 
 `create.newcase` does **not** validate the name — it does `os.listdir` and
 `shutil.copy`. The register is documentation, not an allowlist, so keep it

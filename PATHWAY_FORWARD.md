@@ -36,7 +36,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
    victor cut v1.15.0 on a master that was already red (rule 17 breach -- the
    workflow PATH still exported the deleted scripts/), and his audit found the
    caps read violated rule 4: on a pre-caps model.txt with faultgeom it
-   consumed fault 1's geometry line (reference/bp1002's file parsed to
+   consumed fault 1's geometry line (reference/bp1002.qdc.2500's file parsed to
    min_norm=-60000 Pa). v1.15.1 fixes the PATH, reads the caps record whole
    (backspace when it is faultgeom, loud stop 8 when malformed), runs
    checkNormalStressCaps every cycle instead of cold start only, and stops on
@@ -66,7 +66,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
      pass cycle 9, where the uncapped run died on stop-508 (+0.60 MPa at
      fault A's tip)?
    - `work/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0 matches
-     `reference/bp5.kink` on step count and peak Vmax to displayed precision
+     `reference/bp5.qdc.kink.2000` on step count and peak Vmax to displayed precision
      (4876 steps, peak 1.168).
    - `work/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
      cycle 0 in flight. First event nucleated 2026-08-15 ~10:45.
@@ -202,7 +202,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
   to a default `fort.51` and every fault-2+ station appended there,
   interleaved. BP1002 asks for six stations and three produced nothing
   usable. Fault 1 keeps the plain SEAS name; faults 2+ take an `ft<N>_` tag.
-  CONSEQUENCE CLOSED 2026-08-14: `reference/bp1002` now carries the three
+  CONSEQUENCE CLOSED 2026-08-14: `reference/bp1002.qdc.2500` now carries the three
   `fltst_ft2_*` files. Added additively after all 19 pre-existing entries
   compared equal at v1.13.0, so nothing was re-blessed to accommodate the
   fix.
@@ -237,7 +237,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
   (rule 1) standing between the user and three commands they can check.
 - The orthogonal zoning experiment (VW per segment, not global |x|) is still
   the thing that would make the step-over margin claim isolated rather than
-  merely supported. QUANTIFIED 2026-08-14 -- see reference/bp1002/README.md.
+  merely supported. QUANTIFIED 2026-08-14 -- see reference/bp1002.qdc.2500/README.md.
   The current geometry is symmetric about x = 0, so both segments get
   identical zoning (36.3% VW each); whatever selects the rupturing segment is
   not a zoning difference between them. But the A/B experiment confounds
@@ -308,7 +308,7 @@ needs finding first.
 
 ## 3. Multi-fault in the gate set — DONE (v1.11.0/v1.12.0)
 
-`bp1002.qdc.2500` has a reference (`reference/bp1002/cycle0/`), a row in
+`bp1002.qdc.2500` has a reference (`reference/bp1002.qdc.2500/cycle0/`), a row in
 `testsys/e2e/cases.py`, and a physical invariant in
 `testsys/unit/test_physical_invariants.py` asserting the seed lands on fault 0
 and only fault 0. `PROJECT_RULES.md` rule 12 cites a check that exists.

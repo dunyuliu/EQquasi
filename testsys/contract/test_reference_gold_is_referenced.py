@@ -6,7 +6,7 @@ the test suite or the plotting tooling names it, so an unused file is at least
 visible rather than silently accumulating.
 
 Scoped to reference/<bench>/*.{json,nc,csv} -- the oracles rule 3/8 are
-about. reference/<bench>/plots/ and reference/bp8/archive/ are byproducts and
+about. reference/<bench>/plots/ and reference/test.bp8.qdc.gs.10/archive/ are byproducts and
 scratch, not oracles, and are deliberately excluded.
 """
 

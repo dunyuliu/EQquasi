@@ -14,7 +14,7 @@ the ONE flip from test.stepover.qdc.1000 is the sign of far_vel_load. Identical
 geometry, so over cycles the same step is EXPECTED to clamp the tips instead
 of unclamping them (the stop-508 mode of the releasing twin). Not exhibited
 in the 101-step lock: initial shear is magnitude-only, so this window is not
-yet left-lateral (KNOWN FLAG in reference/stepover.con/README.md).
+yet left-lateral (KNOWN FLAG in reference/test.stepover.qdc.con.1000/README.md).
 
 Station placement (lesson carried from the releasing twin): stations must
 land on the node lattice measured from the fault corners (both at

@@ -12,7 +12,7 @@ asks for. Something has to go.
 
 `taehoKim_ref` resolves it by keeping Table 1 and eq. (27) and letting eq. (29)
 go, and both halves of that are directly visible on the CRESCENT DET comparison
-(see reference/bp8/README.md): its shear_stress_2 starts at 14.6 MPa, and its
+(see reference/test.bp8.qdc.gs.10/README.md): its shear_stress_2 starts at 14.6 MPa, and its
 slip_rate_2 starts at log10 = -12. So theta_0 is derived: 4.0188e11 s, not
 5.0e8 s.
 

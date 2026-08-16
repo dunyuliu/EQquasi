@@ -107,24 +107,14 @@ cd directoryForYourCase
 bash run.sh
 ```
 Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /compset. <br/>
-Currently supported compset, with what gates each one, are in
-```compset/README.md```:
-  - bp5.qdc.2000
-  - bp7.qdc.a.10
-  - bp8.qdc.gs.10
-  - bp1001.fdc.250
-  - bp1001.fdc.rough.250
-  - bp1001.qdc.rough.250
-  - bp1002.qdc.2500 (two-fault step-over; the only `ntotft > 1` compset)
-  - liu2020.qdc.kink.300
-  - liu2020.fdc.planar.300
-  - liu2020.fdc.rough.250
-  - das.qdc.10
+The register — every compset, what gates it, and its reference — lives in
+```compset/README.md```; it is the single list, checked against the directories
+on disk by a contract test. Names follow
+```<benchmark>.<mode>[.<variant>].<dx_m>[.<description>]```.
 
-In addition, ```test.*``` compset (```test.bp5.qdc.2000```,
-```test.bp5.qdc.dip90.2000```, ```test.bp7.qdc.a.10```, ```test.bp8.qdc.gs.10```,
-```test.stepover.qdc.1000```) are small, fast versions used by the test
-suite and deliberately outside the register.
+```test.*``` compsets are small, fast versions used by the test suite and are
+listed separately in the same file. Their names follow the production grammar
+exactly — the `test.` prefix is the only difference.
 
 Where things run
 ---------------------
@@ -242,9 +232,11 @@ python3 -m pytest testsys/ -m e2e       # adds the full BP5 cycle, ~75 min
 
 ### References
 
-`reference/<benchmark>/` holds frozen results. A reference is a **run**, not a
-file: `reference/bp5/cycle0/` is a full earthquake cycle,
-`reference/bp5/cycle0-step101-fast/` the same case stopped at step 101.
+`reference/<compset name>/` holds frozen results — each reference directory is
+named for the compset that produced it, so compset, e2e row and reference always
+agree. A reference is a **run**, not a
+file: `reference/test.bp5.qdc.2000/cycle0/` is a full earthquake cycle,
+`reference/test.bp5.qdc.2000/cycle0-step101-fast/` the same case stopped at step 101.
 
 `testsys/e2e/cases.py` holds the case table and the single runner; a new
 benchmark is a row there plus a reference directory. What gets compared is
@@ -269,13 +261,13 @@ FAIL    global.dat: 12 of 8964 entries outside rtol=1e-09; worst at row 40, colu
 
 References are **regression locks, not validations**. They detect unintended
 change; they do not establish that a benchmark is reproduced correctly. See
-`reference/bp8/README.md` for what BP8's does and does not establish.
+`reference/test.bp8.qdc.gs.10/README.md` for what BP8's does and does not establish.
 
 ### BP8
 
 BP8-specific findings -- pore-pressure solver convergence, the domain-size
 sweep, the time-step study, the initial condition, and how to run and package a
-submission -- are in `reference/bp8/README.md` and `reference/bp8/`. They are
+submission -- are in `reference/test.bp8.qdc.gs.10/README.md` and `reference/test.bp8.qdc.gs.10/`. They are
 kept there because they belong with the reference they describe, and because
 they change as the benchmark does.
 

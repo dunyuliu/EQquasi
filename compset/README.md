@@ -33,15 +33,15 @@ where none exists the test compset still uses the full grammar. Small, cut
 
 | compset | gate | reference | published | changed |
 |---|---|---|---|---|
-| `bp5.qdc.2000` | e2e full (via `test.bp5.qdc.2000`) | `reference/bp5` | Jiang et al. 2022 JGR | 2026-08-12 |
-| `bp7.qdc.a.10` | e2e fast (via `test.bp7.qdc.a.10`) | `reference/bp7` | — | 2026-08-12 |
-| `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc.gs.10`) | `reference/bp8` | CRESCENT DET (submitted) | 2026-08-12 |
-| `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002` | — | 2026-08-13 |
+| `bp5.qdc.2000` | e2e full (via `test.bp5.qdc.2000`) | `reference/test.bp5.qdc.2000` | Jiang et al. 2022 JGR | 2026-08-12 |
+| `bp7.qdc.a.10` | e2e fast (via `test.bp7.qdc.a.10`) | `reference/test.bp7.qdc.a.10` | — | 2026-08-12 |
+| `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc.gs.10`) | `reference/test.bp8.qdc.gs.10` | CRESCENT DET (submitted) | 2026-08-12 |
+| `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002.qdc.2500` | — | 2026-08-13 |
 | `bp1002.qdc.caps.2500` | none — UNVERIFIED (live run's cycle 0 matches uncapped `bp1002.qdc.2500`) | — | — | 2026-08-15 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
-| `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.kink` | Liu et al. 2020 GJI | 2026-08-15 |
-| `bp5.qdc.kink.2000` | **e2e full** | `reference/bp5.kink` | — | 2026-08-15 |
+| `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.qdc.kink.600` | Liu et al. 2020 GJI | 2026-08-15 |
+| `bp5.qdc.kink.2000` | **e2e full** | `reference/bp5.qdc.kink.2000` | — | 2026-08-15 |
 | `bp1001.fdc.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.qdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
@@ -122,6 +122,7 @@ Two things block reproduction, both tracked in `PATHWAY_FORWARD.md`:
 ## Adding one
 
 Rule 7: a production compset gets a directory and a row above; a CI variant
-gets `test.<benchmark>.<mode>/`, a row in `testsys/e2e/cases.py`, and a reference
-under `reference/<benchmark>/`. Put the same status in the file's own header.
+gets the same name with a `test.` prefix, a row in `testsys/e2e/cases.py`, and
+a reference under `reference/<compset name>/` — reference directories are named
+for the compset that produced them, so the three names always agree. Put the same status in the file's own header.
 The contract test fails if the register and the directories disagree.

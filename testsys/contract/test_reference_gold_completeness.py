@@ -4,7 +4,7 @@ profiles). Before this session BP5/BP7/BP5-dip90 had only the snapshot and
 BP8 had only stations; a reference file nothing reads is dead weight, so
 this pins what must exist rather than trusting the directory listing.
 
-BP8 got both shapes plus the profiles this session (see reference/bp8/
+BP8 got both shapes plus the profiles this session (see reference/test.bp8.qdc.gs.10/
 summary.json's "extended_2026-08-12" block for provenance). BP5's Q0 -- the
 first full seismic cycle, needed for a station series that actually spans
 nucleation rather than 101 steps of flat interseismic loading -- was run and
@@ -71,7 +71,7 @@ def test_field_benchmark_still_has_its_snapshot(bench):
 
 @pytest.mark.parametrize("station", BP8_STATIONS)
 def test_bp8_has_all_nine_stations(station):
-    d = gold_dir("bp8")
+    d = gold_dir("test.bp8.qdc.gs.10")
     assert (d / f"fltst_strk{station}.csv").is_file()
     summary = json.loads((d / "summary.json").read_text())
     assert station in summary, f"summary.json carries no numbers for station {station}"
@@ -79,9 +79,9 @@ def test_bp8_has_all_nine_stations(station):
 
 @pytest.mark.parametrize("profile", BP8_PROFILES)
 def test_bp8_has_all_ten_section43_profiles(profile):
-    d = gold_dir("bp8")
+    d = gold_dir("test.bp8.qdc.gs.10")
     assert (d / f"{profile}.csv").is_file(), (
-        f"reference/bp8/{profile}.csv is missing; "
+        f"reference/test.bp8.qdc.gs.10/{profile}.csv is missing; "
         "resampleBP8Profiles.py and checkBP8Submission both exercise this "
         "file with no oracle to catch a regression in it"
     )
@@ -90,17 +90,17 @@ def test_bp8_has_all_ten_section43_profiles(profile):
 def test_bp8_has_a_fault_plane_snapshot():
     """BP5/BP7 have compared a fault-plane snapshot for a long time; BP8 never
     did. Filename differs from BP5/BP7 (step 05301, not 00101) because BP8 is
-    a single aseismic run, not a multi-cycle one -- see reference/bp8/README.md.
+    a single aseismic run, not a multi-cycle one -- see reference/test.bp8.qdc.gs.10/README.md.
     """
-    d = gold_dir("bp8")
+    d = gold_dir("test.bp8.qdc.gs.10")
     hits = glob.glob(str(d / "fault.*.nc"))
-    assert hits, "reference/bp8 has no fault-plane netCDF snapshot"
+    assert hits, "reference/test.bp8.qdc.gs.10 has no fault-plane netCDF snapshot"
     csv_hits = glob.glob(str(d / "fault.*.csv"))
-    assert csv_hits, "reference/bp8 has no flattened CSV of the fault-plane snapshot"
+    assert csv_hits, "reference/test.bp8.qdc.gs.10 has no flattened CSV of the fault-plane snapshot"
 
 
 def test_bp8_fault_snapshot_csv_matches_the_netcdf():
-    """reference/bp8/fault.05301.csv is the flattened, human-eyeballable
+    """reference/test.bp8.qdc.gs.10/fault.05301.csv is the flattened, human-eyeballable
     twin of fault.05301.nc (same convention as BP5/BP7's fault.00101.csv). A
     reader that only checks the .nc would miss the .csv going stale if either
     is regenerated without the other -- this cross-checks them row for row.
@@ -108,10 +108,10 @@ def test_bp8_fault_snapshot_csv_matches_the_netcdf():
     netCDF4 = pytest.importorskip("netCDF4")
     import numpy as np
 
-    d = gold_dir("bp8")
+    d = gold_dir("test.bp8.qdc.gs.10")
     nc_path = d / "fault.05301.nc"
     csv_path = d / "fault.05301.csv"
-    assert csv_path.is_file(), "reference/bp8/fault.05301.csv is missing"
+    assert csv_path.is_file(), "reference/test.bp8.qdc.gs.10/fault.05301.csv is missing"
 
     ds = netCDF4.Dataset(nc_path)
     names = [v for v in ds.variables if not v.startswith("nid_fault")]
@@ -141,9 +141,9 @@ def test_bp8_fault_snapshot_csv_matches_the_netcdf():
 def test_bp8_global_csv_matches_summary():
     """global.csv's last row must agree with the scalar numbers
     summary.json's "global" block and the e2e test both hold it to."""
-    d = gold_dir("bp8")
+    d = gold_dir("test.bp8.qdc.gs.10")
     csv_path = d / "global.csv"
-    assert csv_path.is_file(), "reference/bp8/global.csv is missing"
+    assert csv_path.is_file(), "reference/test.bp8.qdc.gs.10/global.csv is missing"
 
     import numpy as np
     rows = np.genfromtxt(csv_path, delimiter=",", skip_header=1)

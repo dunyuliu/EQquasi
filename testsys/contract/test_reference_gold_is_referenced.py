@@ -5,8 +5,8 @@ not (and cannot) prove a file is compared *correctly* -- only that something in
 the test suite or the plotting tooling names it, so an unused file is at least
 visible rather than silently accumulating.
 
-Scoped to reference/<bench>/*.{json,nc,csv} -- the oracles rule 3/8 are
-about. reference/<bench>/plots/ and reference/bp8/archive/ are byproducts and
+Scoped to reference/<compset>/*.{json,nc,csv} -- the oracles rule 3/8 are
+about. reference/<compset>/plots/ and reference/test.bp8.qdc.gs.10/archive/ are byproducts and
 scratch, not oracles, and are deliberately excluded.
 """
 
@@ -14,7 +14,7 @@ import sys
 
 from conftest import ROOT, read
 
-# The gold/ layer was removed in v1.9.0: reference/<bench>/ is itself the
+# The gold/ layer was removed in v1.9.0: reference/<compset>/ is itself the
 # reference, and a run's results may sit in a subdirectory (cycle0,
 # cycle0-step101-fast). Take both levels.
 GOLD_DIRS = sorted(d for d in (ROOT / "reference").glob("*") if d.is_dir()) + \

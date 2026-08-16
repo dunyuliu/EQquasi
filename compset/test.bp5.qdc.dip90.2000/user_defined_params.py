@@ -2,7 +2,7 @@
 # compset: test.bp5.qdc.dip90.2000
 # gate   : e2e fast
 # changed: 2026-08-12   (content; see git log for the full history)
-# note   : Fast-tier row since 2026-08-15; reference/bp5.dip90.
+# note   : Fast-tier row since 2026-08-15; reference/test.bp5.qdc.dip90.2000.
 # Status is mirrored in compset/README.md, which a contract test checks.
 # ----------------------------------------------------------------------
 

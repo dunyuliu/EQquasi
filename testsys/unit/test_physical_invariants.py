@@ -46,9 +46,9 @@ def _field_references():
 FIELD_GOLD = _field_references()
 
 BP8_SNAPSHOT = ROOT / "reference" / "test.bp8.qdc.gs.10" /  "fault.05301.csv"
-# reference/test.stepover.qdc.1000/ never existed under that name; the two-fault case is
-# BP1002, and its snapshots are netCDF, not CSV. The constant sat here unused
-# and unreachable, so nothing noticed.
+# There was never a CSV step-over gold: the two-fault case is BP1002, and its
+# snapshots are netCDF, not CSV. The constant sat here unused and unreachable,
+# so nothing noticed.
 STEPOVER_SNAPSHOT = ROOT / "reference" / "bp1002.qdc.2500" / "cycle0" / "fault.00001.nc"
 
 BP8_GOLD_DIR = ROOT / "reference" / "test.bp8.qdc.gs.10" 

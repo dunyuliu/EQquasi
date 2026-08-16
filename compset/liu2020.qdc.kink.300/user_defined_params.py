@@ -202,4 +202,4 @@ par.az_maxiter = 2000
 par.az_tol = 1.0e-7
 
 # Caps were historically implied by rough_fault; the switch is explicit now.
-par.enforce_norm_caps = 1
+par.C_normal_stress_caps = 1

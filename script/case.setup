@@ -80,7 +80,7 @@ def create_model_input_file():
         # keeps its defaults. Cannot go after faultgeom -- 13 of 16 compset do
         # not write that block, and their faultgeom read would swallow this line.
         f.write(str(par.min_norm) + "  " + str(par.max_norm)
-                + "  " + str(par.enforce_norm_caps) + "\n")
+                + "  " + str(par.C_normal_stress_caps) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the
         # attribute defaults to None) keeps every existing compset's
@@ -456,6 +456,49 @@ def refuse_if_case_has_run():
         "certain the regenerated inputs are identical.")
 
 
+def report_normal_stress_caps():
+  """Say whether caps are on, and warn when a geometry that perturbs normal
+  stress runs without them.
+
+  Normal stress is constant on a planar fault under uniform far-field load,
+  so most cases never need caps and the default is off. It is not constant
+  where the fault bends, steps, or is rough: the normal component of the
+  far-field traction changes with strike, and a tip facing a releasing step
+  unclamps cycle after cycle until the effective normal stress crosses zero
+  and rate-and-state has no solution (stop 508). That is the whole reason
+  min_norm/max_norm exist.
+
+  This warns rather than sets: which cases want the regularisation is the
+  owner's decision, and turning it on silently would change results nobody
+  asked to change. It exists because a run once believed caps were on for
+  ten cycles while the flag was never written (2026-08-15).
+  """
+  caps_on = getattr(par, "C_normal_stress_caps", 0) == 1
+  if caps_on:
+    print("  normal-stress caps ON: min_norm %.3g MPa, max_norm %.3g MPa"
+          % (par.min_norm / 1e6, par.max_norm / 1e6))
+    return
+
+  reasons = []
+  if getattr(par, "rough_fault", 0) == 1 or getattr(par, "insertFaultType", 0) > 0:
+    reasons.append("non-planar fault geometry (rough_fault/insertFaultType)")
+  if getattr(par, "ntotft", 1) > 1:
+    reasons.append("%d faults: a step-over or branch tip unclamps"
+                   % par.ntotft)
+  geom = getattr(par, "faultgeom", None)
+  if geom and len({g[2] for g in geom}) > 1:
+    reasons.append("fault segments on different y-planes (a step-over)")
+
+  if reasons:
+    print("  normal-stress caps OFF, but this case has:")
+    for r in reasons:
+      print("    - " + r)
+    print("  Effective normal stress can drift toward zero at a tip and the")
+    print("  run then stops on the physics guard (stop 508). Set")
+    print("  par.C_normal_stress_caps = 1 with par.min_norm/par.max_norm if")
+    print("  that regularisation is wanted (Liu et al. 2020, section 3.5).")
+
+
 def _main_func(description):
   refuse_if_case_has_run()
   create_model_input_file()
@@ -465,6 +508,7 @@ def _main_func(description):
   create_station_input_file()
   estimate_HPC_resource()
   report_cohesive_zone()
+  report_normal_stress_caps()
   netcdf_write_on_fault_vars()
   if par.insertFaultType>0:
       # Check the exit status. This used to be ignored, so when

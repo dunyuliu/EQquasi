@@ -60,7 +60,9 @@ Read this first on wake-up. Update in place; close items by deleting them.
    Live science runs as of 2026-08-15 (knox; never restart/stop/rebuild):
    - `work/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.15.1 (launched
      before the 1.16.0 bump; runInfo.json is authoritative), nstep=30000,
-     enforce_norm_caps=1. Cycle 0 matches the uncapped baseline on step count
+     C_normal_stress_caps=1 (it wrote the pre-flag two-value caps line, so
+     caps were in fact OFF for its whole life -- see the finding below).
+     Cycle 0 matches the uncapped baseline on step count
      and peak Vmax to displayed precision (3821 steps, peak 0.8458) — caps
      inert while sigma_n stays in [-25.6, -18.7] MPa. THE question: does it
      pass cycle 9, where the uncapped run died on stop-508 (+0.60 MPa at
@@ -131,9 +133,29 @@ Read this first on wake-up. Update in place; close items by deleting them.
   fixed-length local first. The same file already warned about this for
   allocatable dummies -- it applies to character dummies as well.
 
+### Caps finding, 2026-08-15/16 (bp1002caps)
+
+`work/bp1002caps.sci` ran ten cycles believing caps were on. They were not:
+its `model.txt` carried the two-value pre-flag caps line, so the flag stayed
+0, and `capsActive` also required `C_elastic == 1` -- two hidden conditions.
+Effective normal stress at fault B's tip walked -22.0 -> -10.1 -> -0.01 MPa
+across c0-c9 and the run stopped on the physics guard in cycle 10
+(sigma_bar = +4.92 MPa at x = +2500 m, z = 0, sigma_bar_0 = -12.64 MPa) --
+the mirror of the uncapped run's fault A tip. It DID pass cycle 9, where the
+uncapped run died, but with caps inert that difference is binary version
+(1.15.1 vs 1.14.0) plus chaotic divergence, not the caps.
+
+v1.17.0 replaces the gates with one explicit flag, prints the caps state at
+startup, and `case.setup` warns when a multi-fault or non-planar case runs
+without caps. `work/bp1002caps2.sci` is the honest experiment: forked from
+cycle 5 -- the last cycle whose sigma_n is still inside [-40, -10] -- with
+caps genuinely on. Forking later is refused by the stop-7 guard, correctly:
+clamping an already-drifted state would break steady state.
+
 ### Known open, from today
 - [CLOSED v1.16.0] Hardcoded normal-stress caps. Parameterised as
-  `min_norm`/`max_norm` with ONE switch `par.enforce_norm_caps` (default 0 —
+  `min_norm`/`max_norm` with ONE explicit switch `par.C_normal_stress_caps`
+  (v1.17.0; was `enforce_norm_caps` with a hidden `C_elastic` gate; default 0 —
   caps off unless a compset opts in; the old implicit rough_fault coupling is
   gone, legacy files get a printed NOTE, malformed caps lines stop loudly).
   Of the kink compset only `liu2020.qdc.kink.600` sets the paper's -100 MPa;

@@ -138,16 +138,25 @@ Read this first on wake-up. Update in place; close items by deleting them.
 `work/bp1002caps.sci` ran ten cycles believing caps were on. They were not:
 its `model.txt` carried the two-value pre-flag caps line, so the flag stayed
 0, and `capsActive` also required `C_elastic == 1` -- two hidden conditions.
-Effective normal stress at fault B's tip walked -22.0 -> -10.1 -> -0.01 MPa
-across c0-c9 and the run stopped on the physics guard in cycle 10
-(sigma_bar = +4.92 MPa at x = +2500 m, z = 0, sigma_bar_0 = -12.64 MPa) --
-the mirror of the uncapped run's fault A tip. It DID pass cycle 9, where the
+Effective normal stress walked -22.0 -> -10.1 -> -0.01 MPa across c0-c9 in
+the 5 km overlap zone, at the free surface, on BOTH faults: at c9 the
+least-compressive node is fault 2's at x = +2500 m (-0.01 MPa) and fault
+1's at x = -2500 m (-0.11 MPa), dip index 8 (z = 0). The run stopped on
+the physics guard in cycle 10 at (x = +2500 m, z = 0), sigma_bar = +4.92
+MPa, sigma_bar_0 = -12.64 MPa -- the opposite end of that overlap from the
+uncapped run's failure at x = -2500 m. Both faults span the overlap
+(A: -60 to +2.5 km, B: -2.5 to +60 km), so name the node by coordinate and
+fault index, not by "the tip". It DID pass cycle 9, where the
 uncapped run died, but with caps inert that difference is binary version
 (1.15.1 vs 1.14.0) plus chaotic divergence, not the caps.
 
-v1.17.0 replaces the gates with one explicit flag, prints the caps state at
+v1.17.1 replaces the gates with one explicit flag, prints the caps state at
 startup, and `case.setup` warns when a multi-fault or non-planar case runs
-without caps. `work/bp1002caps2.sci` is the honest experiment: forked from
+without caps. `work/bp1002caps2.sci` is the honest experiment (binary eqquasi-1.17.0;
+that file was rebuilt once, 4 minutes into the run, with a message-text
+change only -- no numerical difference, recorded here rather than hidden;
+the merged version is 1.17.1 so no later build touches the path it uses):
+forked from
 cycle 5 -- the last cycle whose sigma_n is still inside [-40, -10] -- with
 caps genuinely on. Forking later is refused by the stop-7 guard, correctly:
 clamping an already-drifted state would break steady state.

@@ -270,4 +270,4 @@ par.az_maxiter = 2000
 par.az_tol = 1.0e-7
 
 # The one switch this variant exists for.
-par.enforce_norm_caps = 1
+par.C_normal_stress_caps = 1

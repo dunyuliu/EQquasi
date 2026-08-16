@@ -169,10 +169,14 @@ subroutine readmodel
                 ! three numbers: caps plus the enforce flag.
                 min_norm = capsTmp1
                 max_norm = capsTmp2
-                enforce_norm_caps = int(capsTmp3 + 0.5d0)
+                C_normal_stress_caps = int(capsTmp3 + 0.5d0)
             else
                 read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2
                 if (iosCaps == 0) then
+                    ! Two numbers: a model.txt written before the flag
+                    ! existed. Values load, caps stay OFF -- and the run
+                    ! says so below, because a case that believed caps were
+                    ! on when they were not cost ten cycles once.
                     min_norm = capsTmp1
                     max_norm = capsTmp2
                 else
@@ -203,12 +207,16 @@ subroutine readmodel
             fltxyz(1,4,ift) = 270.0d0/180.0d0*pi
             fltxyz(2,4,ift) = 90.0d0/180.0d0*pi
         enddo
-    ! One switch, no rough_fault coupling.
-    capsActive = (enforce_norm_caps == 1 .and. C_elastic == 1)
-    if (rough_fault == 1 .and. enforce_norm_caps /= 1 .and. me == 0) then
-        write(*,*) 'NOTE: rough_fault = 1 but normal-stress caps are OFF.'
-        write(*,*) 'Caps no longer follow rough_fault; set'
-        write(*,*) 'par.enforce_norm_caps = 1 if this case expects them.'
+    ! One explicit switch. No C_elastic gate, no rough_fault coupling.
+    capsActive = (C_normal_stress_caps == 1)
+    ! Always state it: the only way to know caps are on is to be told.
+    if (me == 0) then
+        if (capsActive) then
+            write(*,*) '= normal-stress caps ON  (C_normal_stress_caps = 1) ='
+            write(*,*) '=   min_norm, max_norm (Pa) =', min_norm, max_norm
+        else
+            write(*,*) '= normal-stress caps OFF (C_normal_stress_caps = 0) ='
+        endif
     endif
 
     close(1002)

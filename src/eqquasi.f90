@@ -110,8 +110,8 @@ subroutine checkNormalStressCaps
     ! Stop if the initial normal stress lies outside the caps that will be
     ! applied to it.
     !
-    ! The caps only act when rough_fault == 1 .and. C_elastic == 1. When they
-    ! do, they clamp fric(FR_TNRM0,...) on the first evaluation -- but the initial
+    ! The caps act iff C_normal_stress_caps == 1 -- one explicit flag, no
+    ! other condition. When they do, they clamp fric(FR_TNRM0,...) on the first evaluation -- but the initial
     ! SHEAR stress was computed by the compset from the uncapped normal
     ! stress, and nothing recomputes it. The initial condition is then no
     ! longer at steady state: tau/sigma_bar is too high by exactly the ratio
@@ -151,8 +151,11 @@ subroutine checkNormalStressCaps
                 write(*,*) '=                                                   ='
                 write(*,*) '= Fix: widen par.min_norm/par.max_norm to cover the ='
                 write(*,*) '= initial stress, or lower par.init_norm into range. ='
-                write(*,*) '= The caps act only when rough_fault=1 and           ='
-                write(*,*) '= C_elastic=1; most cases never reach them.          ='
+                write(*,*) '= Caps are on because this case set             ='
+                write(*,*) '= par.C_normal_stress_caps = 1; set it to 0 to  ='
+                write(*,*) '= run without them (the default).               ='
+                write(*,*) '= Forking a run into caps mid-history hits this: ='
+                write(*,*) '= restart from a cycle still inside the range.  ='
                 write(*,*) '====================================================='
                 stop 7
             endif

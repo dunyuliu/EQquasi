@@ -27,10 +27,14 @@ MPIFC := $(shell command -v mpif90.openmpi >/dev/null 2>&1 && mpif90.openmpi -sh
 # conda is not available on utig/ubuntu/local/ls6). Left as a plain Fortran
 # CALL, that is an undefined-reference link failure on every other machine.
 # PETSC_DEFINE is empty by default and set to -DHAVE_PETSC only in the
-# conda-linux branch below; eqquasi.o is preprocessed (-cpp) so the call site
+# conda-linux branch below; eqquasi.o is preprocessed so the call site
 # itself compiles out on machines without it, replaced by a loud runtime stop
-# (rule 2) instead of a link error.
+# (rule 2) instead of a link error. CPPFLAG is the preprocessor flag itself,
+# gfortran-style (-cpp) by default; ls6's mpiifort wants -fpp instead
+# (overridden in that branch below) -- not exercised on any host yet
+# (rule 9), so this is a plausible-not-verified guess, flagged as such.
 PETSC_DEFINE =
+CPPFLAG = -cpp
 
 ifeq ($(SYSTEM), utig)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
@@ -136,6 +140,7 @@ else ifeq ($(SYSTEM), conda-linux)
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort
+    CPPFLAG    = -fpp
     LIB        = ${TACC_MKL_LIB}
     MUMPS_INC  = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
@@ -171,7 +176,7 @@ eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              read_input.o            func_lib.o  \
              netcdf_io.o
-	$(FC) $(OPT) -cpp ${PETSC_DEFINE} eqquasi.f90
+	$(FC) $(OPT) ${CPPFLAG} ${PETSC_DEFINE} eqquasi.f90
 globalvar.o: globalvar.f90
 	$(FC) $(OPT) globalvar.f90     
 mesh4num.o:  mesh4num.f90  globalvar.o
@@ -187,7 +192,7 @@ solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o c8g2.o      shl
              faulting.o  fric.o                \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
-	$(FC) $(OPT) -cpp solveTimeLoopPETSc.f90 ${PETSC_INC}
+	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETSc.f90 ${PETSC_INC}
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o

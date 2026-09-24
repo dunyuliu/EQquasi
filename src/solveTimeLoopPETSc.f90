@@ -27,16 +27,14 @@ subroutine solveTimeLoopPETSc
 !     solving the wrong system (rule 2). See the guard right after
 !     KSPSetFromOptions below.
 !
-! CAUGHT BY THE ROW 8C SWEEP, NOT FIXED HERE: this Mat is still
-! MatCreateSeqAIJ on PETSC_COMM_SELF (rank 0 only), so this path is
-! genuinely serial regardless of -np -- the bp5 sweep shows solver=2 flat at
-! ~1.015-1.018 s/step for ranks 1/2/4/8 while solver=1 (MUMPS, parallel-root)
-! scales 1.015 -> 0.524 s/step. Distributing the matrix (MPIAIJ on
-! PETSC_COMM_WORLD, row-owned per rank) is real work, not a follow-on
-! polish item -- it is the FIRST thing row 8b must do, ahead of the
-! GAMG/CG/near-null-space code below, which was written and left uncompiled
-! pending that decision. Row 8a's own gate (parity) does not need it: a
-! serial solve is still the same solve.
+! CAUGHT BY THE ROW 8C SWEEP, FIXED IN A LATER COMMIT ON THIS SAME PR: this
+! Mat was originally MatCreateSeqAIJ on PETSC_COMM_SELF (rank 0 only), which
+! the bp5 sweep showed made solver=2 genuinely serial regardless of -np
+! (flat ~1.015-1.018 s/step at ranks 1/2/4/8, while solver=1/MUMPS scaled
+! 1.015 -> 0.524). Amat is now MATAIJ on PETSC_COMM_WORLD (see "Row 8c
+! distribution" below), still built from the same rank-0-only CRS arrays.
+! STILL UNCOMPILED as of this note -- rule 9 applies: this is a claim to
+! verify on the target host, not yet a fact.
 !
 ! Same time-loop physics, same CRS assembly (createMatrixHolderInCRSFormat /
 ! elemAssembleInCRS, both reused UNMODIFIED and rank-0-only, exactly as in
@@ -67,10 +65,14 @@ subroutine solveTimeLoopPETSc
 ! RUN SUMMARY block, unchanged, so the two solvers' logs are diffable line
 ! for line.
 !
-! Matrix is built as a SeqAIJ Mat on PETSC_COMM_SELF, rank 0 only: CRS here is
-! rank-0-centralized (not distributed across ranks), so MatCreateMPIAIJ would
-! be the wrong tool -- see the comment above, and PATHWAY_FORWARD row 8b/8c
-! for what changes when that stops being true.
+! SUPERSEDED by the row 8c note near MatCreate below (rule 10: kept only for
+! history) -- row 8a originally built Amat as a SeqAIJ Mat on
+! PETSC_COMM_SELF, rank 0 only, since the CRS arrays feeding it
+! (kstiff/ia/ja/num) are still rank-0-only globals. The row 8c sweep showed
+! that made solver=2 genuinely serial regardless of -np, so Amat is now
+! MATAIJ on PETSC_COMM_WORLD (auto Seq/MPI by comm size) -- see the "Row 8c
+! distribution" comment before MatCreate for the current architecture.
+! kstiff/ia/ja/num themselves are still rank-0-only, unchanged.
 !
 ! kstiff/ia/ja hold only the upper-triangular half (i <= j) of the symmetric
 ! stiffness matrix -- createMatrixHolderInCRSFormat sorts every element pair
@@ -97,12 +99,13 @@ subroutine solveTimeLoopPETSc
     PetscErrorCode             :: perr
     PetscInt                   :: prow, pncols
     PetscInt, allocatable      :: pnnz(:)
+    PetscInt, allocatable      :: nnzArr(:)
     PetscInt, allocatable      :: allIdx(:)
     PetscInt                   :: pcols(100)
     PetscScalar                :: pvals(100)
     PetscScalar, pointer       :: parr(:)
     PetscInt                   :: kspIts, totalKSPIts, nKSPSolves
-    PetscBool                  :: isPreonly
+    PetscBool                  :: isPreonly, isCholesky
     KSPConvergedReason         :: kspReason
     PetscInt                   :: maxRowNnz
 
@@ -174,11 +177,24 @@ subroutine solveTimeLoopPETSc
     CHKERRA(perr)
     call MatSetType(Amat, MATAIJ, perr)
     CHKERRA(perr)
-    call MatSeqAIJSetPreallocation(Amat, maxRowNnz, PETSC_NULL_INTEGER, perr)
+    ! Explicit arrays, not PETSC_NULL_INTEGER: a second audit pass flagged
+    ! that this PETSc Fortran interface (3.25.5) may require the
+    ! array-specific PETSC_NULL_INTEGER_ARRAY sentinel here rather than the
+    ! scalar PETSC_NULL_INTEGER, and could not confirm which without
+    ! compiling. Sidestepped entirely by passing a real, generously-sized
+    ! (length neq, safe for any rank's actual local row count) uniform-fill
+    ! array instead of a null placeholder -- unambiguous across Fortran
+    ! interface versions. The leading scalar `0` in both calls is the
+    ! "uniform nz" convenience argument, ignored once the array is
+    ! non-null; using it too would have hit the exact same sentinel
+    ! question, so both preallocation calls stay fully explicit.
+    allocate(nnzArr(neq))
+    nnzArr = maxRowNnz
+    call MatSeqAIJSetPreallocation(Amat, 0, nnzArr, perr)
     CHKERRA(perr)
-    call MatMPIAIJSetPreallocation(Amat, maxRowNnz, PETSC_NULL_INTEGER, &
-        maxRowNnz, PETSC_NULL_INTEGER, perr)
+    call MatMPIAIJSetPreallocation(Amat, 0, nnzArr, 0, nnzArr, perr)
     CHKERRA(perr)
+    deallocate(nnzArr)
 
     if (me.eq.0) then
         do i = 1, neq
@@ -346,26 +362,37 @@ subroutine solveTimeLoopPETSc
 
     call PetscObjectTypeCompare(ksp, KSPPREONLY, isPreonly, perr)
     CHKERRA(perr)
+    call PetscObjectTypeCompare(pc, PCCHOLESKY, isCholesky, perr)
+    CHKERRA(perr)
     ! CORRECTNESS GUARD (audit-caught before this was ever compiled, 2026-
-    ! 09-24): Amat above stores only the upper triangle (i <= j) of the
-    ! stiffness matrix. MUMPS's Cholesky path (the hardcoded default,
-    ! KSPPREONLY/PCCHOLESKY) reads exactly that by SYM=1 convention -- fine.
-    ! Any OTHER KSP/PC (a runtime -ksp_type cg -pc_type gamg override) does
-    ! real MatMult against Amat as stored, which is not symmetric and not
-    ! the actual stiffness matrix once you only keep half of it: a silently
-    ! WRONG linear system, not a slower one. Fixing this needs MATSBAIJ
-    ! storage or inserting both triangles, neither done yet -- deferred to
-    ! the row 8b compile-and-test pass, after distribution (this pass's own
-    ! priority, see the note above MatCreate). Refuse rather than silently
-    ! solve the wrong system in the meantime (rule 2).
-    if (.not. isPreonly) then
-        if (me == 0) write(*,*) 'PETSc solver: a non-default KSP/PC is ', &
-            'in effect (e.g. -ksp_type/-pc_type), but this Mat only ', &
+    ! 09-24; widened after a second audit pass found the first version only
+    ! checked the KSP type, so `-pc_type lu` under KSPPREONLY -- reaching
+    ! MUMPS with sym=0 on this upper-triangle-only Mat, the exact silent
+    ! wrong-answer case row 8a's own PCLU-vs-PCCHOLESKY finding describes --
+    ! was NOT caught): Amat above stores only the upper triangle (i <= j) of
+    ! the stiffness matrix. MUMPS's Cholesky path (the hardcoded default,
+    ! KSPPREONLY + PCCHOLESKY) reads exactly that by SYM=1 convention --
+    ! fine. Any OTHER KSP type OR PC type (a runtime -ksp_type cg,
+    ! -pc_type lu, -pc_type gamg, etc. override) does a real MatMult against
+    ! Amat as stored, which is not symmetric and not the actual stiffness
+    ! matrix once you only keep half of it: a silently WRONG linear system,
+    ! not a slower one. Fixing this needs MATSBAIJ storage or inserting both
+    ! triangles, neither done yet -- deferred to the row 8b compile-and-test
+    ! pass, after distribution (this pass's own priority, see the note
+    ! above MatCreate). Refuse rather than silently solve the wrong system
+    ! in the meantime (rule 2). Not checked here: the solver package
+    ! (MUMPS vs PETSc's native Cholesky) -- both read symmetric AIJ storage
+    ! the same way, so this is believed harmless, but is not verified
+    ! against PETSc's native Cholesky path the way MUMPS's is.
+    if ((.not. isPreonly) .or. (.not. isCholesky)) then
+        if (me == 0) write(*,*) 'PETSc solver: a non-default KSP or PC ', &
+            'is in effect (e.g. -ksp_type/-pc_type), but this Mat only ', &
             'stores the upper triangle -- correct for the hardcoded ', &
-            'MUMPS Cholesky default, WRONG for CG/GAMG or any method ', &
-            'that does a real MatMult. Not fixed yet (needs MATSBAIJ ', &
-            'storage or both triangles inserted); refusing rather than ', &
-            'computing a silently wrong answer.'
+            'KSPPREONLY/PCCHOLESKY/MUMPS default, WRONG for CG/GAMG/LU ', &
+            'or any method that does a real MatMult or a non-SYM=1 ', &
+            'factorization. Not fixed yet (needs MATSBAIJ storage or ', &
+            'both triangles inserted); refusing rather than computing ', &
+            'a silently wrong answer.'
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
     ! Row 8b warm start: only reachable once the guard above is satisfied
@@ -382,11 +409,14 @@ subroutine solveTimeLoopPETSc
 
     if (me == 0) call initOnFaultKinematics
 
+    ! KSPSetUp (analysis + factorization) is collective on PETSC_COMM_WORLD
+    ! now -- gating it behind `if (me.eq.0)` (row 8c's first pass) hangs
+    ! every other rank waiting on a call that never comes, caught by a
+    ! second audit pass before this was ever compiled. cpu_time is a
+    ! per-process wall/CPU clock, still meaningful read on rank 0 alone.
     call cpu_time(startTime)
-    if (me.eq.0) then
-        call KSPSetUp(ksp, perr)   ! Combines analysis + factorization, once.
-        CHKERRA(perr)
-    endif
+    call KSPSetUp(ksp, perr)   ! Combines analysis + factorization, once.
+    CHKERRA(perr)
     call cpu_time(endTime)
     timeUsedInFactorization = endTime - startTime
 
@@ -486,9 +516,14 @@ subroutine solveTimeLoopPETSc
             ! Rule 2: a solve that did not converge is not a solution.
             call KSPGetConvergedReason(ksp, kspReason, perr)
             CHKERRA(perr)
-            if (kspReason < 0) then
+            ! KSPConvergedReason is a Fortran derived type (type(eKSPConvergedReason),
+            ! petsc/finclude/petscksp.h), not a plain integer -- petscksp.mod
+            ! only defines ==/ /= for it, not <, so the raw integer code
+            ! must be read via its %v component. Caught by an audit reading
+            ! the actual .mod/finclude headers before this was compiled.
+            if (kspReason%v < 0) then
                 if (me == 0) write(*,*) 'PETSc solver: KSPSolve did NOT ', &
-                    'converge (KSPConvergedReason =', kspReason, &
+                    'converge (KSPConvergedReason =', kspReason%v, &
                     ') at step', it, 'iiTag', iiTag, &
                     '-- stopping rather than using an unconverged solve.'
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)

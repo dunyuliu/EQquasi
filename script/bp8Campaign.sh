@@ -1,17 +1,17 @@
 #! /bin/bash
 # Autonomous BP8 study. Runs sequentially, appends one summary line per case to
-# work/campaign.log, and never overwrites a directory another case is using.
+# scratch/campaign.log, and never overwrites a directory another case is using.
 #
 # The problem is small, so everything runs on a single rank with a single
 # OpenMP thread unless the element count makes that impractical.
 
 set -u
-R=/home/utig5/dliu/seas_bp10_eqquasi
+R=/home/utig5/dliu/eqquasi
 EX=$R/bin/eqquasi
 export EQQUASIROOT=$R
 export PATH=$R/bin:$R/scripts:$PATH
 export OMP_NUM_THREADS=1
-LOG=$R/work/campaign.log
+LOG=$R/scratch/campaign.log
 
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
@@ -75,8 +75,8 @@ say "===== BP8 campaign start ====="
 
 # ---------------------------------------------------------------- 1. scaling
 say "--- phase 1: MPI/OpenMP scaling on the 8000-element case"
-mkcase $R/work/camp.scal test.bp8.qdc.gs.10
-cd $R/work/camp.scal
+mkcase $R/scratch/camp.scal test.bp8.qdc.gs.10
+cd $R/scratch/camp.scal
 sed -i "s/^par.nstep       = .*/par.nstep       = 200/" user_defined_params.py
 ./case.setup > setup.log 2>&1
 for NP in 1 2 4 8; do
@@ -89,28 +89,28 @@ done
 # ------------------------------------------------------------ 2. domain sweep
 say "--- phase 2: domain sweep, half-width in x, y and z"
 for H in 500 1000 2000; do
-  mkcase $R/work/camp.dom$H test.bp8.qdc.gs.10
-  cd $R/work/camp.dom$H
+  mkcase $R/scratch/camp.dom$H test.bp8.qdc.gs.10
+  cd $R/scratch/camp.dom$H
   sed -i "s/^par.fxmin, par.fxmax = .*/par.fxmin, par.fxmax = -$H.0, $H.0/" user_defined_params.py
   sed -i "s/^par.fymin, par.fymax = .*/par.fymin, par.fymax = -$H.0, $H.0/" user_defined_params.py
   sed -i "s/^par.fzmin, par.fzmax = .*/par.fzmin, par.fzmax = -$H.0, $H.0/" user_defined_params.py
   sed -i "s/^par.nstep       = .*/par.nstep       = 4000/" user_defined_params.py
   sed -i "s/^par.nt_out      = .*/par.nt_out      = 4000/" user_defined_params.py
-  run_case $R/work/camp.dom$H "domain_${H}m"
+  run_case $R/scratch/camp.dom$H "domain_${H}m"
 done
 
 # ------------------------------------------------------- 3. xi (time step) sweep
 say "--- phase 3: xi sweep at the 1000 m box"
 for XI in 0.05 0.1 0.2; do
-  mkcase $R/work/camp.xi$XI test.bp8.qdc.gs.10
-  cd $R/work/camp.xi$XI
+  mkcase $R/scratch/camp.xi$XI test.bp8.qdc.gs.10
+  cd $R/scratch/camp.xi$XI
   sed -i "s/^par.fxmin, par.fxmax = .*/par.fxmin, par.fxmax = -1000.0, 1000.0/" user_defined_params.py
   sed -i "s/^par.fymin, par.fymax = .*/par.fymin, par.fymax = -1000.0, 1000.0/" user_defined_params.py
   sed -i "s/^par.fzmin, par.fzmax = .*/par.fzmin, par.fzmax = -1000.0, 1000.0/" user_defined_params.py
   sed -i "s/^par.xi = .*/par.xi = $XI/" user_defined_params.py
   sed -i "s/^par.nstep       = .*/par.nstep       = 4000/" user_defined_params.py
   sed -i "s/^par.nt_out      = .*/par.nt_out      = 4000/" user_defined_params.py
-  run_case $R/work/camp.xi$XI "xi_${XI}"
+  run_case $R/scratch/camp.xi$XI "xi_${XI}"
 done
 
 # ------------------------------------------------------------- 4. comparison plot

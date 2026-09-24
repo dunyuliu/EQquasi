@@ -58,7 +58,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
    hits the nstep=10000 cap; gracefully stopped after the in-flight cycle to
    free the box for the e2e tier.
    Live science runs as of 2026-08-15 (knox; never restart/stop/rebuild):
-   - `work/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.15.1 (launched
+   - `scratch/bp1002caps.sci` — bp1002.qdc.caps.2500, eqquasi-1.15.1 (launched
      before the 1.16.0 bump; runInfo.json is authoritative), nstep=30000,
      C_normal_stress_caps=1 (it wrote the pre-flag two-value caps line, so
      caps were in fact OFF for its whole life -- see the finding below).
@@ -67,15 +67,15 @@ Read this first on wake-up. Update in place; close items by deleting them.
      inert while sigma_n stays in [-25.6, -18.7] MPa. THE question: does it
      pass cycle 9, where the uncapped run died on stop-508 (+0.60 MPa at
      fault A's tip)?
-   - `work/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0 matches
+   - `scratch/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0 matches
      `reference/bp5.qdc.kink.2000` on step count and peak Vmax to displayed precision
      (4876 steps, peak 1.168).
-   - `work/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
+   - `scratch/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
      cycle 0 in flight. First event nucleated 2026-08-15 ~10:45.
    Prior knox/cotopaxi datasets that STAND (do not delete):
-   `work/bp1002_stepover/multicycle_20_knox` (9 cycles to stop-508),
-   `work/liu2020.kink.10cyc` (dx=600 coherent), `work/kink.dc014.dx1200`
-   (dtcap control), `work/liu2020.kink.10cyc.dx1200` (negative control).
+   `scratch/bp1002_stepover/multicycle_20_knox` (9 cycles to stop-508),
+   `scratch/liu2020.kink.10cyc` (dx=600 coherent), `scratch/kink.dc014.dx1200`
+   (dtcap control), `scratch/liu2020.kink.10cyc.dx1200` (negative control).
 
 3. [ ] **Full e2e tier at HEAD.** Has not run since the compset rename, the
    script/testsys rename, or the cohesive-zone precheck. `MACHINE=utig` on
@@ -135,7 +135,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
 
 ### Caps finding, 2026-08-15/16 (bp1002caps)
 
-`work/bp1002caps.sci` ran ten cycles believing caps were on. They were not:
+`scratch/bp1002caps.sci` ran ten cycles believing caps were on. They were not:
 its `model.txt` carried the two-value pre-flag caps line, so the flag stayed
 0, and `capsActive` also required `C_elastic == 1` -- two hidden conditions.
 Effective normal stress walked -22.0 -> -10.1 -> -0.01 MPa across c0-c9 in
@@ -152,7 +152,7 @@ uncapped run died, but with caps inert that difference is binary version
 
 v1.17.1 replaces the gates with one explicit flag, prints the caps state at
 startup, and `case.setup` warns when a multi-fault or non-planar case runs
-without caps. `work/bp1002caps2.sci` is the honest experiment (binary eqquasi-1.17.0;
+without caps. `scratch/bp1002caps2.sci` is the honest experiment (binary eqquasi-1.17.0;
 that file was rebuilt once, 4 minutes into the run, with a message-text
 change only -- no numerical difference, recorded here rather than hidden;
 the merged version is 1.17.1 so no later build touches the path it uses):
@@ -173,7 +173,7 @@ clamping an already-drifted state would break steady state.
   below in the reproduction note stands as written.
 
 - **Reproducing Liu, Duan & Luo (2020), EQquasi half.** Paper at
-  `work/liu2020.kink/paper/Liu_Duan_Luo_2020_GJI.pdf`. Read pp. 1-8; the
+  `scratch/liu2020.kink/paper/Liu_Duan_Luo_2020_GJI.pdf`. Read pp. 1-8; the
   appendix and switch criterion (pp. 9-12) matter only for the coupled EQsimu
   loop, not the EQquasi-only compset.
 
@@ -220,7 +220,7 @@ clamping an already-drifted state would break steady state.
   MUMPS factorizes 6.05e9 reals (liu2020.fdc.planar.300) and 6.6e9
   (bp1001.fdc.250) with INFOG(1)=0 -- MUMPS 5.x uses 8-byte offsets for the
   real factor array regardless of intsize64. dx = 300 runs today;
-  `work/kink300.sci` (case-local max_norm=-100e6) is the live attempt.
+  `scratch/kink300.sci` (case-local max_norm=-100e6) is the live attempt.
   dtmax mechanism also closed the same day: the dc014 spikes were 265-day
   strides x 2.9 MPa/yr = 3.2 a-sigma per stride on a fault perched at
   tau/sigma = mu_ss(creep); kink600 is safe by construction (Dc-scaled
@@ -254,8 +254,8 @@ clamping an already-drifted state would break steady state.
   the date current code was confirmed to reproduce them. The version gap was
   never staleness -- the full tier passes against all of them -- it was the
   absence of a record, which is what makes a future divergence datable.
-- Every pre-existing case in `work/` can no longer RESUME: the solver
-  hard-stops without `input/` and `scratch/`. Deliberate, and narrower than
+- Every pre-existing case in `scratch/` can no longer RESUME: the solver
+  hard-stops without the case's own `input/` and `scratch/` subfolders. Deliberate, and narrower than
   it sounds -- verified 2026-08-14 that the utilities still READ the old flat
   layout, `plotPeakSliprateTime.py cycle0 cycle1` and `plotAccumulated
   --fault 1` both included, because cycle discovery tries `result/cycle*`,

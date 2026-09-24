@@ -108,10 +108,10 @@ def test_readme_compset_names_exist():
     readme = read("README.md")
     actual = {d.name for d in compset_dirs()}
     import re
-    # Run directories under work/ are named like compset but are not ones --
+    # Run directories under scratch/ are named like compset but are not ones --
     # they are gitignored outputs the README cites as provenance for a number.
     # Strip them before matching so citing a result does not fail this guard.
-    body = re.sub(r"`?work/[\w.\-/]+`?", "", readme)
+    body = re.sub(r"`?scratch/[\w.\-/]+`?", "", readme)
     cited = set(re.findall(r"\b(bp\d[\w.]*|liu2020[\w.]*|test\.bp[\w.]*)\b", body))
     # Only names shaped like compset, not prose like "bp5" or "BP5".
     cited = {c for c in cited if "." in c}

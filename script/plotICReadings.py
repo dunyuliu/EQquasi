@@ -8,7 +8,7 @@ can hold. Each reading drops a different one, and the choice changes slip by
 tabulated.
 
 Usage:
-    plotICReadings.py [-o work/ic_readings.png]
+    plotICReadings.py [-o scratch/ic_readings.png]
 """
 
 import argparse
@@ -28,9 +28,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # (directory, label, colour). Directories are gitignored run outputs.
 READINGS = [
-    ("work/c3.xi0.2",    "A literal: Table 1 tau + eq.(30) theta\n(violates eq.28: V0 = 65x V_init)", "tab:red"),
-    ("work/bp8.icfix50", "C derived: eq.(28) V + Table 1 tau\n(theta_0 = 4.02e11 s)",                 "tab:orange"),
-    ("work/bp8.equil50", "B equilibrated: eq.(28) V + eq.(30) theta\n(tau_0 = 12.9277 MPa)",          "tab:blue"),
+    ("scratch/c3.xi0.2",    "A literal: Table 1 tau + eq.(30) theta\n(violates eq.28: V0 = 65x V_init)", "tab:red"),
+    ("scratch/bp8.icfix50", "C derived: eq.(28) V + Table 1 tau\n(theta_0 = 4.02e11 s)",                 "tab:orange"),
+    ("scratch/bp8.equil50", "B equilibrated: eq.(28) V + eq.(30) theta\n(tau_0 = 12.9277 MPa)",          "tab:blue"),
 ]
 
 REFERENCE_SLIP_MM = 21.0   # taehoKim_ref, read from a plot -- indicative only
@@ -49,7 +49,7 @@ def load(d):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-o", "--out", default=os.path.join(ROOT, "work", "ic_readings.png"))
+    ap.add_argument("-o", "--out", default=os.path.join(ROOT, "scratch", "ic_readings.png"))
     args = ap.parse_args()
 
     cases = []

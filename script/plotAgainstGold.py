@@ -18,9 +18,9 @@ Two layouts, matching the two kinds of oracle under reference/:
                         e2e test asserts on.
 
 Usage:
-    plotAgainstGold.py bp5  work/mycase            [-o out_prefix]
-    plotAgainstGold.py bp8  work/bp8.sub147        [-o out_prefix]
-    plotAgainstGold.py bp7  work/mycase -v slip_rate
+    plotAgainstGold.py bp5  scratch/mycase            [-o out_prefix]
+    plotAgainstGold.py bp8  scratch/bp8.sub147        [-o out_prefix]
+    plotAgainstGold.py bp7  scratch/mycase -v slip_rate
 
 Exits non-zero if the run and the gold disagree beyond tolerance, so it can be
 used as a check as well as a picture.
@@ -327,7 +327,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="examples:\n"
                "  cd <case> && plotAgainstGold.py test.bp5.qdc.2000\n"
-               "  plotAgainstGold.py test.bp5.qdc.2000 work/mycase\n"
+               "  plotAgainstGold.py test.bp5.qdc.2000 scratch/mycase\n"
                "The field snapshot (fault.00101.nc) is searched recursively, "
                "so Q* cycle folders are found automatically.")
     ap.add_argument("benchmark", choices=list(FIELD_BENCHMARKS) + ["test.bp8.qdc.gs.10"],

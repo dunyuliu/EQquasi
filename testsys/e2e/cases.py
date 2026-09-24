@@ -270,7 +270,7 @@ def run_case(compset, over, workdir):
                         f"stdout:\n{r.stdout[-3000:]}\n"
                         f"stderr:\n{r.stderr[-3000:]}")
 
-    # work/ is gitignored, so it does not exist in a fresh checkout and
+    # scratch/ is gitignored, so it does not exist in a fresh checkout and
     # create.newcase fails on the missing parent. Locally it is always there,
     # which is why this only ever failed in CI.
     os.makedirs(os.path.dirname(os.path.abspath(workdir)), exist_ok=True)

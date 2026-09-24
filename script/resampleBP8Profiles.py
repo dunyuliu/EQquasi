@@ -91,7 +91,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="examples:\n"
                "  cd <results> && resampleBP8Profiles.py     -> ./submission_10m/\n"
-               "  resampleBP8Profiles.py work/bp8.sub147 out/")
+               "  resampleBP8Profiles.py scratch/bp8.sub147 out/")
     ap.add_argument("result_dir", nargs="?", default=".",
                     help="BP8 results directory holding the section 4.3 "
                          "profiles (default: current directory)")

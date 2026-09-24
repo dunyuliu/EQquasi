@@ -1,7 +1,7 @@
 """Guards for where run artifacts are allowed to land.
 
 Convention: every scratch artifact -- generated cases, simulation output, build
-products -- lives under `work/` at the repo root, which is gitignored. Nothing
+products -- lives under `scratch/` at the repo root, which is gitignored. Nothing
 scratch is written to the repo root itself.
 
 This matters because `pytest -m e2e` starts by deleting its scratch directory. A
@@ -13,7 +13,7 @@ import re
 
 from conftest import ROOT, read
 
-SCRATCH_ROOT = "work"
+SCRATCH_ROOT = "scratch"
 
 
 def gitignore_entries():
@@ -27,7 +27,7 @@ def test_scratch_root_is_gitignored():
 
 
 def test_e2e_runs_stay_under_the_scratch_root():
-    """Runs go in work/, which is gitignored -- never beside the sources.
+    """Runs go in scratch/, which is gitignored -- never beside the sources.
 
     Replaces three checks that policed testAll.py and check.test.py. Both are
     gone; cases.run_case is now the single place a run directory is chosen, so
@@ -44,7 +44,7 @@ def test_e2e_runs_stay_under_the_scratch_root():
 
 
 def test_no_tracked_files_under_the_scratch_root():
-    """A tracked file under work/ would be destroyed by the next test run."""
+    """A tracked file under scratch/ would be destroyed by the next test run."""
     import subprocess
     r = subprocess.run(["git", "ls-files", SCRATCH_ROOT],
                        cwd=str(ROOT), capture_output=True, text=True)

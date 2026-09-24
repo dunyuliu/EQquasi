@@ -36,7 +36,7 @@ import cases as C
 
 pytestmark = pytest.mark.e2e
 
-WORK_ROOT = os.path.join(str(ROOT), "work")
+WORK_ROOT = os.path.join(str(ROOT), "scratch")
 
 ALL = [pytest.param(c, marks=pytest.mark.e2e_fast) if c[4] == "fast"
        else pytest.param(c) for c in C.CASES]

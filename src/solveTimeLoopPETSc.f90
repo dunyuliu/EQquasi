@@ -208,9 +208,14 @@ subroutine solveTimeLoopPETSc
     ! Row 8b: rows now also receive mirrored off-diagonal entries from OTHER
     ! rows' upper-triangle lists (see the MatSetValues loop below), so a
     ! row's true final count can exceed its own upper-triangle-only
-    ! maxRowNnz. Doubled as a generous (not exact) safety margin --
-    ! PETSc reallocates and warns rather than corrupting anything if this
-    ! is still short, so "correct first" holds even if this bound is loose.
+    ! maxRowNnz. Doubled as a generous (not exact) safety margin -- a
+    ! third audit pass corrected this comment: PETSc's default behavior
+    ! when preallocation is insufficient is a hard error (MAT_NEW_NONZERO_
+    ! ALLOCATION_ERR), which CHKERRA turns into a loud abort here, not a
+    ! silent reallocate-and-warn. "Correct first" still holds -- an
+    ! insufficient bound fails loudly rather than corrupting anything --
+    ! it just fails rather than quietly reallocating, which is the
+    ! stronger of the two, not a problem.
     allocate(nnzArr(neq))
     nnzArr = 2 * maxRowNnz
     call MatSeqAIJSetPreallocation(Amat, 0, nnzArr, perr)
@@ -425,6 +430,16 @@ subroutine solveTimeLoopPETSc
     CHKERRA(perr)
     call PetscObjectTypeCompare(pc, PCGAMG, isGAMG, perr)
     CHKERRA(perr)
+    ! Read BEFORE the guard below, not after: the guard must see the
+    ! ACTUALLY-RESOLVED rtol (including any runtime -ksp_rtol override) to
+    ! check it, not just report it afterwards. Moved here after a second
+    ! audit pass caught that the original ordering let CG+GAMG through at
+    ! PETSc's own default rtol (1e-5) -- untested territory this PR's own
+    ! evidence shows actually fails the reference at 1e-8, let alone 1e-5 --
+    ! with nothing to stop it, since a converged-but-loose solve never
+    ! trips the divergence check either.
+    call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
+    CHKERRA(perr)
     ! CORRECTNESS GUARD, WHITELIST (widened again after the storage fix
     ! above): Amat now stores BOTH triangles, so a real MatMult (CG/GAMG)
     ! reads the true symmetric stiffness matrix, not half of it -- the
@@ -438,18 +453,27 @@ subroutine solveTimeLoopPETSc
     !       extracts col>=row regardless of what else is stored -- verified
     !       by re-running row 8a's exact parity gate after this change, not
     !       assumed).
-    !   (b) KSPCG + PCGAMG (+ the near-null-space below): row 8b's own
-    !       gate, tolerance-level parity against the fast references,
-    !       iteration count and ksp_rtol reported in RUN SUMMARY.
+    !   (b) KSPCG + PCGAMG, AND ksp_rtol <= 1e-12: row 8b's own gate,
+    !       tolerance-level parity against the fast references, ONLY
+    !       actually verified at ksp_rtol=1e-12 (ANY_FAIL=False). The same
+    !       algorithm at ksp_rtol=1e-8 fails the reference comparator
+    !       (physically reasonable, just not tight enough) -- so the
+    !       algorithm identity alone is not sufficient to trust the answer;
+    !       the tolerance actually used has to be at least as tight as what
+    !       was verified, or this is exactly the same silent-wrong-answer
+    !       risk in a different shape (a converged-but-loose solve never
+    !       trips the divergence check below).
     ! Anything else (-pc_type lu, -pc_type jacobi, -ksp_type gmres with the
-    ! default PC, etc.) is unverified against this matrix's actual
-    ! numerical behavior and stays refused (rule 2) rather than assumed
-    ! safe by analogy.
-    if (.not. ((isPreonly .and. isCholesky) .or. (isCG .and. isGAMG))) then
-        if (me == 0) write(*,*) 'PETSc solver: this KSP/PC combination ', &
-            'has not been verified against a reference. Only ', &
-            'KSPPREONLY+PCCHOLESKY (MUMPS, bit-exact parity) and ', &
-            'KSPCG+PCGAMG (tolerance-level parity) are. Refusing rather ', &
+    ! default PC, CG+GAMG at a looser rtol than verified, etc.) is
+    ! unverified against this matrix's actual numerical behavior and stays
+    ! refused (rule 2) rather than assumed safe by analogy.
+    if (.not. ((isPreonly .and. isCholesky) .or. &
+               (isCG .and. isGAMG .and. kspRtol <= 1.0d-12))) then
+        if (me == 0) write(*,*) 'PETSc solver: this KSP/PC/tolerance ', &
+            'combination has not been verified against a reference. ', &
+            'Only KSPPREONLY+PCCHOLESKY (MUMPS, bit-exact parity) and ', &
+            'KSPCG+PCGAMG with -ksp_rtol <= 1e-12 (tolerance-level ', &
+            'parity, verified at exactly 1e-12) are. Refusing rather ', &
             'than computing an unverified answer.'
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
@@ -461,11 +485,6 @@ subroutine solveTimeLoopPETSc
         call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
         CHKERRA(perr)
     endif
-    ! Reported in RUN SUMMARY (rank 0 only reads these local copies below;
-    ! the call itself just reads ksp's already-collectively-set options,
-    ! not a collective operation needing every rank's result).
-    call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
-    CHKERRA(perr)
 
     if (me == 0) call initOnFaultKinematics
 

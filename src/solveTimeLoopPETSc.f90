@@ -106,6 +106,10 @@ subroutine solveTimeLoopPETSc
     PetscScalar                :: pvals(100)
     PetscScalar, pointer       :: parr(:)
     PetscInt                   :: kspIts, totalKSPIts, nKSPSolves
+    PetscInt                   :: minKSPIts, maxKSPIts
+    PetscInt                   :: itsAtLastProgress, solvesAtLastProgress
+    real (kind = dp)           :: progressStartTime
+    character (len = 16)       :: kspTypeStr, pcTypeStr
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     PetscInt                   :: kspMaxIts
     PetscBool                  :: isPreonly, isCholesky, isCG, isGAMG
@@ -237,6 +241,7 @@ subroutine solveTimeLoopPETSc
                 write(*,*) 'PETSc solver: row', i, 'has', pncols, &
                     'entries, more than the fixed pcols/pvals(100) ', &
                     'buffers hold. Stopping rather than overflowing them.'
+                flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
             do j = 1, pncols
@@ -320,6 +325,7 @@ subroutine solveTimeLoopPETSc
             'node contributes a full ndof-block of equations, which does ', &
             'not hold here. Stopping rather than silently building a ', &
             'near-null-space that GAMG would use incorrectly.'
+        flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     else
         call VecCreate(PETSC_COMM_WORLD, coordsVec, perr)
@@ -475,6 +481,7 @@ subroutine solveTimeLoopPETSc
             'KSPCG+PCGAMG with -ksp_rtol <= 1e-12 (tolerance-level ', &
             'parity, verified at exactly 1e-12) are. Refusing rather ', &
             'than computing an unverified answer.'
+        flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
     ! Row 8b warm start: a no-op under KSPPREONLY (PETSc explicitly rejects
@@ -484,6 +491,21 @@ subroutine solveTimeLoopPETSc
     if (.not. isPreonly) then
         call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
         CHKERRA(perr)
+    endif
+    ! Logging: set from the already-verified whitelist booleans above,
+    ! not from a fresh KSPGetType/PCGetType query -- the guard already
+    ! established exactly which of the two verified combinations is
+    ! active, and reusing that avoids a second, unverified PETSc Fortran
+    ! string-interface call for a value only ever used in a log line.
+    if (isPreonly) then
+        kspTypeStr = 'preonly'
+    else
+        kspTypeStr = 'cg'
+    endif
+    if (isCholesky) then
+        pcTypeStr = 'cholesky'
+    else
+        pcTypeStr = 'gamg'
     endif
 
     if (me == 0) call initOnFaultKinematics
@@ -502,8 +524,13 @@ subroutine solveTimeLoopPETSc
     stoptag = 0 ! set stoptag to FALSE.
     totalKSPIts = 0
     nKSPSolves = 0
+    minKSPIts = huge(minKSPIts)
+    maxKSPIts = 0
+    itsAtLastProgress = 0
+    solvesAtLastProgress = 0
 
     call cpu_time(startTime)
+    progressStartTime = startTime
     do it = 1, nstep
         if (stoptag == 1) exit ! exit EQquasi if stoptag is TRUE.
 
@@ -605,6 +632,7 @@ subroutine solveTimeLoopPETSc
                     'converge (KSPConvergedReason =', kspReason%v, &
                     ') at step', it, 'iiTag', iiTag, &
                     '-- stopping rather than using an unconverged solve.'
+                flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
             ! Row 8b: iterations/step, meaningful once -ksp_type cg is
@@ -630,6 +658,8 @@ subroutine solveTimeLoopPETSc
             if (me.eq.0) then
                 totalKSPIts = totalKSPIts + kspIts
                 nKSPSolves = nKSPSolves + 1
+                minKSPIts = min(minKSPIts, kspIts)
+                maxKSPIts = max(maxKSPIts, kspIts)
 
                 call VecGetArray(xvecSeq, parr, perr)
                 CHKERRA(perr)
@@ -705,6 +735,24 @@ subroutine solveTimeLoopPETSc
                 netcdf_outfile = trim(outDir)//'fault.r.nc'
                 call netcdf_write_on_fault(netcdf_outfile)
             endif
+
+            ! Owner request: no in-flight progress meant s/step had to be
+            ! inferred after the fact from netcdf snapshot mtimes (row 8
+            ! campaign). One line every 100 steps, mean-since-last-line so
+            ! it reflects recent cost, not a running average diluted by
+            ! the first (cold-start) step.
+            if (mod(it, 100) == 0) then
+                call cpu_time(endTime)
+                write(*,'(A,I8,A,E12.5,A,E12.5,A,E12.5,A,F10.2,A,F10.4,A,F8.2)') &
+                    'PROGRESS step=', it, ' t=', time, ' dt=', dtev1, &
+                    ' Vmax=', maxSlipRate, ' wall=', endTime - progressStartTime, &
+                    ' s/step=', (endTime - progressStartTime) / 100.0d0, &
+                    ' ksp_its=', dble(totalKSPIts - itsAtLastProgress) / &
+                        dble(max(1, nKSPSolves - solvesAtLastProgress))
+                progressStartTime = endTime
+                itsAtLastProgress = totalKSPIts
+                solvesAtLastProgress = nKSPSolves
+            endif
         endif
     enddo
     call cpu_time(endTime)
@@ -732,7 +780,19 @@ subroutine solveTimeLoopPETSc
         write(*,'(X,A,40X,E15.7,4X,A)')  '= KSP rtol                 = ', &
             kspRtol, '='
         write(*,*) '====================================================================='
-        call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
+        ! Owner request (enhanced log reporting): real KSP/PC type names
+        ! (set from the verified whitelist booleans above) and min/mean/max
+        ! iteration counts, not just the average. exit_reason mirrors
+        ! solveTimeLoopMUMPS.f90's logic (it-1 < nstep => stoptag).
+        if (it-1 < nstep) then
+            call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
+                kspTypeStr, pcTypeStr, 'stoptag', minKSPIts, &
+                dble(totalKSPIts)/dble(max(1,nKSPSolves)), maxKSPIts)
+        else
+            call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
+                kspTypeStr, pcTypeStr, 'nstep_reached', minKSPIts, &
+                dble(totalKSPIts)/dble(max(1,nKSPSolves)), maxKSPIts)
+        endif
     endif
 
     ! Row 8c: Amat/bvec/xvec/ksp are PETSC_COMM_WORLD objects now, so their

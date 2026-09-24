@@ -309,11 +309,27 @@ def create_run_sh():
         # deliberately no plain `eqquasi`, so a case records which build
         # produced it and a rebuild cannot be picked up mid-run by a loop
         # that relaunches each cycle.
-        w("  $MPIRUN -np " + str(par.HPC_ncpu) + " " + _exe_name())
-        w("  status=$?")
+        # stdout+stderr captured per cycle (not just the exit code) so a
+        # silent-looking failure -- an OOM kill, a signal, anything that
+        # exits before the solver's own error path ever runs -- still
+        # leaves something to read. PIPESTATUS[0] is the launcher's exit
+        # code, not tee's (a bare $? here would report tee's, which is
+        # always 0).
+        w("  $MPIRUN -np " + str(par.HPC_ncpu) + " " + _exe_name() +
+          ' 2>&1 | tee "log/cycle$((i-1)).log"')
+        w("  status=${PIPESTATUS[0]}")
         w("  if [ $status -ne 0 ]; then")
-        w('    echo "eqquasi exited $status in cycle $((i-1)); output left in '
-          'scratch/ for inspection; it is deleted when you retry." >&2')
+        w('    if [ $status -gt 128 ]; then')
+        w('      echo "eqquasi exited $status in cycle $((i-1)) '
+          '(signal $((status-128))); output left in scratch/ for '
+          'inspection; it is deleted when you retry." >&2')
+        w('    else')
+        w('      echo "eqquasi exited $status in cycle $((i-1)); output '
+          'left in scratch/ for inspection; it is deleted when you '
+          'retry." >&2')
+        w('    fi')
+        w('    echo "--- last 20 lines of log/cycle$((i-1)).log ---" >&2')
+        w('    tail -n 20 "log/cycle$((i-1)).log" >&2')
         w("    exit $status")
         w("  fi")
         w('  mkdir -p "result/cycle$((i-1))"')

@@ -505,12 +505,20 @@ end subroutine write_one_profile
 ! The point is postmortem traceability. A timing quoted without its core count
 ! and machine load is not reproducible, and a result found on disk months later
 ! is worth little if nobody can say what produced it.
-subroutine output_run_metadata(solverTime, factorTime)
+subroutine output_run_metadata(solverTime, factorTime, kspTypeName, &
+    pcTypeName, exitReason, kspItsMin, kspItsMean, kspItsMax)
 
     use globalvar
     implicit none
 
     real (kind = dp), intent(in) :: solverTime, factorTime
+    ! Owner request (enhanced log reporting): kspTypeName/pcTypeName are
+    ! 'N/A' and kspItsMin/Max are -1 for the direct MUMPS path (sol_op==1),
+    ! which has no KSP concept -- both callers pass explicit values now,
+    ! neither is optional, so nothing here silently defaults (rule 2).
+    character (len = *), intent(in) :: kspTypeName, pcTypeName, exitReason
+    integer (kind = 4), intent(in) :: kspItsMin, kspItsMax
+    real (kind = dp), intent(in) :: kspItsMean
     character (len = 256) :: hostName, cpuModel, cpuLine
     character (len = 64)  :: timeStamp, ompStr
     integer (kind = 4)    :: dtv(8)
@@ -606,6 +614,12 @@ subroutine output_run_metadata(solverTime, factorTime)
         write(9302,'(A,E15.7,A)') '  "seconds_per_step": ', solverTime/max(1,it-1), ','
         write(9302,'(A,E15.7,A)') '  "max_slip_rate_final_m_s": ', maxSlipRate, ','
         write(9302,'(A,I0,A)') '  "solver": ', sol_op, ','
+        write(9302,'(A)')      '  "ksp_type": "'//trim(kspTypeName)//'",'
+        write(9302,'(A)')      '  "pc_type": "'//trim(pcTypeName)//'",'
+        write(9302,'(A)')      '  "exit_reason": "'//trim(exitReason)//'",'
+        write(9302,'(A,I0,A)') '  "ksp_iterations_min": ', kspItsMin, ','
+        write(9302,'(A,E15.7,A)') '  "ksp_iterations_mean": ', kspItsMean, ','
+        write(9302,'(A,I0,A)') '  "ksp_iterations_max": ', kspItsMax, ','
         write(9302,'(A,I0,A)') '  "friclaw": ', friclaw, ','
         write(9302,'(A,I0)')   '  "fluid_source_model": ', fluid_src
         write(9302,'(A)') '}'

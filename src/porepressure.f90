@@ -95,6 +95,23 @@ subroutine pore_pressure_init
     re = 0.208d0 * dsqrt(dx * dx)
     fluid_WI = 2.0d0 * pi * fluid_perm * fluid_Lfwid / (fluid_eta * dlog(re/fluid_rwell))
 
+    if (fluid_src == 2) then
+        if (pfWell == 0) then
+            write(*,*) 'BP8-PW: no fault node found within 0.5*dx of the ', &
+                'injection point (0,0); the well cell was not located. ', &
+                'Check that the fault mesh is centred on the origin and ', &
+                'that dx evenly divides the domain.'
+            stop
+        endif
+        if (re <= fluid_rwell) then
+            write(*,*) 'BP8-PW: re =', re, &
+                ' is <= fluid_rwell =', fluid_rwell, &
+                '; the Peaceman well index is undefined. Increase dx or ', &
+                'decrease fluid_rwell.'
+            stop
+        endif
+    endif
+
     if (me == 0) then
         write(*,*) '=     BP8 pore fluid diffusion enabled                              ='
         write(*,'(X,A,40X,E15.7,4X,A)') '=', fluid_alpha, 'm^2/s hydraulic diffusivity'

@@ -91,7 +91,7 @@ par.init_shear = 14.6e6 # Table 1 tau_init.
 ##### Fluid injection (bp == 8) #####
 #####################################
 par.fluid_src    = 1        # 1: Gaussian source (GS); 2: Peaceman well (PW).
-par.fluid_q0     = 0.003    # Q0, total volume injection rate, m^3/s.
+par.fluid_q0     = 0.003 if par.fluid_src == 1 else 0.0015  # Q0, m^3/s. GS=0.003, PW=0.0015. Table 1, 2026-08-13 revision.
 par.fluid_toff   = 100*3600.0       # t_off, injection turn-off time, s.
 par.fluid_tend   = 30*24*3600.0     # t_f, final simulation time, s.
 par.fluid_Lgauss = 50.0     # L_inj, characteristic distance of the Gaussian source, m.
@@ -101,7 +101,7 @@ par.fluid_phi    = 0.1      # phi, porosity.
 par.fluid_perm   = 5.0e-14  # k, permeability, m^2.
 par.fluid_eta    = 1.0e-3   # eta, fluid viscosity, Pa s.
 par.fluid_Swell  = 1.0e-7   # S_well, volumetric well storage, m^3/Pa.
-par.fluid_rwell  = 0.05     # r_well, true well radius, m. Table 1, 2026-08-12 revision.
+par.fluid_rwell  = 0.05     # r_well, true well radius, m. Table 1, 2026-08-13 revision.
 # Cap the adaptive time step. Without a cap, xi*Dc/V is ~1e7 s at V_init.
 # 500 s also satisfies the explicit diffusion limit dx^2/(4*alpha) at dx = 10 m.
 par.dtmax        = 500.0

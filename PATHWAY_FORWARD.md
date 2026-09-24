@@ -113,6 +113,40 @@ Read this first on wake-up. Update in place; close items by deleting them.
    first), and holding VW fraction fixed vs VW area fixed are two different
    experiments answering different questions. User's call, not a default.
 
+8. [ ] **P2 -- Move the solver to PETSc, then optimize.** User decision
+   2026-09-23. Today: MUMPS factorizes once (JOB=4) and does one JOB=3
+   solve per time step, with the matrix assembled centralized on rank 0;
+   the only scaling number in the repo is 1.24x at 8 ranks
+   (script/case.setup). Plan, each step gated on the previous one's numbers:
+   (a) new src/solveTimeLoopPETSc.f90 beside the untouched
+   solveTimeLoopMUMPS.f90, KSP with -pc_type lu
+   -pc_factor_mat_solver_type mumps; PARITY with native MUMPS on the fast
+   references is the hard gate; (b) -ksp_type cg -pc_type gamg with the
+   elasticity near-nullspace, warm-started from the previous step;
+   (c) strong-scaling sweep, ranks 1/2/4/8, per-step solve + factorization
+   time on test.bp5.qdc.2000, bp1002.qdc.2500, liu2020.qdc.kink.300;
+   (d) GPU through PETSc (aijcusparse / Kokkos) on a GPU host. MUMPS stays
+   reachable as a PETSc runtime option; the direct interface is phased out.
+   Stack: conda-forge PETSc 3.25.5 via MACHINE=conda-linux, plus a source
+   build under ~/opt/<host> for an A/B speed check.
+   Done when: a committed table of per-step solve time vs ranks for the
+   three cases, and the parity check (PETSc-LU vs native MUMPS) agreeing to
+   MPI-noise level.
+
+9. [ ] **P2 -- Lighter CI, local sweep.** User decision 2026-09-23. CI
+   keeps fast suite + build + two 101-step smokes (test.bp5, stepover for
+   rule 12); the e2e fast tier (BP8's 8000-step row alone is ~13 min) and
+   the full tier move to a local sweep on the 48-64-core hosts, with the
+   pytest summary line + host + binary version required in the PR.
+   Rule 17 is amended in the same change. Done when: CI wall time < 6 min
+   on a code PR and the rule text says who runs which gate.
+
+10. [ ] **P3 -- Land the BP8 Peaceman-well variant** (local branch bp8-pw,
+   one commit 2026-08-03, 173 behind master) as bp8.qdc.pw.10 and
+   test.bp8.qdc.pw.10 beside the GS pair. Well-pressure crosses 25 MPa
+   near day 2, so a 30-day reference hits stop-508: freezing one needs a
+   short run or C_normal_stress_caps -- owner's call.
+
 ### Known open, not queued
 - GitHub Releases stop at v1.3.2 (2022) while 32 tags exist. Tags are not
   Releases; cutting them going forward is easy, backfilling 26 means inventing

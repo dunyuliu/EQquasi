@@ -107,9 +107,22 @@ if [ -n "$MACH" ]; then
         fi
     fi 
     
-    if [ -n "$CONFIG" ]; then 
+    if [ -n "$CONFIG" ]; then
         echo "Simply configure EQquasi without installation ... ..."
     else
+        # The launcher must come from the same MPI the binary links; case.setup
+        # reads it from here, so run.sh never guesses. Check before the build
+        # (and before anything lands in bin/), so a missing launcher can never
+        # leave a fresh binary paired with a stale .cfg from an earlier install
+        # of the same version.
+        if [ -z "$MPIRUN" ]; then
+            echo "EQquasi install FAILED: no MPI launcher found for MACHINE=$MACHINE."
+            exit 1
+        fi
+        # utig's src/makefile resolves MUMPS_ROOT off EQQUASIROOT; export it
+        # before the build, not after, or a fresh shell builds against
+        # /mumps/build instead of $(pwd)/mumps/build.
+        export EQQUASIROOT=$(pwd)
         cd src
         make || { echo "EQquasi build FAILED."; exit 1; }
         cd ..
@@ -130,12 +143,6 @@ if [ -n "$MACH" ]; then
             exit 1
         fi
         mv src/eqquasi "bin/eqquasi-$eqv"
-        # The launcher must come from the same MPI the binary links; case.setup
-        # reads it from here, so run.sh never guesses.
-        if [ -z "$MPIRUN" ]; then
-            echo "EQquasi install FAILED: no MPI launcher found for MACHINE=$MACHINE."
-            exit 1
-        fi
         echo "MPIRUN=$MPIRUN" > "bin/eqquasi-$eqv.cfg"
         echo "Installed bin/eqquasi-$eqv (launcher: $(cut -d= -f2 bin/eqquasi-$eqv.cfg))"
     fi

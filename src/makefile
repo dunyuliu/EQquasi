@@ -113,6 +113,14 @@ else ifeq ($(SYSTEM), conda-linux)
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack
     LAPACK_LIB = -L${LIB} -llapack
+    # PETSc (row 8, PATHWAY_FORWARD): conda-forge ships petsc.pc under
+    # $CONDA_PREFIX/lib/pkgconfig reporting `Cflags: -I${includedir}` and
+    # `Libs: -L${libdir} -lpetsc` -- both already covered by this branch's
+    # INC/LIB, so only the -lpetsc flag itself is new. Only wired up here:
+    # PETSc via conda is not available on the utig/ubuntu/local/ls6 branches.
+    PETSC_INC  = -I${INC}
+    PETSC_LIB  = -L${LIB} -lpetsc ${RPATH}
+    OBJ_PETSC  = solveTimeLoopPETSc.o
 
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
@@ -135,7 +143,7 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
         fric.o               library_output.o \
         createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
-        func_lib.o  netcdf_io.o porepressure.o\
+        func_lib.o  netcdf_io.o porepressure.o ${OBJ_PETSC}\
 
 clean : eqquasi
 	rm -r *.o
@@ -145,7 +153,7 @@ eqquasi: $(OBJ)
 	#$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
 	#${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
 	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
-	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
+	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB} ${PETSC_LIB}
 
 eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      \
@@ -164,6 +172,11 @@ solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o c8g2.o      shl
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) solveTimeLoopMUMPS.f90 -I${MUMPS_INC}        
+solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o c8g2.o      shl.o       \
+             faulting.o  fric.o                \
+             library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
+             netcdf_io.o
+	$(FC) $(OPT) -cpp solveTimeLoopPETSc.f90 ${PETSC_INC}
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o

@@ -88,8 +88,7 @@ program eqquasi3d
     if (sol_op == 1) then 
         call solveTimeLoopMUMPS
     elseif (sol_op == 2) then 
-        write(*,*) 'aztec is temporarily disabled.'
-        !call main_aztec
+        call solveTimeLoopPETSc
     endif
     
     call writeResults(me)

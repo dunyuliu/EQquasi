@@ -241,6 +241,7 @@ subroutine solveTimeLoopPETSc
                 write(*,*) 'PETSc solver: row', i, 'has', pncols, &
                     'entries, more than the fixed pcols/pvals(100) ', &
                     'buffers hold. Stopping rather than overflowing them.'
+                flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
             do j = 1, pncols
@@ -324,6 +325,7 @@ subroutine solveTimeLoopPETSc
             'node contributes a full ndof-block of equations, which does ', &
             'not hold here. Stopping rather than silently building a ', &
             'near-null-space that GAMG would use incorrectly.'
+        flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     else
         call VecCreate(PETSC_COMM_WORLD, coordsVec, perr)
@@ -479,6 +481,7 @@ subroutine solveTimeLoopPETSc
             'KSPCG+PCGAMG with -ksp_rtol <= 1e-12 (tolerance-level ', &
             'parity, verified at exactly 1e-12) are. Refusing rather ', &
             'than computing an unverified answer.'
+        flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
     ! Row 8b warm start: a no-op under KSPPREONLY (PETSc explicitly rejects
@@ -629,6 +632,7 @@ subroutine solveTimeLoopPETSc
                     'converge (KSPConvergedReason =', kspReason%v, &
                     ') at step', it, 'iiTag', iiTag, &
                     '-- stopping rather than using an unconverged solve.'
+                flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
             ! Row 8b: iterations/step, meaningful once -ksp_type cg is

@@ -62,6 +62,7 @@ subroutine solveTimeLoopMUMPS
             'INFOG(1)=', mumps_par%INFOG(1), ' INFOG(2)=', mumps_par%INFOG(2), &
             ' -- stopping rather than solving against a factorization ', &
             'that never happened.'
+        flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
     call cpu_time(endTime)
@@ -154,6 +155,7 @@ subroutine solveTimeLoopMUMPS
                     'step', it, 'iiTag', iiTag, ', INFOG(1)=', &
                     mumps_par%INFOG(1), ' INFOG(2)=', mumps_par%INFOG(2), &
                     ' -- stopping rather than using an unsolved RHS.'
+                flush(6)  ! ensure the diagnostic just written reaches the log before abort tears the process down
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
 

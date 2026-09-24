@@ -101,14 +101,14 @@ subroutine pore_pressure_init
                 'injection point (0,0); the well cell was not located. ', &
                 'Check that the fault mesh is centred on the origin and ', &
                 'that dx evenly divides the domain.'
-            stop
+            stop 9
         endif
         if (re <= fluid_rwell) then
             write(*,*) 'BP8-PW: re =', re, &
                 ' is <= fluid_rwell =', fluid_rwell, &
                 '; the Peaceman well index is undefined. Increase dx or ', &
                 'decrease fluid_rwell.'
-            stop
+            stop 10
         endif
     endif
 

@@ -118,7 +118,7 @@ def env():
     e["EQQUASIROOT"] = str(ROOT)
     # bin/ first: a stale EQquasi elsewhere on PATH shadows this one and dies
     # with a shared-library error that says nothing about the real cause.
-    e["PATH"] = f"{ROOT}/bin:{ROOT}/scripts:" + e.get("PATH", "")
+    e["PATH"] = f"{ROOT}/bin:{ROOT}/script:" + e.get("PATH", "")
     e["OMP_NUM_THREADS"] = "1"
     return e
 

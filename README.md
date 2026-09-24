@@ -170,6 +170,7 @@ as arguments, or none to process every cycle:
 |---|---|---|
 | ```plotRuptureTime.py``` | ```rupture_time.png``` | per cycle |
 | ```plotPeakSliprateTime.py``` | ```peak_slip_rate_vs_time.png``` | all cycles, concatenated |
+| ```plotMagnitudeTime.py``` | ```mag_vs_time.png``` | all cycles: Mw vs time, one fault / joint (through-going), time since previous event |
 | ```plotOnFaultVars``` | ```fault.NNNNN.nc[.fN].png``` + gif | per cycle |
 | ```plotAccumulated``` | ```accumulatedSlip.{horizontal,vertical}.png``` | all cycles, stacked |
 | ```plotStations.py``` | on-/off-fault station time series | per cycle |
@@ -177,6 +178,7 @@ as arguments, or none to process every cycle:
 ```
 plotRuptureTime.py result/cycle2
 plotPeakSliprateTime.py result/cycle0 result/cycle1 result/cycle2
+plotMagnitudeTime.py <run> [<fork continued from it> ...]   # later dirs override repeated cycles
 plotAccumulated --fault 1 --depth-km -10 --ylim 0 18 result/cycle0 result/cycle2
 plotStations.py result/cycle2
 ```

@@ -38,7 +38,8 @@ SCRIPTS = ROOT / "script"
 # Utilities that take a results directory and are expected to work anywhere.
 # Campaign-specific tools (plotDomainSweep, plotICReadings) are excluded by
 # design: they read a fixed set of sweep directories, not an arbitrary run.
-UTILITIES = ["plotRuptureTime.py", "plotStations.py", "plotPeakSliprateTime.py"]
+UTILITIES = ["plotRuptureTime.py", "plotStations.py", "plotPeakSliprateTime.py",
+             "plotMagnitudeTime.py"]
 
 
 def reference_results():

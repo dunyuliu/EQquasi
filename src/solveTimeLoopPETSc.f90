@@ -1,6 +1,32 @@
 subroutine solveTimeLoopPETSc
 ! PETSc-KSP counterpart of solveTimeLoopMUMPS.f90 (PATHWAY_FORWARD row 8a).
 !
+! Row 8b (added on top, NOT YET COMPILED OR TESTED as of this commit -- the
+! host was mid-timing-sweep for row 8c and a build would have perturbed it;
+! compile and verify before trusting anything below this note): elasticity
+! near-null-space (MatSetNearNullSpace via MatNullSpaceCreateRigidBody on
+! nodal coordinates) so `-pc_type gamg` has the 6 rigid-body modes it needs,
+! a warm start from the previous step's displacement
+! (KSPSetInitialGuessNonzero), and per-solve KSP iteration counts logged to
+! RUN SUMMARY. `-ksp_type cg -pc_type gamg` itself is a RUNTIME PETSc option
+! (e.g. via PETSC_OPTIONS or -ksp_type/-pc_type on the command line,
+! consumed by the existing KSPSetFromOptions call below) -- no code branch
+! needed to select it, and the hardcoded PCCHOLESKY/MUMPS default above is
+! unaffected when it is not passed (MatSetNearNullSpace is ignored by a
+! direct solver; KSPSetInitialGuessNonzero is harmless for KSPPREONLY, whose
+! one "iteration" is the direct solve itself).
+!
+! CAUGHT BY THE ROW 8C SWEEP, NOT FIXED HERE: this Mat is still
+! MatCreateSeqAIJ on PETSC_COMM_SELF (rank 0 only), so this path is
+! genuinely serial regardless of -np -- the bp5 sweep shows solver=2 flat at
+! ~1.015-1.018 s/step for ranks 1/2/4/8 while solver=1 (MUMPS, parallel-root)
+! scales 1.015 -> 0.524 s/step. Distributing the matrix (MPIAIJ on
+! PETSC_COMM_WORLD, row-owned per rank) is real work, not a follow-on
+! polish item -- it is the FIRST thing row 8b must do, ahead of the
+! GAMG/CG/near-null-space code below, which was written and left uncompiled
+! pending that decision. Row 8a's own gate (parity) does not need it: a
+! serial solve is still the same solve.
+!
 ! Same time-loop physics, same CRS assembly (createMatrixHolderInCRSFormat /
 ! elemAssembleInCRS, both reused UNMODIFIED and rank-0-only, exactly as in
 ! the MUMPS path -- confirmed by reading both files: neither is per-rank,
@@ -52,15 +78,17 @@ subroutine solveTimeLoopPETSc
     implicit none
 
     Mat                        :: Amat
-    Vec                        :: bvec, xvec
+    Vec                        :: bvec, xvec, coordsVec
     KSP                        :: ksp
     PC                         :: pc
+    MatNullSpace               :: nullsp
     PetscErrorCode             :: perr
     PetscInt                   :: prow, pncols
     PetscInt, allocatable      :: pnnz(:)
     PetscInt                   :: pcols(100)
     PetscScalar                :: pvals(100)
     PetscScalar, pointer       :: parr(:)
+    PetscInt                   :: kspIts, totalKSPIts, nKSPSolves
 
     integer (kind = 4) :: i,j,inv,jnv,ntag,node_num,var,l,k, iiTag
     real (kind = dp) :: startTime, endTime, timeUsedInFactorization,&
@@ -111,14 +139,78 @@ subroutine solveTimeLoopPETSc
         call MatSetOption(Amat, MAT_SPD, PETSC_TRUE, perr)
         CHKERRA(perr)
 
+        ! Row 8b: elasticity near-null-space for -pc_type gamg (a runtime
+        ! option; harmless/ignored by the hardcoded PCCHOLESKY default below).
+        ! GAMG needs the 6 rigid-body modes (3 translations + 3 rotations,
+        ! ndof=3) to build good coarse grids; MatNullSpaceCreateRigidBody
+        ! wants one Vec of nodal coordinates, block size ndof, laid out in
+        ! the SAME order as the matrix rows it will be attached to.
+        !
+        ! That ordering assumption holds here: meshgen.f90's equation
+        ! numbering (search `neq0=neq0+1; id(i1,nnode)=neq0`) assigns all
+        ! ndof=3 equations of a free node consecutively, in one inner loop,
+        ! before moving to the next node -- a node either contributes a full
+        ! contiguous 3-block or none at all (boundary/fault-boundary nodes
+        ! get negative id() codes and never enter the equation count). So
+        ! id(1,i), id(1,i)+1, id(1,i)+2 are exactly id(1,i), id(2,i), id(3,i)
+        ! for every free node i, and a length-neq vector indexed by id(1,i)
+        ! is a valid blocked coordinate vector -- checked defensively below
+        ! rather than assumed silently (rule 2: no silent wrong behavior).
+        if (mod(neq, ndof) /= 0) then
+            write(*,*) 'PETSc solver: neq is not a multiple of ndof; the ', &
+                'rigid-body near-null-space assumes every free node ', &
+                'contributes a full ndof-block of equations. Skipping ', &
+                'MatSetNearNullSpace -- GAMG will still run (with a ', &
+                'weaker default null space), just without this hint.'
+        else
+            call VecCreateSeq(PETSC_COMM_SELF, neq, coordsVec, perr)
+            CHKERRA(perr)
+            call VecSetBlockSize(coordsVec, ndof, perr)
+            CHKERRA(perr)
+            do i = 1, numnp
+                if (id(1,i) > 0) then
+                    do j = 1, ndof
+                        call VecSetValue(coordsVec, id(1,i)-2+j, x(j,i), &
+                            INSERT_VALUES, perr)
+                        CHKERRA(perr)
+                    enddo
+                endif
+            enddo
+            call VecAssemblyBegin(coordsVec, perr)
+            CHKERRA(perr)
+            call VecAssemblyEnd(coordsVec, perr)
+            CHKERRA(perr)
+            call MatNullSpaceCreateRigidBody(coordsVec, nullsp, perr)
+            CHKERRA(perr)
+            call MatSetNearNullSpace(Amat, nullsp, perr)
+            CHKERRA(perr)
+            call MatNullSpaceDestroy(nullsp, perr)
+            CHKERRA(perr)
+            call VecDestroy(coordsVec, perr)
+            CHKERRA(perr)
+        endif
+
         call VecCreateSeq(PETSC_COMM_SELF, neq, bvec, perr)
         CHKERRA(perr)
         call VecDuplicate(bvec, xvec, perr)
+        CHKERRA(perr)
+        ! Row 8b warm start: KSPSetInitialGuessNonzero makes KSPSolve read
+        ! xvec's current contents as the initial guess instead of starting
+        ! from zero every step. xvec is never zeroed or overwritten between
+        ! solves in the time loop below (only read via VecGetArray into
+        ! `resu`), so it already carries the previous step's solution into
+        ! the next KSPSolve call once this is on -- the one explicit
+        ! VecZeroEntries below is only for the very first solve, so that
+        ! "previous step's solution" is a defined zero rather than
+        ! uninitialized memory the first time through.
+        call VecZeroEntries(xvec, perr)
         CHKERRA(perr)
 
         call KSPCreate(PETSC_COMM_SELF, ksp, perr)
         CHKERRA(perr)
         call KSPSetOperators(ksp, Amat, Amat, perr)
+        CHKERRA(perr)
+        call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
         CHKERRA(perr)
         call KSPSetType(ksp, KSPPREONLY, perr)
         CHKERRA(perr)
@@ -158,6 +250,8 @@ subroutine solveTimeLoopPETSc
     timeUsedInFactorization = endTime - startTime
 
     stoptag = 0 ! set stoptag to FALSE.
+    totalKSPIts = 0
+    nKSPSolves = 0
 
     call cpu_time(startTime)
     do it = 1, nstep
@@ -235,6 +329,15 @@ subroutine solveTimeLoopPETSc
             if (me.eq.0) then
                 call KSPSolve(ksp, bvec, xvec, perr)
                 CHKERRA(perr)
+                ! Row 8b: iterations/step, meaningful once -ksp_type cg is
+                ! selected at runtime (KSPPREONLY's default below always
+                ! reports 1). Logged even in the LU/Cholesky-default case,
+                ! since a stray non-1 there would itself be a bug worth
+                ! seeing.
+                call KSPGetIterationNumber(ksp, kspIts, perr)
+                CHKERRA(perr)
+                totalKSPIts = totalKSPIts + kspIts
+                nKSPSolves = nKSPSolves + 1
 
                 call VecGetArray(xvec, parr, perr)
                 CHKERRA(perr)
@@ -332,6 +435,8 @@ subroutine solveTimeLoopPETSc
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Factorization            = ', timeUsedInFactorization, 'seconds'
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Seconds per step         = ', timeUsedInComputing/max(1,it-1), 'seconds'
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Final max slip rate      = ', maxSlipRate, 'm/s'
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= Avg KSP iterations/solve = ', &
+            dble(totalKSPIts)/dble(max(1,nKSPSolves)), '='
         write(*,*) '====================================================================='
         call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
 

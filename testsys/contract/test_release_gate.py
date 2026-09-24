@@ -38,8 +38,13 @@ def _wf():
 
 def test_ci_runs_the_fast_e2e_tier():
     wf = _wf()
-    assert "-m e2e_fast" in wf, (
-        "CI does not run the fast e2e tier. The static tiers read source and "
+    # Owner decision 2026-09-23 (row 9): CI runs only the two smoke cases
+    # tagged `e2e_ci` (a narrower subset of `e2e_fast`, which now denotes the
+    # broader local/periodic sweep). Either marker satisfies the original
+    # intent of this test: that CI executes real solver runs, not just the
+    # static tiers.
+    assert "-m e2e_ci" in wf or "-m e2e_fast" in wf, (
+        "CI does not run an e2e smoke tier. The static tiers read source and "
         "never execute the solver, so on their own they cannot catch a change "
         "that alters the physics while leaving the text intact.")
 
@@ -61,7 +66,7 @@ def test_ci_does_not_swallow_the_exit_code():
 
 def test_both_e2e_tiers_select_something():
     """`-m e2e_fast` selecting zero tests would pass CI while testing nothing."""
-    for marker in ("e2e_fast", "e2e"):
+    for marker in ("e2e_fast", "e2e", "e2e_ci"):
         r = subprocess.run(
             [sys.executable, "-m", "pytest", "testsys/", "-q", "-m", marker,
              "--collect-only"],
@@ -95,8 +100,11 @@ def test_ci_builds_before_it_runs_benchmarks():
     """
     wf = _wf()
     build = wf.find("install.eqquasi.sh")
-    e2e = wf.find("-m e2e_fast")
+    e2e = wf.find("-m e2e_ci")
+    if e2e == -1:
+        e2e = wf.find("-m e2e_fast")
     assert build != -1, "CI never builds the solver"
+    assert e2e != -1, "CI does not run an e2e smoke tier"
     assert build < e2e, (
         "CI runs the e2e tier before building, so every benchmark skips for "
         "want of bin/eqquasi and the job passes having tested nothing")

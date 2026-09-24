@@ -20,9 +20,13 @@ them into categories, and each category has one comparison method:
 Nothing here names a benchmark to decide what to check, so a new benchmark is a
 row in `cases.CASES` plus a reference directory.
 
-    pytest -m e2e_fast testsys/    what CI runs: 101-step cases, BP8's 30 days,
-                                 and the clean build
-    pytest -m e2e testsys/         adds the full BP5 cycle
+    pytest -m e2e_ci testsys/      what CI runs on every push: two 101-step
+                                 smokes (test.bp5.qdc.2000,
+                                 test.stepover.qdc.1000 for rule 12)
+    pytest -m e2e_fast testsys/    the periodic/local sweep: every fast case,
+                                 101-step and BP8's 8000-step alike, plus the
+                                 clean build
+    pytest -m e2e testsys/         adds the full tiers (a full BP5 cycle, etc.)
 """
 
 import json
@@ -38,8 +42,24 @@ pytestmark = pytest.mark.e2e
 
 WORK_ROOT = os.path.join(str(ROOT), "scratch")
 
-ALL = [pytest.param(c, marks=pytest.mark.e2e_fast) if c[4] == "fast"
-       else pytest.param(c) for c in C.CASES]
+# The two fast cases CI itself runs on every push (owner decision 2026-09-23,
+# PATHWAY_FORWARD.md row 9): a plain BP5 smoke, and the project's only
+# ntotft > 1 case in the gate (rule 12). Everything else under e2e_fast --
+# including BP8's ~8000-step case, ~13 min alone -- moves to the
+# periodic/local sweep and is never selected by CI.
+CI_FAST_NAMES = {"test.bp5.qdc.2000", "test.stepover.qdc.1000"}
+
+
+def _marks(c):
+    if c[4] != "fast":
+        return []
+    marks = [pytest.mark.e2e_fast]
+    if c[0] in CI_FAST_NAMES:
+        marks.append(pytest.mark.e2e_ci)
+    return marks
+
+
+ALL = [pytest.param(c, marks=_marks(c)) for c in C.CASES]
 IDS = [C.case_id(c) for c in C.CASES]
 
 

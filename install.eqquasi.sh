@@ -6,7 +6,10 @@
 
 # Currently, the machines supported are:
 #	ls6:	Lonestar6 at TACC
-#	ubuntu: Ubuntu 22.04
+#	ubuntu: Ubuntu 22.04 (system packages)
+#	utig:	UTIG workstations (locally built MUMPS)
+#	local:	build a private MUMPS copy with install.mumps.sh
+#	conda-linux: everything from an activated conda-forge env (environment.yml)
 
 # Usage: install-eqquasi [-h] [-m Machine_name] [-c Machine_name]
 set -- "$@"
@@ -38,19 +41,28 @@ while getopts "hm:c:" OPTION; do
             echo "source install-eqquasi.sh                                            "
             echo " -----Activate ENV VAR EQQUASIROOT and add exes to PATH              "
             echo "                                                                     "
+            echo "./install-eqquasi.sh -m conda-linux                                      "
+            echo " -----Install from an activated conda-forge env (no admin needed):   "
+            echo "      conda env create -f environment.yml                            "
+            echo "      conda activate eqquasi-petsc                                   "
+            echo "                                                                     "
             echo "Currently supported machines include:                                "
-            echo " ls6/ubuntu                                                          "
+            echo " ls6/ubuntu/utig/local/conda-linux                                       "
             ;;
     esac
 done 
 
 if [ -n "$MACH" ]; then 
     export MACHINE=$MACH
+    # Launcher default for every branch; branches below override it. Reset
+    # here so an MPIRUN left in the caller's environment is never recorded.
+    MPIRUN=$(command -v mpirun.openmpi)
     if [ $MACHINE == "ls6" ]; then 
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
         
         echo "Loading netcdf and mumps modules ... ..."
         module load netcdf/4.6.2 mumps
+        MPIRUN=ibrun
         ml
         
         echo "NETCDF INC and LIB PATH"
@@ -64,8 +76,19 @@ if [ -n "$MACH" ]; then
     elif [ $MACHINE == "ubuntu" ]; then 
         echo "Installing EQquasi on Ubuntu 22.04 ... ..."
         export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+        MPIRUN=$(command -v mpirun.openmpi)
+    elif [ "$MACHINE" == "conda-linux" ]; then
+        if [ -z "$CONDA_PREFIX" ] || [ ! -x "$CONDA_PREFIX/bin/mpif90" ]; then
+            echo "MACHINE=conda-linux needs an activated env with MPI. Run:"
+            echo "  conda env create -f environment.yml"
+            echo "  conda activate eqquasi-petsc"
+            exit 1
+        fi
+        echo "Installing EQquasi from conda env $CONDA_PREFIX ... ..."
+        MPIRUN=$CONDA_PREFIX/bin/mpirun
     elif [ "$MACHINE" == "local" ]; then
         MUMPS_LIB_DIR="./mumps/build/local/lib"
+        MPIRUN=$(command -v mpirun.openmpi)
         libNames=("libdmumps.a" "libmumps_common.a" "libpord.a" "libsmumps.a")
         all_exist=true
         for file in "${libNames[@]}"; do
@@ -84,9 +107,22 @@ if [ -n "$MACH" ]; then
         fi
     fi 
     
-    if [ -n "$CONFIG" ]; then 
+    if [ -n "$CONFIG" ]; then
         echo "Simply configure EQquasi without installation ... ..."
     else
+        # The launcher must come from the same MPI the binary links; case.setup
+        # reads it from here, so run.sh never guesses. Check before the build
+        # (and before anything lands in bin/), so a missing launcher can never
+        # leave a fresh binary paired with a stale .cfg from an earlier install
+        # of the same version.
+        if [ -z "$MPIRUN" ]; then
+            echo "EQquasi install FAILED: no MPI launcher found for MACHINE=$MACHINE."
+            exit 1
+        fi
+        # utig's src/makefile resolves MUMPS_ROOT off EQQUASIROOT; export it
+        # before the build, not after, or a fresh shell builds against
+        # /mumps/build instead of $(pwd)/mumps/build.
+        export EQQUASIROOT=$(pwd)
         cd src
         make || { echo "EQquasi build FAILED."; exit 1; }
         cd ..
@@ -107,7 +143,8 @@ if [ -n "$MACH" ]; then
             exit 1
         fi
         mv src/eqquasi "bin/eqquasi-$eqv"
-        echo "Installed bin/eqquasi-$eqv"
+        echo "MPIRUN=$MPIRUN" > "bin/eqquasi-$eqv.cfg"
+        echo "Installed bin/eqquasi-$eqv (launcher: $(cut -d= -f2 bin/eqquasi-$eqv.cfg))"
     fi
 
     export EQQUASIROOT=$(pwd)
@@ -117,7 +154,7 @@ if [ -n "$MACH" ]; then
     echo EQQUASIROOT
     echo PATH 
     
-    chmod -R 755 scripts
+    chmod -R 755 script
 fi
 
 export EQQUASIROOT=$(pwd)

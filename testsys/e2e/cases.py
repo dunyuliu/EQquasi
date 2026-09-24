@@ -224,16 +224,15 @@ def check_binary_is_current(exe):
             f"{exe} is older than src/{newest_name}: binary built "
             f"{fmt(os.path.getmtime(exe))}, source modified {fmt(newest_src)}. "
             f"Both report version {declared}, so the version check alone "
-            f"cannot see this. Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> "
-            f"make -C src && mv src/eqquasi bin/   (MACHINE=utig here)")
+            f"cannot see this. Rebuild: bash install.eqquasi.sh -m <host>   "
+            f"(utig, ubuntu, conda-linux, ...)")
 
     if declared != built:
         pytest.fail(
             f"bin/eqquasi is {built} but src/globalvar.f90 declares "
             f"{declared}. Running a benchmark against a stale binary tests "
             f"last week's code and would bless it as a reference. Rebuild: "
-            f"EQQUASIROOT=$(pwd) MACHINE=<host> make -C src && "
-            f"mv src/eqquasi bin/   (MACHINE=utig on the utig hosts)")
+            f"bash install.eqquasi.sh -m <host>   (utig, ubuntu, conda-linux, ...)")
 
 
 def run_case(compset, over, workdir):

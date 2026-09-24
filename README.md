@@ -61,9 +61,11 @@ default 132-column limit and the build fails with `Line truncated` errors in
 `globalvar.f90` that look like corrupted source. Both variables are required:
 
 ```
-EQQUASIROOT=/path/to/EQquasi MACHINE=utig make -C src
-mv src/eqquasi bin/
+bash install.eqquasi.sh -m utig
 ```
+(the installer runs the make above and records the MPI launcher in
+`bin/eqquasi-<version>.cfg`, which `case.setup` requires -- a bare
+`make -C src` no longer yields a usable install)
 
 The makefile now stops with an explicit message when `MACHINE` is unset.
 
@@ -82,6 +84,16 @@ worth knowing when a build breaks:
     every host. The makefile falls back to AMD AOCL with an embedded rpath. Link
     the AOCL *shared* library; its `libscalapack.a` is not built `-fPIC` and
     cannot go into a PIE executable.
+
+**No admin rights, any Linux host: conda.** Everything, compilers and MPI
+included, comes from conda-forge (`environment.yml`):
+```
+conda env create -f environment.yml
+conda activate eqquasi-petsc
+bash install.eqquasi.sh -m conda-linux
+```
+The installer records the matching MPI launcher in `bin/eqquasi-<version>.cfg`,
+and every case's `run.sh` uses it (override with `MPIRUN=... bash run.sh`).
 
 To activate bash environment variables $EQQUASIROOT and add executable scripts to $PATH,
 ```

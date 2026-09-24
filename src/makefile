@@ -5,6 +5,7 @@
 #     ls6
 #     ubuntu
 #     utig (with locally installed mumps through scivision/mumps) 
+#     conda-linux (everything from an activated conda-forge env; see environment.yml)
 
 SYSTEM = ${MACHINE}
 
@@ -13,7 +14,7 @@ SYSTEM = ${MACHINE}
 # the build dies deep in globalvar.f90 with "Line truncated" errors that read
 # like source corruption rather than a missing variable.
 ifeq ($(strip $(SYSTEM)),)
-$(error MACHINE is not set. Build with e.g. `EQQUASIROOT=/path/to/repo MACHINE=utig make` -- see README. Supported: utig, ubuntu, local, ls6)
+$(error MACHINE is not set. Build with e.g. `EQQUASIROOT=/path/to/repo MACHINE=utig make` -- see README. Supported: utig, ubuntu, local, conda-linux, ls6)
 endif
 
 # Some hosts ship a broken mpif90.openmpi wrapper (missing wrapper-data file)
@@ -90,6 +91,29 @@ else ifeq ($(SYSTEM), local)
     SCALAPACK_LIB = -L${MUMPS_ROOT}/lib -lscalapack -lblacs
     LAPACK_LIB = -L${LIB} -llapack
     
+else ifeq ($(SYSTEM), conda-linux)
+    # Compilers, MPI, MUMPS, ScaLAPACK, BLAS and netCDF all come from one
+    # activated conda-forge env (environment.yml), so the build is the same on
+    # every host and needs no admin. Refuse rather than silently mixing in the
+    # system MPI, which is the classic ABI-mismatch crash.
+    ifeq ($(strip $(CONDA_PREFIX)),)
+    $(error MACHINE=conda-linux needs an activated env: conda env create -f environment.yml && conda activate eqquasi-petsc)
+    endif
+    FFLAGS     = -fopenmp -ffree-line-length-none -O3
+    FC         = ${CONDA_PREFIX}/bin/mpif90
+    LIB        = ${CONDA_PREFIX}/lib
+    INC        = ${CONDA_PREFIX}/include
+    # rpath so bin/eqquasi-<version> runs without LD_LIBRARY_PATH.
+    RPATH      = -Wl,-rpath,${LIB}
+    NETCDF_LIB = -L${LIB} -lnetcdff -lnetcdf ${RPATH}
+    NETCDF_INC = -I${INC}
+    MUMPS_INC  = ${INC}
+    MUMPS_LIB  = -L${LIB} -ldmumps -lmumps_common
+    PORD_LIB   = -L${LIB} -lpord
+    BLAS_LIB   = -L${LIB} -lblas
+    SCALAPACK_LIB = -L${LIB} -lscalapack
+    LAPACK_LIB = -L${LIB} -llapack
+
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort

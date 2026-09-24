@@ -226,6 +226,26 @@ def create_batch_script():
         f.write("done" + "\n")
         # End excutable part.
 
+def _mpirun():
+    """The MPI launcher, as recorded by install.eqquasi.sh next to the binary.
+
+    The installer knows which MPI it compiled against, so it writes
+    bin/eqquasi-<version>.cfg with MPIRUN=<absolute path>. A launcher from a
+    different MPI than the binary links is the classic ABI-mismatch crash, so
+    there is no fallback: a missing record means a binary not installed by
+    install.eqquasi.sh.
+    """
+    cfg = os.path.join(os.environ.get("EQQUASIROOT", ""), "bin", _exe_name() + ".cfg")
+    try:
+        for line in open(cfg):
+            if line.startswith("MPIRUN="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    raise SystemExit("case.setup: no MPIRUN in " + cfg + "; install the binary "
+                     "with install.eqquasi.sh -m <machine>.")
+
+
 def _exe_name():
     """`eqquasi-<version>`, read from the source the run will be built from.
 
@@ -264,6 +284,8 @@ def create_run_sh():
         # as it likes and several ranks oversubscribe a node badly; measured
         # scaling is only 1.24x for 8 ranks, so threads buy nothing here.
         w("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}")
+        # Launcher recorded by install.eqquasi.sh; override with MPIRUN=... bash run.sh
+        w("MPIRUN=${MPIRUN:-" + _mpirun() + "}")
         w("mkdir -p result log")
         w("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");")
         w("do")
@@ -286,7 +308,7 @@ def create_run_sh():
         # deliberately no plain `eqquasi`, so a case records which build
         # produced it and a rebuild cannot be picked up mid-run by a loop
         # that relaunches each cycle.
-        w("  mpirun.openmpi -np " + str(par.HPC_ncpu) + " " + _exe_name())
+        w("  $MPIRUN -np " + str(par.HPC_ncpu) + " " + _exe_name())
         w("  status=$?")
         w("  if [ $status -ne 0 ]; then")
         w('    echo "eqquasi exited $status in cycle $((i-1)); output left in '

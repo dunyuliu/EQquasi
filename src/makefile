@@ -22,6 +22,20 @@ endif
 # otherwise fall back. Override with `make FC=...` at any time.
 MPIFC := $(shell command -v mpif90.openmpi >/dev/null 2>&1 && mpif90.openmpi -show >/dev/null 2>&1 && echo mpif90.openmpi || echo mpif90)
 
+# Row 8: eqquasi.f90 unconditionally references solveTimeLoopPETSc regardless
+# of MACHINE, but only conda-linux compiles and links that object (PETSc via
+# conda is not available on utig/ubuntu/local/ls6). Left as a plain Fortran
+# CALL, that is an undefined-reference link failure on every other machine.
+# PETSC_DEFINE is empty by default and set to -DHAVE_PETSC only in the
+# conda-linux branch below; eqquasi.o is preprocessed so the call site
+# itself compiles out on machines without it, replaced by a loud runtime stop
+# (rule 2) instead of a link error. CPPFLAG is the preprocessor flag itself,
+# gfortran-style (-cpp) by default; ls6's mpiifort wants -fpp instead
+# (overridden in that branch below) -- not exercised on any host yet
+# (rule 9), so this is a plausible-not-verified guess, flagged as such.
+PETSC_DEFINE =
+CPPFLAG = -cpp
+
 ifeq ($(SYSTEM), utig)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
     FC         = ${MPIFC}
@@ -113,10 +127,20 @@ else ifeq ($(SYSTEM), conda-linux)
     BLAS_LIB   = -L${LIB} -lblas
     SCALAPACK_LIB = -L${LIB} -lscalapack
     LAPACK_LIB = -L${LIB} -llapack
+    # PETSc (row 8, PATHWAY_FORWARD): conda-forge ships petsc.pc under
+    # $CONDA_PREFIX/lib/pkgconfig reporting `Cflags: -I${includedir}` and
+    # `Libs: -L${libdir} -lpetsc` -- both already covered by this branch's
+    # INC/LIB, so only the -lpetsc flag itself is new. Only wired up here:
+    # PETSc via conda is not available on the utig/ubuntu/local/ls6 branches.
+    PETSC_INC  = -I${INC}
+    PETSC_LIB  = -L${LIB} -lpetsc ${RPATH}
+    OBJ_PETSC  = solveTimeLoopPETSc.o
+    PETSC_DEFINE = -DHAVE_PETSC
 
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
     FC         = mpiifort
+    CPPFLAG    = -fpp
     LIB        = ${TACC_MKL_LIB}
     MUMPS_INC  = ${TACC_MUMPS_INC}
     NETCDF_INC = -I${TACC_NETCDF_INC}
@@ -135,7 +159,7 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
         fric.o               library_output.o \
         createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
-        func_lib.o  netcdf_io.o porepressure.o\
+        func_lib.o  netcdf_io.o porepressure.o ${OBJ_PETSC}\
 
 clean : eqquasi
 	rm -r *.o
@@ -145,14 +169,14 @@ eqquasi: $(OBJ)
 	#$(FC) $(OPT1) $(OBJ) -o eqquasi ${BLAS_LIB} ${SCALAPACK_LIB} \
 	#${LAPACK_LIB} ${NETCDF_LIB} ${MUMPS_LIB} ${PORD_LIB}
 	$(FC) $(OPT1) $(OBJ) -o eqquasi ${MUMPS_LIB} ${PORD_LIB} \
-	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB}
+	${SCALAPACK_LIB} ${BLAS_LIB} ${LAPACK_LIB} ${NETCDF_LIB} ${PETSC_LIB}
 
 eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
              meshgen.o   faulting.o  fric.o      \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              read_input.o            func_lib.o  \
              netcdf_io.o
-	$(FC) $(OPT) eqquasi.f90 
+	$(FC) $(OPT) ${CPPFLAG} ${PETSC_DEFINE} eqquasi.f90
 globalvar.o: globalvar.f90
 	$(FC) $(OPT) globalvar.f90     
 mesh4num.o:  mesh4num.f90  globalvar.o
@@ -164,6 +188,11 @@ solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o c8g2.o      shl
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) solveTimeLoopMUMPS.f90 -I${MUMPS_INC}        
+solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o c8g2.o      shl.o       \
+             faulting.o  fric.o                \
+             library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
+             netcdf_io.o
+	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETSc.f90 ${PETSC_INC}
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o

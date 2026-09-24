@@ -2,7 +2,7 @@
 ! * and Institute for Geophysics, the University of Texas at Austin.
 ! * All Rights Reserved.
 ! * This code is part of software EQquasi, please see EQquasi License Agreement
-! * attached before you copy, download, install or use EQquasi./
+! * attached before you copy, download, install or use EQquasi.*/
 
 program eqquasi3d
     use globalvar
@@ -85,11 +85,16 @@ program eqquasi3d
         enddo            
     endif
     
-    if (sol_op == 1) then 
+    if (sol_op == 1) then
         call solveTimeLoopMUMPS
-    elseif (sol_op == 2) then 
-        write(*,*) 'aztec is temporarily disabled.'
-        !call main_aztec
+    elseif (sol_op == 2) then
+#ifdef HAVE_PETSC
+        call solveTimeLoopPETSc
+#else
+        write(*,*) 'par.solver=2 (PETSc) needs MACHINE=conda-linux (or ', &
+            'another PETSc-enabled build); not available on this binary.'
+        stop
+#endif
     endif
     
     call writeResults(me)

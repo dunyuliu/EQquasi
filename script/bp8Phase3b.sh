@@ -7,7 +7,7 @@
 # reason to pay 64k elements when 8k gives the same physics eight times faster.
 
 set -u
-R=/home/utig5/dliu/seas_bp10_eqquasi
+R=/home/utig5/dliu/eqquasi
 EX=$R/bin/eqquasi
 export EQQUASIROOT=$R
 export PATH=$R/bin:$R/scripts:$PATH

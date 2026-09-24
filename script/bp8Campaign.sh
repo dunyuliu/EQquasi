@@ -6,7 +6,7 @@
 # OpenMP thread unless the element count makes that impractical.
 
 set -u
-R=/home/utig5/dliu/seas_bp10_eqquasi
+R=/home/utig5/dliu/eqquasi
 EX=$R/bin/eqquasi
 export EQQUASIROOT=$R
 export PATH=$R/bin:$R/scripts:$PATH

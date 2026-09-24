@@ -106,9 +106,12 @@ subroutine solveTimeLoopPETSc
     PetscScalar                :: pvals(100)
     PetscScalar, pointer       :: parr(:)
     PetscInt                   :: kspIts, totalKSPIts, nKSPSolves
-    PetscBool                  :: isPreonly, isCholesky
+    PetscReal                  :: kspRtol, kspAtol, kspDtol
+    PetscInt                   :: kspMaxIts
+    PetscBool                  :: isPreonly, isCholesky, isCG, isGAMG
     KSPConvergedReason         :: kspReason
     PetscInt                   :: maxRowNnz
+    PetscInt                   :: matLocalRows, matLocalCols
 
     integer (kind = 4) :: i,j,inv,jnv,ntag,node_num,var,l,k, iiTag
     integer (kind = 4) :: maxRowNnzI4
@@ -178,6 +181,19 @@ subroutine solveTimeLoopPETSc
     CHKERRA(perr)
     call MatSetType(Amat, MATAIJ, perr)
     CHKERRA(perr)
+    ! Row 8b, real bug found by actually running the 8-rank config (not
+    ! assumed from the 1/2/4-rank passes): with no explicit block size,
+    ! PETSc's PETSC_DECIDE row partitioning does not have to land on a
+    ! multiple of ndof=3 per rank, and coordsVec (given block size 3
+    ! explicitly, below) then gets ITS OWN independent PETSC_DECIDE split
+    ! that can disagree with Amat's -- PCSetData_AGG aborted at 8 ranks
+    ! with "30 != matrix size 25529", a local-size mismatch between the
+    ! near-null-space vector and the matrix GAMG was actually handed.
+    ! Fixed by making Amat's own partition block-respecting, then deriving
+    ! every other PETSC_COMM_WORLD vector's local size FROM Amat's actual
+    ! partition (below) instead of each independently guessing PETSC_DECIDE.
+    call MatSetBlockSize(Amat, ndof, perr)
+    CHKERRA(perr)
     ! Explicit arrays, not PETSC_NULL_INTEGER: a second audit pass flagged
     ! that this PETSc Fortran interface (3.25.5) may require the
     ! array-specific PETSC_NULL_INTEGER_ARRAY sentinel here rather than the
@@ -189,8 +205,14 @@ subroutine solveTimeLoopPETSc
     ! "uniform nz" convenience argument, ignored once the array is
     ! non-null; using it too would have hit the exact same sentinel
     ! question, so both preallocation calls stay fully explicit.
+    ! Row 8b: rows now also receive mirrored off-diagonal entries from OTHER
+    ! rows' upper-triangle lists (see the MatSetValues loop below), so a
+    ! row's true final count can exceed its own upper-triangle-only
+    ! maxRowNnz. Doubled as a generous (not exact) safety margin --
+    ! PETSc reallocates and warns rather than corrupting anything if this
+    ! is still short, so "correct first" holds even if this bound is loose.
     allocate(nnzArr(neq))
-    nnzArr = maxRowNnz
+    nnzArr = 2 * maxRowNnz
     call MatSeqAIJSetPreallocation(Amat, 0, nnzArr, perr)
     CHKERRA(perr)
     call MatMPIAIJSetPreallocation(Amat, 0, nnzArr, 0, nnzArr, perr)
@@ -219,16 +241,50 @@ subroutine solveTimeLoopPETSc
             call MatSetValues(Amat, 1, [prow], pncols, pcols(1:pncols), &
                 pvals(1:pncols), INSERT_VALUES, perr)
             CHKERRA(perr)
+            ! Row 8b storage fix: kstiff/ia/ja hold only the upper triangle
+            ! (col >= row), which is exactly what MUMPS's SYM=1 factorization
+            ! needs and exactly what row 8a verified byte-for-byte -- PETSc's
+            ! aij-to-mumps symmetric conversion extracts the col>=row half of
+            ! whatever is stored regardless of what else is present, so
+            ! mirroring the OFF-DIAGONAL entries below into their transposed
+            ! (col,row) position adds information for a real MatMult
+            ! (CG/GAMG) without changing what the Cholesky/MUMPS path reads.
+            ! That claim is exactly what the immediately-following parity
+            ! re-run checks -- this is not assumed to hold, it is verified
+            ! every time this file is tested. The diagonal (j=1, since
+            ! createMatrixHolderInCRSFormat sorts col>=row ascending) is
+            ! never mirrored -- it would double-insert the same value at
+            ! the same (row,row) position, which INSERT_VALUES tolerates
+            ! (last write wins, same value) but which is pointless and
+            ! confusing to read.
+            do j = 1, pncols
+                if (pcols(j) /= prow) then
+                    call MatSetValues(Amat, 1, [pcols(j)], 1, [prow], &
+                        [pvals(j)], INSERT_VALUES, perr)
+                    CHKERRA(perr)
+                endif
+            enddo
         enddo
     endif
     call MatAssemblyBegin(Amat, MAT_FINAL_ASSEMBLY, perr)
     CHKERRA(perr)
     call MatAssemblyEnd(Amat, MAT_FINAL_ASSEMBLY, perr)
     CHKERRA(perr)
-    ! SYM=1 (SPD) in MUMPS-speak -- matches mumps_par%SYM = 1 in
-    ! solveTimeLoopMUMPS.f90 exactly; only the upper triangle was
-    ! inserted above, matching what SYM=1 expects.
+    ! Both MAT_SPD (unchanged -- still selects MUMPS's SYM=1 code path
+    ! exactly as before) and MAT_SYMMETRIC (new -- now honest, since both
+    ! triangles are genuinely stored, and this is what lets GAMG/CG treat
+    ! the matrix as symmetric for their own algorithms).
     call MatSetOption(Amat, MAT_SPD, PETSC_TRUE, perr)
+    CHKERRA(perr)
+    call MatSetOption(Amat, MAT_SYMMETRIC, PETSC_TRUE, perr)
+    CHKERRA(perr)
+
+    ! The actual local row/col count PETSc gave THIS rank of Amat, now that
+    ! it is block-respecting (MatSetBlockSize above) -- every other
+    ! PETSC_COMM_WORLD Vec below is sized from THIS, not its own
+    ! independent PETSC_DECIDE guess, so they are all guaranteed to agree
+    ! with Amat's partition (the fix for the 8-rank PCSetData_AGG crash).
+    call MatGetLocalSize(Amat, matLocalRows, matLocalCols, perr)
     CHKERRA(perr)
 
     ! Row 8b: elasticity near-null-space for -pc_type gamg (a runtime
@@ -263,7 +319,7 @@ subroutine solveTimeLoopPETSc
     else
         call VecCreate(PETSC_COMM_WORLD, coordsVec, perr)
         CHKERRA(perr)
-        call VecSetSizes(coordsVec, PETSC_DECIDE, neq, perr)
+        call VecSetSizes(coordsVec, matLocalRows, neq, perr)
         CHKERRA(perr)
         call VecSetBlockSize(coordsVec, ndof, perr)
         CHKERRA(perr)
@@ -296,7 +352,7 @@ subroutine solveTimeLoopPETSc
 
     call VecCreate(PETSC_COMM_WORLD, bvec, perr)
     CHKERRA(perr)
-    call VecSetSizes(bvec, PETSC_DECIDE, neq, perr)
+    call VecSetSizes(bvec, matLocalRows, neq, perr)
     CHKERRA(perr)
     call VecSetFromOptions(bvec, perr)
     CHKERRA(perr)
@@ -365,48 +421,51 @@ subroutine solveTimeLoopPETSc
     CHKERRA(perr)
     call PetscObjectTypeCompare(pc, PCCHOLESKY, isCholesky, perr)
     CHKERRA(perr)
-    ! CORRECTNESS GUARD (audit-caught before this was ever compiled, 2026-
-    ! 09-24; widened after a second audit pass found the first version only
-    ! checked the KSP type, so `-pc_type lu` under KSPPREONLY -- reaching
-    ! MUMPS with sym=0 on this upper-triangle-only Mat, the exact silent
-    ! wrong-answer case row 8a's own PCLU-vs-PCCHOLESKY finding describes --
-    ! was NOT caught): Amat above stores only the upper triangle (i <= j) of
-    ! the stiffness matrix. MUMPS's Cholesky path (the hardcoded default,
-    ! KSPPREONLY + PCCHOLESKY) reads exactly that by SYM=1 convention --
-    ! fine. Any OTHER KSP type OR PC type (a runtime -ksp_type cg,
-    ! -pc_type lu, -pc_type gamg, etc. override) does a real MatMult against
-    ! Amat as stored, which is not symmetric and not the actual stiffness
-    ! matrix once you only keep half of it: a silently WRONG linear system,
-    ! not a slower one. Fixing this needs MATSBAIJ storage or inserting both
-    ! triangles, neither done yet -- deferred to the row 8b compile-and-test
-    ! pass, after distribution (this pass's own priority, see the note
-    ! above MatCreate). Refuse rather than silently solve the wrong system
-    ! in the meantime (rule 2). Not checked here: the solver package
-    ! (MUMPS vs PETSc's native Cholesky) -- both read symmetric AIJ storage
-    ! the same way, so this is believed harmless, but is not verified
-    ! against PETSc's native Cholesky path the way MUMPS's is.
-    if ((.not. isPreonly) .or. (.not. isCholesky)) then
-        if (me == 0) write(*,*) 'PETSc solver: a non-default KSP or PC ', &
-            'is in effect (e.g. -ksp_type/-pc_type), but this Mat only ', &
-            'stores the upper triangle -- correct for the hardcoded ', &
-            'KSPPREONLY/PCCHOLESKY/MUMPS default, WRONG for CG/GAMG/LU ', &
-            'or any method that does a real MatMult or a non-SYM=1 ', &
-            'factorization. Not fixed yet (needs MATSBAIJ storage or ', &
-            'both triangles inserted); refusing rather than computing ', &
-            'a silently wrong answer.'
+    call PetscObjectTypeCompare(ksp, KSPCG, isCG, perr)
+    CHKERRA(perr)
+    call PetscObjectTypeCompare(pc, PCGAMG, isGAMG, perr)
+    CHKERRA(perr)
+    ! CORRECTNESS GUARD, WHITELIST (widened again after the storage fix
+    ! above): Amat now stores BOTH triangles, so a real MatMult (CG/GAMG)
+    ! reads the true symmetric stiffness matrix, not half of it -- the
+    ! silent-wrong-answer risk this guard existed to prevent is gone for
+    ! that combination specifically. Still a whitelist, not a blanket
+    ! allow: only the two combinations actually verified against a
+    ! reference are permitted --
+    !   (a) KSPPREONLY + PCCHOLESKY (+ MUMPS via PCFactorSetMatSolverType
+    !       above): the original row 8a bit-exact parity path, unaffected
+    !       by the storage fix (PETSc's aij-mumps symmetric conversion
+    !       extracts col>=row regardless of what else is stored -- verified
+    !       by re-running row 8a's exact parity gate after this change, not
+    !       assumed).
+    !   (b) KSPCG + PCGAMG (+ the near-null-space below): row 8b's own
+    !       gate, tolerance-level parity against the fast references,
+    !       iteration count and ksp_rtol reported in RUN SUMMARY.
+    ! Anything else (-pc_type lu, -pc_type jacobi, -ksp_type gmres with the
+    ! default PC, etc.) is unverified against this matrix's actual
+    ! numerical behavior and stays refused (rule 2) rather than assumed
+    ! safe by analogy.
+    if (.not. ((isPreonly .and. isCholesky) .or. (isCG .and. isGAMG))) then
+        if (me == 0) write(*,*) 'PETSc solver: this KSP/PC combination ', &
+            'has not been verified against a reference. Only ', &
+            'KSPPREONLY+PCCHOLESKY (MUMPS, bit-exact parity) and ', &
+            'KSPCG+PCGAMG (tolerance-level parity) are. Refusing rather ', &
+            'than computing an unverified answer.'
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
-    ! Row 8b warm start: only reachable once the guard above is satisfied
-    ! (today, only the KSPPREONLY default reaches here, where it is a
-    ! no-op -- PETSc's KSPPREONLY explicitly rejects a nonzero initial
-    ! guess, "Running KSP of preonly doesn't make sense with nonzero
-    ! initial guess", confirmed against libpetsc.so 3.25.5). Left in place,
-    ! inert, for when a real iterative method is enabled after the storage
-    ! fix above.
+    ! Row 8b warm start: a no-op under KSPPREONLY (PETSc explicitly rejects
+    ! a nonzero initial guess there, "Running KSP of preonly doesn't make
+    ! sense with nonzero initial guess", confirmed against libpetsc.so
+    ! 3.25.5) and the real point once CG+GAMG is selected.
     if (.not. isPreonly) then
         call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
         CHKERRA(perr)
     endif
+    ! Reported in RUN SUMMARY (rank 0 only reads these local copies below;
+    ! the call itself just reads ksp's already-collectively-set options,
+    ! not a collective operation needing every rank's result).
+    call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
+    CHKERRA(perr)
 
     if (me == 0) call initOnFaultKinematics
 
@@ -651,6 +710,8 @@ subroutine solveTimeLoopPETSc
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Final max slip rate      = ', maxSlipRate, 'm/s'
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Avg KSP iterations/solve = ', &
             dble(totalKSPIts)/dble(max(1,nKSPSolves)), '='
+        write(*,'(X,A,40X,E15.7,4X,A)')  '= KSP rtol                 = ', &
+            kspRtol, '='
         write(*,*) '====================================================================='
         call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
     endif

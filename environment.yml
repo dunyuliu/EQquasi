@@ -10,7 +10,7 @@ dependencies:
   - cxx-compiler
   - openmpi
   - openmpi-mpifort
-  - petsc            # conda-forge build ships MUMPS, hypre, ScaLAPACK, METIS/ParMETIS
+  - petsc=3.25.5     # conda-forge build ships MUMPS, hypre, ScaLAPACK, METIS/ParMETIS
   - netcdf-fortran
   - make
   - cmake

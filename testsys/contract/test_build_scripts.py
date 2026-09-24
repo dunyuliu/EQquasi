@@ -148,11 +148,10 @@ def test_binary_on_disk_is_built_from_the_current_source():
             f"bin/eqquasi was built {fmt(binary.stat().st_mtime)} but "
             f"src/{newest[1]} was modified {fmt(newest[0])}. Both report "
             f"{declared}, so comparing versions cannot detect this. "
-            f"Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src "
-            f"&& mv src/eqquasi bin/")
+            f"Rebuild: bash install.eqquasi.sh -m <host>")
 
     assert built == declared, (
         f"bin/eqquasi reports {built}, but src/globalvar.f90 declares "
         f"{declared}. Every result and reference produced from it describes "
-        f"older code. Rebuild: EQQUASIROOT=$(pwd) MACHINE=<host> make -C src "
-        f"&& mv src/eqquasi bin/   (MACHINE=utig on the utig hosts)")
+        f"older code. Rebuild: bash install.eqquasi.sh -m <host>   "
+        f"(utig, ubuntu, conda-linux, ...)")

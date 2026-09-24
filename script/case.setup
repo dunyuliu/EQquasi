@@ -238,7 +238,7 @@ def _mpirun():
     cfg = os.path.join(os.environ.get("EQQUASIROOT", ""), "bin", _exe_name() + ".cfg")
     try:
         for line in open(cfg):
-            if line.startswith("MPIRUN="):
+            if line.startswith("MPIRUN=") and line.split("=", 1)[1].strip():
                 return line.split("=", 1)[1].strip()
     except OSError:
         pass
@@ -278,6 +278,7 @@ def create_run_sh():
     half-written cycle can never be mistaken for a finished one. Recovery is
     `rm -rf scratch`; a full reset is `rm -rf scratch result`.
     """
+    mpirun = _mpirun()   # before open(): a hard fail must not truncate run.sh
     with open("run.sh", "w") as f:
         w = lambda t: f.write(t + "\n")
         # Pin OpenMP threads. Left unset, each MPI rank spawns as many threads
@@ -285,7 +286,7 @@ def create_run_sh():
         # scaling is only 1.24x for 8 ranks, so threads buy nothing here.
         w("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}")
         # Launcher recorded by install.eqquasi.sh; override with MPIRUN=... bash run.sh
-        w("MPIRUN=${MPIRUN:-" + _mpirun() + "}")
+        w("MPIRUN=${MPIRUN:-" + mpirun + "}")
         w("mkdir -p result log")
         w("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");")
         w("do")

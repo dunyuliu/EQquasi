@@ -54,6 +54,9 @@ done
 
 if [ -n "$MACH" ]; then 
     export MACHINE=$MACH
+    # Launcher default for every branch; branches below override it. Reset
+    # here so an MPIRUN left in the caller's environment is never recorded.
+    MPIRUN=$(command -v mpirun.openmpi)
     if [ $MACHINE == "ls6" ]; then 
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
         
@@ -129,7 +132,11 @@ if [ -n "$MACH" ]; then
         mv src/eqquasi "bin/eqquasi-$eqv"
         # The launcher must come from the same MPI the binary links; case.setup
         # reads it from here, so run.sh never guesses.
-        echo "MPIRUN=${MPIRUN:-$(command -v mpirun.openmpi)}" > "bin/eqquasi-$eqv.cfg"
+        if [ -z "$MPIRUN" ]; then
+            echo "EQquasi install FAILED: no MPI launcher found for MACHINE=$MACHINE."
+            exit 1
+        fi
+        echo "MPIRUN=$MPIRUN" > "bin/eqquasi-$eqv.cfg"
         echo "Installed bin/eqquasi-$eqv (launcher: $(cut -d= -f2 bin/eqquasi-$eqv.cfg))"
     fi
 

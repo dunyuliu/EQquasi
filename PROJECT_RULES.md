@@ -13,7 +13,7 @@ below it is the record of why.
 |---|---|
 | 1 | New file, name, or parameter? Say so and get agreement **first**. |
 | 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. |
-| 3 | Before merging `src/*.f90` or `case.setup`: run the fast tiers **and** `-m e2e`. |
+| 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. |
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
@@ -27,7 +27,7 @@ below it is the record of why.
 | 14 | Work in a worktree. Stage explicit paths — **never** `git add -A`. |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. |
-| 17 | Branch → PR → `build` check green → merge. Tag only green master. |
+| 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. |
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
@@ -112,13 +112,33 @@ guards the exit-code path.
 ## 3. The regression gate is the release gate
 
 `reference/test.bp5.qdc.2000/`, `reference/test.bp5.qdc.dip90.2000/`, `reference/test.bp7.qdc.a.10/`, `reference/test.bp8.qdc.gs.10/`
-and `reference/bp1002.qdc.2500/` are the safety net. Before merging any change to
-`src/*.f90` or `script/defaultParameters.py`/`case.setup`:
+and `reference/bp1002.qdc.2500/` are the safety net.
+
+**Per-PR gate (owner decision, 2026-09-23):** merging any change to
+`src/*.f90` or `script/defaultParameters.py`/`case.setup` requires all three:
+
+1. CI green (the GitHub Actions `build` check — see rule 17).
+2. A `victor-reyes` audit of the final diff.
+3. A LOCAL run of the fast + `e2e_fast` tiers by whoever lands the PR, with
+   the pytest summary line, host, and binary version pasted into the PR
+   body/comment as evidence:
 
 ```
-python3 -m pytest testsys/          # unit + contract + regression, ~1 min
+python3 -m pytest testsys/               # unit + contract + regression, ~1 min
+python3 -m pytest -m e2e_fast testsys/   # 101-step smokes, ~18 min
+```
+
+The full `-m e2e` tier (`testsys/e2e/`, ~92 tests, ~3 h) is **no longer a
+per-PR gate**. It runs periodically instead — weekly by default, and the
+owner may relax it to monthly:
+
+```
 python3 -m pytest -m e2e testsys/   # builds and runs the benchmarks, ~3 h
 ```
+
+This does not weaken rule 12: `e2e_fast` already carries
+`test.stepover.qdc.1000` (`ntotft > 1`), so the multi-fault guarantee stays in
+the per-PR gate even though the full tier moved to a schedule.
 
 A gate only counts if it **stops** the commit. Chaining the test run with `;`
 instead of `&&` let a red suite through on 2026-08-14.
@@ -348,7 +368,7 @@ mine and wrong, both belonging to the previous release.
 
 ---
 
-## 17. CI is the gate, not the local suite
+## 17. CI is the clean-machine gate, not the full regression tier
 
 **Mechanical since 2026-08-15**: `master` has branch protection requiring the
 `build` check; force-push and deletion are blocked server-side. Work happens
@@ -357,6 +377,12 @@ only when the check is green. Tags are created only on green master commits.
 Admin pushes can still bypass (enforce_admins is off) -- that is a bypass to
 be used never, not a workflow.
 
+**Owner decision, 2026-09-23**: CI's job is the fast suite, the build, and the
+two `e2e_fast` 101-step smokes — a clean-machine check, run on every push. It
+is no longer where the full `-m e2e` tier runs; that tier moved to a periodic
+schedule (weekly default, owner may relax to monthly) and is not a per-PR
+requirement (see rule 3). The numerics gate for a given PR is the LOCAL
+`e2e_fast` sweep rule 3 requires, with its evidence posted to the PR.
 
 A red CI run stops work. Do not commit, tag or release on top of one. Check
 after pushing: `gh run list --limit 5`, and `gh run view <id> --log-failed`

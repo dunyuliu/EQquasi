@@ -9,6 +9,13 @@ on:
     branches: [master]
   pull_request:
 
+# A superseded push on the same PR/branch cancels its stale run instead of
+# queuing behind it -- otherwise every push during a review burns a full
+# ~15-18 min run nobody will read the result of.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -48,12 +55,17 @@ jobs:
         eqv=$(grep -oP "EQQUASI_VERSION = '\K[^']*" src/globalvar.f90)
         test -x "bin/eqquasi-$eqv"
 
-    - name: End-to-end (fast tier)
+    - name: End-to-end (CI smokes only)
+      # Owner decision 2026-09-23 (PATHWAY_FORWARD.md row 9): CI runs only the
+      # two 101-step smokes -- test.bp5.qdc.2000 and test.stepover.qdc.1000,
+      # the project's only ntotft > 1 case in the gate (rule 12). The rest of
+      # e2e_fast (BP8's ~8000-step case, ~13 min alone) and the full e2e tier
+      # move to a periodic/local sweep on the 48-64-core hosts instead.
       run: |
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$(pwd)/script:$PATH
         set -o pipefail
-        python3 -m pytest testsys/ -m e2e_fast -v 2>&1 | tee testRunLog.txt
+        python3 -m pytest testsys/ -m e2e_ci -v 2>&1 | tee testRunLog.txt
 
     - name: Print log
       if: always()   # otherwise a failing test step hides the very log needed to debug it

@@ -255,7 +255,7 @@ clamping an already-drifted state would break steady state.
   never staleness -- the full tier passes against all of them -- it was the
   absence of a record, which is what makes a future divergence datable.
 - Every pre-existing case in `scratch/` can no longer RESUME: the solver
-  hard-stops without `input/` and `scratch/`. Deliberate, and narrower than
+  hard-stops without the case's own `input/` and `scratch/` subfolders. Deliberate, and narrower than
   it sounds -- verified 2026-08-14 that the utilities still READ the old flat
   layout, `plotPeakSliprateTime.py cycle0 cycle1` and `plotAccumulated
   --fault 1` both included, because cycle discovery tries `result/cycle*`,

@@ -7,9 +7,22 @@ subroutine solveTimeLoopPETSc
 ! both operate on the global neq/numel and are only ever called from inside
 ! an `if (me == 0)` guard). The only thing that differs from
 ! solveTimeLoopMUMPS.f90 is how the linear system is factorized and solved:
-! KSP with -pc_type lu -pc_factor_mat_solver_type mumps, i.e. PETSc calling
-! the SAME MUMPS library through its own wrapper, so parity with the direct
-! DMUMPS path is a same-library, same-algorithm question, gated in Phase C.
+! KSP with -pc_type cholesky -pc_factor_mat_solver_type mumps, i.e. PETSc
+! calling the SAME MUMPS library through its own wrapper, so parity with the
+! direct DMUMPS path is a same-library, same-algorithm question, gated in
+! Phase C.
+!
+! NOT "-pc_type lu" (PATHWAY_FORWARD row 8a's literal wording): PETSc 3.25.5's
+! MatGetFactor_aij_mumps hardcodes mumps->sym = 0 for MAT_FACTOR_LU on a
+! MATAIJ regardless of MAT_SPD/MAT_SYMMETRIC -- confirmed by reading
+! src/mat/impls/aij/mpi/mumps/impl/imumps.c, and empirically: PCLU's
+! -ksp_view reported MUMPS "structural symmetry ... 3%", i.e. it silently
+! factorized our upper-triangular-only input as if it were the full
+! unsymmetric matrix, which is a different, wrong linear system, not a MUMPS
+! roundoff difference. Only MAT_FACTOR_CHOLESKY honors A->spd to select
+! mumps->sym = 1, the actual match for mumps_par%SYM = 1 in the MUMPS path.
+! PCCHOLESKY is therefore the PETSc call that reaches the same MUMPS code
+! path; parity below is gated on that choice, not on the literal PCLU text.
 !
 ! Mirrors the MUMPS JOB=4-once / JOB=3-per-step split as KSPSetUp-once (factor)
 ! / KSPSolve-per-step (solve), and reports timeUsedInFactorization /
@@ -111,7 +124,19 @@ subroutine solveTimeLoopPETSc
         CHKERRA(perr)
         call KSPGetPC(ksp, pc, perr)
         CHKERRA(perr)
-        call PCSetType(pc, PCLU, perr)
+        ! NOT PCLU: read against PETSc 3.25.5 src/mat/impls/aij/mpi/mumps
+        ! (MatGetFactor_aij_mumps) shows MAT_FACTOR_LU on a MATAIJ hardcodes
+        ! mumps->sym = 0 (general unsymmetric) UNCONDITIONALLY, ignoring
+        ! MAT_SPD/MAT_SYMMETRIC entirely -- confirmed empirically too: with
+        ! PCLU, MUMPS's own -ksp_view reported "structural symmetry ... 3%"
+        ! (i.e. it silently treated our upper-triangular-only input as if it
+        ! were the full unsymmetric matrix, factorizing the wrong system and
+        ! producing a plausible-looking but physically wrong solution). Only
+        ! MAT_FACTOR_CHOLESKY honors A->spd to select mumps->sym = 1, which is
+        ! the SYM=1 the raw mumps_par%SYM = 1 call actually uses. PCCHOLESKY
+        ! is therefore the PETSc equivalent that reaches the same MUMPS code
+        ! path, not PCLU as PATHWAY_FORWARD's row 8a note literally says.
+        call PCSetType(pc, PCCHOLESKY, perr)
         CHKERRA(perr)
         call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
         CHKERRA(perr)

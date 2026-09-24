@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 """Overlay the campaign's domain-size and xi cases on one set of axes.
 
-Reads work/camp.dom*/ and work/camp.xi*/ and writes:
-    work/campaign_domain.png   key variables vs time, one line per domain size
-    work/campaign_xi.png       same for the time-step safety factor
+Reads scratch/camp.dom*/ and scratch/camp.xi*/ and writes:
+    scratch/campaign_domain.png   key variables vs time, one line per domain size
+    scratch/campaign_xi.png       same for the time-step safety factor
 """
 
 import glob
@@ -26,7 +26,7 @@ def rd(path):
     return read_array(path)
 def collect(pattern, keyfn):
     out = []
-    for d in sorted(glob.glob(os.path.join(R, "work", pattern)), key=keyfn):
+    for d in sorted(glob.glob(os.path.join(R, "scratch", pattern)), key=keyfn):
         g = os.path.join(d, "global.dat")
         # BP8 station files are .dat, not .txt -- the platform routes on the
         # extension and ignores .txt. This looked for .txt only, so it silently
@@ -82,12 +82,12 @@ def main():
     dom = collect("c*.dom*", dom_key)
     panel(dom, lambda d: f"half-width {dom_key(d)} m",
           "BP8-QD-GS, dx = 50 m: sensitivity to elastic domain size",
-          os.path.join(R, "work", "campaign_domain.png"))
+          os.path.join(R, "scratch", "campaign_domain.png"))
 
     xi = collect("c*.xi*", xi_key)
     panel(xi, lambda d: f"xi = {xi_key(d)}",
           "BP8-QD-GS, 500 m box: sensitivity to the time-step factor xi",
-          os.path.join(R, "work", "campaign_xi.png"))
+          os.path.join(R, "scratch", "campaign_xi.png"))
 
 
 if __name__ == "__main__":

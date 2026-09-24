@@ -320,7 +320,7 @@ retract it.
 ## 15. Operational safety on the shared compute host
 
 Work runs on shared 64-core boxes (`cotopaxi`, `knox`). All simulation
-artifacts belong under `work/` (gitignored). Check `uptime` before launching;
+artifacts belong under `scratch/` (gitignored). Check `uptime` before launching;
 at most two of your runs at once at 3 ranks; **wait if load is above ~56**
 rather than adding to it. A long run is not more urgent than someone else's
 interactive session.

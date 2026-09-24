@@ -119,11 +119,11 @@ exactly — the `test.` prefix is the only difference.
 Where things run
 ---------------------
 Every scratch artifact -- generated cases, simulation output, build products --
-belongs under ```work/``` at the repository root, which is gitignored. Nothing
+belongs under ```scratch/``` at the repository root, which is gitignored. Nothing
 scratch is written to the repo root itself.
 
 ```
-work/          # gitignored; create your cases here
+scratch/          # gitignored; create your cases here
 reference/     # committed reference results; never wiped
 bin/           # gitignored build product
 ```

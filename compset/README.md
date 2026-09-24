@@ -97,8 +97,8 @@ represent an oblique segment.
 Run the geometry generator before `case.setup`:
 
 ```
-create.newcase work/mykink liu2020.qdc.kink.300
-cd work/mykink
+create.newcase scratch/mykink liu2020.qdc.kink.300
+cd scratch/mykink
 python3 input/generateKinkGeometry.py input
 ./case.setup && bash run.sh
 ```
@@ -114,7 +114,7 @@ Two things block reproduction, both tracked in `PATHWAY_FORWARD.md`:
   blocker for 300 m is DEAD (2026-08-15): the claim was a derived estimate;
   measured, our 32-bit MUMPS factorizes 6.05e9 reals with INFOG(1)=0 in 65 s
   (MUMPS 5.x indexes the real factor array with 8-byte offsets regardless of
-  intsize64). dx = 300 runs today; `work/kink300.sci` is the live attempt.
+  intsize64). dx = 300 runs today; `scratch/kink300.sci` is the live attempt.
 - **It is quasi-dynamic.** The paper loops EQquasi with EQdyna through EQsimu;
   every rupture in its figures 3–7 is EQdyna's. This is `par.mode = 1`,
   EQquasi alone — interseismic and nucleation only.

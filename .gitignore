@@ -1,7 +1,7 @@
 
 .DS_Store
 bin/
-work/
+scratch/
 mumps
 *.o
 *.mod

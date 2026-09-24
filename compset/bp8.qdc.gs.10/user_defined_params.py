@@ -10,7 +10,7 @@
 # Quasi-dynamic fluid injection in 3D: a planar fault in a homogeneous whole
 # space, velocity-strengthening rate-and-state friction everywhere, driven
 # purely by the pore pressure change from an injection at the fault centre.
-# Parameter values follow Table 1 of the BP8 benchmark description (2026/07/31).
+# Parameter values follow Table 1 of the BP8 benchmark description (2026-08-13 revision; PW selected by par.fluid_src = 2).
 
 from defaultParameters import parameters
 import numpy as np

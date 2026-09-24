@@ -77,10 +77,16 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `scratch/liu2020.kink.10cyc` (dx=600 coherent), `scratch/kink.dc014.dx1200`
    (dtcap control), `scratch/liu2020.kink.10cyc.dx1200` (negative control).
 
-3. [ ] **Full e2e tier at HEAD.** Has not run since the compset rename, the
-   script/testsys rename, or the cohesive-zone precheck. `MACHINE=utig` on
-   cotopaxi, `MACHINE=ubuntu` on knox -- knox has no `utig` branch in
-   install.eqquasi.sh and falls through to no LD_LIBRARY_PATH. ~3h05.
+3. [x] **Full e2e tier at HEAD -- green 2026-09-24** (theo4, conda-linux,
+   eqquasi-1.18.2/1.18.3). Full run: `10 failed, 58 passed, 24 skipped in
+   14722.33s`; all 10 traced to the harness, not the solver: 9 were
+   test.bp5.qdc.dip90.2000, whose case.setup could not find
+   generateFaultInterface because testsys/e2e/cases.py put the pre-rename
+   `scripts/` on PATH (CI masks it by exporting `script/` itself); 1 was
+   test_clean_build run with MACHINE unset. After the PATH fix, from a clean
+   PATH without script/: `8 passed, 3 skipped` for exactly those tests. The
+   full tier is now periodic (rule 3), so this row stays closed until the
+   next scheduled run.
 
 4. [x] **Five pre-par compset ported** (values untouched, dy/dz paired --
    the contract test caught the old files never set them). UNVERIFIED: no

@@ -10,7 +10,7 @@ set -u
 R=/home/utig5/dliu/eqquasi
 EX=$R/bin/eqquasi
 export EQQUASIROOT=$R
-export PATH=$R/bin:$R/scripts:$PATH
+export PATH=$R/bin:$R/script:$PATH
 export OMP_NUM_THREADS=1
 LOG=$R/scratch/campaign.log
 

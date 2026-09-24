@@ -9,6 +9,7 @@ subroutine solveTimeLoopMUMPS
     integer (kind = 4) :: i,j,inv,jnv,ntag,node_num,var,l,k, iiTag
     real (kind = dp) :: startTime, endTime, timeUsedInFactorization,&
         timeUsedInComputing
+    real (kind = dp) :: progressStartTime
     character (len = 50) :: netcdf_outfile, output_type
     
     mumps_par%COMM = MPI_COMM_WORLD
@@ -46,16 +47,31 @@ subroutine solveTimeLoopMUMPS
     endif
 
     call cpu_time(startTime)
-    mumps_par%JOB = 4! Combines the actions of JOB=1, the analysis phase, 
+    mumps_par%JOB = 4! Combines the actions of JOB=1, the analysis phase,
     ! and JOB=2, the factorization phase.
     call DMUMPS(mumps_par)
+    ! Owner request (enhanced log reporting): MUMPS's own error code
+    ! (negative INFOG(1) on failure) was never checked here -- a failed
+    ! factorization (singular matrix, out of memory inside MUMPS, etc.)
+    ! would have silently continued into JOB=3 solves against a
+    ! factorization that never happened. This is additive: on every run
+    ! that has ever passed the parity gate, INFOG(1) is 0 and this branch
+    ! never executes.
+    if (mumps_par%INFOG(1) < 0) then
+        if (me == 0) write(*,*) 'MUMPS factorization (JOB=4) failed, ', &
+            'INFOG(1)=', mumps_par%INFOG(1), ' INFOG(2)=', mumps_par%INFOG(2), &
+            ' -- stopping rather than solving against a factorization ', &
+            'that never happened.'
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
     call cpu_time(endTime)
     timeUsedInFactorization = endTime - startTime
     
     stoptag = 0 ! set stoptag to FALSE.
-    
+
     call cpu_time(startTime)
-    do it = 1, nstep 
+    progressStartTime = startTime
+    do it = 1, nstep
         if (stoptag == 1) exit ! exit EQquasi if stoptag is TRUE.
         
         if (me == 0) then
@@ -128,7 +144,19 @@ subroutine solveTimeLoopMUMPS
             ! It controls the output stream of global information.
             ! Disabled here with -1. 
             call DMUMPS(mumps_par)
-            
+            ! Owner request: same additive check as the JOB=4 factorization
+            ! above, for the per-step solve. INFOG(1) is MUMPS's own global
+            ! (replicated-on-every-rank) error code -- checked on every
+            ! rank so the MPI_ABORT below is genuinely collective, not
+            ! rank-0-only.
+            if (mumps_par%INFOG(1) < 0) then
+                if (me == 0) write(*,*) 'MUMPS solve (JOB=3) failed at ', &
+                    'step', it, 'iiTag', iiTag, ', INFOG(1)=', &
+                    mumps_par%INFOG(1), ' INFOG(2)=', mumps_par%INFOG(2), &
+                    ' -- stopping rather than using an unsolved RHS.'
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+
             if (me.eq.0) then
                 resu = mumps_par%RHS
             
@@ -200,6 +228,18 @@ subroutine solveTimeLoopMUMPS
                 netcdf_outfile = trim(outDir)//'fault.r.nc'
                 call netcdf_write_on_fault(netcdf_outfile)
             endif
+
+            ! Owner request (enhanced log reporting): one line every 100
+            ! steps, mean-since-last-line, matching solveTimeLoopPETSc.f90's
+            ! PROGRESS line (no ksp_its here -- MUMPS is a direct solver).
+            if (mod(it, 100) == 0) then
+                call cpu_time(endTime)
+                write(*,'(A,I8,A,E12.5,A,E12.5,A,E12.5,A,F10.2,A,F10.4)') &
+                    'PROGRESS step=', it, ' t=', time, ' dt=', dtev1, &
+                    ' Vmax=', maxSlipRate, ' wall=', endTime - progressStartTime, &
+                    ' s/step=', (endTime - progressStartTime) / 100.0d0
+                progressStartTime = endTime
+            endif
         endif
     enddo
     call cpu_time(endTime)
@@ -227,7 +267,20 @@ subroutine solveTimeLoopMUMPS
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Seconds per step         = ', timeUsedInComputing/max(1,it-1), 'seconds'
         write(*,'(X,A,40X,E15.7,4X,A)')  '= Final max slip rate      = ', maxSlipRate, 'm/s'
         write(*,*) '====================================================================='
-        call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
+        ! Owner request (enhanced log reporting): 'N/A'/-1 for MUMPS, which
+        ! has no KSP concept -- the direct-solve counterpart to
+        ! solveTimeLoopPETSc.f90's real kspType/pcType/iteration reporting.
+        ! exit_reason distinguishes the loop ending because nstep was
+        ! reached from ending early via exitCriteria's stoptag (it-1, not
+        ! it, since a stoptag exit is caught at the TOP of the following
+        ! iteration, before that step's body ever runs).
+        if (it-1 < nstep) then
+            call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
+                'N/A', 'N/A', 'stoptag', -1, 0.0d0, -1)
+        else
+            call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
+                'N/A', 'N/A', 'nstep_reached', -1, 0.0d0, -1)
+        endif
     endif
     
 end subroutine solveTimeLoopMUMPS

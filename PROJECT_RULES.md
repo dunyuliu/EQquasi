@@ -31,6 +31,7 @@ below it is the record of why.
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
+| 21 | Branch → local check → PR w/ evidence → CI + victor audit in parallel → squash-merge, tag green master → serial. |
 
 Two habits that would have caught most violations of the above: read the file
 list a commit prints before pushing it, and re-read this card before staging.
@@ -57,6 +58,7 @@ list a commit prints before pushing it, and re-read this card before staging.
 18. [The whole workflow must work for every example](#18-the-whole-workflow-must-work-for-every-example)
 19. [Drive runs through the workflow, never the binary directly](#19-drive-runs-through-the-workflow-never-the-binary-directly)
 20. [“Plot” means a fixed set of five figures](#20-plot-means-a-fixed-set-of-five-figures)
+21. [The PR workflow: branch, review, squash, tag, serial](#21-the-pr-workflow-branch-review-squash-tag-serial)
 
 ## How these rules overlap
 
@@ -430,6 +432,47 @@ whether they support the story or not.
 region, so a plane-wide maximum is not the earthquake — on BP1002 the largest
 number in the file is imposed creep at |x| > 50 km. Restrict to VW before
 quoting coseismic slip.
+
+---
+
+## 21. The PR workflow: branch, review, squash, tag, serial
+
+Every PR from #5 onward (`#5`-`#14`) has followed this loop; only rule 17's
+mechanical half of it was written down before now.
+
+1. **Branch off `master`.** Anything that builds gets an isolated `git
+   worktree` (rule 14) rather than a checkout switch in the shared tree.
+2. **Local check before opening.** `python3 -m pytest testsys/` (rule 3's fast
+   tier — measured 114 s / ~1:54 on cotopaxi on 2026-09-23, not the "~70 s"
+   this step is sometimes quoted at, and not rule 3's own "~1 min"; re-time
+   rather than trust either figure). A change to `src/*.f90` also bumps
+   `EQQUASI_VERSION` in `src/globalvar.f90` — enforced by
+   `testsys/contract/test_repo_hygiene.py`'s
+   `test_version_has_a_single_source_of_truth` and
+   `test_declared_version_matches_a_git_tag`, **not by rule 9** (rule 9 is
+   build/environment verification on the target host; no rule number owned
+   the version-bump requirement before this one) — and runs the full sweep,
+   `python3 -m pytest -m e2e testsys/` (rule 3, ~3h).
+3. **Open the PR.** The body says what changed and why; every removal
+   carries its evidence — a grep for remaining references, or the test it
+   would break — the same discipline rule 8 requires of `reference/`,
+   applied here to source and docs.
+4. **Two gates, in parallel**: the CI `build` check, the sole required status
+   check in branch protection (`contexts: ["build"]`, confirmed 2026-09-23
+   against `repos/dunyuliu/EQquasi/branches/master/protection`), and a
+   victor-reyes audit of the final diff.
+5. **Fix findings on the branch, push, and re-audit only the new commit.**
+   Loop until both gates pass.
+6. **Squash-merge, and delete the branch.** #5 through #14 each landed as one
+   squash commit with no merge commit, and left no merged head on the
+   remote; either surviving is a Tier-1 finding.
+7. **Tag only a master commit whose own CI run passed** (rule 17).
+8. **Serial.** The next PR opens only once this one has merged — #5 through
+   #14 never had two open at the same time.
+
+**Check**: `gh api repos/dunyuliu/EQquasi/branches/master/protection` for the
+required-check name; `git log --merges <range>` for a stray non-squash merge;
+`git branch -r` for a surviving merged head.
 
 ---
 

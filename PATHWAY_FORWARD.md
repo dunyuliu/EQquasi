@@ -180,13 +180,16 @@ Read this first on wake-up. Update in place; close items by deleting them.
    plainly above rather than leaving it open pending the unlikely event
    the owner wants liu2020.qdc.kink.300 swept too or a GPU host provisioned.
 
-9. [ ] **P2 -- Lighter CI, local sweep.** User decision 2026-09-23. CI
+9. [x] **P2 -- Lighter CI, local sweep.** User decision 2026-09-23. CI
    keeps fast suite + build + two 101-step smokes (test.bp5, stepover for
    rule 12); the e2e fast tier (BP8's 8000-step row alone is ~13 min) and
    the full tier move to a local sweep on the 48-64-core hosts, with the
    pytest summary line + host + binary version required in the PR.
    Rule 17 is amended in the same change. Done when: CI wall time < 6 min
    on a code PR and the rule text says who runs which gate.
+   Landed PR #15, merged ba73294, 2026-09-24 03:33:54Z. CI check `build`
+   on ba73294: completed/success (`gh api .../commits/ba73294/check-runs`).
+   Rule 3/17 text amended in the same PR.
 
 10. [ ] **P3 -- Land the BP8 Peaceman-well variant** (local branch bp8-pw,
    one commit 2026-08-03, 173 behind master) as bp8.qdc.pw.10 and

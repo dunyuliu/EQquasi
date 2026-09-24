@@ -2,7 +2,7 @@
 ! * and Institute for Geophysics, the University of Texas at Austin.
 ! * All Rights Reserved.
 ! * This code is part of software EQquasi, please see EQquasi License Agreement
-! * attached before you copy, download, install or use EQquasi./
+! * attached before you copy, download, install or use EQquasi.*/
 
 program eqquasi3d
     use globalvar

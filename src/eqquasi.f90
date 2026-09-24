@@ -85,10 +85,16 @@ program eqquasi3d
         enddo            
     endif
     
-    if (sol_op == 1) then 
+    if (sol_op == 1) then
         call solveTimeLoopMUMPS
-    elseif (sol_op == 2) then 
+    elseif (sol_op == 2) then
+#ifdef HAVE_PETSC
         call solveTimeLoopPETSc
+#else
+        write(*,*) 'par.solver=2 (PETSc) needs MACHINE=conda-linux (or ', &
+            'another PETSc-enabled build); not available on this binary.'
+        stop
+#endif
     endif
     
     call writeResults(me)

@@ -1,20 +1,31 @@
 subroutine solveTimeLoopPETSc
 ! PETSc-KSP counterpart of solveTimeLoopMUMPS.f90 (PATHWAY_FORWARD row 8a).
 !
-! Row 8b (added on top, NOT YET COMPILED OR TESTED as of this commit -- the
-! host was mid-timing-sweep for row 8c and a build would have perturbed it;
+! Row 8b (added on top, STILL NOT COMPILED as of this commit -- the host
+! was mid-timing-sweep for row 8c and a build would have perturbed it;
 ! compile and verify before trusting anything below this note): elasticity
 ! near-null-space (MatSetNearNullSpace via MatNullSpaceCreateRigidBody on
 ! nodal coordinates) so `-pc_type gamg` has the 6 rigid-body modes it needs,
 ! a warm start from the previous step's displacement
 ! (KSPSetInitialGuessNonzero), and per-solve KSP iteration counts logged to
-! RUN SUMMARY. `-ksp_type cg -pc_type gamg` itself is a RUNTIME PETSc option
-! (e.g. via PETSC_OPTIONS or -ksp_type/-pc_type on the command line,
-! consumed by the existing KSPSetFromOptions call below) -- no code branch
-! needed to select it, and the hardcoded PCCHOLESKY/MUMPS default above is
-! unaffected when it is not passed (MatSetNearNullSpace is ignored by a
-! direct solver; KSPSetInitialGuessNonzero is harmless for KSPPREONLY, whose
-! one "iteration" is the direct solve itself).
+! RUN SUMMARY.
+!
+! CORRECTED after a source audit caught two false claims in an earlier
+! version of this comment, before either was ever compiled:
+! (1) KSPSetInitialGuessNonzero is NOT harmless for the hardcoded KSPPREONLY
+!     default -- PETSc explicitly rejects a nonzero initial guess on it
+!     ("Running KSP of preonly doesn't make sense with nonzero initial
+!     guess", confirmed against the installed libpetsc.so 3.25.5). It is
+!     now called only when the resolved KSP type is NOT KSPPREONLY.
+! (2) `-ksp_type cg -pc_type gamg` is NOT a drop-in runtime option with "no
+!     code branch needed": Amat below stores only the upper triangle, which
+!     MUMPS's Cholesky path reads correctly by SYM=1 convention but which a
+!     real MatMult (what CG/GAMG do) reads as a wrong, non-symmetric
+!     matrix. Not fixed in this pass (needs MATSBAIJ storage or both
+!     triangles inserted) -- guarded instead: selecting any KSP/PC other
+!     than the hardcoded default now aborts loudly rather than silently
+!     solving the wrong system (rule 2). See the guard right after
+!     KSPSetFromOptions below.
 !
 ! CAUGHT BY THE ROW 8C SWEEP, NOT FIXED HERE: this Mat is still
 ! MatCreateSeqAIJ on PETSC_COMM_SELF (rank 0 only), so this path is
@@ -78,19 +89,25 @@ subroutine solveTimeLoopPETSc
     implicit none
 
     Mat                        :: Amat
-    Vec                        :: bvec, xvec, coordsVec
+    Vec                        :: bvec, xvec, coordsVec, xvecSeq
+    VecScatter                 :: xScatter
     KSP                        :: ksp
     PC                         :: pc
     MatNullSpace               :: nullsp
     PetscErrorCode             :: perr
     PetscInt                   :: prow, pncols
     PetscInt, allocatable      :: pnnz(:)
+    PetscInt, allocatable      :: allIdx(:)
     PetscInt                   :: pcols(100)
     PetscScalar                :: pvals(100)
     PetscScalar, pointer       :: parr(:)
     PetscInt                   :: kspIts, totalKSPIts, nKSPSolves
+    PetscBool                  :: isPreonly
+    KSPConvergedReason         :: kspReason
+    PetscInt                   :: maxRowNnz
 
     integer (kind = 4) :: i,j,inv,jnv,ntag,node_num,var,l,k, iiTag
+    integer (kind = 4) :: maxRowNnzI4
     real (kind = dp) :: startTime, endTime, timeUsedInFactorization,&
         timeUsedInComputing
     character (len = 50) :: netcdf_outfile, output_type
@@ -103,24 +120,81 @@ subroutine solveTimeLoopPETSc
     if (bp == 8) call pore_pressure_init
     if (bp == 8) call bp8_profile_init
 
+    ! Row 8c distribution (FIRST PASS, NOT YET COMPILED -- see the row 8b
+    ! commit message for why builds are being deferred right now). Mat/Vec/
+    ! KSP creation, assembly and the KSPSolve/scatter in the time loop below
+    ! are now COLLECTIVE PETSc calls on PETSC_COMM_WORLD, run by every rank
+    ! -- row 8a's MatCreateSeqAIJ/PETSC_COMM_SELF Mat was confirmed genuinely
+    ! serial regardless of -np by the row 8c timing sweep (solver=2 flat at
+    ! ~1.015-1.018 s/step for ranks 1/2/4/8, while solver=1/MUMPS scaled
+    ! 1.015 -> 0.524). createMatrixHolderInCRSFormat/elemAssembleInCRS and
+    ! the MatSetValues/VecSetValues loops below stay rank-0-only, unchanged
+    ! from row 8a: kstiff/ia/ja/num/right/resu are still rank-0-only globals,
+    ! and distributing THOSE is a bigger rewrite than this pass attempts.
+    ! A rank that inserts nothing into a collective Mat/Vec assembly is
+    ! valid PETSc usage, not an error.
+    !
+    ! neq/ndof/numnp/x/id are valid, identical values on every rank at this
+    ! point, not just rank 0: mesh4num (sets neq, mesh4num.f90:221) and
+    ! meshgen (sets x/id) are both called unconditionally from eqquasi.f90
+    ! (lines 44/46, no `if (me == 0)` guard), before solveTimeLoopPETSc is
+    ! ever reached -- confirmed by reading eqquasi.f90, not assumed.
     if (me.eq.0) then
         write(*,*) '= Building Stiffness Matrix in CRS format      ='
         call createMatrixHolderInCRSFormat
         call elemAssembleInCRS
-
         write(*,*) '= Converting from CRS to PETSc Mat/Vec format  ='
+    endif
+
+    ! Preallocation, FIRST PASS: every row gets the SAME maxRowNnz slots on
+    ! every rank (both the Seq and MPI preallocation calls below -- whichever
+    ! does not match Amat's actual runtime type, decided by MatSetType/comm
+    ! size, is a documented no-op, so both are safe to call unconditionally).
+    ! This is deliberately not tight: exact per-rank diagonal/off-diagonal
+    ! counts need PETSc's row-ownership split, which is only decided inside
+    ! MatSetSizes/MatSetType below, so rank 0's pnnz(:) can't be sliced for
+    ! it ahead of time without more bookkeeping than this pass attempts.
+    ! Correct first (uniform over-allocation wastes memory, never produces a
+    ! wrong answer), fast later.
+    maxRowNnzI4 = 0
+    if (me == 0) then
         allocate(pnnz(neq))
         do i = 1, neq
             pnnz(i) = num(i)
         enddo
-
-        call MatCreateSeqAIJ(PETSC_COMM_SELF, neq, neq, 0, pnnz, Amat, perr)
-        CHKERRA(perr)
+        maxRowNnzI4 = maxval(pnnz)
         deallocate(pnnz)
+    endif
+    call MPI_BCAST(maxRowNnzI4, 1, MPI_INT, 0, MPI_COMM_WORLD, IERR)
+    maxRowNnz = maxRowNnzI4
 
+    call MatCreate(PETSC_COMM_WORLD, Amat, perr)
+    CHKERRA(perr)
+    call MatSetSizes(Amat, PETSC_DECIDE, PETSC_DECIDE, neq, neq, perr)
+    CHKERRA(perr)
+    call MatSetType(Amat, MATAIJ, perr)
+    CHKERRA(perr)
+    call MatSeqAIJSetPreallocation(Amat, maxRowNnz, PETSC_NULL_INTEGER, perr)
+    CHKERRA(perr)
+    call MatMPIAIJSetPreallocation(Amat, maxRowNnz, PETSC_NULL_INTEGER, &
+        maxRowNnz, PETSC_NULL_INTEGER, perr)
+    CHKERRA(perr)
+
+    if (me.eq.0) then
         do i = 1, neq
             prow   = i - 1
             pncols = num(i)
+            ! Rule 2: pcols/pvals are fixed-size(100) buffers; an
+            ! unchecked overflow here would silently corrupt memory rather
+            ! than fail. Upper-triangle hex8 rows fit today (at most 81),
+            ! but a future mesh/element change should not find out by
+            ! crashing somewhere unrelated.
+            if (pncols > 100) then
+                write(*,*) 'PETSc solver: row', i, 'has', pncols, &
+                    'entries, more than the fixed pcols/pvals(100) ', &
+                    'buffers hold. Stopping rather than overflowing them.'
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
             do j = 1, pncols
                 pcols(j) = ja(ia(i)+j-1) - 1
                 pvals(j) = kstiff(ia(i)+j-1)
@@ -129,44 +203,56 @@ subroutine solveTimeLoopPETSc
                 pvals(1:pncols), INSERT_VALUES, perr)
             CHKERRA(perr)
         enddo
-        call MatAssemblyBegin(Amat, MAT_FINAL_ASSEMBLY, perr)
-        CHKERRA(perr)
-        call MatAssemblyEnd(Amat, MAT_FINAL_ASSEMBLY, perr)
-        CHKERRA(perr)
-        ! SYM=1 (SPD) in MUMPS-speak -- matches mumps_par%SYM = 1 in
-        ! solveTimeLoopMUMPS.f90 exactly; only the upper triangle was
-        ! inserted above, matching what SYM=1 expects.
-        call MatSetOption(Amat, MAT_SPD, PETSC_TRUE, perr)
-        CHKERRA(perr)
+    endif
+    call MatAssemblyBegin(Amat, MAT_FINAL_ASSEMBLY, perr)
+    CHKERRA(perr)
+    call MatAssemblyEnd(Amat, MAT_FINAL_ASSEMBLY, perr)
+    CHKERRA(perr)
+    ! SYM=1 (SPD) in MUMPS-speak -- matches mumps_par%SYM = 1 in
+    ! solveTimeLoopMUMPS.f90 exactly; only the upper triangle was
+    ! inserted above, matching what SYM=1 expects.
+    call MatSetOption(Amat, MAT_SPD, PETSC_TRUE, perr)
+    CHKERRA(perr)
 
-        ! Row 8b: elasticity near-null-space for -pc_type gamg (a runtime
-        ! option; harmless/ignored by the hardcoded PCCHOLESKY default below).
-        ! GAMG needs the 6 rigid-body modes (3 translations + 3 rotations,
-        ! ndof=3) to build good coarse grids; MatNullSpaceCreateRigidBody
-        ! wants one Vec of nodal coordinates, block size ndof, laid out in
-        ! the SAME order as the matrix rows it will be attached to.
-        !
-        ! That ordering assumption holds here: meshgen.f90's equation
-        ! numbering (search `neq0=neq0+1; id(i1,nnode)=neq0`) assigns all
-        ! ndof=3 equations of a free node consecutively, in one inner loop,
-        ! before moving to the next node -- a node either contributes a full
-        ! contiguous 3-block or none at all (boundary/fault-boundary nodes
-        ! get negative id() codes and never enter the equation count). So
-        ! id(1,i), id(1,i)+1, id(1,i)+2 are exactly id(1,i), id(2,i), id(3,i)
-        ! for every free node i, and a length-neq vector indexed by id(1,i)
-        ! is a valid blocked coordinate vector -- checked defensively below
-        ! rather than assumed silently (rule 2: no silent wrong behavior).
-        if (mod(neq, ndof) /= 0) then
-            write(*,*) 'PETSc solver: neq is not a multiple of ndof; the ', &
-                'rigid-body near-null-space assumes every free node ', &
-                'contributes a full ndof-block of equations. Skipping ', &
-                'MatSetNearNullSpace -- GAMG will still run (with a ', &
-                'weaker default null space), just without this hint.'
-        else
-            call VecCreateSeq(PETSC_COMM_SELF, neq, coordsVec, perr)
-            CHKERRA(perr)
-            call VecSetBlockSize(coordsVec, ndof, perr)
-            CHKERRA(perr)
+    ! Row 8b: elasticity near-null-space for -pc_type gamg (a runtime
+    ! option; harmless/ignored by the hardcoded PCCHOLESKY default below).
+    ! GAMG needs the 6 rigid-body modes (3 translations + 3 rotations,
+    ! ndof=3) to build good coarse grids; MatNullSpaceCreateRigidBody
+    ! wants one Vec of nodal coordinates, block size ndof, laid out in
+    ! the SAME order as the matrix rows it will be attached to.
+    !
+    ! That ordering assumption holds here: meshgen.f90's equation
+    ! numbering (search `neq0=neq0+1; id(i1,nnode)=neq0`) assigns all
+    ! ndof=3 equations of a free node consecutively, in one inner loop,
+    ! before moving to the next node -- a node either contributes a full
+    ! contiguous 3-block or none at all (boundary/fault-boundary nodes
+    ! get negative id() codes and never enter the equation count). So
+    ! id(1,i), id(1,i)+1, id(1,i)+2 are exactly id(1,i), id(2,i), id(3,i)
+    ! for every free node i, and a length-neq vector indexed by id(1,i)
+    ! is a valid blocked coordinate vector -- checked defensively below
+    ! rather than assumed silently (rule 2: no silent wrong behavior).
+    if (mod(neq, ndof) /= 0) then
+        ! Rule 2: no warn-and-proceed. An audit flagged the original
+        ! "skip and continue with a weaker null space" here as exactly the
+        ! disallowed pattern -- fail loudly instead, since a silently
+        ! degraded GAMG hint is a correctness question a caller must decide,
+        ! not one this code should quietly decide for them.
+        if (me == 0) write(*,*) 'PETSc solver: neq is not a multiple of ', &
+            'ndof; the rigid-body near-null-space assumes every free ', &
+            'node contributes a full ndof-block of equations, which does ', &
+            'not hold here. Stopping rather than silently building a ', &
+            'near-null-space that GAMG would use incorrectly.'
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    else
+        call VecCreate(PETSC_COMM_WORLD, coordsVec, perr)
+        CHKERRA(perr)
+        call VecSetSizes(coordsVec, PETSC_DECIDE, neq, perr)
+        CHKERRA(perr)
+        call VecSetBlockSize(coordsVec, ndof, perr)
+        CHKERRA(perr)
+        call VecSetFromOptions(coordsVec, perr)
+        CHKERRA(perr)
+        if (me == 0) then
             do i = 1, numnp
                 if (id(1,i) > 0) then
                     do j = 1, ndof
@@ -176,70 +262,125 @@ subroutine solveTimeLoopPETSc
                     enddo
                 endif
             enddo
-            call VecAssemblyBegin(coordsVec, perr)
-            CHKERRA(perr)
-            call VecAssemblyEnd(coordsVec, perr)
-            CHKERRA(perr)
-            call MatNullSpaceCreateRigidBody(coordsVec, nullsp, perr)
-            CHKERRA(perr)
-            call MatSetNearNullSpace(Amat, nullsp, perr)
-            CHKERRA(perr)
-            call MatNullSpaceDestroy(nullsp, perr)
-            CHKERRA(perr)
-            call VecDestroy(coordsVec, perr)
-            CHKERRA(perr)
         endif
+        call VecAssemblyBegin(coordsVec, perr)
+        CHKERRA(perr)
+        call VecAssemblyEnd(coordsVec, perr)
+        CHKERRA(perr)
+        call MatNullSpaceCreateRigidBody(coordsVec, nullsp, perr)
+        CHKERRA(perr)
+        call MatSetNearNullSpace(Amat, nullsp, perr)
+        CHKERRA(perr)
+        call MatNullSpaceDestroy(nullsp, perr)
+        CHKERRA(perr)
+        call VecDestroy(coordsVec, perr)
+        CHKERRA(perr)
+    endif
 
-        call VecCreateSeq(PETSC_COMM_SELF, neq, bvec, perr)
-        CHKERRA(perr)
-        call VecDuplicate(bvec, xvec, perr)
-        CHKERRA(perr)
-        ! Row 8b warm start: KSPSetInitialGuessNonzero makes KSPSolve read
-        ! xvec's current contents as the initial guess instead of starting
-        ! from zero every step. xvec is never zeroed or overwritten between
-        ! solves in the time loop below (only read via VecGetArray into
-        ! `resu`), so it already carries the previous step's solution into
-        ! the next KSPSolve call once this is on -- the one explicit
-        ! VecZeroEntries below is only for the very first solve, so that
-        ! "previous step's solution" is a defined zero rather than
-        ! uninitialized memory the first time through.
-        call VecZeroEntries(xvec, perr)
-        CHKERRA(perr)
+    call VecCreate(PETSC_COMM_WORLD, bvec, perr)
+    CHKERRA(perr)
+    call VecSetSizes(bvec, PETSC_DECIDE, neq, perr)
+    CHKERRA(perr)
+    call VecSetFromOptions(bvec, perr)
+    CHKERRA(perr)
+    call VecDuplicate(bvec, xvec, perr)
+    CHKERRA(perr)
+    ! Rank 0 still does all the serial FEM bookkeeping (bound_load, faulting,
+    ! output) against plain Fortran arrays (`right`, `resu`), unchanged from
+    ! row 8a -- only the linear solve is distributed. allIdx is the fixed
+    ! 0..neq-1 global index list rank 0 uses to push `right` through
+    ! VecSetValues each step; built once here, not per step.
+    if (me == 0) then
+        allocate(allIdx(neq))
+        do i = 1, neq
+            allIdx(i) = i - 1
+        enddo
+    endif
+    ! Gathers the distributed xvec back to a full copy on rank 0 after every
+    ! solve (xvecSeq) -- the standard PETSc idiom for a solver embedded in an
+    ! otherwise-serial legacy driver. Built once; reused via
+    ! VecScatterBegin/End every step in the time loop below.
+    call VecScatterCreateToZero(xvec, xScatter, xvecSeq, perr)
+    CHKERRA(perr)
+    ! Row 8b warm start: KSPSetInitialGuessNonzero makes KSPSolve read
+    ! xvec's current contents as the initial guess instead of starting
+    ! from zero every step. xvec is never zeroed or overwritten between
+    ! solves in the time loop below (only read via the scatter above into
+    ! `resu`), so it already carries the previous step's solution into
+    ! the next KSPSolve call once this is on -- the one explicit
+    ! VecZeroEntries below is only for the very first solve, so that
+    ! "previous step's solution" is a defined zero rather than
+    ! uninitialized memory the first time through.
+    call VecZeroEntries(xvec, perr)
+    CHKERRA(perr)
 
-        call KSPCreate(PETSC_COMM_SELF, ksp, perr)
-        CHKERRA(perr)
-        call KSPSetOperators(ksp, Amat, Amat, perr)
-        CHKERRA(perr)
+    call KSPCreate(PETSC_COMM_WORLD, ksp, perr)
+    CHKERRA(perr)
+    call KSPSetOperators(ksp, Amat, Amat, perr)
+    CHKERRA(perr)
+    call KSPSetType(ksp, KSPPREONLY, perr)
+    CHKERRA(perr)
+    call KSPGetPC(ksp, pc, perr)
+    CHKERRA(perr)
+    ! NOT PCLU: read against PETSc 3.25.5 src/mat/impls/aij/mpi/mumps
+    ! (MatGetFactor_aij_mumps) shows MAT_FACTOR_LU on a MATAIJ hardcodes
+    ! mumps->sym = 0 (general unsymmetric) UNCONDITIONALLY, ignoring
+    ! MAT_SPD/MAT_SYMMETRIC entirely -- confirmed empirically too: with
+    ! PCLU, MUMPS's own -ksp_view reported "structural symmetry ... 3%"
+    ! (i.e. it silently treated our upper-triangular-only input as if it
+    ! were the full unsymmetric matrix, factorizing the wrong system and
+    ! producing a plausible-looking but physically wrong solution). Only
+    ! MAT_FACTOR_CHOLESKY honors A->spd to select mumps->sym = 1, which is
+    ! the SYM=1 the raw mumps_par%SYM = 1 call actually uses. PCCHOLESKY
+    ! is therefore the PETSc equivalent that reaches the same MUMPS code
+    ! path, not PCLU as PATHWAY_FORWARD's row 8a note literally says.
+    call PCSetType(pc, PCCHOLESKY, perr)
+    CHKERRA(perr)
+    call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
+    CHKERRA(perr)
+    ! Runtime overrides (e.g. -ksp_view, or a different -pc_type for row
+    ! 8b) are applied on top of the hardcoded defaults above, never
+    ! instead of them.
+    call KSPSetFromOptions(ksp, perr)
+    CHKERRA(perr)
+
+    call PetscObjectTypeCompare(ksp, KSPPREONLY, isPreonly, perr)
+    CHKERRA(perr)
+    ! CORRECTNESS GUARD (audit-caught before this was ever compiled, 2026-
+    ! 09-24): Amat above stores only the upper triangle (i <= j) of the
+    ! stiffness matrix. MUMPS's Cholesky path (the hardcoded default,
+    ! KSPPREONLY/PCCHOLESKY) reads exactly that by SYM=1 convention -- fine.
+    ! Any OTHER KSP/PC (a runtime -ksp_type cg -pc_type gamg override) does
+    ! real MatMult against Amat as stored, which is not symmetric and not
+    ! the actual stiffness matrix once you only keep half of it: a silently
+    ! WRONG linear system, not a slower one. Fixing this needs MATSBAIJ
+    ! storage or inserting both triangles, neither done yet -- deferred to
+    ! the row 8b compile-and-test pass, after distribution (this pass's own
+    ! priority, see the note above MatCreate). Refuse rather than silently
+    ! solve the wrong system in the meantime (rule 2).
+    if (.not. isPreonly) then
+        if (me == 0) write(*,*) 'PETSc solver: a non-default KSP/PC is ', &
+            'in effect (e.g. -ksp_type/-pc_type), but this Mat only ', &
+            'stores the upper triangle -- correct for the hardcoded ', &
+            'MUMPS Cholesky default, WRONG for CG/GAMG or any method ', &
+            'that does a real MatMult. Not fixed yet (needs MATSBAIJ ', &
+            'storage or both triangles inserted); refusing rather than ', &
+            'computing a silently wrong answer.'
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+    ! Row 8b warm start: only reachable once the guard above is satisfied
+    ! (today, only the KSPPREONLY default reaches here, where it is a
+    ! no-op -- PETSc's KSPPREONLY explicitly rejects a nonzero initial
+    ! guess, "Running KSP of preonly doesn't make sense with nonzero
+    ! initial guess", confirmed against libpetsc.so 3.25.5). Left in place,
+    ! inert, for when a real iterative method is enabled after the storage
+    ! fix above.
+    if (.not. isPreonly) then
         call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
         CHKERRA(perr)
-        call KSPSetType(ksp, KSPPREONLY, perr)
-        CHKERRA(perr)
-        call KSPGetPC(ksp, pc, perr)
-        CHKERRA(perr)
-        ! NOT PCLU: read against PETSc 3.25.5 src/mat/impls/aij/mpi/mumps
-        ! (MatGetFactor_aij_mumps) shows MAT_FACTOR_LU on a MATAIJ hardcodes
-        ! mumps->sym = 0 (general unsymmetric) UNCONDITIONALLY, ignoring
-        ! MAT_SPD/MAT_SYMMETRIC entirely -- confirmed empirically too: with
-        ! PCLU, MUMPS's own -ksp_view reported "structural symmetry ... 3%"
-        ! (i.e. it silently treated our upper-triangular-only input as if it
-        ! were the full unsymmetric matrix, factorizing the wrong system and
-        ! producing a plausible-looking but physically wrong solution). Only
-        ! MAT_FACTOR_CHOLESKY honors A->spd to select mumps->sym = 1, which is
-        ! the SYM=1 the raw mumps_par%SYM = 1 call actually uses. PCCHOLESKY
-        ! is therefore the PETSc equivalent that reaches the same MUMPS code
-        ! path, not PCLU as PATHWAY_FORWARD's row 8a note literally says.
-        call PCSetType(pc, PCCHOLESKY, perr)
-        CHKERRA(perr)
-        call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
-        CHKERRA(perr)
-        ! Runtime overrides (e.g. -ksp_view, or a different -pc_type for row
-        ! 8b) are applied on top of the hardcoded defaults above, never
-        ! instead of them.
-        call KSPSetFromOptions(ksp, perr)
-        CHKERRA(perr)
-
-        call initOnFaultKinematics
     endif
+
+    if (me == 0) call initOnFaultKinematics
 
     call cpu_time(startTime)
     if (me.eq.0) then
@@ -317,32 +458,69 @@ subroutine solveTimeLoopPETSc
                 ! COMPUTE U*(t+1) FOR THE WHOLE VOLUME'
                 ! COMPUTE U**(t+1) FOR THE WHOLE VOLUME.
                 call bound_load
-                call VecGetArray(bvec, parr, perr)
-                CHKERRA(perr)
-                parr = right
-                call VecRestoreArray(bvec, parr, perr)
+                ! Row 8c distribution: bvec is now a PETSC_COMM_WORLD Vec, so
+                ! VecGetArray only exposes rank 0's OWN local slice, not the
+                ! whole length-neq array -- `parr = right` (row 8a) silently
+                ! wrote into the wrong-sized buffer once bvec stopped being
+                ! sequential. VecSetValues by explicit global index (allIdx,
+                ! built once above) is the correct way for rank 0 to push the
+                ! full RHS into a distributed vector; the collective
+                ! Assembly call below routes each entry to its owning rank.
+                call VecSetValues(bvec, neq, allIdx, right(1:neq), &
+                    INSERT_VALUES, perr)
                 CHKERRA(perr)
             endif
+            call VecAssemblyBegin(bvec, perr)
+            CHKERRA(perr)
+            call VecAssemblyEnd(bvec, perr)
+            CHKERRA(perr)
 
             call MPI_BCAST(stoptag, 1, MPI_INT, 0, MPI_COMM_WORLD, IERR)
 
+            ! KSPSolve is collective -- every rank must call it now that Amat/
+            ! bvec/xvec are PETSC_COMM_WORLD objects, not just rank 0 (row
+            ! 8a's `if (me.eq.0)` guard here would hang every other rank
+            ! waiting on a call that never comes).
+            call KSPSolve(ksp, bvec, xvec, perr)
+            CHKERRA(perr)
+            ! Rule 2: a solve that did not converge is not a solution.
+            call KSPGetConvergedReason(ksp, kspReason, perr)
+            CHKERRA(perr)
+            if (kspReason < 0) then
+                if (me == 0) write(*,*) 'PETSc solver: KSPSolve did NOT ', &
+                    'converge (KSPConvergedReason =', kspReason, &
+                    ') at step', it, 'iiTag', iiTag, &
+                    '-- stopping rather than using an unconverged solve.'
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            ! Row 8b: iterations/step, meaningful once -ksp_type cg is
+            ! selected at runtime (KSPPREONLY's default below always
+            ! reports 1). Logged even in the LU/Cholesky-default case,
+            ! since a stray non-1 there would itself be a bug worth
+            ! seeing.
+            call KSPGetIterationNumber(ksp, kspIts, perr)
+            CHKERRA(perr)
+
+            ! Gather the distributed solution back to a full copy on rank 0
+            ! (xvecSeq, via the VecScatterCreateToZero context built once
+            ! above) -- VecGetArray directly on xvec (row 8a) only ever
+            ! exposed rank 0's own local slice, which is a real bug once
+            ! xvec is no longer sequential, not merely a style change.
+            call VecScatterBegin(xScatter, xvec, xvecSeq, INSERT_VALUES, &
+                SCATTER_FORWARD, perr)
+            CHKERRA(perr)
+            call VecScatterEnd(xScatter, xvec, xvecSeq, INSERT_VALUES, &
+                SCATTER_FORWARD, perr)
+            CHKERRA(perr)
+
             if (me.eq.0) then
-                call KSPSolve(ksp, bvec, xvec, perr)
-                CHKERRA(perr)
-                ! Row 8b: iterations/step, meaningful once -ksp_type cg is
-                ! selected at runtime (KSPPREONLY's default below always
-                ! reports 1). Logged even in the LU/Cholesky-default case,
-                ! since a stray non-1 there would itself be a bug worth
-                ! seeing.
-                call KSPGetIterationNumber(ksp, kspIts, perr)
-                CHKERRA(perr)
                 totalKSPIts = totalKSPIts + kspIts
                 nKSPSolves = nKSPSolves + 1
 
-                call VecGetArray(xvec, parr, perr)
+                call VecGetArray(xvecSeq, parr, perr)
                 CHKERRA(perr)
                 resu = parr
-                call VecRestoreArray(xvec, parr, perr)
+                call VecRestoreArray(xvecSeq, parr, perr)
                 CHKERRA(perr)
 
                 if (iiTag==0) then
@@ -439,16 +617,23 @@ subroutine solveTimeLoopPETSc
             dble(totalKSPIts)/dble(max(1,nKSPSolves)), '='
         write(*,*) '====================================================================='
         call output_run_metadata(timeUsedInComputing, timeUsedInFactorization)
-
-        call VecDestroy(bvec, perr)
-        CHKERRA(perr)
-        call VecDestroy(xvec, perr)
-        CHKERRA(perr)
-        call KSPDestroy(ksp, perr)
-        CHKERRA(perr)
-        call MatDestroy(Amat, perr)
-        CHKERRA(perr)
     endif
+
+    ! Row 8c: Amat/bvec/xvec/ksp are PETSC_COMM_WORLD objects now, so their
+    ! destroy calls are collective too -- gating them behind `if (me==0)`
+    ! (row 8a) would hang every other rank.
+    call VecScatterDestroy(xScatter, perr)
+    CHKERRA(perr)
+    call VecDestroy(xvecSeq, perr)
+    CHKERRA(perr)
+    call VecDestroy(bvec, perr)
+    CHKERRA(perr)
+    call VecDestroy(xvec, perr)
+    CHKERRA(perr)
+    call KSPDestroy(ksp, perr)
+    CHKERRA(perr)
+    call MatDestroy(Amat, perr)
+    CHKERRA(perr)
 
     call PetscFinalize(perr)
     CHKERRA(perr)

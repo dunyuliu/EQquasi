@@ -22,6 +22,16 @@ endif
 # otherwise fall back. Override with `make FC=...` at any time.
 MPIFC := $(shell command -v mpif90.openmpi >/dev/null 2>&1 && mpif90.openmpi -show >/dev/null 2>&1 && echo mpif90.openmpi || echo mpif90)
 
+# Row 8: eqquasi.f90 unconditionally references solveTimeLoopPETSc regardless
+# of MACHINE, but only conda-linux compiles and links that object (PETSc via
+# conda is not available on utig/ubuntu/local/ls6). Left as a plain Fortran
+# CALL, that is an undefined-reference link failure on every other machine.
+# PETSC_DEFINE is empty by default and set to -DHAVE_PETSC only in the
+# conda-linux branch below; eqquasi.o is preprocessed (-cpp) so the call site
+# itself compiles out on machines without it, replaced by a loud runtime stop
+# (rule 2) instead of a link error.
+PETSC_DEFINE =
+
 ifeq ($(SYSTEM), utig)
     FFLAGS     = -fopenmp -ffree-line-length-none -O3
     FC         = ${MPIFC}
@@ -121,6 +131,7 @@ else ifeq ($(SYSTEM), conda-linux)
     PETSC_INC  = -I${INC}
     PETSC_LIB  = -L${LIB} -lpetsc ${RPATH}
     OBJ_PETSC  = solveTimeLoopPETSc.o
+    PETSC_DEFINE = -DHAVE_PETSC
 
 else ifeq ($(SYSTEM), ls6)
     FFLAGS     = -qopenmp
@@ -160,7 +171,7 @@ eqquasi.o:   eqquasi.f90 solveTimeLoopMUMPS.o      globalvar.o mesh4num.o  \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              read_input.o            func_lib.o  \
              netcdf_io.o
-	$(FC) $(OPT) eqquasi.f90 
+	$(FC) $(OPT) -cpp ${PETSC_DEFINE} eqquasi.f90
 globalvar.o: globalvar.f90
 	$(FC) $(OPT) globalvar.f90     
 mesh4num.o:  mesh4num.f90  globalvar.o

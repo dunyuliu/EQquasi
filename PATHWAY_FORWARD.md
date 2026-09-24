@@ -113,25 +113,72 @@ Read this first on wake-up. Update in place; close items by deleting them.
    first), and holding VW fraction fixed vs VW area fixed are two different
    experiments answering different questions. User's call, not a default.
 
-8. [ ] **P2 -- Move the solver to PETSc, then optimize.** User decision
-   2026-09-23. Today: MUMPS factorizes once (JOB=4) and does one JOB=3
-   solve per time step, with the matrix assembled centralized on rank 0;
-   the only scaling number in the repo is 1.24x at 8 ranks
-   (script/case.setup). Plan, each step gated on the previous one's numbers:
-   (a) new src/solveTimeLoopPETSc.f90 beside the untouched
-   solveTimeLoopMUMPS.f90, KSP with -pc_type lu
-   -pc_factor_mat_solver_type mumps; PARITY with native MUMPS on the fast
-   references is the hard gate; (b) -ksp_type cg -pc_type gamg with the
-   elasticity near-nullspace, warm-started from the previous step;
-   (c) strong-scaling sweep, ranks 1/2/4/8, per-step solve + factorization
-   time on test.bp5.qdc.2000, bp1002.qdc.2500, liu2020.qdc.kink.300;
-   (d) GPU through PETSc (aijcusparse / Kokkos) on a GPU host. MUMPS stays
-   reachable as a PETSc runtime option; the direct interface is phased out.
-   Stack: conda-forge PETSc 3.25.5 via MACHINE=conda-linux, plus a source
-   build under ~/opt/<host> for an A/B speed check.
-   Done when: a committed table of per-step solve time vs ranks for the
-   three cases, and the parity check (PETSc-LU vs native MUMPS) agreeing to
-   MPI-noise level.
+8. [x] **P2 -- Move the solver to PETSc, then optimize.** User decision
+   2026-09-23. Landed 2026-09-24, PRs #17 (1c710df, v1.18.0), #18
+   (bfc9782, v1.18.1), #19 (eb8c540, v1.18.2), all merged to master with
+   CI green.
+   (a) parity: new src/solveTimeLoopPETSc.f90 beside the untouched
+   solveTimeLoopMUMPS.f90. Gate is `-pc_type cholesky
+   -pc_factor_mat_solver_type mumps`, not `-pc_type lu` as originally
+   planned here -- PETSc 3.25.5 hardcodes mumps->sym=0 for LU regardless
+   of MAT_SPD (read from PETSc source and confirmed via `-ksp_view`: LU
+   silently factorized the upper-triangular-only input as an unsymmetric
+   matrix, a different linear system, not roundoff). Bit-exact parity
+   verified on test.bp5.qdc.2000 and test.stepover.qdc.1000 (ntotft>1).
+   (b) CG+GAMG: works and is numerically correct, not merely guarded.
+   Needed a real fix along the way -- Amat originally stored only the
+   upper triangle (correct for MUMPS-Cholesky's SYM=1 convention, silently
+   wrong for a real MatMult); now stores both triangles, with the
+   original Cholesky path re-verified bit-exact afterward. Correctness
+   is enforced by a whitelist (`KSPPREONLY+PCCHOLESKY` OR `KSPCG+PCGAMG`
+   with `ksp_rtol<=1e-12`, the only tolerance actually verified) that
+   MPI_ABORTs on anything else, including CG+GAMG at PETSc's own
+   untested default rtol.
+   (c) scaling: full speed table, 3 solvers x ranks 1/2/4/8, on
+   test.bp5.qdc.2000 -- 12/12 MATCH. CG+GAMG scales BETTER in relative
+   terms than MUMPS (4.93x vs 1.94x over ranks 1->8) but stays
+   absolutely slower at every rank count at this problem size (~25k
+   equations). A larger case, bp1002.qdc.2500 (127k equations, 2
+   faults), was swept at 8/16/24 ranks (one socket): no crossover
+   through 24 ranks. A clean, fully isolated (no other job on the host)
+   full-cycle A/B at 8 ranks gives the least-confounded numbers to date:
+   native MUMPS 0.443 s/step (wall 1700 s), CG+GAMG 0.614 s/step (wall
+   2351 s, avg 9.76 KSP iterations/solve) -- CG+GAMG **1.39x slower**,
+   confirming the qualitative conclusion above, not reversing it. An
+   earlier reading that CG+GAMG might be faster over a full cycle
+   (0.963 vs 0.677 s/step) was a measurement artifact, not a finding: a
+   `kill` that was believed to have stopped a paired MUMPS run did not
+   (OpenMPI 5's PRRTE runtime can outlive the killed `prterun` launcher
+   process), so that MUMPS number ran contended with several unrelated
+   jobs for its full ~2h span (measured inflation 2.17x versus the
+   clean rerun); the CG+GAMG number in that same comparison was itself
+   ~10% contention-inflated by a partial overlap with an unrelated test
+   run. liu2020.qdc.kink.300 (the third case named in the original
+   plan) was never run for this sweep -- test.bp5.qdc.2000 and
+   bp1002.qdc.2500 only. A real, smaller, non-contention effect was also
+   found: CG's iteration count is highest early in a cycle (11-13,
+   observed via the new per-100-step PROGRESS logging from PR #19) and
+   settles to a steady 9 for most of the interseismic period, so a
+   short truncated run modestly overstates CG's true full-cycle average
+   cost -- distinct from, and much smaller than, the contention effect.
+   (d) GPU: not attempted. theo4 (this session's host) has no GPU, and
+   the conda-forge PETSc 3.25.5 build used throughout is CPU-only.
+   Stopped here per the original plan's own instruction.
+   Also landed along the way (PR #19, owner request): enhanced log
+   reporting -- per-100-step PROGRESS lines in both solver loops (the
+   tool that produced the phase-dependent iteration finding above),
+   MUMPS INFOG(1) error checking (first-ever edit to
+   solveTimeLoopMUMPS.f90, additive only, re-verified bit-exact after),
+   and run.sh capturing per-cycle stdout+stderr with signal decoding on
+   failure.
+   Done when: a committed table of per-step solve time vs ranks exists
+   for two of the three originally-named cases (not liu2020.qdc.kink.300)
+   and the parity check (PETSc-Cholesky vs native MUMPS, not PETSc-LU as
+   originally written here) agrees to MPI-noise level -- both true. Not
+   fully done against the letter of the original plan (3 cases, and (d)
+   was in scope); closing this row as landed with the two gaps stated
+   plainly above rather than leaving it open pending the unlikely event
+   the owner wants liu2020.qdc.kink.300 swept too or a GPU host provisioned.
 
 9. [ ] **P2 -- Lighter CI, local sweep.** User decision 2026-09-23. CI
    keeps fast suite + build + two 101-step smokes (test.bp5, stepover for

@@ -1,9 +1,7 @@
 subroutine solveTimeLoopPETSc
 ! PETSc-KSP counterpart of solveTimeLoopMUMPS.f90 (PATHWAY_FORWARD row 8a).
 !
-! Row 8b (added on top, STILL NOT COMPILED as of this commit -- the host
-! was mid-timing-sweep for row 8c and a build would have perturbed it;
-! compile and verify before trusting anything below this note): elasticity
+! Row 8b (added on top): elasticity
 ! near-null-space (MatSetNearNullSpace via MatNullSpaceCreateRigidBody on
 ! nodal coordinates) so `-pc_type gamg` has the 6 rigid-body modes it needs,
 ! a warm start from the previous step's displacement
@@ -33,8 +31,11 @@ subroutine solveTimeLoopPETSc
 ! (flat ~1.015-1.018 s/step at ranks 1/2/4/8, while solver=1/MUMPS scaled
 ! 1.015 -> 0.524). Amat is now MATAIJ on PETSC_COMM_WORLD (see "Row 8c
 ! distribution" below), still built from the same rank-0-only CRS arrays.
-! STILL UNCOMPILED as of this note -- rule 9 applies: this is a claim to
-! verify on the target host, not yet a fact.
+! Verified on theo4/conda-linux: solver=2 now scales too (factorization
+! 11.03 -> 3.86s, per-step 1.02 -> 0.59s at ranks 1/2/4/8) -- tracks
+! solver=1 closely at 2 and 4 ranks (within ~2%), less closely at 8 ranks
+! (+22% factorization, +13% per-step) -- fixed, not just guarded, though
+! not yet as fast as the raw MUMPS path at higher rank counts.
 !
 ! Same time-loop physics, same CRS assembly (createMatrixHolderInCRSFormat /
 ! elemAssembleInCRS, both reused UNMODIFIED and rank-0-only, exactly as in
@@ -123,8 +124,8 @@ subroutine solveTimeLoopPETSc
     if (bp == 8) call pore_pressure_init
     if (bp == 8) call bp8_profile_init
 
-    ! Row 8c distribution (FIRST PASS, NOT YET COMPILED -- see the row 8b
-    ! commit message for why builds are being deferred right now). Mat/Vec/
+    ! Row 8c distribution (verified on theo4/conda-linux: parity holds and
+    ! solver=2 now scales with ranks -- see the top-of-file note). Mat/Vec/
     ! KSP creation, assembly and the KSPSolve/scatter in the time loop below
     ! are now COLLECTIVE PETSc calls on PETSC_COMM_WORLD, run by every rank
     ! -- row 8a's MatCreateSeqAIJ/PETSC_COMM_SELF Mat was confirmed genuinely

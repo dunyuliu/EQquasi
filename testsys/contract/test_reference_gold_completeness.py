@@ -150,3 +150,53 @@ def test_bp8_global_csv_matches_summary():
     g = json.loads((d / "summary.json").read_text())["global"]
     assert rows[-1, 0] / 86400.0 == pytest.approx(g["t_end_d"], rel=1e-3)
     assert rows[:, 1].max() == pytest.approx(g["peak_Vmax_log10"], abs=1e-3)
+
+
+# Row 6 (2026-09-25): peak_sliprate_per_fault.dat is time, then one peak-V
+# column per fault. It is additive to global.dat (whose column 2 stays the
+# all-fault max), so a reference that carries it must agree with its own
+# global.dat: same rows, same time column, and the max over the fault columns
+# is column 2 -- both are maxval() of the same sliprate_arr in faulting.f90 at
+# the same step, so within one run they are bit-identical. Across the files of
+# a reference they are not: rule 8 keeps the pre-existing global.dat (knox,
+# 1.16.0 for the stepover), and the per-fault file was blessed additively from
+# a later run, so the two differ by run-to-run MPI reduction noise (~1e-15
+# relative, measured 2026-09-25). The gate's own series tolerance (1e-9,
+# testsys/e2e/cases.py) is used here for the same reason it is used there; a
+# routing bug puts a wrong FAULT's value in a column, which is not a 1e-15
+# effect. This is also the rule-8a reader for the file in the fast tier;
+# testsys/e2e/cases.py compares it against a fresh run in the e2e tier.
+PERFAULT_REFS = [b for b in FIELD_BENCHMARKS
+                 if (gold_dir(b) / "peak_sliprate_per_fault.dat").is_file()]
+
+
+def test_some_reference_carries_peak_sliprate_per_fault():
+    assert PERFAULT_REFS, ("no reference holds peak_sliprate_per_fault.dat; the "
+                           "per-fault test below would be vacuous")
+
+
+@pytest.mark.parametrize("bench", PERFAULT_REFS)
+def test_peak_sliprate_per_fault_matches_global(bench):
+    import sys
+    import numpy as np
+    sys.path.insert(0, str(ROOT / "script"))
+    from seasio import read_array
+    d = gold_dir(bench)
+    p = np.atleast_2d(read_array(d / "peak_sliprate_per_fault.dat"))
+    g = np.atleast_2d(read_array(d / "global.dat"))
+    assert p.shape[1] >= 2, f"{bench}: fewer than one fault column"
+    assert p.shape[0] == g.shape[0], \
+        f"{bench}: {p.shape[0]} rows vs {g.shape[0]} in global.dat"
+    assert np.array_equal(p[:, 0], g[:, 0]), f"{bench}: time columns differ"
+    vmax = p[:, 1:].max(axis=1)
+    assert np.allclose(vmax, g[:, 1], rtol=1e-9, atol=1e-18), \
+        (f"{bench}: max over faults != global.dat column 2; worst relative "
+         f"difference {np.max(np.abs(vmax - g[:, 1]) / np.maximum(np.abs(g[:, 1]), 1e-30)):.2e}")
+    # The compset says how many faults there are; the file must have one
+    # column per fault, or a fault is silently missing from the figure.
+    import re
+    udp = (d / "user_defined_params.py").read_text() if (d / "user_defined_params.py").is_file() else ""
+    m = re.search(r"par\.ntotft\s*=\s*(\d+)", udp)
+    if m:
+        assert p.shape[1] - 1 == int(m.group(1)), \
+            f"{bench}: {p.shape[1] - 1} fault columns, par.ntotft = {m.group(1)}"

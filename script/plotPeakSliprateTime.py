@@ -12,9 +12,16 @@ except BP8, which stores log10(m/s) (src/library_output.f90); both are shown
 on the same log axis by converting the BP8 form back to linear. The BP8 case
 is detected from the file's own '# Column #2 ... log10' header, not guessed.
 
-Reads:  global.dat per cycle
-Writes: peak_slip_rate_vs_time.png (into the case directory; cwd when several
-        cases are overlaid)
+Per fault: peak_sliprate_per_fault.dat (time, then one peak-V column per
+fault; written since 1.19.1 alongside global.dat) gives a second figure with
+one curve per fault -- the all-fault maximum above cannot say which fault
+slipped, and rule 20 wants that stated, not implied. Cycles or cases without
+the file are reported on stdout and the per-fault figure is skipped; the
+global figure is always drawn.
+
+Reads:  global.dat per cycle; peak_sliprate_per_fault.dat per cycle if present
+Writes: peak_slip_rate_vs_time.png, peak_slip_rate_per_fault_vs_time.png (into
+        the case directory; cwd when several cases are overlaid)
 """
 
 import glob
@@ -38,13 +45,27 @@ def _global(d):
     import glob as _g
     hits = _g.glob(os.path.join(d, "global.dat")) or _g.glob(os.path.join(d, "global.csv"))
     return hits[0] if hits else os.path.join(d, "global.dat")
+
+
+def _perfault(d):
+    """peak_sliprate_per_fault.dat (or .csv from a gold directory), or None."""
+    import glob as _g
+    hits = _g.glob(os.path.join(d, "peak_sliprate_per_fault.dat")) or \
+        _g.glob(os.path.join(d, "peak_sliprate_per_fault.csv"))
+    return hits[0] if hits else None
 SECONDS_PER_YEAR = 365.25 * 24 * 3600
 
 
 def load_case(tokens_or_dir):
-    """(t_years, vmax) concatenated over the case's cycles."""
+    """(t_years, vmax, vfault) concatenated over the case's cycles.
+
+    vfault is an (nstep, nfault) array from peak_sliprate_per_fault.dat, or
+    None when any cycle lacks the file (an older run or reference) -- said on
+    stdout, never silently.
+    """
     parts = pu.resolve_targets(tokens_or_dir, PATTERNS, "plotPeakSliprateTime.py")
     times, rates, t0 = [], [], 0.0
+    perfault, missing = [], []
     for label, rdir in parts:
         path = _global(rdir)
         is_log10 = False
@@ -56,10 +77,27 @@ def load_case(tokens_or_dir):
         v = 10.0 ** d[:, 1] if is_log10 else d[:, 1]
         times.append(d[:, 0] + t0)
         rates.append(v)
+        pf = _perfault(rdir)
+        if pf is None:
+            missing.append(label or rdir)
+        else:
+            pfd = np.atleast_2d(read_array(pf))
+            if pfd.shape[0] != d.shape[0]:
+                raise SystemExit(
+                    f"plotPeakSliprateTime.py: {pf} has {pfd.shape[0]} rows "
+                    f"but {path} has {d.shape[0]}; the two are written from "
+                    f"the same step loop and must agree")
+            perfault.append(pfd[:, 1:])
         t0 += d[-1, 0]
         print(f"  {label or rdir}: {len(d)} steps, "
               f"{d[-1, 0] / 86400:.2f} d simulated")
-    return np.concatenate(times) / SECONDS_PER_YEAR, np.concatenate(rates)
+    if missing:
+        print(f"  no peak_sliprate_per_fault.dat in {missing} (written since "
+              f"1.19.1); per-fault figure skipped for this case")
+        vfault = None
+    else:
+        vfault = np.concatenate(perfault)
+    return np.concatenate(times) / SECONDS_PER_YEAR, np.concatenate(rates), vfault
 
 
 def main():
@@ -94,9 +132,14 @@ def main():
             case_dirs.append((os.path.basename(os.path.abspath(t)), [t]))
 
     fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
+    # Per-fault curves, drawn into a second figure after this one; a case
+    # without the file contributes nothing there (already reported above).
+    perfault_curves = []
     for name, toks in case_dirs:
-        t, v = load_case(toks)
+        t, v, vf = load_case(toks)
         ax.plot(t, np.maximum(v, 1e-30), lw=2.2, label=name)
+        if vf is not None:
+            perfault_curves.append((name, t, vf))
     ax.set_yscale("log")
     ax.set_xlabel("time (years)")
     ax.set_ylabel("peak slip rate (m/s)")
@@ -123,6 +166,29 @@ def main():
     else:
         out = "peak_slip_rate_vs_time.png"
     pu.save(fig, out, dpi=150)
+
+    if perfault_curves:
+        fig2, ax2 = plt.subplots(figsize=(8, 6), constrained_layout=True)
+        for name, t, vf in perfault_curves:
+            for k in range(vf.shape[1]):
+                lab = f"fault {k + 1}" if len(perfault_curves) == 1 \
+                    else f"{name} / fault {k + 1}"
+                ax2.plot(t, np.maximum(vf[:, k], 1e-30), lw=2.0, label=lab)
+        ax2.set_yscale("log")
+        ax2.set_xlabel("time (years)")
+        ax2.set_ylabel("peak slip rate on fault (m/s)")
+        ax2.set_title("Peak slip rate vs time, per fault", fontsize=16)
+        ax2.tick_params(which="major", length=6)
+        ax2.tick_params(which="minor", length=3)
+        ax2.grid(alpha=0.25, which="major", lw=0.8)
+        ax2.grid(alpha=0.12, which="minor", lw=0.5)
+        ax2.axhline(1e-3, color="tab:red", ls="--", lw=1.6, alpha=0.8)
+        ax2.text(0.995, 1e-3, " 1e-3 m/s (seismic threshold)", transform=
+                 ax2.get_yaxis_transform(), ha="right", va="bottom",
+                 fontsize=11, color="tab:red")
+        ax2.legend(fontsize=12)
+        pu.save(fig2, out.replace("peak_slip_rate_vs_time.png",
+                                  "peak_slip_rate_per_fault_vs_time.png"), dpi=150)
     return 0
 
 

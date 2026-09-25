@@ -111,13 +111,18 @@ Read this first on wake-up. Update in place; close items by deleting them.
    top of rule 5's three. Rule 5 needs rewriting when it lands.
 
 6. [ ] **Per-fault peak slip rate.** `global.dat` column 2 is a single maxval
-   over all faults in solveTimeLoopMUMPS.f90. Per-fault peaks need new columns
-   and a re-bless of every reference. DO NOT DO THIS UNATTENDED -- it is an
-   output-format change the user must approve.
+   over all faults in solveTimeLoopMUMPS.f90. **Owner decision 2026-09-24:**
+   additive, no re-bless -- `global.dat` stays as is; both solver loops also
+   write `peak_sliprate_per_fault.dat` (time, then one peak-V column per
+   fault); `plotPeakSliprateTime.py` plots per fault from it; references gain
+   the file additively (rule 8) with a reader (8a).
 
 7. [ ] **Orthogonal zoning experiment** — needs a new compset (rule 1: flag
    first), and holding VW fraction fixed vs VW area fixed are two different
-   experiments answering different questions. User's call, not a default.
+   experiments answering different questions. **Owner decision 2026-09-24:**
+   hold VW AREA fixed -- the same absolute VW patch on each segment, same
+   distance from the step-over, only segment length varies. New compset
+   `bp1002.qdc.zone.2500` + test twin + register row (rule 7).
 
 8. [x] **P2 -- Move the solver to PETSc, then optimize.** User decision
    2026-09-23. Landed 2026-09-24, PRs #17 (1c710df, v1.18.0), #18
@@ -197,16 +202,37 @@ Read this first on wake-up. Update in place; close items by deleting them.
    on ba73294: completed/success (`gh api .../commits/ba73294/check-runs`).
    Rule 3/17 text amended in the same PR.
 
-10. [ ] **P3 -- Land the BP8 Peaceman-well variant** (local branch bp8-pw,
-   one commit 2026-08-03, 173 behind master) as bp8.qdc.pw.10 and
-   test.bp8.qdc.pw.10 beside the GS pair. Well-pressure crosses 25 MPa
-   near day 2, so a 30-day reference hits stop-508: freezing one needs a
-   short run or C_normal_stress_caps -- owner's call.
+10. [x] **BP8 Peaceman-well** -- landed #22 (v1.18.3) as `par.fluid_src = 2`
+   on the bp8 compset, spec values Q0 = 0.0015, r_well = 0.05 (2026-08-13
+   revision); 30-day run clean, peak well-cell p 14.3 MPa. Follow-up is row 15.
+
+### Owner decisions, 2026-09-24 ("go as recommended for all")
+
+11. [ ] **kink300 caps.** `par.max_norm = -100e6` in `liu2020.qdc.kink.300`
+   (the paper's value, as kink600 already has), then the kink300 native-MUMPS
+   vs CG+GAMG A/B that row 8 left unswept.
+12. [ ] **dtmax.** No global default change (it would shift every reference).
+   `case.setup` precheck warns when `dtmax = 0` or `taudot*dtmax > xi*a*sigma_min`,
+   printing the criterion value; the kink compsets set an explicit dtmax.
+13. [ ] **Constraining twin.** Initial shear follows `sign(far_vel_load)` so
+   `test.stepover.qdc.con.1000` starts at steady state. Its reference was
+   produced off steady state: this is an owner-approved re-bless of that one
+   reference, recorded in the commit (the rule-8 exception, not a precedent).
+14. [ ] **En-echelon compset.** Add the collaborator's
+   `enechelon.qdc.gap4.1000` + register row, unverified (no reference); fix
+   its step-sense comment (left step under right-lateral = restraining, verify
+   from the loading sign) and the stale 50x10 km core docstring. Telling the
+   author is the owner's.
+15. [ ] **BP8-PW in the gate.** Keep the name `bp8.qdc.gs.10` (GS is the
+   default; renaming orphans a read-only reference). PW gets a full-tier e2e
+   row (not CI, not e2e_fast: 30 days) with reference
+   `reference/test.bp8.qdc.gs.10.pw/`, marked a first, unverified reference.
+16. [ ] **Tapered-tip step-over.** `bp1002.qdc.caps.taper.2500` (VW tapered
+   toward the inner tips) and a longer caps run -- the slides' "next".
+17. [ ] **Housekeeping.** Remove the stale `.claude/worktrees/bp8-pw`
+   worktree (superseded by #22 and `scratch/bp8.pw.spec0813`).
 
 ### Known open, not queued
-- GitHub Releases stop at v1.3.2 (2022) while 32 tags exist. Tags are not
-  Releases; cutting them going forward is easy, backfilling 26 means inventing
-  notes.
 - `src/globalvar.f90` has one comment reading `scripts/case.setup`, left stale
   because correcting it would invalidate the binary three live runs are using.
 - 243 `.DS_Store` files across `$HOME`, none in this repo any more.

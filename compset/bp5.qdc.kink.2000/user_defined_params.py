@@ -169,5 +169,16 @@ par.az_tol = 1.0e-7 # tolerance for solution in AZTEC.
 KINK_X = 0.0
 KINK_ANGLE_DEG = 10.0
 
+# Cap on the adaptive time step (PATHWAY_FORWARD row 12). xi*Dc/V_pl with
+# Dc = 0.14 m is 24.3 d; reference cycle0 is coseismic only (dt <= 0.01 d) and
+# 14 cycles of scratch/bp5kink.sci never stepped past 22.8 d, so this is a
+# no-op guard for Vmax < V_pl. The criterion taudot*dtmax <= xi*a*sigma_min
+# asks for 2.6 d here (xi = 0.015, a = 0.004, sigma_min = the 10 MPa cap the
+# fault sits on from cycle 10, taudot = mu*V_pl/W_vw = 0.084 MPa/yr): below
+# the creep step, so meeting it would multiply interseismic steps by ~9 and
+# run into nstep = 10000 before an event. Left at the creep ceiling; case.setup
+# prints the violation. Owner's call whether to tighten it.
+par.dtmax = 2.1e6
+
 # Caps were historically implied by rough_fault; the switch is explicit now.
 par.C_normal_stress_caps = 1

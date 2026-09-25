@@ -269,7 +269,7 @@ subroutine allocAndInit
     allocate(nsmp(2,nftmx,ntotft),fnft(nftmx,ntotft),un(3,nftmx,ntotft),&
                 us(3,nftmx,ntotft),ud(3,nftmx,ntotft),fric(100,nftmx,ntotft),&
                 arn(nftmx,ntotft),r4nuc(nftmx,ntotft),anonfs(3,nonmx),&
-                slp4fri(nftmx,ntotft),fltslp(3,nftmx,ntotft), globaldat(10,nstep), fltsta(14,nstep,nonmx))
+                slp4fri(nftmx,ntotft),fltslp(3,nftmx,ntotft), globaldat(10,nstep), peakSlipRatePerFault(ntotft,nstep), fltsta(14,nstep,nonmx))
 
     fnft    = -1000.d0!Should be initialized over 600.
     fric    = 0.0d0
@@ -286,6 +286,7 @@ subroutine allocAndInit
     status1 = 0
     fltsta  = 0.0d0
     globaldat     = 0.0d0
+    peakSlipRatePerFault = 0.0d0
     totMomRate    = 0.0d0    
     tdynastart    = -1000.0d0
     tdynaend      = -1000.0d0
@@ -303,6 +304,7 @@ subroutine writeResults(currentProcID)
         call output_onfault_transfer 
         call output_timedy
         call output_globaldat
+        call output_peak_sliprate_per_fault
         call output_bp8_profiles
         call output_ruptarea_trac_slip
         write(*,*) 'Done.'

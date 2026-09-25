@@ -25,3 +25,11 @@ magnitudes respond.
   and stress magnitudes fully respond to the sign flip; the residual decay is
   the same kind of settling the releasing twin's positive-sign case also
   shows over its first few steps, not a reintroduction of the old bug).
+- **Additive re-bless 2026-09-25** (row 6, rule 8): `peak_sliprate_per_fault.dat`
+  added (time, then one peak-V column per fault; column count = 1 + ntotft).
+  Every pre-existing oracle file was first compared against the fresh run
+  (`create.newcase` + `case.setup` + `bash run.sh`, binary `eqquasi-1.19.1`,
+  theo4, 2 MPI ranks) with the e2e comparators: all pass, worst 1.8e-13 of
+  scale (cplot_ft2), 1.1e-15 (global.dat), 2.9e-15 (fault.*.nc). Nothing else
+  was replaced. max over the two fault columns equals global.dat column 2
+  exactly.

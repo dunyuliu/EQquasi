@@ -92,7 +92,7 @@ MODULE globalvar
     integer (kind=4), parameter :: FR_TRACT_END = 84  ! traction at rupture end [Pa]
     real (kind=dp), allocatable :: x(:,:), mat(:,:), fnft(:,:), &
         arn(:,:), r4nuc(:,:), arn4m(:,:), slp4fri(:,:), &
-        globaldat(:,:), cons(:,:), constmp(:,:), consv(:,:), &
+        globaldat(:,:), peakSlipRatePerFault(:,:), cons(:,:), constmp(:,:), consv(:,:), &
         consvtmp(:,:), consa(:,:), consf(:,:), consm(:,:), &
         brhs(:), d(:), v(:), mass(:), kstiff(:), dump(:), &
         f(:), right(:), resu(:), resu_1(:), eledet(:), &

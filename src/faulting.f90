@@ -501,6 +501,13 @@ enddo ! ending ift
         pma             = maxval(ma_bar_ku_arr)
         maxSlipRate     = maxval(sliprate_arr) 
         loc             = maxloc(sliprate_arr)
+        ! Per-fault peak, same source array and same step slot as
+        ! globaldat(2,it) = maxSlipRate, so max over faults of this row
+        ! equals global.dat column 2 exactly. Restricted to 1:nftnd(ift):
+        ! slots beyond it are the zero padding of the shared capacity.
+        do ift = 1, ntotft
+            if (nftnd(ift) > 0) peakSlipRatePerFault(ift,it) = maxval(sliprate_arr(1:nftnd(ift),ift))
+        enddo
         !write(*,*) 'maxSlipRate at ', loc(1)
         totMomRate      = sum(momrate_arr)
                 totMomRateVW    = sum(momRateVW)

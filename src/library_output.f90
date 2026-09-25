@@ -352,6 +352,37 @@ subroutine output_globaldat
 
 end subroutine output_globaldat
 
+subroutine output_peak_sliprate_per_fault
+    ! peak_sliprate_per_fault.dat: one row per step, time (the same
+    ! globaldat(1,:) column global.dat carries) then one peak-V column per
+    ! fault. global.dat column 2 is the max over all faults and is left
+    ! as it is (additive, no re-bless). Single full-precision block for
+    ! every bp, so the reader needs no header to know the layout: the
+    ! column count is 1 + ntotft.
+    !
+    ! bp == 8's global.dat carries one extra row: an initial condition at
+    ! t = 0 (output_globaldat, above), so it has `it` rows against every
+    ! other bp's `it-1`. Match that here so the two files always agree on
+    ! row count (plotPeakSliprateTime.py enforces this and would otherwise
+    ! SystemExit on the very first live BP8 plot) -- using the same
+    ! per-fault initial slip rate fric(FR_VINIT,...) global.dat's own bp==8
+    ! branch reads, generalised over ift rather than hardcoded to fault 1.
+    use globalvar
+    implicit none
+    integer (kind = 4) :: i, ift
+
+    open(1115,file=trim(outDir)//'peak_sliprate_per_fault.dat',form='formatted',status='unknown')
+        if (bp == 8) then
+            write(1115,'(*(e32.21e4))') 0.0d0, (merge(maxval(fric(FR_VINIT,1:nftnd(ift),ift)), &
+                0.0d0, nftnd(ift) > 0), ift = 1, ntotft)
+        endif
+        do i = 1, it-1
+            write(1115,'(*(e32.21e4))') globaldat(1,i), (peakSlipRatePerFault(ift,i), ift = 1, ntotft)
+        enddo
+    close(1115)
+
+end subroutine output_peak_sliprate_per_fault
+
 
 subroutine output_prof
 

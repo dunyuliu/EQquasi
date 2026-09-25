@@ -403,6 +403,10 @@ CATEGORIES = {
     "onfault":  (("fltst_strk*",),                   "series"),
     "offfault": (("srfst_strk*",),                   "series"),
     "global":   (("global.dat", "global.csv"),       "series"),
+    # Row 6 (2026-09-25): time + one peak-V column per fault. Additive to
+    # global.dat (whose column 2 stays the all-fault max); only the
+    # references re-blessed additively since then hold it.
+    "perfault": (("peak_sliprate_per_fault.dat",),    "series"),
     "profile":  (("*_strike.dat", "*_strike.csv",
                   "*_depth.dat",  "*_depth.csv"),    "series"),
     "cplot":    (("cplot_EQquasi.*",),               "series"),

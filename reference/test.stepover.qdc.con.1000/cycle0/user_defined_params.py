@@ -12,9 +12,12 @@ Segment B: x in [-7.5, 32.5] km,  y = -5.0 km    (the "cuts through the model" s
 Both z in [-20, 0] km, dx = 1000 m, LEFT-lateral, constraining step-over:
 the ONE flip from test.stepover.qdc.1000 is the sign of far_vel_load. Identical
 geometry, so over cycles the same step is EXPECTED to clamp the tips instead
-of unclamping them (the stop-508 mode of the releasing twin). Not exhibited
-in the 101-step lock: initial shear is magnitude-only, so this window is not
-yet left-lateral (KNOWN FLAG in reference/stepover.con/README.md).
+of unclamping them (the stop-508 mode of the releasing twin). Initial shear
+follows sign(far_vel_load) (owner decision 2026-09-24), so this case starts
+at steady state left-lateral rather than off steady state
+(FIXED, was KNOWN FLAG in reference/test.stepover.qdc.con.1000/README.md;
+the reference is re-blessed for this one fix, recorded there and in rule 8's
+exception, not a precedent).
 
 Station placement (lesson carried from the releasing twin): stations must
 land on the node lattice measured from the fault corners (both at
@@ -165,11 +168,18 @@ for ift, (xlo, xhi, ycoor, zlo, zhi) in enumerate(par.faultgeom):
             # 0.03 m/s node with creep-consistent shear. That inconsistency
             # collapses V to the creep rate on step 1, which sends the adaptive
             # step dtev = xi*Dc/V to ~2e6 s and flattens the model.
+            # Magnitude from shear_steady_state, sign from the imposed loading
+            # direction (owner decision 2026-09-24): the function itself takes
+            # only positive rates/magnitudes, so it cannot express which way
+            # the fault is being driven. Without this, a left-lateral case
+            # (far_vel_load < 0) starts off steady state and the 101-step
+            # window shows a spurious V transient instead of the flat creep
+            # rate the releasing twin's positive-sign case gets for free.
             par.on_fault_vars[ift, iz, ix, 8]  = shear_steady_state(
                 a, par.fric_rsf_b, par.fric_rsf_v0, par.fric_rsf_r0,
                 par.creep_slip_rate, init_norm,
                 par.on_fault_vars[ift, iz, ix, 46],
-                par.rou, par.vs)
+                par.rou, par.vs) * (1.0 if par.far_vel_load >= 0 else -1.0)
             par.on_fault_vars[ift, iz, ix, 99] = ift * 100 + ix  # mapping marker, not physical
 
 ###############################################

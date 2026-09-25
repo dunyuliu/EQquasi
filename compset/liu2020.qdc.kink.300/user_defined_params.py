@@ -209,5 +209,8 @@ par.az_tol = 1.0e-7
 # prints the numbers.
 par.dtmax = 2.6e6
 
+# Liu, Duan & Luo (2020) section 3.5: normal stress caps of -100 to -10 MPa.
+par.max_norm = -100.0e6
+
 # Caps were historically implied by rough_fault; the switch is explicit now.
 par.C_normal_stress_caps = 1

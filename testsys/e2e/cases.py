@@ -88,6 +88,14 @@ CASES = [
     ("test.bp7.qdc.a.10", "test.bp7.qdc.a.10",
      {"nstep": 100000, "nt_out": 1000},          "cycle0",         "full"),
     ("bp1002.qdc.2500", "bp1002.qdc.2500",   {},       "cycle0",         "full"),
+    # Row-7 zoning experiment (PATHWAY_FORWARD, owner decision 2026-09-24):
+    # bp1002 with the VW patch held fixed in area and distance from the
+    # step-over while the segments are made unequal (A 57.5 km, B 102.5 km).
+    # UNVERIFIED: no reference is committed yet -- the case is a first read of
+    # a genuinely new experiment, not a regression lock -- so _run() skips it
+    # ("no reference at ...") until reference/test.bp1002.qdc.zone.2500 is
+    # frozen from a reviewed run. 155 km mesh, ~1.3x bp1002's cost.
+    ("test.bp1002.qdc.zone.2500", "test.bp1002.qdc.zone.2500", {}, "cycle0", "full"),
     # BP5 dip90 with only the surface kinked 10 deg (user-designed control;
     # the result it locks: rupture crosses the bend freely under BP5
     # friction). ~40 min on 3 ranks -- full tier.

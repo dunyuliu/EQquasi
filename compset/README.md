@@ -38,6 +38,7 @@ where none exists the test compset still uses the full grammar. Small, cut
 | `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc.gs.10`) | `reference/test.bp8.qdc.gs.10` | CRESCENT DET (submitted) | 2026-08-12 |
 | `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002.qdc.2500` | — | 2026-08-13 |
 | `bp1002.qdc.caps.2500` | none — UNVERIFIED (live run's cycle 0 matches uncapped `bp1002.qdc.2500`) | — | — | 2026-08-15 |
+| `bp1002.qdc.zone.2500` | none — UNVERIFIED (row-7 zoning experiment: VW patch fixed in area and distance from the step-over, segment lengths 57.5 vs 102.5 km; first read only, no reference yet) | — | — | 2026-09-25 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
 | `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.qdc.kink.600` | Liu et al. 2020 GJI | 2026-08-15 |
@@ -82,6 +83,7 @@ Small and fast, for the gate, **not for science**. Outside the register.
 | `test.bp5.qdc.dip90.2000` | e2e fast | 2026-08-15 |
 | `test.stepover.qdc.1000` | e2e fast (ntotft > 1 in the fast tier) | 2026-08-15 |
 | `test.stepover.qdc.con.1000` | e2e fast | 2026-08-15 |
+| `test.bp1002.qdc.zone.2500` | e2e full row registered; gate: none — UNVERIFIED, skips until `reference/test.bp1002.qdc.zone.2500` exists | 2026-09-25 |
 
 The two-tier design of rule 7: the production compset produces the reference,
 and a smaller `test.*` variant with the same `dx` but a cut `nstep` runs on

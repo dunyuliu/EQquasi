@@ -464,6 +464,104 @@ def report_cohesive_zone():
         print("  " + "!" * 68)
 
 
+def report_dtmax_criterion():
+    """Advisory on par.dtmax, the cap on the adaptive time step.
+
+    dtev = xi*Dc/Vmax bounds the state evolution per step but says nothing
+    about the loading increment per step: once the whole rate-and-state
+    region slips slower than the plate rate, Vmax < V_pl, dtev grows past the
+    creep step xi*Dc/V_pl without limit. Each stride then adds taudot*dt of
+    shear stress, and rate-and-state turns that into a log slip-rate jump
+    dlnV ~ taudot*dt/(a*sigma). Holding that jump to the same tolerance the
+    Dc rule uses gives the board's criterion (PATHWAY_FORWARD.md row 12):
+
+        taudot * dtmax <= xi * a * sigma_min
+
+    taudot is the interseismic loading rate of the locked velocity-weakening
+    patch, mu*V_pl/W_vw: the creeping fault around a patch of width W_vw
+    loads it at the plate rate (antiplane back-slip; the centre value is
+    2/pi of this). Measured in bp5.qdc.kink.2000 cycles 1 and 13 at
+    0.03-0.08 MPa/yr against 0.084 here, and in liu2020.qdc.kink.600 cycle 0
+    at 0.01-0.21 MPa/yr against 0.14 (2026-09-25). Faster loading only
+    appears as V rises toward nucleation, where dtev is already shrinking.
+    sigma_min is the least compressive effective normal stress the case can
+    reach: the min_norm cap when caps are on (the bp5 kink sits on it from
+    cycle 10), else init_norm.
+
+    Reported, not enforced: the global default stays 0 so no reference
+    shifts, and for xi = 0.015 compsets the bound sits below the creep step
+    itself, which is the owner's call to act on. dtmax = 0 is flagged as
+    the choice it is, not passed in silence.
+    """
+    YR, DAY = 365.25 * 86400.0, 86400.0
+    need = ("xi", "minDc", "rou", "vs", "dx", "creep_slip_rate",
+            "far_vel_load", "init_norm")
+    missing = [n for n in need if getattr(par, n, None) is None]
+    ov = getattr(par, "on_fault_vars", None)
+    if missing or ov is None:
+        print(f"  dtmax criterion: not computed, "
+              f"{', '.join(missing) or 'on_fault_vars'} unset")
+        return
+    dtmax = float(getattr(par, "dtmax", 0.0) or 0.0)
+    a_all, b_all, dc_all = ov[..., FR_RSF_A], ov[..., FR_RSF_B], ov[..., FR_RSF_DC]
+    if ov.ndim == 3:                       # legacy single-fault layout
+        a_all, b_all, dc_all = a_all[None], b_all[None], dc_all[None]
+    vw = a_all < b_all                     # padded nodes have a = b = 0
+    if not vw.any():
+        print("  dtmax criterion: no velocity-weakening node (a < b nowhere);"
+              f" dtmax = {dtmax:g} s" + (" (no cap)" if dtmax == 0 else ""))
+        return
+    dz = getattr(par, "dz", None) or par.dx
+    widths = []
+    for k in range(vw.shape[0]):
+        iz, ix = np.nonzero(vw[k])
+        if iz.size:
+            widths.append(max(min((iz.max() - iz.min()) * dz,
+                                  (ix.max() - ix.min()) * par.dx), par.dx))
+    w_vw = min(widths)
+    a_vw = float(a_all[vw].min())
+    dc_vw = float(dc_all[vw].min())
+    mu = par.rou * par.vs ** 2
+    v_pl = max(par.creep_slip_rate, 2.0 * par.far_vel_load)
+    caps_on = getattr(par, "C_normal_stress_caps", 0) == 1
+    sigma_min = abs(par.min_norm) if caps_on else abs(par.init_norm)
+    rhs = par.xi * a_vw * sigma_min                       # Pa
+    taudot = mu * v_pl / w_vw                             # Pa/s
+    print(f"  dtmax criterion: taudot = mu*V_pl/W_vw = {taudot * YR / 1e6:.3f} MPa/yr"
+          f" (mu = {mu / 1e9:.1f} GPa, V_pl = {v_pl:.2e} m/s, W_vw = {w_vw / 1e3:.1f} km)")
+    print(f"    xi*a*sigma_min = {par.xi:g} * {a_vw:g} * {sigma_min / 1e6:.3g} MPa"
+          f" ({'min_norm cap' if caps_on else 'init_norm'}) = {rhs / 1e3:.3g} kPa")
+    if taudot <= 0.0:
+        print("    no tectonic loading (V_pl = 0): the criterion is not binding;"
+              f" dtmax = {dtmax:g} s" + (" (no cap)" if dtmax == 0 else ""))
+        return
+    dt_crit = rhs / taudot
+    dt_creep = par.xi * dc_vw / v_pl
+    print(f"    -> dtmax <= {dt_crit / DAY:.1f} d; creep step xi*Dc/V_pl = {dt_creep / DAY:.1f} d"
+          + ("" if dt_crit >= dt_creep else
+             " (the bound is BELOW the creep step: meeting it changes the interseismic stepping)"))
+    if dtmax == 0.0:
+        print("  " + "!" * 68)
+        print("  ! dtmax = 0: NO CAP on the adaptive step. That is a choice, not a")
+        print("  ! safe default: with Vmax < V_pl the stride is unbounded, and each")
+        print(f"  ! stride loads the fault by taudot*dt; the criterion allows {dt_crit / DAY:.1f} d.")
+        print("  ! Set par.dtmax (s) to cap it. Proceeding -- a warning, not a gate.")
+        print("  " + "!" * 68)
+        return
+    lhs = taudot * dtmax
+    ratio = lhs / rhs
+    verdict = ("OK" if ratio <= 1.0 else f"VIOLATED by {ratio:.1f}x")
+    print(f"    dtmax = {dtmax:g} s = {dtmax / DAY:.1f} d: taudot*dtmax = {lhs / 1e3:.3g} kPa"
+          f" = {ratio:.2f} x xi*a*sigma_min  -- {verdict}")
+    if ratio > 1.0:
+        print("  " + "!" * 68)
+        print(f"  ! dtmax exceeds the criterion by {ratio:.1f}x: one stride at this cap")
+        print(f"  ! loads the fault by {lhs / (a_vw * sigma_min):.2f} a*sigma_min (tolerance xi = {par.xi:g}).")
+        print(f"  ! dtmax <= {dt_crit:.3g} s ({dt_crit / DAY:.1f} d) would clear it. Proceeding --")
+        print("  ! a warning, not a gate.")
+        print("  " + "!" * 68)
+
+
 def refuse_if_case_has_run():
     """Refuse to regenerate input/ once the case has produced anything.
 
@@ -548,6 +646,7 @@ def _main_func(description):
   estimate_HPC_resource()
   report_cohesive_zone()
   report_normal_stress_caps()
+  report_dtmax_criterion()
   netcdf_write_on_fault_vars()
   if par.insertFaultType>0:
       # Check the exit status. This used to be ignored, so when

@@ -204,5 +204,13 @@ par.az_tol = 1.0e-7
 # Liu, Duan & Luo (2020) section 3.5: normal stress caps of -100 to -10 MPa.
 par.max_norm = -100.0e6
 
+# Cap on the adaptive time step (PATHWAY_FORWARD row 12). The creep step
+# xi*Dc/V_pl is 25.5 d; reference cycle0 never stepped past 25.14 d and 14
+# cycles of scratch/kink600.sci never past 25.1 d, so 30 d leaves the reference
+# untouched and guards Vmax < V_pl. The criterion taudot*dtmax <= xi*a*sigma_min
+# (taudot = mu*V_pl/W_vw = 0.14 MPa/yr, sigma_min = the 10 MPa cap) allows
+# 37 d; 30 d sits at 0.82 of it. case.setup prints the numbers.
+par.dtmax = 2.6e6
+
 # Caps were historically implied by rough_fault; the switch is explicit now.
 par.C_normal_stress_caps = 1

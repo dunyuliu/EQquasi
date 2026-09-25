@@ -201,5 +201,13 @@ par.az_op = 2
 par.az_maxiter = 2000
 par.az_tol = 1.0e-7
 
+# Cap on the adaptive time step (PATHWAY_FORWARD row 12). The creep step
+# xi*Dc/V_pl is 25.5 d and no run of this geometry has stepped past 25.1 d, so
+# 30 d is a no-op in normal operation and a guard for Vmax < V_pl. The criterion
+# taudot*dtmax <= xi*a*sigma_min (taudot = mu*V_pl/W_vw = 0.135 MPa/yr,
+# sigma_min = the 10 MPa cap) allows 38 d; 30 d sits at 0.79 of it. case.setup
+# prints the numbers.
+par.dtmax = 2.6e6
+
 # Caps were historically implied by rough_fault; the switch is explicit now.
 par.C_normal_stress_caps = 1

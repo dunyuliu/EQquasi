@@ -1,6 +1,6 @@
 # EQquasi Project Rules
 
-Twenty rules, each earned by an incident in this repository. Rule numbers are
+Twenty-one rules, each earned by an incident in this repository. Rule numbers are
 cited from `testsys/`, `script/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
@@ -31,6 +31,7 @@ below it is the record of why.
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
+| 21 | Release = green CI on the exact master SHA → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
 
 Two habits that would have caught most violations of the above: read the file
 list a commit prints before pushing it, and re-read this card before staging.
@@ -57,6 +58,7 @@ list a commit prints before pushing it, and re-read this card before staging.
 18. [The whole workflow must work for every example](#18-the-whole-workflow-must-work-for-every-example)
 19. [Drive runs through the workflow, never the binary directly](#19-drive-runs-through-the-workflow-never-the-binary-directly)
 20. [“Plot” means a fixed set of five figures](#20-plot-means-a-fixed-set-of-five-figures)
+21. [A release is a tag plus its Release page, and the unattended grant](#21-a-release-is-a-tag-plus-its-release-page-and-the-unattended-grant)
 
 ## How these rules overlap
 
@@ -456,6 +458,30 @@ whether they support the story or not.
 region, so a plane-wide maximum is not the earthquake — on BP1002 the largest
 number in the file is imposed creep at |x| > 50 km. Restrict to VW before
 quoting coseismic slip.
+
+## 21. A release is a tag plus its Release page, and the unattended grant
+
+**Unattended scope (owner decision, 2026-09-24).** The conductor may merge its
+own PRs to `master` once the rule-3 gate is met, and may cut **patch and minor**
+releases there without asking. Not granted: a major bump, a force-updated or
+deleted tag, a package publish.
+
+The sequence, in order:
+
+1. The version bump rides in the PR it describes: `EQQUASI_VERSION` in
+   `src/globalvar.f90` is the single source. Patch = fix, tooling, docs;
+   minor = a new capability (solver, option, compset, utility); major = owner.
+2. After the squash-merge, CI green on that exact SHA
+   (`gh run list --commit <sha>`). Never tag before, never over red (rule 17).
+3. `git tag -a vX.Y.Z <sha> -m "<one-line summary>"`, `git push origin vX.Y.Z`,
+   and the very next command
+   `gh release create vX.Y.Z --verify-tag --latest --notes-file <notes>`.
+   Tag push and Release page are one action; never split them.
+4. `gh release view vX.Y.Z` shows it as Latest.
+
+*Incident, 2026-09-24.* v1.13.0 through v1.18.3 were pushed as tags only, so
+the repo's Latest release stayed on v1.3.2, 379 commits behind, until the
+owner noticed. The 34 missing pages were backfilled from the tag messages.
 
 ---
 

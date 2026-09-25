@@ -14,7 +14,7 @@ is visible where you are editing.
 `<benchmark>.<mode>[.<variant>].<dx_m>[.<description>]`
 
 - **mode** — `qdc` quasi-dynamic, `fdc` fully dynamic
-- **variant** — optional, open list; in use: `rough`, `kink`, `planar`, `gs`, `a`, `con`, `dip90`
+- **variant** — optional, open list; in use: `rough`, `kink`, `planar`, `gs`, `a`, `con`, `dip90`, `gap4`
 - **dx_m** — on-fault element size in metres, always present
 - **description** — optional free token after resolution (e.g. `leftlateral`)
 
@@ -47,6 +47,7 @@ where none exists the test compset still uses the full grammar. Small, cut
 | `bp1001.qdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `liu2020.fdc.planar.300` | none (ported, UNVERIFIED) | — | Liu et al. 2020 GJI | 2026-08-12 |
 | `liu2020.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
+| `enechelon.qdc.gap4.1000` | none — UNVERIFIED (no reference; collaborator's compset, added as-is 2026-09-25 with two comment fixes: step sense, core size) | — | — | 2026-09-25 |
 
 ### Ported 2026-08-15, unverified — the five pre-`par` compset
 

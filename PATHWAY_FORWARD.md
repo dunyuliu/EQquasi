@@ -110,19 +110,29 @@ Read this first on wake-up. Update in place; close items by deleting them.
    pass: naming at some call sites only creates a fourth source of truth on
    top of rule 5's three. Rule 5 needs rewriting when it lands.
 
-6. [ ] **Per-fault peak slip rate.** `global.dat` column 2 is a single maxval
-   over all faults in solveTimeLoopMUMPS.f90. **Owner decision 2026-09-24:**
-   additive, no re-bless -- `global.dat` stays as is; both solver loops also
-   write `peak_sliprate_per_fault.dat` (time, then one peak-V column per
-   fault); `plotPeakSliprateTime.py` plots per fault from it; references gain
-   the file additively (rule 8) with a reader (8a).
+6. [x] **Per-fault peak slip rate.** Landed PR #30 (`f05080a`). Additive, no
+   re-bless: `global.dat` stays as is; both solver loops now also write
+   `peak_sliprate_per_fault.dat` (time, then one peak-V column per fault) via
+   one shared write site; `plotPeakSliprateTime.py` plots per fault from it.
+   victor-reyes audit found a Medium bug -- BP8's extra t=0 row would crash
+   the plot script -- fixed and re-verified before merge. References gained
+   the file additively (rule 8/8a): `test.stepover.qdc.con.1000`'s README
+   records max over the two fault columns equal to `global.dat` column 2
+   exactly, worst diff 1.8e-13 of scale.
 
-7. [ ] **Orthogonal zoning experiment** — needs a new compset (rule 1: flag
-   first), and holding VW fraction fixed vs VW area fixed are two different
-   experiments answering different questions. **Owner decision 2026-09-24:**
-   hold VW AREA fixed -- the same absolute VW patch on each segment, same
-   distance from the step-over, only segment length varies. New compset
-   `bp1002.qdc.zone.2500` + test twin + register row (rule 7).
+7. [x] **Orthogonal zoning experiment.** Landed PR #31 (`271b654`). Owner
+   decision: hold VW AREA fixed, not fraction -- the same absolute VW patch on
+   each segment, same distance from the step-over, only segment length varies
+   (57.5 km vs 102.5 km). New compset `bp1002.qdc.zone.2500` + `test.` twin +
+   register rows (rule 7). 3 cycles run: A alone (5.01 m) -> B alone (4.84 m)
+   -> both faults 16.15 m, through-going -- but that third cycle hit
+   `nstep=10000` exactly, a truncated lower bound, not a clean physical exit.
+   Same alternate-then-join pattern as the symmetric `bp1002.qdc.2500` case's
+   own 5-cycle history, arguing the pattern is not a pure symmetry artifact.
+   Gate: none, UNVERIFIED, no reference (new experiment). Open, not resolved
+   here: this project's `fault.*.nc` `slips`-field maxima and the `cplot`
+   rupture-time column disagree on what counts as a "joint" rupture (see row
+   16).
 
 8. [x] **P2 -- Move the solver to PETSc, then optimize.** User decision
    2026-09-23. Landed 2026-09-24, PRs #17 (1c710df, v1.18.0), #18
@@ -208,29 +218,84 @@ Read this first on wake-up. Update in place; close items by deleting them.
 
 ### Owner decisions, 2026-09-24 ("go as recommended for all")
 
-11. [ ] **kink300 caps.** `par.max_norm = -100e6` in `liu2020.qdc.kink.300`
-   (the paper's value, as kink600 already has), then the kink300 native-MUMPS
-   vs CG+GAMG A/B that row 8 left unswept.
-12. [ ] **dtmax.** No global default change (it would shift every reference).
-   `case.setup` precheck warns when `dtmax = 0` or `taudot*dtmax > xi*a*sigma_min`,
-   printing the criterion value; the kink compsets set an explicit dtmax.
-13. [ ] **Constraining twin.** Initial shear follows `sign(far_vel_load)` so
-   `test.stepover.qdc.con.1000` starts at steady state. Its reference was
-   produced off steady state: this is an owner-approved re-bless of that one
-   reference, recorded in the commit (the rule-8 exception, not a precedent).
-14. [ ] **En-echelon compset.** Add the collaborator's
-   `enechelon.qdc.gap4.1000` + register row, unverified (no reference); fix
-   its step-sense comment (left step under right-lateral = restraining, verify
-   from the loading sign) and the stale 50x10 km core docstring. Telling the
-   author is the owner's.
-15. [ ] **BP8-PW in the gate.** Keep the name `bp8.qdc.gs.10` (GS is the
-   default; renaming orphans a read-only reference). PW gets a full-tier e2e
-   row (not CI, not e2e_fast: 30 days) with reference
-   `reference/test.bp8.qdc.gs.10.pw/`, marked a first, unverified reference.
-16. [ ] **Tapered-tip step-over.** `bp1002.qdc.caps.taper.2500` (VW tapered
-   toward the inner tips) and a longer caps run -- the slides' "next".
-17. [ ] **Housekeeping.** Remove the stale `.claude/worktrees/bp8-pw`
-   worktree (superseded by #22 and `scratch/bp8.pw.spec0813`).
+11. [x] **kink300 caps.** Landed PR #29 (`adaa492`). `par.max_norm =
+   -100.0e6` set on `liu2020.qdc.kink.300` (the paper's value). Native-MUMPS
+   vs CG+GAMG A/B at 3 ranks on this dx=300 mesh: CG+GAMG ~7.7x slower.
+   **Caveat, state plainly**: the measurement ran with 3-4 other missions'
+   jobs concurrently on the host (each on its own dedicated core via
+   `--bind-to none`, not the severe core-oversubscription bug measured
+   earlier that day, but not a clean isolated benchmark either). The
+   qualitative direction is very likely robust (effect size two orders larger
+   than the ~2.17x contention-artifact scale this project has previously
+   measured), but the precise 7.7x ratio is directional, not confirmed
+   isolated -- this was corrected as a PR comment on #29 after an initial
+   overclaim of "fully isolated." Re-measuring alone is left for the owner to
+   request if the precise ratio matters.
+12. [x] **dtmax.** Landed PR #27 (`3a93bbe`, EQquasi 1.19.1). No global
+   default change (would shift every reference). `case.setup` gained
+   `report_dtmax_criterion()` (advisory only: warns when `dtmax = 0` or
+   `taudot*dtmax > xi*a*sigma_min`, printing the criterion value);
+   `liu2020.qdc.kink.300`, `liu2020.qdc.kink.600` and `bp5.qdc.kink.2000` got
+   explicit `par.dtmax`. `bp5.qdc.kink.2000` (xi=0.015) genuinely violates the
+   criterion at any dtmax -- reported, not fixed, owner's call. victor-reyes
+   audited: pass with notes.
+13. [x] **Constraining twin.** Landed PR #26 (`e7de22a`). Initial shear in
+   `test.stepover.qdc.con.1000` now follows `sign(par.far_vel_load)` (was
+   magnitude-only, the KNOWN FLAG since 2026-08-15), so the left-lateral case
+   starts near steady state. Reference re-blessed (rule-8 exception,
+   owner-approved, not a precedent), recorded in
+   `reference/test.stepover.qdc.con.1000/README.md`: binary eqquasi-1.19.0,
+   cycle0 101 steps, V decays 1.0e-9 -> 8.07e-10 (was -> 6.0e-10), a smaller
+   transient consistent with starting nearer steady state, not perfectly flat.
+14. [x] **En-echelon compset.** Landed PR #28 (`d77f554`). Added the
+   collaborator's `enechelon.qdc.gap4.1000` compset, unverified, no
+   reference, register row added (rule 7). Fixed two stale comments: step
+   sense is RESTRAINING (verified from the loading-rate sign in
+   `solveTimeLoopMUMPS.f90`), not "releasing" as originally written; core
+   size is ~56x12 km (22.1x4.7 h*), not the stale "50x10 km, 19.7x3.9 h*".
+   Telling the original author is the owner's, not done here.
+15. [x] **BP8-PW in the gate.** Landed PR #35 (`4ae56bc`). Kept the name
+   `bp8.qdc.gs.10` (GS is the default); PW gets its own full-tier e2e row
+   `test.bp8.qdc.gs.10.pw` (`name != compset`, `fluid_src=2`), reference at
+   `reference/test.bp8.qdc.gs.10.pw/`, marked a first, UNVERIFIED reference
+   (5196 steps, 30.0026 days simulated, matches a prior non-current-binary
+   sanity run to 3 sig figs). Also landed in the same PR: a real bug fix in
+   `script/plotMagnitudeTime.py` (raw `np.loadtxt` choked on BP8's
+   un-`#`-prefixed `global.dat` header line; fixed by reusing the existing
+   `seasio.read_array` helper). **Open finding, not resolved, state plainly**:
+   a self-consistency re-run of this exact case against this exact reference
+   fails the `onfault` comparison category at 4 of 9 stations (the well's
+   strike=0/dip=0-axis ones) by up to ~8%, consistent with this project's
+   already-documented MPI-reduction-order -> RSF chaotic amplification (the
+   bp1002caps finding above) but not confirmed to that exact mechanism.
+   Whether to loosen tolerance or drop those stations is left undecided, for
+   the owner. EQquasi 1.20.1 (patch bump for this row) is NOT yet landed: it
+   exists only as one unpushed commit (`0367212`) on local worktree
+   `scratch/wt-bump`, branch `bump-1.20.1`, no PR opened -- pending.
+16. [x] **Tapered-tip step-over.** Landed PR #32 (`c572d01`). New compset
+   `bp1002.qdc.caps.taper.2500` -- 5 km VW->VS taper at the interior
+   step-over tips (every prior bp1002 compset left these fully untapered). 5
+   cycles run: strict A,B,A,B,A alternation, overlap-stress trajectory within
+   ~1 MPa of the untapered baseline at every cycle -- a **clean NEGATIVE
+   result**: the taper as designed shows no measurable effect over 5 cycles
+   (the kill criterion the mission was briefed with was exactly this
+   comparison, and it was met). Neither run reached the -10 MPa cap by cycle
+   4, so this is a negative result over the cycles actually run, not proof
+   the taper never matters. Caveat inherited, not resolved: the untapered
+   baseline it's compared against (`bp1002caps.sci`) had caps later found to
+   be inert (see the caps finding below), so the comparison is against
+   uncapped physics, not caps-on vs. caps-on-tapered. Also flagged, not
+   resolved by this row or row 7: this project's `fault.*.nc` `slips`-field
+   maxima and the `cplot` rupture-time column disagree on what counts as a
+   "joint" rupture.
+17. [x] **Housekeeping.** Stale `.claude/worktrees/bp8-pw` worktree reaped
+   (worktree removed, local branch deleted) -- no PR, direct action.
+   Confirmed still absent: `.claude/worktrees/` is empty and `git worktree
+   list` shows no `bp8-pw` entry.
+
+Versions landed today: EQquasi 1.19.0 (PR #25) -> 1.19.1 (PR #27, row 12) ->
+1.20.0 (PR #33, rows 6/7/14/16, released on green CI as v1.20.0) -> 1.20.1
+pending (row 15 patch bump, not yet merged as of this write-up).
 
 ### Known open, not queued
 - `src/globalvar.f90` has one comment reading `scripts/case.setup`, left stale

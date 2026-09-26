@@ -34,6 +34,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
+from seasio import read_array
 
 pu.apply_style()
 import matplotlib.pyplot as plt
@@ -138,7 +139,12 @@ def main():
         # without global.dat (a flat BP8 gold directory) needs none.
         g = os.path.join(rdir, "global.dat")
         if os.path.exists(g):
-            dur = float(np.atleast_2d(np.loadtxt(g))[-1, 0])
+            # np.loadtxt chokes on bp==8's raw output: a label line
+            # ("t max_slip_rate moment_rate") that isn't "#"-prefixed, unlike
+            # every other bp. read_array (seasio.py) already handles both
+            # that and the comma-separated gold format uniformly -- the same
+            # reader plotPeakSliprateTime.py uses for the same file.
+            dur = float(np.atleast_2d(read_array(g))[-1, 0])
         elif c == cycles[-1]:
             dur = 0.0
         else:

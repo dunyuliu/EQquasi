@@ -101,6 +101,31 @@ CASES = [
     # friction). ~40 min on 3 ranks -- full tier.
     ("bp5.qdc.kink.2000", "bp5.qdc.kink.2000", {},       "cycle0",         "full"),
 
+    # BP8 Peaceman-well loading (par.fluid_src = 2), the same compset as the
+    # GS row above -- reused rather than duplicated, because everything but
+    # the source term is identical. `name` differs from `compset` on purpose
+    # (see case_id()/reference_dir() at the top of this file): it is what
+    # routes this row's reference to reference/test.bp8.qdc.gs.10.pw/ without
+    # touching the GS row's own reference or renaming the compset directory
+    # (a rename would orphan that read-only reference). fluid_q0 (0.0015) and
+    # fluid_rwell (0.05) already default correctly for fluid_src == 2 in the
+    # compset's own user_defined_params.py (2026-08-13 spec values landed with
+    # row 10, PR #22); only fluid_src itself needs overriding here. nstep is
+    # a cap, not the exit criterion -- the run exits on its own via
+    # fluid_tend (30 days simulated) -- set with headroom above the 5196
+    # steps a prior (non-current-binary) sanity run took to reach that exit.
+    # HPC_ncpu=3 to respect the shared-host rank budget (rule 15), not the
+    # compset's own HPC_ncpu=20 written for a dedicated cluster node.
+    # Owner decision 2026-09-24 (PATHWAY_FORWARD.md row 15): full tier only,
+    # never fast/CI -- a 30-day-simulated PW run is not a per-push cost.
+    # Reference is a FIRST, UNVERIFIED reference (rule 8): no prior run of
+    # THIS binary exists to diff against, only an order-of-magnitude sanity
+    # check against an older binary's numbers (scratch/bp8.pw.spec0813,
+    # eqquasi-1.18.2 -- never diffed byte-for-byte per rule 11).
+    ("test.bp8.qdc.gs.10.pw", "test.bp8.qdc.gs.10",
+     {"fluid_src": 2, "nstep": 8000, "nt_out": 8000, "HPC_ncpu": 3},
+     "",                                                             "full"),
+
     # Recreated later, through this mechanism, from a clean run: BP5-dip90.
     # Its old reference was produced ad hoc, before the workflow rule and
     # before the gold/ flatten, so it is not carried forward -- a reference

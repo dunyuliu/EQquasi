@@ -24,7 +24,7 @@ below it is the record of why.
 | 11 | Comparing two runs? Check both `runInfo.json` versions first. |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
-| 14 | Worktree under `scratch/`; move run data out before removing it. Stage explicit paths — **never** `git add -A`. |
+| 14 | Work only inside this folder: worktrees, runs, temp under `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. |
 | 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. |
@@ -324,8 +324,11 @@ Guarded by `testsys/regression/test_code_convention_landmines.py`:
 - **Work in your own `git worktree`**, never `git checkout` a branch in the
   shared checkout. Branching in place has put two commits on another agent's
   branch. Worktrees live under the gitignored `scratch/` (e.g.
-  `scratch/wt-<topic>`), never beside the checkout: the tree outside the repo
-  is not ours to litter.
+  `scratch/wt-<topic>`).
+- **Work only inside this repo folder** (owner rule, 2026-09-25). Worktrees,
+  runs, logs and temp files go under `scratch/`, never in `$HOME` or beside
+  the checkout. The only writes outside are the ones the owner named: the
+  slides repo, the consilium inbox, and the global papercuts log.
 - **Move run data out before `git worktree remove`.** It deletes gitignored
   files too, so a run left inside a worktree goes with it. *2026-09-25:* the
   row 7 and row 16 runs (3 and 5 cycles) were lost this way; their numbers

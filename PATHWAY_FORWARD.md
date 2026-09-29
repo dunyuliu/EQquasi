@@ -254,24 +254,16 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `solveTimeLoopMUMPS.f90`), not "releasing" as originally written; core
    size is ~56x12 km (22.1x4.7 h*), not the stale "50x10 km, 19.7x3.9 h*".
    Telling the original author is the owner's, not done here.
-15. [x] **BP8-PW in the gate.** Landed PR #35 (`4ae56bc`). Kept the name
-   `bp8.qdc.gs.10` (GS is the default); PW gets its own full-tier e2e row
-   `test.bp8.qdc.gs.10.pw` (`name != compset`, `fluid_src=2`), reference at
-   `reference/test.bp8.qdc.gs.10.pw/`, marked a first, UNVERIFIED reference
-   (5196 steps, 30.0026 days simulated, matches a prior non-current-binary
-   sanity run to 3 sig figs). Also landed in the same PR: a real bug fix in
-   `script/plotMagnitudeTime.py` (raw `np.loadtxt` choked on BP8's
-   un-`#`-prefixed `global.dat` header line; fixed by reusing the existing
-   `seasio.read_array` helper). **Open finding, not resolved, state plainly**:
-   a self-consistency re-run of this exact case against this exact reference
-   fails the `onfault` comparison category at 4 of 9 stations (the well's
-   strike=0/dip=0-axis ones) by up to ~8%, consistent with this project's
-   already-documented MPI-reduction-order -> RSF chaotic amplification (the
-   bp1002caps finding above) but not confirmed to that exact mechanism.
-   Whether to loosen tolerance or drop those stations is left undecided, for
-   the owner. EQquasi 1.20.1 (patch bump for this row) is NOT yet landed: it
-   exists only as one unpushed commit (`0367212`) on local worktree
-   `scratch/wt-bump`, branch `bump-1.20.1`, no PR opened -- pending.
+15. [ ] **BP8-PW reference: upload first, then decide** (owner, 2026-09-29).
+   PR #35 froze `reference/test.bp8.qdc.gs.10.pw/` and a full-tier row before
+   the result was validated; both removed (a reference is decided only after
+   the SEAS platform comparison with other codes). Kept from #35: the
+   `plotMagnitudeTime.py` BP8 `global.dat` fix. Candidate output kept at
+   `scratch/bp8.pw.candidate.v1.19.0` (1.19.0, 3 ranks, 5196 steps, 30.0 days).
+   Open: an immediate rerun differs by up to ~8% at the 4 on-axis stations --
+   unexplained; an aseismic 30-day case should not amplify reduction-order
+   noise that much, so check determinism (same ranks, OMP_NUM_THREADS=1,
+   porepressure.f90) before the upload.
 16. [x] **Tapered-tip step-over.** Landed PR #32 (`c572d01`). New compset
    `bp1002.qdc.caps.taper.2500` -- 5 km VW->VS taper at the interior
    step-over tips (every prior bp1002 compset left these fully untapered). 5

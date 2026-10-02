@@ -14,7 +14,7 @@
 ! characteristic size Lgauss (fluid_src == 1, BP8-QD-GS) or with a Peaceman
 ! well model (fluid_src == 2, BP8-QD-PW, operator-split explicit well update).
 !
-! Fault nodes are ordered n = (ix-1)*nzt + iz, the same convention used by
+! Fault nodes are ordered n = (ix-1)*nz1 + iz (nz1: fault 1's z lines), the same convention used by
 ! netcdf_read_on_fault in netcdf_io.f90.
 !
 ! Everything here runs on the master rank only, like faulting.
@@ -271,7 +271,7 @@ subroutine bp8_profile_init
     profS2s = 0.0d0; profS3s = 0.0d0; profT2s = 0.0d0; profT3s = 0.0d0; profPs = 0.0d0
     profS2d = 0.0d0; profS3d = 0.0d0; profT2d = 0.0d0; profT3d = 0.0d0; profPd = 0.0d0
 
-    ! Fault nodes are ordered n = (ix-1)*nzt + iz, so walking i in order gives
+    ! Fault nodes are ordered n = (ix-1)*nz1 + iz, so walking i in order gives
     ! increasing x3 along the dip line and increasing x2 along the strike line.
     is = 0; idp = 0
     do i = 1, nftnd(1)
@@ -366,11 +366,11 @@ end subroutine reverse_profile_line
 ! pf_neighbor returns the fault-node index of the Omega_f neighbour of node i
 ! in the requested stencil direction, or 0 if there is none -- either the grid
 ! edge or a neighbour that lies outside Omega_f (pfActive == 0). This is the
-! single place that turns the n = (ix-1)*nzt + iz node ordering into a 4-point
+! single place that turns the n = (ix-1)*nz1 + iz node ordering into a 4-point
 ! stencil; pore_pressure_init (boundary cell fractions) and pore_pressure_update
 ! (the Laplacian and the Darcy velocity) all call it instead of repeating the
 ! bounds-and-active checks inline.
-! dir: 1 = -dip (iz-1), 2 = +dip (iz+1), 3 = -strike (i-nzt), 4 = +strike (i+nzt)
+! dir: 1 = -dip (iz-1), 2 = +dip (iz+1), 3 = -strike (i-nz1), 4 = +strike (i+nz1)
 subroutine pf_neighbor(i, dir, j)
 
     use globalvar
@@ -379,19 +379,23 @@ subroutine pf_neighbor(i, dir, j)
     integer (kind = 4), intent(in)  :: i, dir
     integer (kind = 4), intent(out) :: j
 
-    integer (kind = 4) :: iz
+    integer (kind = 4) :: iz, nz1
 
-    iz = mod(i-1, nzt) + 1
+    ! Fault 1's own count of z lines. Equal to the mesh's nzt while the fault
+    ! spans the whole domain in z; a buried fault (1.21, enlarging_ratio_xz)
+    ! has fewer, and walking it with nzt would pick wrong neighbours silently.
+    nz1 = int((fltxyz(2,3,1) - fltxyz(1,3,1))/dx + 0.5d0) + 1
+    iz = mod(i-1, nz1) + 1
     j = 0
     select case (dir)
     case (1)
         if (iz > 1) j = i - 1
     case (2)
-        if (iz < nzt) j = i + 1
+        if (iz < nz1) j = i + 1
     case (3)
-        if (i > nzt) j = i - nzt
+        if (i > nz1) j = i - nz1
     case (4)
-        if (i + nzt <= nftnd(1)) j = i + nzt
+        if (i + nz1 <= nftnd(1)) j = i + nz1
     end select
     if (j > 0) then
         if (pfActive(j) == 0) j = 0

@@ -188,6 +188,32 @@ subroutine readmodel
             endif
             endif
         endif
+        ! x/z cell growth ratio outside the fault box (1.21). One number on its
+        ! own line, after the caps and before faultgeom; a model.txt written
+        ! before 1.21 has no such line and keeps ratxz = 1 (uniform). Read the
+        ! line whole, as for the caps: two or more numbers -> it is faultgeom,
+        ! put it back; one number -> ratxz; anything else non-empty -> stop.
+        ratxz = 1.0d0
+        read(1002,'(A)',iostat=ios) capsLine
+        if (ios == 0) then
+            read(capsLine,*,iostat=iosCaps) capsTmp1, capsTmp2
+            if (iosCaps == 0) then
+                backspace(1002)
+            else
+                read(capsLine,*,iostat=iosCaps) capsTmp1
+                if (iosCaps == 0) then
+                    ratxz = capsTmp1
+                elseif (len_trim(capsLine) > 0) then
+                    write(*,*) 'model.txt: expected enlarging_ratio_xz (one number)'
+                    write(*,*) 'or the faultgeom block, got: ', trim(capsLine)
+                    stop 11
+                endif
+            endif
+        endif
+        if (ratxz < 1.0d0) then
+            write(*,*) 'model.txt: enlarging_ratio_xz must be >= 1, got ', ratxz
+            stop 11
+        endif
         ! Optional per-fault geometry block, one line per fault:
         !   xlo xhi ycoor zlo zhi   (meters)
         ! Appended after the bp8 block and read with iostat so a model.txt
@@ -209,6 +235,8 @@ subroutine readmodel
         enddo
     ! One explicit switch. No C_elastic gate, no rough_fault coupling.
     capsActive = (C_normal_stress_caps == 1)
+    if (me == 0 .and. ratxz /= 1.0d0) write(*,'(X,A,F6.3,A)') &
+        '= x/z cells grow by ', ratxz, ' per step outside the fault box ='
     ! Always state it: the only way to know caps are on is to be told.
     if (me == 0) then
         if (capsActive) then

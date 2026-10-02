@@ -12,6 +12,12 @@ subroutine meshgen
             real (kind = dp), allocatable, intent(out) :: ylinet(:)
             integer (kind = 4), intent(out) :: nyt
         end subroutine build_yline_belt
+        subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
+            use globalvar, only: dp
+            real (kind = dp), intent(in) :: fltx1, fltx2, fltz1, fltz2
+            real (kind = dp), allocatable, intent(out) :: xlinet(:), zlinet(:)
+            integer (kind = 4), intent(out) :: nxt, nzt
+        end subroutine build_xzlines
     end interface
 
     integer(kind=4)::nnode,nelement,neq0,ix,iy,iz,&
@@ -54,40 +60,10 @@ subroutine meshgen
     fltz1=minval(fltxyz(1,3,:))
     fltz2=maxval(fltxyz(2,3,:))
 
-    nxuni=(fltx2-fltx1-2.0d0*dx)/dx+1
-    xstep=dx
-    xcoor=fltx1+dx
-    do ix=1,np
-        xstep=xstep
-        xcoor=xcoor-xstep
-        if(xcoor<=xmin) exit
-    enddo
-    edgex1=ix
-    xstep=dx
-    xcoor=fltx2-dx
-    do ix=1,np
-        xstep=xstep
-        xcoor=xcoor+xstep
-        if(xcoor>=xmax) exit
-    enddo
-    nxt=nxuni+edgex1+ix
-    allocate(xlinet(nxt))
-    !predetermine x-coor
-    xlinet(edgex1+1)=fltx1+dx
-    xstep=dx
-    do ix=edgex1,1,-1
-        xstep=xstep
-        xlinet(ix)=xlinet(ix+1)-xstep
-    enddo
+    ! x and z node lines: build_xzlines (func_lib.f90), shared with the
+    ! other mesher so the two stay consistent by construction.
+    call build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
     xmin1=xlinet(1)
-    do ix=edgex1+2,edgex1+nxuni
-        xlinet(ix)=xlinet(ix-1)+dx
-    enddo
-    xstep=dx
-    do ix=edgex1+nxuni+1,nxt
-        xstep=xstep
-        xlinet(ix)=xlinet(ix-1)+xstep
-    enddo
     xmax1=xlinet(nxt)
     !Y
     ! Uniform-dy belt spans [min fault y, max fault y], unchanged from
@@ -105,28 +81,7 @@ subroutine meshgen
     ! Outer two element layers in y, used below to tag far-field elements.
     yfar_lo = ylinet(min(3, nyt))
     yfar_hi = ylinet(max(nyt-1, 1))
-    !Z
-    zstep=dz
-    zcoor=fltz1+dx
-    do iz=1,np
-        zstep=zstep
-        zcoor=zcoor-zstep
-        if(zcoor<=zmin) exit
-    enddo
-    edgezn=iz
-    nzuni=(fltz2-fltz1-dx)/dx+1
-    nzt=edgezn+nzuni
-    !...predetermine z-coor
-    allocate(zlinet(nzt))
-    zlinet(nzt)=zmax
-    do iz=nzt-1,nzt-nzuni+1,-1
-        zlinet(iz)=zlinet(iz+1)-dz
-    enddo
-    zstep=dz
-    do iz=nzt-nzuni,1,-1
-        zstep=zstep
-        zlinet(iz)=zlinet(iz+1)-zstep
-    enddo
+    !Z: built above by build_xzlines.
     zmin1=zlinet(1)
     !...prepare for digitizing    
     allocate(plane1(nyt+ntotft,nzt),plane2(nyt+ntotft,nzt),fltrc(2,nxt,nzt,ntotft))

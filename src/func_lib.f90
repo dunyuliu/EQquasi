@@ -193,8 +193,9 @@ subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
     ! fault is buried (fltz2 < zmax), it is anchored at fltz2 and lines grow
     ! upward to zmax as well.
     !
-    ! The last line may overshoot xmin/xmax/zmin/zmax by part of a cell; the
-    ! caller records the true extent in xmin1/xmax1/zmin1.
+    ! The last line may overshoot xmin/xmax/zmin by part of a cell (far,
+    ! free faces); the caller records the true extent in xmin1/xmax1/zmin1.
+    ! zmax is never overshot: see the buried branch below.
     !
     ! ONLY-import: the dummies nxt/nzt are this routine's outputs and must not
     ! collide with globalvar's module-level nxt/nzt.
@@ -258,14 +259,17 @@ subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
     enddo
     edgezn=iz
     nzuni=(fltz2-fltz1-dx)/dx+1
+    ! Above a buried fault the top line is placed ON zmax, not past it: zmax
+    ! is typically the free surface, and an overshoot would move it. The
+    ! last cell takes the remaining gap, kept within (0.5, 1.5] of a step.
     edgezp=0
     if (buried) then
         zstep=dz
         zcoor=fltz2
         do iz=1,np
             if (iz > 1) zstep = min(zstep*ratxz, max(dymax, dx))
+            if (zmax - zcoor <= 1.5d0*zstep) exit
             zcoor=zcoor+zstep
-            if(zcoor>=zmax) exit
         enddo
         edgezp=iz
     endif
@@ -283,9 +287,10 @@ subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
         zlinet(iz)=zlinet(iz+1)-zstep
     enddo
     zstep=dz
-    do iz=edgezn+nzuni+1,nzt
+    do iz=edgezn+nzuni+1,nzt-1
         if (iz > edgezn+nzuni+1) zstep = min(zstep*ratxz, max(dymax, dx))
         zlinet(iz)=zlinet(iz-1)+zstep
     enddo
+    if (buried) zlinet(nzt)=zmax
 
 end subroutine build_xzlines

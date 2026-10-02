@@ -30,6 +30,12 @@ subroutine pore_pressure_init
     integer (kind = 4) :: i, isn, jm, jp
     real (kind = dp)   :: xtmp, ztmp, wsum, re
 
+    ! pf_neighbor walks n = (ix-1)*nz1 + iz; that needs whole columns.
+    if (mod(nftnd(1), int((fltxyz(2,3,1) - fltxyz(1,3,1))/dx + 0.5d0) + 1) /= 0) then
+        write(*,*) 'BP8: fault 1 node count ', nftnd(1), ' is not a whole number of', &
+            ' z columns; the pore-pressure stencil would pick wrong neighbours.'
+        stop 12
+    endif
     allocate(pf(nftnd(1)), pfActive(nftnd(1)), pfWt(nftnd(1)))
     allocate(pfFx(nftnd(1)), pfFz(nftnd(1)))
 

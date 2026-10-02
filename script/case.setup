@@ -81,6 +81,9 @@ def create_model_input_file():
         # not write that block, and their faultgeom read would swallow this line.
         f.write(str(par.min_norm) + "  " + str(par.max_norm)
                 + "  " + str(par.C_normal_stress_caps) + "\n")
+        # x/z cell growth outside the fault box (1.21). One number on its own
+        # line, after the caps and before faultgeom, read with iostat.
+        f.write(str(par.enlarging_ratio_xz) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the
         # attribute defaults to None) keeps every existing compset's

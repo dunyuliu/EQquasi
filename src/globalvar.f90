@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.20.1'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.21.0'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -116,6 +116,7 @@ MODULE globalvar
     real (kind=dp) :: xmin, xmax, ymin, ymax, zmin, zmax ! left/right/front/back/top/bot domain boundaries.
     real (kind=dp) :: dx ! grid cell sizes.
     real (kind=dp) :: rat ! geometrical enlarging ratio of cell size outside of uniform grid domain.
+    real (kind=dp) :: ratxz = 1.0d0 ! x/z cell growth ratio outside the fault box (1.21; 1 = uniform, the old behaviour).
     ! Currently only along y direction outside of dis4uniF and dis4uniB.
     real (kind=dp) :: dymax, dxtmp
     real (kind=dp) :: xminc, xmaxc, zminc ! On-fault creeping zone left/right/top boundaries. 

@@ -133,6 +133,7 @@ class parameters:
     dz = dx
     nuni_y_plus, nuni_y_minus = 5, 5 # along the fault-normal dimension, the number of cells share the dx cell size.
     enlarging_ratio = 1.3e0 # along the fault-normal dimension (y), cell size will be enlarged at this ratio compoundly.
+    enlarging_ratio_xz = 1.0e0 # along strike (x) and dip (z), outside the fault box (par.faultgeom, else the domain): cell size grows at this ratio compoundly, capped at min(12*dx, 3 km). 1 = uniform (pre-1.21).
 
     # Isotropic material propterty.
     # Vp, Vs, Rou

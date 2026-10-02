@@ -176,3 +176,121 @@ subroutine build_yline_belt(ylinet, nyt)
     enddo
 
 end subroutine build_yline_belt
+
+subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
+
+    ! x and z node lines, shared by meshgen.f90 and mesh4num.f90 so the two
+    ! cannot drift (as build_yline_belt does for y).
+    !
+    ! Uniform dx over the union of the fault boxes [fltx1, fltx2] x
+    ! [fltz1, fltz2]. Outside it, cells grow by ratxz per step (capped at
+    ! dymax) out to the domain edge. The first step off the fault is always
+    ! dx, so the fault's own edge line exists exactly. ratxz = 1 reproduces
+    ! the pre-1.21 uniform lines bit for bit.
+    !
+    ! z: when the fault reaches the top of the domain (every compset before
+    ! 1.21) the uniform block is anchored at zmax exactly as before. When the
+    ! fault is buried (fltz2 < zmax), it is anchored at fltz2 and lines grow
+    ! upward to zmax as well.
+    !
+    ! The last line may overshoot xmin/xmax/zmin by part of a cell (far,
+    ! free faces); the caller records the true extent in xmin1/xmax1/zmin1.
+    ! zmax is never overshot: see the buried branch below.
+    !
+    ! ONLY-import: the dummies nxt/nzt are this routine's outputs and must not
+    ! collide with globalvar's module-level nxt/nzt.
+    use globalvar, only: dp, dx, ratxz, dymax, np, xmin, xmax, zmin, zmax
+    implicit none
+
+    real (kind = dp), intent(in) :: fltx1, fltx2, fltz1, fltz2
+    real (kind = dp), allocatable, intent(out) :: xlinet(:), zlinet(:)
+    integer (kind = 4), intent(out) :: nxt, nzt
+
+    real (kind = dp) :: dz, tol, xstep, xcoor, zstep, zcoor, ztop
+    integer (kind = 4) :: ix, iz, edgex1, edgex2, nxuni, edgezn, edgezp, nzuni
+    logical :: buried
+
+    dz  = dx
+    tol = dx/100.d0
+
+    ! ---- x ----
+    nxuni=(fltx2-fltx1-2.0d0*dx)/dx+1
+    xstep=dx
+    xcoor=fltx1+dx
+    do ix=1,np
+        if (ix > 1) xstep = min(xstep*ratxz, max(dymax, dx))
+        xcoor=xcoor-xstep
+        if(xcoor<=xmin) exit
+    enddo
+    edgex1=ix
+    xstep=dx
+    xcoor=fltx2-dx
+    do ix=1,np
+        if (ix > 1) xstep = min(xstep*ratxz, max(dymax, dx))
+        xcoor=xcoor+xstep
+        if(xcoor>=xmax) exit
+    enddo
+    edgex2=ix
+    nxt=nxuni+edgex1+edgex2
+    allocate(xlinet(nxt))
+    xlinet(edgex1+1)=fltx1+dx
+    xstep=dx
+    do ix=edgex1,1,-1
+        if (ix < edgex1) xstep = min(xstep*ratxz, max(dymax, dx))
+        xlinet(ix)=xlinet(ix+1)-xstep
+    enddo
+    do ix=edgex1+2,edgex1+nxuni
+        xlinet(ix)=xlinet(ix-1)+dx
+    enddo
+    xstep=dx
+    do ix=edgex1+nxuni+1,nxt
+        if (ix > edgex1+nxuni+1) xstep = min(xstep*ratxz, max(dymax, dx))
+        xlinet(ix)=xlinet(ix-1)+xstep
+    enddo
+
+    ! ---- z ----
+    buried = (fltz2 < zmax - tol)
+    zstep=dz
+    zcoor=fltz1+dx
+    do iz=1,np
+        if (iz > 1) zstep = min(zstep*ratxz, max(dymax, dx))
+        zcoor=zcoor-zstep
+        if(zcoor<=zmin) exit
+    enddo
+    edgezn=iz
+    nzuni=(fltz2-fltz1-dx)/dx+1
+    ! Above a buried fault the top line is placed ON zmax, not past it: zmax
+    ! is typically the free surface, and an overshoot would move it. The
+    ! last cell takes the remaining gap, kept within (0.5, 1.5] of a step.
+    edgezp=0
+    if (buried) then
+        zstep=dz
+        zcoor=fltz2
+        do iz=1,np
+            if (iz > 1) zstep = min(zstep*ratxz, max(dymax, dx))
+            if (zmax - zcoor <= 1.5d0*zstep) exit
+            zcoor=zcoor+zstep
+        enddo
+        edgezp=iz
+    endif
+    nzt=edgezn+nzuni+edgezp
+    allocate(zlinet(nzt))
+    ztop = zmax
+    if (buried) ztop = fltz2
+    zlinet(edgezn+nzuni)=ztop
+    do iz=edgezn+nzuni-1,edgezn+1,-1
+        zlinet(iz)=zlinet(iz+1)-dz
+    enddo
+    zstep=dz
+    do iz=edgezn,1,-1
+        if (iz < edgezn) zstep = min(zstep*ratxz, max(dymax, dx))
+        zlinet(iz)=zlinet(iz+1)-zstep
+    enddo
+    zstep=dz
+    do iz=edgezn+nzuni+1,nzt-1
+        if (iz > edgezn+nzuni+1) zstep = min(zstep*ratxz, max(dymax, dx))
+        zlinet(iz)=zlinet(iz-1)+zstep
+    enddo
+    if (buried) zlinet(nzt)=zmax
+
+end subroutine build_xzlines

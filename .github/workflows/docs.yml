@@ -1,0 +1,74 @@
+name: Build and publish the EQquasi docs site
+
+# A MkDocs Material site built from docs/user/. On a pull request that
+# touches the docs this workflow only builds (--strict, so any warning
+# fails). On a v* tag push it also publishes to GitHub Pages, so each
+# release publishes the docs that match its own code.
+#
+# Separate from test.yml, which owns the solver build and test tiers; the
+# two share no job and neither blocks the other.
+on:
+  pull_request:
+    paths:
+      - 'docs/user/**'
+      - '.github/workflows/docs.yml'
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: docs-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install MkDocs and the Material theme
+        run: pip install -r docs/user/requirements.txt
+
+      - name: Generated parameter page is current
+        run: python3 docs/user/gen_params.py --check
+
+      - name: Build the docs site (strict -- any warning fails the build)
+        run: mkdocs build --strict -f docs/user/mkdocs.yml
+
+      # Pull-request runs stop here: build only, nothing deployed.
+      - name: Upload the built site as a workflow artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eqquasi-docs-site
+          path: docs/user-site
+          retention-days: 7
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/user-site
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v4
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

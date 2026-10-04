@@ -1,0 +1,42 @@
+site_name: EQquasi
+site_url: https://dunyuliu.github.io/EQquasi/
+repo_url: https://github.com/dunyuliu/EQquasi
+repo_name: dunyuliu/EQquasi
+edit_uri: ''
+
+# This file lives at docs/user/mkdocs.yml so the repository root stays
+# clean; docs_dir therefore points back at this same directory (mkdocs'
+# default, docs/ relative to the config file, would look for
+# docs/user/docs/). site_dir must lie outside docs_dir, so the site is built
+# into docs/user-site, a gitignored sibling of docs/user/.
+docs_dir: .
+site_dir: ../user-site
+
+theme:
+  name: material
+  palette:
+    scheme: default
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Running a case: running-a-case.md
+  - Parameters: parameters.md
+  - Output files: outputs.md
+  - Benchmarks: benchmarks.md
+  - Performance: performance.md
+  - Troubleshooting: troubleshooting.md
+  - Citing: citing.md
+
+# strict is passed on the command line (`mkdocs build --strict`), so a plain
+# `mkdocs serve` preview is never blocked by a warning.
+markdown_extensions:
+  - tables
+  - fenced_code
+  - toc:
+      permalink: true
+
+# Tooling, not pages: kept out of the built site.
+exclude_docs: |
+  gen_params.py
+  requirements.txt

@@ -93,7 +93,7 @@ conda activate eqquasi-petsc
 bash install.eqquasi.sh -m conda-linux
 ```
 The installer records the matching MPI launcher in `bin/eqquasi-<version>.cfg`,
-and every case's `run.sh` uses it (override with `MPIRUN=... bash run.sh`).
+and every case's `run.sh` uses it (override with `MPIRUN=... bash run.sh`). It also records `MPIRUN_ARGS` (OpenMPI: `--bind-to none`, so two runs on one host do not share cores; conda adds shared-memory transport); override with `MPIRUN_ARGS=... bash run.sh`.
 
 To activate bash environment variables $EQQUASIROOT and add executable scripts to $PATH,
 ```

@@ -57,12 +57,17 @@ if [ -n "$MACH" ]; then
     # Launcher default for every branch; branches below override it. Reset
     # here so an MPIRUN left in the caller's environment is never recorded.
     MPIRUN=$(command -v mpirun.openmpi)
+    # OpenMPI binds rank k to core k by default, so two runs on one host
+    # share cores 0..N-1 and each runs at half speed (2026-10-04: 40 cores
+    # idle, ~18 h lost). Do not bind; the OS spreads the ranks.
+    MPIRUN_ARGS="--bind-to none"
     if [ $MACHINE == "ls6" ]; then 
         echo "Installing EQquasi on Lonestar6 at TACC ... ..."
         
         echo "Loading netcdf and mumps modules ... ..."
         module load netcdf/4.6.2 mumps
         MPIRUN=ibrun
+        MPIRUN_ARGS=""
         ml
         
         echo "NETCDF INC and LIB PATH"
@@ -86,6 +91,9 @@ if [ -n "$MACH" ]; then
         fi
         echo "Installing EQquasi from conda env $CONDA_PREFIX ... ..."
         MPIRUN=$CONDA_PREFIX/bin/mpirun
+        # On one host, ranks talk through shared memory, not TCP: two runs
+        # deadlocked in the MUMPS solve over the TCP btl (2026-10-03).
+        MPIRUN_ARGS="--bind-to none --mca btl self,sm --mca pml ob1"
     elif [ "$MACHINE" == "local" ]; then
         MUMPS_LIB_DIR="./mumps/build/local/lib"
         MPIRUN=$(command -v mpirun.openmpi)
@@ -144,7 +152,8 @@ if [ -n "$MACH" ]; then
         fi
         mv src/eqquasi "bin/eqquasi-$eqv"
         echo "MPIRUN=$MPIRUN" > "bin/eqquasi-$eqv.cfg"
-        echo "Installed bin/eqquasi-$eqv (launcher: $(cut -d= -f2 bin/eqquasi-$eqv.cfg))"
+        echo "MPIRUN_ARGS=$MPIRUN_ARGS" >> "bin/eqquasi-$eqv.cfg"
+        echo "Installed bin/eqquasi-$eqv (launcher: $MPIRUN $MPIRUN_ARGS)"
     fi
 
     export EQQUASIROOT=$(pwd)

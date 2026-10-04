@@ -249,6 +249,21 @@ def _mpirun():
                      "with install.eqquasi.sh -m <machine>.")
 
 
+def _mpirun_args():
+    """Launcher flags recorded next to MPIRUN (e.g. --bind-to none), or "".
+
+    Optional: a .cfg from before this line existed simply has none.
+    """
+    cfg = os.path.join(os.environ.get("EQQUASIROOT", ""), "bin", _exe_name() + ".cfg")
+    try:
+        for line in open(cfg):
+            if line.startswith("MPIRUN_ARGS="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
+
+
 def _exe_name():
     """`eqquasi-<version>`, read from the source the run will be built from.
 
@@ -282,6 +297,7 @@ def create_run_sh():
     `rm -rf scratch`; a full reset is `rm -rf scratch result`.
     """
     mpirun = _mpirun()   # before open(): a hard fail must not truncate run.sh
+    mpirun_args = _mpirun_args()
     with open("run.sh", "w") as f:
         w = lambda t: f.write(t + "\n")
         # Pin OpenMP threads. Left unset, each MPI rank spawns as many threads
@@ -290,6 +306,7 @@ def create_run_sh():
         w("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}")
         # Launcher recorded by install.eqquasi.sh; override with MPIRUN=... bash run.sh
         w("MPIRUN=${MPIRUN:-" + mpirun + "}")
+        w('MPIRUN_ARGS=${MPIRUN_ARGS-"' + mpirun_args + '"}')
         w("mkdir -p result log")
         w("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");")
         w("do")
@@ -318,7 +335,7 @@ def create_run_sh():
         # leaves something to read. PIPESTATUS[0] is the launcher's exit
         # code, not tee's (a bare $? here would report tee's, which is
         # always 0).
-        w("  $MPIRUN -np " + str(par.HPC_ncpu) + " " + _exe_name() +
+        w("  $MPIRUN $MPIRUN_ARGS -np " + str(par.HPC_ncpu) + " " + _exe_name() +
           ' 2>&1 | tee "log/cycle$((i-1)).log"')
         w("  status=${PIPESTATUS[0]}")
         w("  if [ $status -ne 0 ]; then")

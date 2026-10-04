@@ -5,6 +5,19 @@
 *MUMPS* is distributed under the [CeCILL-C license](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html) and for proper ackowledgement, please read the LICENCE for *MUMPS*. The newest version of MUMPS can be downloaded through this [link](http://mumps-tech.com/mumps-2/). <br/>
 *AZTEC* now comes with [*Trilinos*](https://github.com/trilinos/Trilinos) in the name of *AZTECOO*, but the current *EQquasi* still uses the standalone *AZTEC2.1*. (To-do-list: need to update its license.)  <br/>
 
+Documentation
+---------------------
+The user guide -- installing, running a case, the parameter reference, output
+files, benchmarks, performance and troubleshooting -- is published with each
+release at https://dunyuliu.github.io/EQquasi/. Its source is `docs/user/`;
+to preview it locally:
+```
+pip install -r docs/user/requirements.txt
+mkdocs serve -f docs/user/mkdocs.yml
+```
+`docs/user/parameters.md` is generated from `script/defaultParameters.py`;
+rerun `python3 docs/user/gen_params.py` after changing a default.
+
 Setup of computing environment
 ---------------------
 *```EQquasi```* relies on the following packages for pre-staging and computing. <br/>

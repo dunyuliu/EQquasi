@@ -12,3 +12,4 @@ src/eqquasi.O0
 .claude/
 resume_claude.sh
 .pytest_cache/
+docs/user-site/

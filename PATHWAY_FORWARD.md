@@ -254,7 +254,16 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `solveTimeLoopMUMPS.f90`), not "releasing" as originally written; core
    size is ~56x12 km (22.1x4.7 h*), not the stale "50x10 km, 19.7x3.9 h*".
    Telling the original author is the owner's, not done here.
-15. [ ] **BP8-PW reference: upload first, then decide** (owner, 2026-09-29).
+15. [ ] **BP8 submission: DEADLINE 2026-10-15 (CRESCENT data upload).**
+   Ready 2026-10-04: GS and PW at 10 m, EQquasi 1.21.0, fault box +-500 m in an
+   x/z +-1500, y +-2000 m domain (enlarging_ratio_xz 1.2), both
+   `checkBP8Submission` 21 ok / 0 errors, zips in
+   `scratch/bp8.submit.v1.21.0/upload/{GS,PW}/`. Uploading is the owner's.
+   vs Kim (HBI): GS slip -6 to -14 %, PW source slip -7 %; pressures and late
+   slip rates match. Domain converged at 50 m (y +-2000..8000 and x/z
+   +-1500..3000 change slip < 1 %); the residual shrinks with dx (depth
+   -18 % at 50 m, -13 % at 10 m), i.e. FEM convergence, not boundaries.
+   **BP8-PW reference: upload first, then decide** (owner, 2026-09-29).
    PR #35 froze `reference/test.bp8.qdc.gs.10.pw/` and a full-tier row before
    the result was validated; both removed (a reference is decided only after
    the SEAS platform comparison with other codes). Kept from #35: the

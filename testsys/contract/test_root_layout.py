@@ -45,8 +45,12 @@ ALLOWED_ROOT_ENTRIES = {
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-def _git(args):
+def _git(args, report_only=False):
     r = subprocess.run(["git"] + args, cwd=str(ROOT), capture_output=True, text=True)
+    if report_only:
+        # The tidy report must never fail: CI's checkout has no local master
+        # branch, and a missing ref is not a layout violation.
+        return r.stdout if r.returncode == 0 else ""
     assert r.returncode == 0, f"git {args} failed: {r.stderr}"
     return r.stdout
 
@@ -93,12 +97,12 @@ def test_tidy_report():
     """Report-only: never fails. Prints what a human tidy pass would remove."""
     lines = ["", "--- rule 22 tidy report (informational only) ---"]
 
-    wt = _git(["worktree", "list", "--porcelain"])
+    wt = _git(["worktree", "list", "--porcelain"], report_only=True)
     worktrees = [l.split(" ", 1)[1] for l in wt.splitlines() if l.startswith("worktree ")]
     stale = [w for w in worktrees if "/scratch/" in w and w.rstrip("/") != str(ROOT)]
     lines.append(f"worktrees under scratch/: {stale or 'none'}")
 
-    branches = _git(["branch", "--merged", "master"]).splitlines()
+    branches = _git(["branch", "--merged", "master"], report_only=True).splitlines()
     merged = [b.strip().lstrip("* ").strip() for b in branches if b.strip() and "master" not in b]
     lines.append(f"local branches merged into master: {merged or 'none'}")
 

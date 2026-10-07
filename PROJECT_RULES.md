@@ -1,6 +1,6 @@
 # EQquasi Project Rules
 
-Twenty-one rules, each earned by an incident in this repository. Rule numbers are
+Twenty-two rules, each earned by an incident in this repository. Rule numbers are
 cited from `testsys/`, `script/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
@@ -32,6 +32,7 @@ below it is the record of why.
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
 | 21 | Release = green CI on the exact master SHA → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
+| 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 5 MB. |
 
 Two habits that would have caught most violations of the above: read the file
 list a commit prints before pushing it, and re-read this card before staging.
@@ -59,6 +60,7 @@ list a commit prints before pushing it, and re-read this card before staging.
 19. [Drive runs through the workflow, never the binary directly](#19-drive-runs-through-the-workflow-never-the-binary-directly)
 20. [“Plot” means a fixed set of five figures](#20-plot-means-a-fixed-set-of-five-figures)
 21. [A release is a tag plus its Release page, and the unattended grant](#21-a-release-is-a-tag-plus-its-release-page-and-the-unattended-grant)
+22. [The root is a whitelist, not a preference](#22-the-root-is-a-whitelist-not-a-preference)
 
 ## How these rules overlap
 
@@ -491,6 +493,70 @@ The sequence, in order:
 *Incident, 2026-09-24.* v1.13.0 through v1.18.3 were pushed as tags only, so
 the repo's Latest release stayed on v1.3.2, 379 commits behind, until the
 owner noticed. The 34 missing pages were backfilled from the tag messages.
+
+## 22. The root is a whitelist, not a preference
+
+Owner decision, 2026-10-07. The tracked repo root holds exactly these entries,
+no others:
+
+| entry | job |
+|---|---|
+| `README.md` | user-facing: what this is, install, run a case |
+| `CLAUDE.md` | agent-facing working doc -- **absent today** (see below) |
+| `PATHWAY_FORWARD.md` | the board: open items, priority, re-check date |
+| `PROJECT_RULES.md` | this rule book |
+| `LICENSE` | -- |
+| `environment.yml`, `install.eqquasi.sh`, `install.mumps.sh`, `ubuntu.env.setup.sh`, `make.scripts.executable.sh` | install/bootstrap entry points -- project-specific, no starter-set slot |
+| `pytest.ini` | test-runner config |
+| `archive/` | retired code (e.g. the Aztec solver, rule 13's dead-code finding) |
+| `compset/` | case templates + `compset/README.md`'s register (rule 7) |
+| `docs/` | `docs/user/` ships the MkDocs site; `docs/dev/` is not yet populated |
+| `reference/` | read-only gold data (rule 8) -- this project's `data/` slot |
+| `script/` | Python entry points |
+| `src/` | Fortran source |
+| `testsys/` | the gate |
+| `.github/` | CI workflow |
+| `.gitignore` | tool config |
+
+`bin/` (the built binary), `mumps` (a symlink to an external checkout) and
+`scratch/` (worktrees, runs, temp -- rule 14) are gitignored and so never
+appear in `git ls-tree`; the check below only ever sees tracked names and does
+not need to special-case them.
+
+**Why `script/` and `testsys/`, not a starter template's `scripts/`/`tests/`.**
+This repo already renamed `scripts/` -> `script/` and `tests/` -> `testsys/`
+on purpose (`aa5bbcd`, "Rename scripts to script and tests to testsys"). This
+rule keeps the project's names: the slot's *job* (entry points, the gate) is
+what matters, not the spelling, and renaming back would recreate whatever the
+original rename was solving.
+
+**No tracked file over 5 MB.** The largest tracked file today is
+`reference/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
+under the limit, so this is a ceiling, not yet a problem; the check guards it
+so a future gold file doesn't cross it silently.
+
+**`CLAUDE.md` is absent.** The starter template this rule is drawn from
+requires one (what an agent must know before touching this project: build,
+test, conventions, traps). Creating it is a seed action, out of scope for this
+rule addition; tracked as a board item instead (`PATHWAY_FORWARD.md` row 18).
+
+*Rationale.* An uncurated root is how a second status board, a second rule
+book, or a stray debug script accumulates silently -- each one a fact that can
+now be wrong in two places. Same argument as rule 1 ("fold into the file that
+owns the concern"), applied at root scope instead of file scope.
+
+**How to apply**: before adding anything at the repo root, check this table
+first. Not on it -> fold the content into an existing entry, or raise it here
+as a new row -- same process as rule 1 for a new name or parameter.
+
+**Check**: `testsys/contract/test_root_layout.py` diffs `git ls-tree
+--name-only HEAD` against this table's entries and fails on any addition or
+removal, and fails on any tracked file over 5 MB. A `tidy()` step in the same
+file prints -- and does not fail on -- stale worktrees under `scratch/`,
+merged local branches, and `scratch/` run directories nothing in
+`PATHWAY_FORWARD.md` cites.
+
+---
 
 ---
 

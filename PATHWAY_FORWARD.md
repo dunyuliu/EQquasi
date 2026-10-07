@@ -285,6 +285,21 @@ Read this first on wake-up. Update in place; close items by deleting them.
    Confirmed still absent: `.claude/worktrees/` is empty and `git worktree
    list` shows no `bp8-pw` entry.
 
+18. [~] **P2 -- root layout per zofia template.** PROJECT_RULES.md rule 22
+   added 2026-10-07, whitelisting the tracked repo root. Evidence:
+   `python3 -m pytest -q testsys/contract/test_root_layout.py`. No violations
+   found against today's tree. Pending renames, owner OK required before any
+   is actioned (each would move a path something outside the repo depends on):
+   - `CLAUDE.md` does not exist at root -- rule 22 whitelists it; creating it
+     is a seed action, not done here.
+   - no actual mismatch between the starter template's `scripts/`/`tests/`
+     and this repo's `script/`/`testsys/` -- rule 22 keeps the project's
+     names (commit `aa5bbcd`) rather than proposing a rename back; listed
+     here only because it was the template difference most likely to be
+     flagged.
+   Nothing else on today's tree is off the whitelist. Re-check: next time the
+   root gains or loses a tracked entry.
+
 Versions landed today: EQquasi 1.19.0 (PR #25) -> 1.19.1 (PR #27, row 12) ->
 1.20.0 (PR #33, rows 6/7/14/16, released on green CI as v1.20.0) -> 1.20.1
 pending (row 15 patch bump, not yet merged as of this write-up).

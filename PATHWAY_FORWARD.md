@@ -254,25 +254,16 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `solveTimeLoopMUMPS.f90`), not "releasing" as originally written; core
    size is ~56x12 km (22.1x4.7 h*), not the stale "50x10 km, 19.7x3.9 h*".
    Telling the original author is the owner's, not done here.
-15. [ ] **BP8 submission: DEADLINE 2026-10-15 (CRESCENT data upload).**
-   Ready 2026-10-04: GS and PW at 10 m, EQquasi 1.21.0, fault box +-500 m in an
-   x/z +-1500, y +-2000 m domain (enlarging_ratio_xz 1.2), both
-   `checkBP8Submission` 21 ok / 0 errors, zips in
-   `scratch/bp8.submit.v1.21.0/upload/{GS,PW}/`. Uploading is the owner's.
-   vs Kim (HBI): GS slip -6 to -14 %, PW source slip -7 %; pressures and late
-   slip rates match. Domain converged at 50 m (y +-2000..8000 and x/z
-   +-1500..3000 change slip < 1 %); the residual shrinks with dx (depth
-   -18 % at 50 m, -13 % at 10 m), i.e. FEM convergence, not boundaries.
-   **BP8-PW reference: upload first, then decide** (owner, 2026-09-29).
-   PR #35 froze `reference/test.bp8.qdc.gs.10.pw/` and a full-tier row before
-   the result was validated; both removed (a reference is decided only after
-   the SEAS platform comparison with other codes). Kept from #35: the
-   `plotMagnitudeTime.py` BP8 `global.dat` fix. Candidate output kept at
-   `scratch/bp8.pw.candidate.v1.19.0` (1.19.0, 3 ranks, 5196 steps, 30.0 days).
-   Open: an immediate rerun differs by up to ~8% at the 4 on-axis stations --
-   unexplained; an aseismic 30-day case should not amplify reduction-order
-   noise that much, so check determinism (same ranks, OMP_NUM_THREADS=1,
-   porepressure.f90) before the upload.
+15. [x] **BP8 submission -- uploaded 2026-10-07** (deadline 2026-10-15).
+   GS and PW at 10 m, EQquasi 1.21.0, fault box +-500 m in an x/z +-1500,
+   y +-2000 m domain (enlarging_ratio_xz 1.2); listed on CRESCENT as
+   `dliu_eqquasi-1-21-0-10m` (bp8-qd-GS) and `dliu_eqquasi-1-21-0-10m-pw`
+   (bp8-qd-PW). vs Kim (HBI): GS slip -6 to -14 %, PW source slip -7 %;
+   pressures and late slip rates match. Domain converged at 50 m (y
+   +-2000..8000, x/z +-1500..3000: < 1 %); the residual shrinks with dx
+   (depth -18 % at 50 m, -13 % at 10 m) -- FEM convergence, not boundaries.
+   Follow-ups moved to "Known open": the PW reference decision and the
+   unexplained ~8 % same-binary rerun spread at 4 PW stations.
 16. [x] **Tapered-tip step-over.** Landed PR #32 (`c572d01`). New compset
    `bp1002.qdc.caps.taper.2500` -- 5 km VW->VS taper at the interior
    step-over tips (every prior bp1002 compset left these fully untapered). 5
@@ -299,6 +290,9 @@ Versions landed today: EQquasi 1.19.0 (PR #25) -> 1.19.1 (PR #27, row 12) ->
 pending (row 15 patch bump, not yet merged as of this write-up).
 
 ### Known open, not queued
+- BP8-PW reference: decide against the CRESCENT comparison now that both are
+  uploaded; first check the ~8 % same-binary rerun spread at the 4 on-axis
+  stations (same ranks, OMP_NUM_THREADS=1, porepressure.f90).
 - `src/globalvar.f90` has one comment reading `scripts/case.setup`, left stale
   because correcting it would invalidate the binary three live runs are using.
 - 243 `.DS_Store` files across `$HOME`, none in this repo any more.

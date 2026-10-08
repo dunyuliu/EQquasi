@@ -1,7 +1,7 @@
 # EQquasi Project Rules
 
 Twenty-two rules, each earned by an incident in this repository. Rule numbers are
-cited from `testsys/`, `script/defaultParameters.py`, `src/read_input.f90` and
+cited from `tests/`, `scripts/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
 ## Before you act
@@ -18,13 +18,13 @@ below it is the record of why.
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
 | 7 | New compset: `compset/<bench>.<mode>[.<var>].<dx>[.<desc>]/` (test twin: `test.` prefix only) + a row in `compset/README.md`. |
-| 8 | `reference/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
+| 8 | `data/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
 | 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
 | 10 | Docs move with the code, in the same commit. |
 | 11 | Comparing two runs? Check both `runInfo.json` versions first. |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
-| 14 | Work only inside this folder: worktrees, runs, temp under `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. |
+| 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. |
 | 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. |
@@ -82,7 +82,7 @@ same change.
 
 The same applies to **names**. A new variable, parameter or constant is a new
 thing to keep consistent: reuse one, or inline the value, before inventing a
-name. `par` carries a schema (`script/defaultParameters.py`); a key not in
+name. `par` carries a schema (`scripts/defaultParameters.py`); a key not in
 that schema is not a parameter however well it reads.
 
 *Incidents.* A pore-pressure feature that also reorganized `globalvar.f90`
@@ -108,18 +108,18 @@ run produces numbers.
 
 *Incident.* `install.eqquasi.sh`'s malformed `[ $MACHINE == "local"]` test and
 a workflow line that discarded `pytest -m e2e`'s exit code both made a broken
-branch look green. Both fixed; `testsys/contract/test_release_gate.py` now
+branch look green. Both fixed; `tests/contract/test_release_gate.py` now
 guards the exit-code path.
 
 ---
 
 ## 3. The regression gate is the release gate
 
-`reference/test.bp5.qdc.2000/`, `reference/test.bp5.qdc.dip90.2000/`, `reference/test.bp7.qdc.a.10/`, `reference/test.bp8.qdc.gs.10/`
-and `reference/bp1002.qdc.2500/` are the safety net.
+`data/test.bp5.qdc.2000/`, `data/test.bp5.qdc.dip90.2000/`, `data/test.bp7.qdc.a.10/`, `data/test.bp8.qdc.gs.10/`
+and `data/bp1002.qdc.2500/` are the safety net.
 
 **Per-PR gate (owner decision, 2026-09-23):** merging any change to
-`src/*.f90` or `script/defaultParameters.py`/`case.setup` requires all three:
+`src/*.f90` or `scripts/defaultParameters.py`/`case.setup` requires all three:
 
 1. CI green (the GitHub Actions `build` check — see rule 17).
 2. A `victor-reyes` audit of the final diff.
@@ -128,16 +128,16 @@ and `reference/bp1002.qdc.2500/` are the safety net.
    body/comment as evidence:
 
 ```
-python3 -m pytest testsys/               # unit + contract + regression, ~1 min
-python3 -m pytest -m e2e_fast testsys/   # 101-step smokes, ~18 min
+python3 -m pytest tests/               # unit + contract + regression, ~1 min
+python3 -m pytest -m e2e_fast tests/   # 101-step smokes, ~18 min
 ```
 
-The full `-m e2e` tier (`testsys/e2e/`, ~92 tests, ~3 h) is **no longer a
+The full `-m e2e` tier (`tests/e2e/`, ~92 tests, ~3 h) is **no longer a
 per-PR gate**. It runs periodically instead — weekly by default, and the
 owner may relax it to monthly:
 
 ```
-python3 -m pytest -m e2e testsys/   # builds and runs the benchmarks, ~3 h
+python3 -m pytest -m e2e tests/   # builds and runs the benchmarks, ~3 h
 ```
 
 This does not weaken rule 12: `e2e_fast` already carries
@@ -163,7 +163,7 @@ Optional trailing blocks (per-fault `faultgeom`) are read with `iostat`, so
 append scalars **before** them: 13 of 16 compset write no faultgeom, and their
 faultgeom read would swallow a scalar placed after it.
 
-**Check**: `testsys/contract/test_io_contracts.py` counts writes against reads.
+**Check**: `tests/contract/test_io_contracts.py` counts writes against reads.
 
 ---
 
@@ -171,7 +171,7 @@ faultgeom read would swallow a scalar placed after it.
 
 `fric(slot, node, fault)` slots carry names now, defined twice with the SAME
 names and numbers: `src/globalvar.f90` (Fortran `integer, parameter ::
-FR_RSF_A = 9`, ...) and `script/defaultParameters.py` (Python module level),
+FR_RSF_A = 9`, ...) and `scripts/defaultParameters.py` (Python module level),
 which also holds the full slot -> meaning -> unit -> writer table. Slots 1-5
 stay numeric: their meaning depends on `friclaw`.
 
@@ -221,7 +221,7 @@ blocks.
   `compset/README.md`), plus a row in the register table there.
 - **CI regression**: same grammar with a `test.` prefix as the ONLY
   difference (`test.bp5.qdc.2000` ↔ `bp5.qdc.2000`), smaller (cut `nstep`),
-  added to `testsys/e2e/cases.py`, reference under `reference/<compset name>/`
+  added to `tests/e2e/cases.py`, reference under `data/<compset name>/`
   (reference dirs are named for the compset that produced them).
 
 `create.newcase` does **not** validate the name — it does `os.listdir` and
@@ -243,7 +243,7 @@ unverified and must say so.
 
 **8a. Every reference artifact needs a test that reads it.** Gold nothing
 asserts on is dead weight masquerading as a safety net.
-`testsys/contract/test_reference_gold_is_referenced.py` enforces this.
+`tests/contract/test_reference_gold_is_referenced.py` enforces this.
 
 ---
 
@@ -296,13 +296,13 @@ physical invariant asserting the seed lands on fault 0 only.
 
 It sits in the **full** tier, not every-push, because the event is 3821 steps
 and ~2600 s on 3 ranks. So every-push CI still has no multi-fault case — a
-known, costed gap recorded beside the row in `testsys/e2e/cases.py`.
+known, costed gap recorded beside the row in `tests/e2e/cases.py`.
 
 ---
 
 ## 13. Known Fortran landmines must not recur
 
-Guarded by `testsys/regression/test_code_convention_landmines.py`:
+Guarded by `tests/regression/test_code_convention_landmines.py`:
 
 - **13a. No `if (ntotft == 1) ... else ...` branching.** The fault-node engine
   was made `ntotft`-neutral so that `ntotft = 1` exercises the identical path
@@ -325,12 +325,15 @@ Guarded by `testsys/regression/test_code_convention_landmines.py`:
 
 - **Work in your own `git worktree`**, never `git checkout` a branch in the
   shared checkout. Branching in place has put two commits on another agent's
-  branch. Worktrees live under the gitignored `scratch/` (e.g.
-  `scratch/wt-<topic>`).
-- **Work only inside this repo folder** (owner rule, 2026-09-25). Worktrees,
-  runs, logs and temp files go under `scratch/`, never in `$HOME` or beside
-  the checkout. The only writes outside are the ones the owner named: the
-  slides repo, the consilium inbox, and the global papercuts log.
+  branch. Worktrees live under the gitignored `.claude/worktrees/<topic>`
+  (`git worktree add .claude/worktrees/<topic> -b <branch>`). Before
+  2026-10-08 they lived under `scratch/wt-<topic>`.
+- **Work only inside this repo folder** (owner rule, 2026-09-25). New runs go
+  in `runs/<YYYYMMDD>_<slug>/`; logs and temp files go in `scratch/`; never
+  in `$HOME` or beside the checkout. All three locations are gitignored.
+  Campaign data already under `scratch/` stays there, because the board
+  cites those paths; only new runs go in `runs/` (2026-10-08). The only
+  writes outside are the ones the owner named: the slides repo, the consilium inbox, and the global papercuts log.
 - **Move run data out before `git worktree remove`.** It deletes gitignored
   files too, so a run left inside a worktree goes with it. *2026-09-25:* the
   row 7 and row 16 runs (3 and 5 cycles) were lost this way; their numbers
@@ -353,7 +356,7 @@ retract it.
 ## 15. Operational safety on the shared compute host
 
 Work runs on shared 64-core boxes (`cotopaxi`, `knox`). All simulation
-artifacts belong under `scratch/` (gitignored). Check `uptime` before launching;
+artifacts belong under `runs/` (gitignored, rule 14). Check `uptime` before launching;
 at most two of your runs at once at 3 ranks; **wait if load is above ~56**
 rather than adding to it. A long run is not more urgent than someone else's
 interactive session.
@@ -415,7 +418,7 @@ binaries became versioned. It died before the e2e tier ran at all.
 ## 18. The whole workflow must work for every example
 
 Create the case, run it, post-process it. All three must work for **every**
-compset in `compset/`, and above all for the runs frozen under `reference/`.
+compset in `compset/`, and above all for the runs frozen under `data/`.
 A gold reference nobody can regenerate or plot is a file, not a reference.
 
 - `create.newcase <dir> <compset>` then `./case.setup` produces a runnable case
@@ -424,7 +427,7 @@ A gold reference nobody can regenerate or plot is a file, not a reference.
 - every post-processing utility runs and produces a figure, or says clearly
   why not (BP8 is aseismic; an empty rupture-time plot is the right answer)
 
-**Check**: `testsys/contract/test_utilities_run_on_every_reference.py`.
+**Check**: `tests/contract/test_utilities_run_on_every_reference.py`.
 
 ---
 
@@ -496,8 +499,8 @@ owner noticed. The 34 missing pages were backfilled from the tag messages.
 
 ## 22. The root is a whitelist, not a preference
 
-Owner decision, 2026-10-07. The tracked repo root holds exactly these entries,
-no others:
+Owner decision, 2026-10-07; names aligned to the starter template 2026-10-08.
+The tracked repo root holds exactly these entries, no others:
 
 | entry | job |
 |---|---|
@@ -510,28 +513,30 @@ no others:
 | `pytest.ini` | test-runner config |
 | `archive/` | retired code (e.g. the Aztec solver, rule 13's dead-code finding) |
 | `compset/` | case templates + `compset/README.md`'s register (rule 7) |
-| `docs/` | `docs/user/` ships the MkDocs site; `docs/dev/` is not yet populated |
-| `reference/` | read-only gold data (rule 8) -- this project's `data/` slot |
-| `script/` | Python entry points |
+| `data/` | read-only gold data (rule 8) |
+| `docs/` | `docs/user/` ships the MkDocs site; `docs/dev/` is the developer index |
+| `evals/` | agent eval fixtures (none yet) |
+| `scripts/` | Python entry points |
 | `src/` | Fortran source |
-| `testsys/` | the gate |
+| `tests/` | the gate |
 | `.github/` | CI workflow |
 | `.gitignore` | tool config |
 
-`bin/` (the built binary), `mumps` (a symlink to an external checkout) and
-`scratch/` (worktrees, runs, temp -- rule 14) are gitignored and so never
-appear in `git ls-tree`; the check below only ever sees tracked names and does
-not need to special-case them.
+`bin/` (the built binary), `mumps` (a symlink to an external checkout),
+`.claude/` (worktrees under `.claude/worktrees/`), `runs/` and `scratch/`
+(rule 14) are gitignored and so never appear in `git ls-tree`; the check
+below only ever sees tracked names and does not need to special-case them.
 
-**Why `script/` and `testsys/`, not a starter template's `scripts/`/`tests/`.**
-This repo already renamed `scripts/` -> `script/` and `tests/` -> `testsys/`
-on purpose (`aa5bbcd`, "Rename scripts to script and tests to testsys"). This
-rule keeps the project's names: the slot's *job* (entry points, the gate) is
-what matters, not the spelling, and renaming back would recreate whatever the
-original rename was solving.
+**Why `scripts/`, `tests/` and `data/`.** This repo renamed `scripts/` ->
+`script/` and `tests/` -> `testsys/` in `aa5bbcd` ("Rename scripts to script
+and tests to testsys"), and kept them here on 2026-10-07. That rename was
+reverted on 2026-10-08 at the owner's request, and `reference/` became
+`data/`, so the root matches the starter template. `aa5bbcd`'s reason for
+`testsys` -- `test` shadows the stdlib package -- does not apply to `tests`.
+Commit messages before 2026-10-08 still use the old names.
 
 **No tracked file over 5 MB.** The largest tracked file today is
-`reference/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
+`data/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
 under the limit, so this is a ceiling, not yet a problem; the check guards it
 so a future gold file doesn't cross it silently.
 
@@ -544,12 +549,12 @@ owns the concern"), applied at root scope instead of file scope.
 first. Not on it -> fold the content into an existing entry, or raise it here
 as a new row -- same process as rule 1 for a new name or parameter.
 
-**Check**: `testsys/contract/test_root_layout.py` diffs `git ls-tree
+**Check**: `tests/contract/test_root_layout.py` diffs `git ls-tree
 --name-only HEAD` against this table's entries and fails on any addition or
 removal, and fails on any tracked file over 5 MB. A `tidy()` step in the same
-file prints -- and does not fail on -- stale worktrees under `scratch/`,
-merged local branches, and `scratch/` run directories nothing in
-`PATHWAY_FORWARD.md` cites.
+file prints -- and does not fail on -- worktrees under `.claude/worktrees/` (or
+left under `scratch/`), merged local branches, and `runs/` and `scratch/`
+entries nothing in `PATHWAY_FORWARD.md` cites.
 
 ---
 

@@ -41,7 +41,7 @@ jobs:
         pip install xarray imageio pdf2image numpy==1.26.4 netCDF4 pytest matplotlib
 
     - name: Fast tiers (unit, contract, regression)
-      run: python3 -m pytest testsys/ -v
+      run: python3 -m pytest tests/ -v
 
     - name: Build
       run: |
@@ -63,9 +63,9 @@ jobs:
       # move to a periodic/local sweep on the 48-64-core hosts instead.
       run: |
         export EQQUASIROOT=$(pwd)
-        export PATH=$(pwd)/bin:$(pwd)/script:$PATH
+        export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
         set -o pipefail
-        python3 -m pytest testsys/ -m e2e_ci -v 2>&1 | tee testRunLog.txt
+        python3 -m pytest tests/ -m e2e_ci -v 2>&1 | tee testRunLog.txt
 
     - name: Print log
       if: always()   # otherwise a failing test step hides the very log needed to debug it

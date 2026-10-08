@@ -72,7 +72,7 @@ as the launcher.
 
 ### Every session
 
-Each new shell needs `EQQUASIROOT` set and the `bin/` and `script/` folders
+Each new shell needs `EQQUASIROOT` set and the `bin/` and `scripts/` folders
 on its path. From the repository root:
 
 ```
@@ -83,7 +83,7 @@ or add the equivalent lines to your shell startup file:
 
 ```
 export EQQUASIROOT=/path/to/EQquasi
-export PATH=$EQQUASIROOT/bin:$EQQUASIROOT/script:$PATH
+export PATH=$EQQUASIROOT/bin:$EQQUASIROOT/scripts:$PATH
 ```
 
 Do not build with a bare `make` in `src/`. The makefile takes all of its
@@ -96,13 +96,13 @@ The fast test tiers read the source and reference files only. They need
 `pytest` but no MPI run, and take about one to two minutes:
 
 ```
-python3 -m pytest testsys/
+python3 -m pytest tests/
 ```
 
 To also build and run small benchmark cases end to end (about 20 minutes):
 
 ```
-python3 -m pytest testsys/ -m e2e_fast
+python3 -m pytest tests/ -m e2e_fast
 ```
 
 ## Run a first case

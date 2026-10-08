@@ -4,7 +4,7 @@ A compset is one directory holding a `user_defined_params.py`, plus any static
 input it ships (a rough-geometry table, a fault-geometry generator).
 `create.newcase <dir> <name>` copies it into a case.
 
-**This table is the register.** `testsys/contract/test_compsets.py` asserts it
+**This table is the register.** `tests/contract/test_compsets.py` asserts it
 matches the directories on disk, so it cannot drift silently. Each
 `user_defined_params.py` repeats its own row in a header comment, so the status
 is visible where you are editing.
@@ -20,7 +20,7 @@ is visible where you are editing.
 
 Durable facts only. Gate status is deliberately *not* in the name: it changes
 as the suite evolves, and a name that encodes a changing fact is a rename
-waiting to happen — with `reference/` paths, `testsys/e2e/cases.py` and every
+waiting to happen — with `data/` paths, `tests/e2e/cases.py` and every
 existing case to update each time.
 
 `test.` prefixes a regression variant and is the ONLY difference from the
@@ -33,17 +33,17 @@ where none exists the test compset still uses the full grammar. Small, cut
 
 | compset | gate | reference | published | changed |
 |---|---|---|---|---|
-| `bp5.qdc.2000` | e2e full (via `test.bp5.qdc.2000`) | `reference/test.bp5.qdc.2000` | Jiang et al. 2022 JGR | 2026-08-12 |
-| `bp7.qdc.a.10` | e2e fast (via `test.bp7.qdc.a.10`) | `reference/test.bp7.qdc.a.10` | — | 2026-08-12 |
-| `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc.gs.10`) | `reference/test.bp8.qdc.gs.10` | CRESCENT DET (submitted) | 2026-08-12 |
-| `bp1002.qdc.2500` | **e2e full, run directly** | `reference/bp1002.qdc.2500` | — | 2026-08-13 |
+| `bp5.qdc.2000` | e2e full (via `test.bp5.qdc.2000`) | `data/test.bp5.qdc.2000` | Jiang et al. 2022 JGR | 2026-08-12 |
+| `bp7.qdc.a.10` | e2e fast (via `test.bp7.qdc.a.10`) | `data/test.bp7.qdc.a.10` | — | 2026-08-12 |
+| `bp8.qdc.gs.10` | e2e fast (via `test.bp8.qdc.gs.10`) | `data/test.bp8.qdc.gs.10` | CRESCENT DET (submitted) | 2026-08-12 |
+| `bp1002.qdc.2500` | **e2e full, run directly** | `data/bp1002.qdc.2500` | — | 2026-08-13 |
 | `bp1002.qdc.caps.2500` | none — UNVERIFIED (live run's cycle 0 matches uncapped `bp1002.qdc.2500`) | — | — | 2026-08-15 |
 | `bp1002.qdc.zone.2500` | none — UNVERIFIED (row-7 zoning experiment: VW patch fixed in area and distance from the step-over, segment lengths 57.5 vs 102.5 km; first read only, no reference yet) | — | — | 2026-09-25 |
 | `bp1002.qdc.caps.taper.2500` | none — UNVERIFIED (new experiment: 5 km VW→VS taper at the interior tips; no reference) | — | — | 2026-09-25 |
 | `das.qdc.10` | none | — | — | 2026-08-12 |
 | `liu2020.qdc.kink.300` | none | — | Liu et al. 2020 GJI | 2026-08-14 |
-| `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `reference/liu2020.qdc.kink.600` | Liu et al. 2020 GJI | 2026-08-15 |
-| `bp5.qdc.kink.2000` | **e2e full** | `reference/bp5.qdc.kink.2000` | — | 2026-08-15 |
+| `liu2020.qdc.kink.600` | reference frozen (utilities-read; no e2e row, ~5 h/cycle) | `data/liu2020.qdc.kink.600` | Liu et al. 2020 GJI | 2026-08-15 |
+| `bp5.qdc.kink.2000` | **e2e full** | `data/bp5.qdc.kink.2000` | — | 2026-08-15 |
 | `bp1001.fdc.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.fdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
 | `bp1001.qdc.rough.250` | none (ported, UNVERIFIED) | — | — | 2026-08-12 |
@@ -60,7 +60,7 @@ domain names mapped to `fxmin`-family — and each now passes `case.setup` and
 starts the solver (planar path stepped to 40; the rough path assembled its
 1.55M-node mesh from the shipped table before the smoke timeout).
 
-**Unverified remains the operative word**: none has a `reference/`, so the
+**Unverified remains the operative word**: none has a `data/`, so the
 numbers are checked by nothing. The rough compset' `rough_geo_cycle.txt` was
 renamed to `bFault_Rough_Geometry.txt`, the name the solver actually reads;
 the old name survives only in the legacy HPC batch template.
@@ -84,7 +84,7 @@ Small and fast, for the gate, **not for science**. Outside the register.
 | `test.bp5.qdc.dip90.2000` | e2e fast | 2026-08-15 |
 | `test.stepover.qdc.1000` | e2e fast (ntotft > 1 in the fast tier) | 2026-08-15 |
 | `test.stepover.qdc.con.1000` | e2e fast | 2026-08-15 |
-| `test.bp1002.qdc.zone.2500` | e2e full row registered; gate: none — UNVERIFIED, skips until `reference/test.bp1002.qdc.zone.2500` exists | 2026-09-25 |
+| `test.bp1002.qdc.zone.2500` | e2e full row registered; gate: none — UNVERIFIED, skips until `data/test.bp1002.qdc.zone.2500` exists | 2026-09-25 |
 
 The two-tier design of rule 7: the production compset produces the reference,
 and a smaller `test.*` variant with the same `dx` but a cut `nstep` runs on
@@ -126,7 +126,7 @@ Two things block reproduction, both tracked in `PATHWAY_FORWARD.md`:
 ## Adding one
 
 Rule 7: a production compset gets a directory and a row above; a CI variant
-gets the same name with a `test.` prefix, a row in `testsys/e2e/cases.py`, and
-a reference under `reference/<compset name>/` — reference directories are named
+gets the same name with a `test.` prefix, a row in `tests/e2e/cases.py`, and
+a reference under `data/<compset name>/` — reference directories are named
 for the compset that produced them, so the three names always agree. Put the same status in the file's own header.
 The contract test fails if the register and the directories disagree.

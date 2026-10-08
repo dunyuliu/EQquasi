@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 """Generate docs/user/parameters.md's parameter reference from
-script/defaultParameters.py's `parameters` class -- the class case.setup and
+scripts/defaultParameters.py's `parameters` class -- the class case.setup and
 every compset's user_defined_params.py read their defaults from -- so the
 page cannot list a knob that does not exist or show a stale default.
 
@@ -30,11 +30,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-SOURCE = os.path.join(ROOT, 'script', 'defaultParameters.py')
+SOURCE = os.path.join(ROOT, 'scripts', 'defaultParameters.py')
 TARGET = os.path.join(HERE, 'parameters.md')
 
 BEGIN = ('<!-- BEGIN PARAMETER REFERENCE (generated from '
-         'script/defaultParameters.py by docs/user/gen_params.py; do not '
+         'scripts/defaultParameters.py by docs/user/gen_params.py; do not '
          'edit by hand) -->')
 END = '<!-- END PARAMETER REFERENCE -->'
 
@@ -42,7 +42,7 @@ END = '<!-- END PARAMETER REFERENCE -->'
 SKIP_NAMES = {'on_fault_vars', 'fx', 'fz', 'nfx', 'nfz',
               'n_on_fault', 'n_off_fault'}
 
-# The same class of internal reference testsys/contract/test_user_docs_style.py
+# The same class of internal reference tests/contract/test_user_docs_style.py
 # refuses on a user page.
 INTERNAL_MARKERS = [
     re.compile(r'\bPR\s*#\d+|\(#\d+\)'),
@@ -164,7 +164,7 @@ def extract(source_text=None):
                 defaults.append(repr(ast.literal_eval(value)))
             except Exception:
                 defaults.append(ast.get_source_segment(text, value))
-        owner = '%s (script/defaultParameters.py line %d)' % (
+        owner = '%s (scripts/defaultParameters.py line %d)' % (
             ', '.join(n for n, _ in keep), node.lineno)
         last = lines[node.end_lineno - 1]
         inline = last.split('#', 1)[1].strip() if '#' in last else ''
@@ -189,7 +189,7 @@ def render(rows, banners):
     events.sort(key=lambda e: e[0])
     out = [BEGIN, '',
            'Every entry below is an attribute of the `parameters` class in '
-           '`script/defaultParameters.py`. A case overrides any of them in its '
+           '`scripts/defaultParameters.py`. A case overrides any of them in its '
            'own `user_defined_params.py` as `par.<name> = <value>`. The '
            'defaults are the class\'s own, taken from BP5 at 2000 m; each '
            'compset sets its own values on top.', '']
@@ -235,7 +235,7 @@ def check_or_update(update):
               % (len(rows), len(banners)))
         return []
     return ["docs/user/parameters.md no longer matches "
-            "script/defaultParameters.py -- run 'python3 docs/user/gen_params.py'"]
+            "scripts/defaultParameters.py -- run 'python3 docs/user/gen_params.py'"]
 
 
 def main():

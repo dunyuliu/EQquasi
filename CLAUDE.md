@@ -9,8 +9,8 @@ does not repeat them.
 
 EQquasi is a 3D quasi-dynamic finite-element code for earthquake cycles on
 rate-and-state faults: Fortran 90 solver (`src/`), Python case tooling and
-post-processing (`script/`), case templates (`compset/`), read-only gold
-results (`reference/`), and the test gate (`testsys/`). SEAS benchmarks it
+post-processing (`scripts/`), case templates (`compset/`), read-only gold
+results (`data/`), and the test gate (`tests/`). SEAS benchmarks it
 targets include BP5, BP7, BP8 (GS and PW) and the BP1002 step-over.
 
 ## Build
@@ -35,7 +35,7 @@ uses.
 ```
 create.newcase <case_dir> <compset>
 cd <case_dir>            # edit user_defined_params.py
-python3 ./case.setup     # the case's own copy, not script/case.setup
+python3 ./case.setup     # the case's own copy, not scripts/case.setup
 bash run.sh
 ```
 
@@ -45,12 +45,21 @@ restarts from step 0.
 ## Test
 
 ```
-EQQUASIROOT=<checkout> python3 -m pytest -q -m "not e2e" testsys   # fast tier
-EQQUASIROOT=<checkout> python3 -m pytest -q -m e2e_fast testsys    # local sweep, ~20-40 min
+EQQUASIROOT=<checkout> python3 -m pytest -q -m "not e2e" tests   # fast tier
+EQQUASIROOT=<checkout> python3 -m pytest -q -m e2e_fast tests    # local sweep, ~20-40 min
 ```
 
 CI runs the fast tier, the build and two smokes (`-m e2e_ci`). The full
 `-m e2e` tier is periodic, not per-PR.
+
+## Where work goes
+
+- Worktrees: `git worktree add .claude/worktrees/<topic> -b <branch>`.
+- New runs: `runs/<YYYYMMDD>_<slug>/`.
+- Temp files: `scratch/`. Existing campaign data stays in `scratch/`; the
+  board cites those paths.
+
+All three are gitignored. Rule 14 has the rest.
 
 ## Traps that cost real time
 

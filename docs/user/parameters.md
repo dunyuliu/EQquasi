@@ -24,7 +24,7 @@ default class fills it with the BP5 distribution; a compset that needs
 different properties fills its own. The fourth index selects the quantity;
 the named slots (`FR_RSF_A`, `FR_RSF_B`, `FR_RSF_DC`, `FR_VINIT`,
 `FR_STATE`, `FR_TNRM0`, `FR_TSTK0`, ...) are defined, with units, at the top
-of `script/defaultParameters.py`. Import them from there rather than writing
+of `scripts/defaultParameters.py`. Import them from there rather than writing
 raw numbers.
 
 **Benchmark-specific behaviour.** `bp` selects behaviour built into the
@@ -44,9 +44,9 @@ origin. The solver refuses a geometry that breaks this (see
 `C_normal_stress_caps = 1`. They are off by default. `case.setup` warns when
 a non-planar or multi-fault case runs without them.
 
-<!-- BEGIN PARAMETER REFERENCE (generated from script/defaultParameters.py by docs/user/gen_params.py; do not edit by hand) -->
+<!-- BEGIN PARAMETER REFERENCE (generated from scripts/defaultParameters.py by docs/user/gen_params.py; do not edit by hand) -->
 
-Every entry below is an attribute of the `parameters` class in `script/defaultParameters.py`. A case overrides any of them in its own `user_defined_params.py` as `par.<name> = <value>`. The defaults are the class's own, taken from BP5 at 2000 m; each compset sets its own values on top.
+Every entry below is an attribute of the `parameters` class in `scripts/defaultParameters.py`. A case overrides any of them in its own `user_defined_params.py` as `par.<name> = <value>`. The defaults are the class's own, taken from BP5 at 2000 m; each compset sets its own values on top.
 
 * **`istart`** -- default `1`
 

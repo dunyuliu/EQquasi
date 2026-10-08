@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.21.1'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.21.2'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -41,7 +41,7 @@ MODULE globalvar
         ntotft, nnx, nnz, nres, nplpts, nhplt=20, nstep, &
         dis4uniF, dis4uniB, C_farfield = 0, nt_output_stress
     ! fric(slot, node, fault) named slots. One authoritative list (rule 5);
-    ! the same numbers appear in script/defaultParameters.py (Python side)
+    ! the same numbers appear in scripts/defaultParameters.py (Python side)
     ! and the full slot -> meaning -> unit -> writer table lives there.
     ! Slots 1-5 are friction-law-dependent legacy and stay numeric.
     integer (kind=4), parameter :: FR_PORE_DP = 6  ! pore pressure change [Pa]
@@ -129,7 +129,7 @@ MODULE globalvar
     real (kind=dp) :: init_norm ! initial effective normal stress on the fault, MPa.
     real (kind=dp) :: critt0 ! critical time for the nucleation to occur.
     ! Effective normal stress caps, Pa (negative = compressive). Read from
-    ! model.txt (script/case.setup writes par.min_norm/par.max_norm); these
+    ! model.txt (scripts/case.setup writes par.min_norm/par.max_norm); these
     ! defaults are the values that were literals in faulting.f90 before, so a
     ! model.txt predating them leaves every existing case unchanged.
     real (kind=dp) :: min_norm = -10.0d6, max_norm = -40.0d6

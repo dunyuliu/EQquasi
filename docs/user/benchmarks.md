@@ -8,7 +8,7 @@ Jiang et al. (2022, JGR); see [Citing](citing.md).
 
 ## How results are checked
 
-A set of frozen results lives under `reference/<compset name>/`, each named
+A set of frozen results lives under `data/<compset name>/`, each named
 for the compset that produced it. The test suite reruns those compsets and
 compares every output file against the reference.
 
@@ -20,13 +20,13 @@ bit-for-bit: two runs of the same case on the same host differ by about
 size of the quantity it belongs to.
 
 ```
-python3 -m pytest testsys/              # source and format checks, no runs, about 1-2 minutes
-python3 -m pytest testsys/ -m e2e_fast  # builds and runs the small cases, about 20 minutes
-python3 -m pytest testsys/ -m e2e       # adds full first cycles, about 75 minutes and longer
+python3 -m pytest tests/              # source and format checks, no runs, about 1-2 minutes
+python3 -m pytest tests/ -m e2e_fast  # builds and runs the small cases, about 20 minutes
+python3 -m pytest tests/ -m e2e       # adds full first cycles, about 75 minutes and longer
 ```
 
 The e2e tiers need EQquasi installed for the current source
-(`bin/eqquasi-<version>`), with `EQQUASIROOT` set and `script/` on `PATH`.
+(`bin/eqquasi-<version>`), with `EQQUASIROOT` set and `scripts/` on `PATH`.
 
 ## SEAS benchmark cases
 
@@ -126,6 +126,6 @@ ranks barely help.
 ## Further reading
 
 Each reference directory has a README with what that result does and does
-not establish. The BP8 one (`reference/test.bp8.qdc.gs.10/README.md`)
+not establish. The BP8 one (`data/test.bp8.qdc.gs.10/README.md`)
 covers the pore-pressure solver, the domain-size and time-step studies, and
 the initial condition.

@@ -290,8 +290,8 @@ Read this first on wake-up. Update in place; close items by deleting them.
    `python3 -m pytest -q testsys/contract/test_root_layout.py`. No violations
    found against today's tree. Pending renames, owner OK required before any
    is actioned (each would move a path something outside the repo depends on):
-   - `CLAUDE.md` does not exist at root -- rule 22 whitelists it; creating it
-     is a seed action, not done here.
+   - `CLAUDE.md` created 2026-10-07. The stale EQdyna.2Dcycle CLAUDE.md in
+     the home folder, which every project below it loaded, was removed.
    - no actual mismatch between the starter template's `scripts/`/`tests/`
      and this repo's `script/`/`testsys/` -- rule 22 keeps the project's
      names (commit `aa5bbcd`) rather than proposing a rename back; listed

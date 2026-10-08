@@ -502,7 +502,7 @@ no others:
 | entry | job |
 |---|---|
 | `README.md` | user-facing: what this is, install, run a case |
-| `CLAUDE.md` | agent-facing working doc -- **absent today** (see below) |
+| `CLAUDE.md` | agent-facing working doc: build, test, traps; points to this book and the board, repeats neither |
 | `PATHWAY_FORWARD.md` | the board: open items, priority, re-check date |
 | `PROJECT_RULES.md` | this rule book |
 | `LICENSE` | -- |
@@ -534,11 +534,6 @@ original rename was solving.
 `reference/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
 under the limit, so this is a ceiling, not yet a problem; the check guards it
 so a future gold file doesn't cross it silently.
-
-**`CLAUDE.md` is absent.** The starter template this rule is drawn from
-requires one (what an agent must know before touching this project: build,
-test, conventions, traps). Creating it is a seed action, out of scope for this
-rule addition; tracked as a board item instead (`PATHWAY_FORWARD.md` row 18).
 
 *Rationale.* An uncurated root is how a second status board, a second rule
 book, or a stray debug script accumulates silently -- each one a fact that can

@@ -6,7 +6,7 @@ Two mechanical checks (fail the build):
 
 One report-only step (prints, never fails): `test_tidy_report` lists
 worktrees under .claude/worktrees/ (and any left under scratch/), merged local
-branches, and runs/ and scratch/ entries PATHWAY_FORWARD.md does not mention
+branches, and runs/ and scratch/ entries neither the board nor its history mentions
 -- tidying is judgment, not a gate.
 """
 
@@ -107,11 +107,14 @@ def test_tidy_report():
     merged = [b.strip().lstrip("* ").strip() for b in branches if b.strip() and "master" not in b]
     lines.append(f"local branches merged into master: {merged or 'none'}")
 
-    pathway = (ROOT / "PATHWAY_FORWARD.md").read_text() if (ROOT / "PATHWAY_FORWARD.md").is_file() else ""
+    # A run is cited if the board or its history names it.
+    pathway = "".join(
+        (ROOT / f).read_text() for f in ("PATHWAY_FORWARD.md", "docs/dev/board_history.md")
+        if (ROOT / f).is_file())
     for sub in ("runs", "scratch"):
         d = ROOT / sub
         entries = sorted(p.name for p in d.iterdir()) if d.is_dir() else []
         uncited = [e for e in entries if e not in pathway]
-        lines.append(f"{sub}/ entries not mentioned in PATHWAY_FORWARD.md: {uncited or 'none'}")
+        lines.append(f"{sub}/ entries not cited on the board or in docs/dev/board_history.md: {uncited or 'none'}")
 
     print("\n".join(lines))

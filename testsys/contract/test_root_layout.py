@@ -37,9 +37,7 @@ ALLOWED_ROOT_ENTRIES = {
     "testsys",
     ".github",
     ".gitignore",
-    # CLAUDE.md is in rule 22's table but not yet created (noted there as a
-    # board item, PATHWAY_FORWARD.md row 18) -- NOT included here, so its
-    # eventual addition does not need this test touched.
+    "CLAUDE.md",
 }
 
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024  # 5 MB

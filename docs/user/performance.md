@@ -9,7 +9,7 @@ you can compare your runs the same way.
 
 ## Reference runs
 
-From `runInfo.json` in each `reference/` directory. "Time loop" excludes
+From `runInfo.json` in each `data/` directory. "Time loop" excludes
 mesh generation, assembly and the first factorization; `OMP_NUM_THREADS=1`
 throughout.
 

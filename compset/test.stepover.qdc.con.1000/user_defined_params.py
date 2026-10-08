@@ -15,7 +15,7 @@ geometry, so over cycles the same step is EXPECTED to clamp the tips instead
 of unclamping them (the stop-508 mode of the releasing twin). Initial shear
 follows sign(far_vel_load) (owner decision 2026-09-24), so this case starts
 at steady state left-lateral rather than off steady state
-(FIXED, was KNOWN FLAG in reference/test.stepover.qdc.con.1000/README.md;
+(FIXED, was KNOWN FLAG in data/test.stepover.qdc.con.1000/README.md;
 the reference is re-blessed for this one fix, recorded there and in rule 8's
 exception, not a precedent).
 

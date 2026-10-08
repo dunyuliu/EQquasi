@@ -150,7 +150,7 @@ subroutine readmodel
         ! without consuming the next record). A list-directed
         ! read(1002,*) here was wrong twice over: on a pre-caps model.txt
         ! whose next line is faultgeom it swallowed fault 1's geometry --
-        ! reference/bp1002's file yielded min_norm=-60000, max_norm=2500 Pa
+        ! data/bp1002's file yielded min_norm=-60000, max_norm=2500 Pa
         ! and desynchronised the whole geometry loop -- and its iostat
         ! fallback masked malformed lines as if they were absent. Read the
         ! line whole instead: three numbers parse -> it is faultgeom, put it

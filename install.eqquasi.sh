@@ -158,17 +158,17 @@ if [ -n "$MACH" ]; then
 
     export EQQUASIROOT=$(pwd)
     export PATH=$(pwd)/bin:$PATH
-    export PATH=$(pwd)/script:$PATH
+    export PATH=$(pwd)/scripts:$PATH
     
     echo EQQUASIROOT
     echo PATH 
     
-    chmod -R 755 script
+    chmod -R 755 scripts
 fi
 
 export EQQUASIROOT=$(pwd)
 export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/script:$PATH
+export PATH=$(pwd)/scripts:$PATH
 
 echo EQQUASIROOT
 echo PATH 

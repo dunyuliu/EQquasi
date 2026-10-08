@@ -15,7 +15,7 @@ to preview it locally:
 pip install -r docs/user/requirements.txt
 mkdocs serve -f docs/user/mkdocs.yml
 ```
-`docs/user/parameters.md` is generated from `script/defaultParameters.py`;
+`docs/user/parameters.md` is generated from `scripts/defaultParameters.py`;
 rerun `python3 docs/user/gen_params.py` after changing a default.
 
 Setup of computing environment
@@ -26,7 +26,7 @@ Setup of computing environment
   - netCDF <br/>
   - pip <br/>
     - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
-    - netCDF4 (```script/case.setup``` imports it to write on_fault_vars_input.nc)
+    - netCDF4 (```scripts/case.setup``` imports it to write on_fault_vars_input.nc)
 
 For post-processing, additional Python packages are needed:
   - xarray
@@ -116,7 +116,7 @@ or manually add the paths to .bashrc:
 ```
 export EQQUASIROOT=$(pwd)
 export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/script:$PATH
+export PATH=$(pwd)/scripts:$PATH
 ```
 where $(pwd) is the root path for your *```EQquasi```* installation. <br/>
 <br/>
@@ -149,7 +149,7 @@ scratch is written to the repo root itself.
 
 ```
 scratch/          # gitignored; create your cases here
-reference/     # committed reference results; never wiped
+data/     # committed reference results; never wiped
 bin/           # gitignored build product
 ```
 
@@ -244,9 +244,9 @@ reference files only -- no MPI, no MUMPS, seconds. The `e2e` tiers build the
 code and run benchmarks.
 
 ```
-python3 -m pytest testsys/              # unit + contract + regression, ~1 min
-python3 -m pytest testsys/ -m e2e_fast  # what CI runs on every push, ~20 min
-python3 -m pytest testsys/ -m e2e       # adds the full BP5 cycle, ~75 min
+python3 -m pytest tests/              # unit + contract + regression, ~1 min
+python3 -m pytest tests/ -m e2e_fast  # what CI runs on every push, ~20 min
+python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
 ```
 
 | tier | checks | cost |
@@ -259,13 +259,13 @@ python3 -m pytest testsys/ -m e2e       # adds the full BP5 cycle, ~75 min
 
 ### References
 
-`reference/<compset name>/` holds frozen results — each reference directory is
+`data/<compset name>/` holds frozen results — each reference directory is
 named for the compset that produced it, so compset, e2e row and reference always
 agree. A reference is a **run**, not a
-file: `reference/test.bp5.qdc.2000/cycle0/` is a full earthquake cycle,
-`reference/test.bp5.qdc.2000/cycle0-step101-fast/` the same case stopped at step 101.
+file: `data/test.bp5.qdc.2000/cycle0/` is a full earthquake cycle,
+`data/test.bp5.qdc.2000/cycle0-step101-fast/` the same case stopped at step 101.
 
-`testsys/e2e/cases.py` holds the case table and the single runner; a new
+`tests/e2e/cases.py` holds the case table and the single runner; a new
 benchmark is a row there plus a reference directory. What gets compared is
 decided by what the reference contains -- fault snapshots per fault, station
 and profile series in full, and the scalars each `summary.json` names.
@@ -288,13 +288,13 @@ FAIL    global.dat: 12 of 8964 entries outside rtol=1e-09; worst at row 40, colu
 
 References are **regression locks, not validations**. They detect unintended
 change; they do not establish that a benchmark is reproduced correctly. See
-`reference/test.bp8.qdc.gs.10/README.md` for what BP8's does and does not establish.
+`data/test.bp8.qdc.gs.10/README.md` for what BP8's does and does not establish.
 
 ### BP8
 
 BP8-specific findings -- pore-pressure solver convergence, the domain-size
 sweep, the time-step study, the initial condition, and how to run and package a
-submission -- are in `reference/test.bp8.qdc.gs.10/README.md` and `reference/test.bp8.qdc.gs.10/`. They are
+submission -- are in `data/test.bp8.qdc.gs.10/README.md` and `data/test.bp8.qdc.gs.10/`. They are
 kept there because they belong with the reference they describe, and because
 they change as the benchmark does.
 

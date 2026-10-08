@@ -4,7 +4,7 @@ Working plan, ordered by what blocks what. Updated 2026-08-15, at v1.16.0.
 
 This is a live document: close items by deleting them, and record what was
 learned in the place that will be read again (`PROJECT_RULES.md` for a rule,
-`reference/<bench>/README.md` for a benchmark finding, a commit message for a
+`data/<bench>/README.md` for a benchmark finding, a commit message for a
 fix). Do not let this file become the archive.
 
 ---
@@ -36,7 +36,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
    victor cut v1.15.0 on a master that was already red (rule 17 breach -- the
    workflow PATH still exported the deleted scripts/), and his audit found the
    caps read violated rule 4: on a pre-caps model.txt with faultgeom it
-   consumed fault 1's geometry line (reference/bp1002.qdc.2500's file parsed to
+   consumed fault 1's geometry line (data/bp1002.qdc.2500's file parsed to
    min_norm=-60000 Pa). v1.15.1 fixes the PATH, reads the caps record whole
    (backspace when it is faultgeom, loud stop 8 when malformed), runs
    checkNormalStressCaps every cycle instead of cold start only, and stops on
@@ -68,7 +68,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
      pass cycle 9, where the uncapped run died on stop-508 (+0.60 MPa at
      fault A's tip)?
    - `scratch/bp5kink.sci` — bp5.qdc.kink.2000, eqquasi-1.15.1. Cycle 0 matches
-     `reference/bp5.qdc.kink.2000` on step count and peak Vmax to displayed precision
+     `data/bp5.qdc.kink.2000` on step count and peak Vmax to displayed precision
      (4876 steps, peak 1.168).
    - `scratch/kink600.sci` — liu2020.qdc.kink.600, eqquasi-1.15.1, nstep raised;
      cycle 0 in flight. First event nucleated 2026-08-15 ~10:45.
@@ -244,7 +244,7 @@ Read this first on wake-up. Update in place; close items by deleting them.
    magnitude-only, the KNOWN FLAG since 2026-08-15), so the left-lateral case
    starts near steady state. Reference re-blessed (rule-8 exception,
    owner-approved, not a precedent), recorded in
-   `reference/test.stepover.qdc.con.1000/README.md`: binary eqquasi-1.19.0,
+   `data/test.stepover.qdc.con.1000/README.md`: binary eqquasi-1.19.0,
    cycle0 101 steps, V decays 1.0e-9 -> 8.07e-10 (was -> 6.0e-10), a smaller
    transient consistent with starting nearer steady state, not perfectly flat.
 14. [x] **En-echelon compset.** Landed PR #28 (`d77f554`). Added the
@@ -285,20 +285,15 @@ Read this first on wake-up. Update in place; close items by deleting them.
    Confirmed still absent: `.claude/worktrees/` is empty and `git worktree
    list` shows no `bp8-pw` entry.
 
-18. [~] **P2 -- root layout per zofia template.** PROJECT_RULES.md rule 22
-   added 2026-10-07, whitelisting the tracked repo root. Evidence:
-   `python3 -m pytest -q testsys/contract/test_root_layout.py`. No violations
-   found against today's tree. Pending renames, owner OK required before any
-   is actioned (each would move a path something outside the repo depends on):
-   - `CLAUDE.md` created 2026-10-07. The stale EQdyna.2Dcycle CLAUDE.md in
-     the home folder, which every project below it loaded, was removed.
-   - no actual mismatch between the starter template's `scripts/`/`tests/`
-     and this repo's `script/`/`testsys/` -- rule 22 keeps the project's
-     names (commit `aa5bbcd`) rather than proposing a rename back; listed
-     here only because it was the template difference most likely to be
-     flagged.
-   Nothing else on today's tree is off the whitelist. Re-check: next time the
-   root gains or loses a tracked entry.
+18. [x] **P2 -- root layout per zofia template.** PROJECT_RULES.md rule 22
+   added 2026-10-07, whitelisting the tracked repo root. 2026-10-08, owner
+   OK: `testsys/` -> `tests/`, `script/` -> `scripts/`, `reference/` ->
+   `data/` (git mv, one PR, EQquasi 1.21.2); `evals/` and `docs/dev/` added;
+   worktrees now in `.claude/worktrees/<topic>`, new runs in
+   `runs/<YYYYMMDD>_<slug>/` (rule 14). Existing campaign data stays in
+   `scratch/`. `CLAUDE.md` created 2026-10-07. Evidence: `python3 -m pytest -q
+   tests/contract/test_root_layout.py`. Re-check: next time the root gains or
+   loses a tracked entry.
 
 Versions landed today: EQquasi 1.19.0 (PR #25) -> 1.19.1 (PR #27, row 12) ->
 1.20.0 (PR #33, rows 6/7/14/16, released on green CI as v1.20.0) -> 1.20.1
@@ -424,7 +419,7 @@ clamping an already-drifted state would break steady state.
   to a default `fort.51` and every fault-2+ station appended there,
   interleaved. BP1002 asks for six stations and three produced nothing
   usable. Fault 1 keeps the plain SEAS name; faults 2+ take an `ft<N>_` tag.
-  CONSEQUENCE CLOSED 2026-08-14: `reference/bp1002.qdc.2500` now carries the three
+  CONSEQUENCE CLOSED 2026-08-14: `data/bp1002.qdc.2500` now carries the three
   `fltst_ft2_*` files. Added additively after all 19 pre-existing entries
   compared equal at v1.13.0, so nothing was re-blessed to accommodate the
   fix.
@@ -459,7 +454,7 @@ clamping an already-drifted state would break steady state.
   (rule 1) standing between the user and three commands they can check.
 - The orthogonal zoning experiment (VW per segment, not global |x|) is still
   the thing that would make the step-over margin claim isolated rather than
-  merely supported. QUANTIFIED 2026-08-14 -- see reference/bp1002.qdc.2500/README.md.
+  merely supported. QUANTIFIED 2026-08-14 -- see data/bp1002.qdc.2500/README.md.
   The current geometry is symmetric about x = 0, so both segments get
   identical zoning (36.3% VW each); whatever selects the rupturing segment is
   not a zoning difference between them. But the A/B experiment confounds
@@ -495,7 +490,7 @@ converged in domain size.
 
 Ship the coarse pair for a quick platform view, with the convergence caveat
 stated. Steps: resample profiles onto the 81-node 10 m grid required by section
-4.3 (`script/resampleBP8Profiles.py`), validate (`script/checkBP8Submission`),
+4.3 (`scripts/resampleBP8Profiles.py`), validate (`scripts/checkBP8Submission`),
 package as `dliu_eqquasi-<version>-50m.zip`.
 
 The 10 m production entry waits on item 2. There is no point spending 25 hours
@@ -530,9 +525,9 @@ needs finding first.
 
 ## 3. Multi-fault in the gate set — DONE (v1.11.0/v1.12.0)
 
-`bp1002.qdc.2500` has a reference (`reference/bp1002.qdc.2500/cycle0/`), a row in
-`testsys/e2e/cases.py`, and a physical invariant in
-`testsys/unit/test_physical_invariants.py` asserting the seed lands on fault 0
+`bp1002.qdc.2500` has a reference (`data/bp1002.qdc.2500/cycle0/`), a row in
+`tests/e2e/cases.py`, and a physical invariant in
+`tests/unit/test_physical_invariants.py` asserting the seed lands on fault 0
 and only fault 0. `PROJECT_RULES.md` rule 12 cites a check that exists.
 
 It sits in the **full** tier, not every-push CI: 3821 steps, ~2600 s on 3

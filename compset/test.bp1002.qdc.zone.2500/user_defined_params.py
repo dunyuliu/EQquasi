@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 # compset: test.bp1002.qdc.zone.2500
 # gate   : e2e full row registered, gate: none -- UNVERIFIED (skips until
-#          reference/test.bp1002.qdc.zone.2500 exists; see compset/README.md)
+#          data/test.bp1002.qdc.zone.2500 exists; see compset/README.md)
 # changed: 2026-09-25
 # note   : 101-step twin of bp1002.qdc.zone.2500 (unequal segment lengths,
 #          identical VW patches). Same mesh; nstep cut only.

@@ -65,7 +65,7 @@ inputs are identical, `./case.setup --force` overrides the refusal.
 
 `case.setup` is copied into the case when it is created, so a case keeps the
 version it was made with. To update an existing case to the current one,
-run `cp $EQQUASIROOT/script/case.setup .` in the case.
+run `cp $EQQUASIROOT/scripts/case.setup .` in the case.
 
 ### Compsets with a geometry generator
 
@@ -143,7 +143,7 @@ and `scratch/`, and do not run a case laid out as above.
 
 ## Plot
 
-Post-processing tools live in `script/` and are on your `PATH` once
+Post-processing tools live in `scripts/` and are on your `PATH` once
 `install.eqquasi.sh` has been sourced. Run them from inside the case. Each
 takes cycle directories as arguments, or none to process every cycle:
 

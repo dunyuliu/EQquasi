@@ -35,3 +35,18 @@ build, run and traps are in `CLAUDE.md`.
    Uses the host's fenicsx conda env; no new file in the repo until the
    answer says so (rule 1). Done when: a one-page verdict with numbers, under
    docs/dev/, and a go / no-go for a port.
+
+3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
+   the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
+   converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);
+   EQquasi does not (depth station -18 % at 50 m, -13 % at 10 m). Pressure
+   matches; domain and dtmax ruled out. The uploaded BP8 entries are suspect
+   along depth until this closes. Done when: the cause is found and fixed, and
+   EQquasi at 25 m agrees with Kim within a few % at all 9 stations.
+4. [ ] **P2 -- FEniCSx backend, EQdyna pattern.** Owner, 2026-10-09: "like
+   eqdyna, we will have a fortran and fenicsx backend now ... follow eqdyna's
+   success". One compset and one gold set, a test matrix that runs each case
+   on each backend, a backend counts only at parity with the gold. Order:
+   after row 3 (the Fortran gold must be right); BP5 and step-over parity
+   first, BP8 against Kim. The prototype's precomputed slip-to-traction matrix
+   (quasi-static, linear) is also a scaling idea for row 1.

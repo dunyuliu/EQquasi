@@ -97,3 +97,36 @@ no audit) once content is reviewed; prototype scripts stay in `runs/`
 - Row-1 profiling: run directly by the conductor (Bash, no subagent — no
   roster specialist fits per-rank MUMPS/PETSc timing; dunyu-liu's budget
   for this session is scoped to row 2 only, per owner note).
+
+## Update 13:50 — host contention, step (b)/(c) scoping
+
+Two more clean-rerun attempts of BP8-wide r8 (13:23-13:36, 13:36-13:50) both
+landed at ~10.6-11.0 s/step, suspiciously matching the first "contaminated"
+run. Root cause found: an unrelated 8-process job (`run_inversion.py`,
+`work3d/3d_exp086_modelerr_twin_fig9data_hashimalyr`, fenicsx env, ~90% CPU
+each, started ~13:38) is running on theo4 — not dunyu-liu's, not row 1's,
+likely the human owner's own unrelated work on this shared host. Per rule 15,
+not ours to kill. BP8-wide step (a) numbers stay **blocked** until the host
+is genuinely idle again; bp1002's numbers (collected 12:43-12:45, before any
+contamination) stand.
+
+Scoping check for (b)/(c), no host time needed:
+- **(b) MUMPS BLR**: not enabled anywhere in `src/solveTimeLoopMUMPS.f90` —
+  only `ICNTL(3)` (output stream) is set today. `ICNTL(35)`/`CNTL(7)` are
+  untouched. ParMETIS: `libparmetis.so` is present in the eqquasi-petsc conda
+  env (no install needed), but MUMPS's `ICNTL(28)`/`ICNTL(29)` (parallel
+  analysis / parmetis ordering) are likewise unset. Real code change, real
+  work.
+- **(c) hypre BoomerAMG vs GAMG**: `libHYPRE.so` is present, but
+  `solveTimeLoopPETSc.f90:476-486` is a hard correctness whitelist — only
+  `KSPPREONLY+PCCHOLESKY` (MUMPS) and `KSPCG+PCGAMG` at `ksp_rtol<=1e-12`
+  are permitted; anything else (including `-pc_type hypre`) hits
+  `MPI_ABORT` by design (rule 2, no silent unverified answers). Testing
+  BoomerAMG is therefore not a runtime-flag experiment — it needs its own
+  reference-parity verification (same rigor as row 8b's CG+GAMG gate) before
+  the whitelist can be widened, i.e. a real `src/*.f90` change through the
+  rule-3 gate, not a profiling run.
+
+Neither (b) nor (c) is startable as a quick measurement; both are scoped
+engineering tasks for a dedicated session. Not started this session given
+budget and the live host contention.

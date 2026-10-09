@@ -198,35 +198,13 @@ def create_batch_script():
         f.write("#SBATCH --mail-type=begin" + "\n")
         f.write("#SBATCH --mail-type=end" + "\n")
         f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
-        f.write("  module load mumps"     + "\n")
-        # Executable part.
-        f.write("for i in $(seq " + str(par.istart) + " " + str(par.iend) + ");" + "\n")
-        f.write("do" + "\n")
-        # Same scratch workflow as run.sh: the solver writes where it is, so
-        # run it inside tmp/ and package from there. A batch job that dies
-        # part-way otherwise strews half-written output across the case root,
-        # where the inputs live.
-        f.write("  rm -rf tmp && mkdir tmp" + "\n")
-        f.write("  for g in model.txt stations.txt on_fault_vars_input.nc \\" + "\n")
-        f.write("           bFault_Rough_Geometry.txt roughness.nc *.r.nc; do" + "\n")
-        f.write("    [ -e \"$g\" ] && cp \"$g\" tmp/" + "\n")
-        f.write("  done" + "\n")
-        f.write("  echo $i > tmp/currentcycle.txt" + "\n")
-        f.write("  (cd tmp && ibrun " + _exe_name() + ")" + "\n")
-        f.write("  mkdir -p \"./cycle$((i-1))\"" + "\n")
-        # Everything the cycle produced is in tmp/, so move the lot: no
-        # pattern list to keep in step with what the solver writes, which is
-        # how the BP8 section 4.3 profiles and runInfo.json were stranded in
-        # the case root before.
-        f.write("  mv tmp/* \"./cycle$((i-1))/\"" + "\n")
-        f.write("  rm -rf tmp" + "\n")
-        f.write("  cp \"./cycle$((i-1))/\"*.r.nc ./" + "\n")
-        # Post-processing tools live on PATH (source install.eqquasi.sh), not
-        # in the case directory; they take the cycle directory as an argument.
-        f.write("  plotOnFaultVars \"./cycle$((i-1))\" || echo 'plotOnFaultVars "
-                "not on PATH; source install.eqquasi.sh and rerun by hand'"
-                + "\n")
-        f.write("done" + "\n")
+        # The modules install.eqquasi.sh -m ls6 builds against.
+        f.write("module load netcdf/4.6.2 mumps" + "\n")
+        # One cycle loop, one case layout (input/, scratch/, result/, log/)
+        # and one launcher (bin/eqquasi-<ver>.cfg: ibrun on ls6): run.sh's.
+        # This script used to carry its own copy of the loop, which kept the
+        # pre-1.13 layout and stopped the solver with code 6.
+        f.write("bash run.sh" + "\n")
         # End excutable part.
 
 def _mpirun():

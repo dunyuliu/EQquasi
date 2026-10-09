@@ -17,10 +17,10 @@ Two layouts, matching the two kinds of oracle under data/:
                         with the residual beneath, and prints the numbers the
                         e2e test asserts on.
 
-Usage:
-    plotAgainstGold.py bp5  scratch/mycase            [-o out_prefix]
-    plotAgainstGold.py bp8  scratch/bp8.sub147        [-o out_prefix]
-    plotAgainstGold.py bp7  scratch/mycase -v slip_rate
+Usage (the first argument is the gold's compset name under data/):
+    plotAgainstGold.py test.bp5.qdc.2000   runs/mycase      [-o out_prefix]
+    plotAgainstGold.py test.bp8.qdc.gs.10  runs/mycase      [-o out_prefix]
+    plotAgainstGold.py test.bp7.qdc.a.10   runs/mycase -v slip_rate
 
 Exits non-zero if the run and the gold disagree beyond tolerance, so it can be
 used as a check as well as a picture.
@@ -192,7 +192,13 @@ def find_snapshot(run_dir):
 
 
 def compare_field(bench, run_dir, out, only=None):
-    gold_path = os.path.join(gold_dir(bench), SNAPSHOT)
+    # The step-101 snapshot sits in cycle0-step101-fast/ for BP5 and BP7 and in
+    # cycle0/ for the dip90 and step-over golds.
+    gd0 = gold_dir(bench)
+    cands = [os.path.join(gd0, sub, SNAPSHOT) for sub in ("cycle0-step101-fast", "cycle0", "")]
+    gold_path = next((c for c in cands if os.path.exists(c)), None)
+    if gold_path is None:
+        raise SystemExit(f"no {SNAPSHOT} under {gd0} (looked in cycle0-step101-fast/, cycle0/, .)")
     snap, cycle = find_snapshot(run_dir)
     hits = [snap]
     print(f"comparing {snap}")

@@ -19,8 +19,3 @@ build, run and traps are in `CLAUDE.md`.
    local only; test tiering, likely superseded). Keep or delete.
 2. [ ] **Owner: enable GitHub Pages** (Settings -> Pages -> Source: GitHub
    Actions) so `docs/user/` publishes on the next tag.
-3. [ ] **Pre-existing tool bugs** (found writing `docs/user/`):
-   `scripts/case.submit` and the `batch.hpc` it submits use the pre-1.13 case
-   layout (the solver would stop with code 6); `scripts/plotAgainstGold.py`'s
-   usage lists choices it does not accept and looks for a missing reference
-   file for `test.bp5.qdc.2000`.

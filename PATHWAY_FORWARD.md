@@ -26,6 +26,26 @@ build, run and traps are in `CLAUDE.md`.
    Done when: 10 m BP8 wide <= 5 s/step at 32 ranks, or a measured reason it
    cannot be, with parity to the gold at every change.
    Evidence: the per-step table from (a) and the final run's runInfo.json.
+   **(a) done, 2026-10-09** (conductor, binary eqquasi-1.21.2, HEAD 605eacf,
+   theo4 host-exclusive, fresh builds, 10-step profiling runs, native MUMPS
+   `par.solver=1`): bp1002.qdc.2500 (127k eq) -- 8r 0.436 s/step, 16r 0.409,
+   32r 0.394 s/step (flat; rank-0-only faulting/pressure work dominates at
+   this size). BP8 10 m wide (3.52M eq / 1.23M nodes, the scratch-only
+   `fxmin/fxmax/fzmin/fzmax=-1500/1500`, `enlarging_ratio_xz=1.2` variant, NOT
+   the committed `compset/bp8.qdc.gs.10` which is a smaller `-500/500` box,
+   694k nodes) -- first sweep (8r 10.63 s/step, 16r 7.98, 32r 6.76 s/step)
+   **discarded as contaminated**: row 2's agent ran heavy serial compute
+   (up to 19 GB/11 min) on the same host in that exact window. Clean rerun
+   in progress as of this entry; see the next evidence line or runInfo.json
+   under `runs/20261009_petsc-profile/bp8wide-r{8,16,32}/` for the real
+   numbers. (b)/(c)/(d) not started either way. Finer solve /
+   faulting+pressure / communication / I/O split (as (a) asks) is NOT yet
+   instrumented -- only aggregate time-loop and factorization time exist
+   today (`solveTimeLoopMUMPS.f90`'s `cpu_time` calls). Runs + logs +
+   runInfo.json in `runs/20261009_petsc-profile/{bp1002,bp8wide}-r{8,16,32}/`.
+   Recommendation (not acted on -- rule 1, new-compset naming needs
+   agreement): register the -1500/1500 wide box as its own compset (e.g.
+   `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
 2. [ ] **P2 -- FEniCSx feasibility spike.** Owner, 2026-10-09. Not a port: a
    one-fault quasi-static prototype (BP5 or BP8) outside src/, in runs/, to
    answer three questions before any port is considered: can split-node (or

@@ -7,6 +7,19 @@ Paths in this text predate the 2026-10-08 renames: `testsys/` is now `tests/`,
 
 ---
 
+## Parked 2026-10-09 (owner: "bp8 submitted and good for now")
+
+1. [ ] **BP8-PW reference.** Decide it against the CRESCENT comparison; both
+   10 m entries (EQquasi 1.21.0) were uploaded 2026-10-07. Check first: an
+   immediate same-binary rerun differed by up to ~8 % at the 4 on-axis
+   stations (same ranks, `OMP_NUM_THREADS=1`, `src/porepressure.f90`).
+2. [ ] **BP8 convergence statement (optional).** On the wide box the residual
+   vs Kim shrinks with cell size (along depth: -18 % at 50 m, -13 % at 10 m);
+   domain size is converged (< 1 %). A 25 m wide-box run (~2 h, 8 ranks)
+   would give a third point.
+
+---
+
 
 ## 55-HOUR AUTONOMOUS QUEUE — started 2026-08-14 17:00, user back Monday
 

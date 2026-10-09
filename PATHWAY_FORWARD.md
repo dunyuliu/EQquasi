@@ -55,3 +55,14 @@ build, run and traps are in `CLAUDE.md`.
    Uses the host's fenicsx conda env; no new file in the repo until the
    answer says so (rule 1). Done when: a one-page verdict with numbers, under
    docs/dev/, and a go / no-go for a port.
+   **Q1/Q2 done, 2026-10-09** (dunyu-liu): verdict landed at
+   `docs/dev/fenicsx_feasibility_2026-10-09.md` (PR #52, merged 45ab982).
+   Split-node RSF works cleanly in dolfinx. P2 elements do NOT close the
+   BP8-vs-Kim depth gap -- the gap is EQquasi-specific (an independent
+   FEniCSx linear-hex model converges to Kim; EQquasi's own 50m/10m runs sit
+   at -18%/-13% and get worse with refinement at the centre station) --
+   **new finding, routed to lars-eriksson, not row 2's to fix**. Lean verdict
+   so far: no-go on a port for the depth-gap motivation. **Q3 (step cost vs
+   EQquasi) still open**, blocked on an idle host (theo4 had an unrelated
+   external job running as of 13:52; row 1's own timing needs it too).
+   Not done yet: row 2 isn't closed until Q3 has a number.

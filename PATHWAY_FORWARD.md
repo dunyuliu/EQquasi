@@ -13,11 +13,6 @@ build, run and traps are in `CLAUDE.md`.
 
 ## Open
 
-1. [ ] **Owner: two local branches with unmerged commits.**
-   `docs/codify-pr-workflow` (2026-09-23, also on GitHub; a draft of the PR
-   rule, likely superseded by rule 17) and `kai/bp8-simplify` (2026-08-07,
-   local only; test tiering, likely superseded). Keep or delete.
-2. [ ] **Owner: allow tag deploys to Pages.** Pages is on (Actions), but the
-   `github-pages` environment allows only `master`, so the tag-triggered
-   deploy is refused. Settings -> Environments -> github-pages -> add a Tag
-   rule `v*`; then re-run the latest docs workflow run.
+Nothing open. (2026-10-09: the two stale branches were deleted, and the docs
+site is live at https://dunyuliu.github.io/EQquasi/ after the `github-pages`
+environment got a `v*` tag rule.)

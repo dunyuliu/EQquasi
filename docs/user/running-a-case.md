@@ -134,12 +134,19 @@ well (see [Performance](performance.md)).
 
 ### On a cluster
 
-On TACC Lonestar6 the installer records `ibrun` as the launcher, so
-`bash run.sh` is run from inside a SLURM allocation (an interactive session
-or your own job script). `case.setup` also writes `batch.hpc` and
-`batch.cycle.eqquasi.hpc`, and `./case.submit` submits `batch.hpc`, but
-these batch scripts still use an older flat case layout, without `input/`
-and `scratch/`, and do not run a case laid out as above.
+On TACC Lonestar6 the installer records `ibrun` as the launcher. Submit the
+case with
+
+```
+./case.submit
+```
+
+which runs `sbatch batch.hpc`. `batch.hpc` holds the SLURM header built from
+the `par.HPC_*` parameters (nodes, ranks, queue, wall time, account, email),
+loads the modules, and runs `bash run.sh`, so a batch job runs exactly what
+an interactive `bash run.sh` would. You can also run `bash run.sh` yourself
+from inside an allocation. `batch.cycle.eqquasi.hpc` belongs to the coupled
+EQquasi/EQdyna cycle workflow and still uses the older flat case layout.
 
 ## Plot
 

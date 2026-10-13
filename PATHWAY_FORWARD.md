@@ -50,3 +50,16 @@ build, run and traps are in `CLAUDE.md`.
    after row 3 (the Fortran gold must be right); BP5 and step-over parity
    first, BP8 against Kim. The prototype's precomputed slip-to-traction matrix
    (quasi-static, linear) is also a scaling idea for row 1.
+5. [ ] **P2 -- EQquasi/EQdyna coupled-restart dz != dx dip misalignment.**
+   Relayed 2026-10-10 from the EQdyna session. EQdyna writes one
+   `fault.dyna.r.nc` in EQquasi's multi-fault layout (`nid_fault` dim,
+   zero-padded); the I/O round trip is verified against EQquasi (2 faults,
+   rel 6e-8). Caveat: `src/netcdf_io.f90:164,195,527,593` all index the dip
+   (z) coordinate with `dx` (`int((... - fltxyz(1,3,ift))/dx + 0.5d0) + 1`),
+   confirmed by reading those four lines -- EQdyna uses `dz` for the same
+   index. A coupled restart with `dz != dx` misaligns the fault grid along
+   dip. Keep `dz = dx` until fixed. A full two-fault coupled cycle has not
+   been run yet. Done when: either the indexing uses `dz` (with a coupled
+   two-fault cycle run as proof), or `dz == dx` is enforced loudly at
+   restart read (rule 2: missing/violated precondition fails loudly, no
+   silent proceed).

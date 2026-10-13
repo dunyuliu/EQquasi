@@ -24,9 +24,9 @@ below it is the record of why.
 | 11 | Comparing two runs? Check both `runInfo.json` versions first. |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
-| 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. |
+| 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
-| 16 | A subagent's or audit's finding is a hypothesis. Check the source. |
+| 16 | A subagent's or audit's finding is a hypothesis. Check the source. Before escalating: re-derive against file:line, a dimensional check, and against already-passing gates (16a). |
 | 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. |
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
@@ -351,6 +351,39 @@ a session id, pid and process start time — into a commit about the README, and
 from there into a public repo with forks, where a history rewrite cannot
 retract it.
 
+**14a. A dispatch brief states the scope; a return gets diffed against it
+before merge.** Dispatching a subagent into a worktree does not exempt it
+from this rule — state the intended file scope in the dispatch brief itself
+(e.g. "touch only `unit_slip_test.py` and the board row"), and before
+considering a returning branch for merge or review, diff its commits against
+that stated scope:
+
+```
+git diff --stat <base>..<branch>
+```
+
+Any file outside the stated scope is a `git add -A` violation to investigate,
+not content to fold in — reject or re-stage down to scope, never merge
+around it.
+
+*Incident (2026-10-12).* A `lars-eriksson` dispatch scoped to one unit-slip
+verification script (`lars-unit-slip-audit`) committed 61 unrelated files —
+old release-note stubs, PR-body drafts, sweep scripts, a stale board doc —
+almost certainly via `git add -A` inside its worktree. The brief never stated
+the intended scope, and nothing required the conductor to diff the returning
+commit against it; the mismatch surfaced only by chance, while deciding
+whether to merge an already-rejected branch. No secrets were among the 61
+files this time (checked before deleting the branch) — this rule's own
+`.claude/scheduled_tasks.lock` incident above is the case where there were.
+
+**How to apply**: name the intended file scope in every dispatch brief; before
+merging — or even reading for content — a subagent's branch, run the `git
+diff --stat` above and treat anything outside scope as a stop, not a drive-by
+cleanup.
+
+**Tier**: mechanical — `git diff --stat <base>..<branch>` against the stated
+scope is a yes/no check a human or future tool can run.
+
 ---
 
 ## 15. Operational safety on the shared compute host
@@ -381,6 +414,44 @@ source before it drives a fix or a rule change.
 
 This cuts both ways: a subagent caught two claims in a release brief that were
 mine and wrong, both belonging to the previous release.
+
+**16a. Check a finding against three cheap tests before escalating it.** A
+finding's own derivation script or working is not the source — re-derive it
+against the cited `file:line` before trusting a mismatch. Before escalating,
+run what's cheap:
+
+- **Re-derivation.** Open the exact lines the finding cites and transcribe the
+  formula or logic again, term by term, against the finding's own script or
+  claim — not against its summary of itself.
+- **Dimensional / sanity check.** Does the full expression, taken from source,
+  resolve to the quantity it claims to be (units, sign, order of magnitude)?
+- **Consistency against gates already passing.** If the claimed defect were
+  real at the size claimed, would a benchmark that is currently green fail?
+  If not, the finding does not survive contact with evidence already in hand.
+
+A finding that fails any of these three is refuted, not escalated.
+
+*Incident (2026-10-12).* A dispatched audit (`lars-eriksson`) reported a
+"critical," ~200x wrong-sign traction bug at `src/faulting.f90:121`. Its own
+verification script dropped the dominant numerator term of the formula it was
+checking: re-reading `src/faulting.f90:112-128` directly showed the "missing"
+term is the inertial/compatibility term that *is* the split-node method
+(Day/Dalguer-style two-node fault coupling), not an extraneous factor. A
+dimensional check on the real formula (mass^2 x velocity/time, and mass x
+force, over mass x area) resolves to Pa — consistent with a traction, which
+contradicted the claim. A 200x, wrong-sign error at that line would have
+failed BP5 and BP1002 outright, not left them green at a -18% depth
+discrepancy in BP8 alone — neither check had been run before the finding was
+escalated. This was the fourth `lars-eriksson` finding on the same bug hunt
+rejected after a source check (board row 3).
+
+**How to apply**: before acting on or escalating any finding — including one
+from a subagent dispatched specifically to find bugs — run the three checks
+above against the cited `file:line`, not against the finding's own script or
+summary.
+
+**Tier**: judgment — no single command runs all three; each is a reasoning
+step performed against named source lines.
 
 ---
 

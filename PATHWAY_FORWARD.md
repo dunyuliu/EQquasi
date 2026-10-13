@@ -46,24 +46,6 @@ build, run and traps are in `CLAUDE.md`.
    `cpu_time` calls). Recommendation (not acted on -- rule 1, new-compset
    naming needs agreement): register the -1500/1500 wide box as its own
    compset (e.g. `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
-2. [ ] **P2 -- FEniCSx feasibility spike.** Owner, 2026-10-09. Not a port: a
-   one-fault quasi-static prototype (BP5 or BP8) outside src/, in runs/, to
-   answer three questions before any port is considered: can split-node (or
-   interface) fault slip with rate-and-state be done cleanly; do P2 elements
-   close the BP8 gap to Kim that linear hexes leave (depth -18 % at 50 m,
-   -13 % at 10 m); what does a step cost against EQquasi on the same problem.
-   Uses the host's fenicsx conda env; no new file in the repo until the
-   answer says so (rule 1). Done when: a one-page verdict with numbers, under
-   docs/dev/, and a go / no-go for a port.
-   **Q1/Q2 done, 2026-10-09** (`docs/dev/fenicsx_feasibility_2026-10-09.md`,
-   merged in #52): split-node RSF works cleanly in dolfinx; P2 elements do
-   NOT close the BP8-vs-Kim depth gap (independently converges to Kim with
-   linear hexes; EQquasi's own 50 m/10 m runs sit at -18%/-13% and get worse
-   at the centre station with refinement) -- that finding is row 3's, not
-   row 2's. Lean verdict so far: no-go on a port for the depth-gap
-   motivation. **Q3 (step cost vs EQquasi) still open**, blocked on an idle
-   host; row 1's own timing above needed it too and the host is free now.
-   Row 2 isn't closed until Q3 has a number.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

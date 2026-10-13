@@ -10,8 +10,8 @@ Destination: `docs/dev/fenicsx_feasibility_2026-10-09.md` (approved name). Proto
 |---|---|
 | Split-node fault slip with rate-and-state in dolfinx | **Yes, cleanly** (below) |
 | Do P2 elements close the BP8 gap to Kim | **The gap is not an element-order problem.** An independent *linear*-hex FEniCSx model converges to Kim; EQquasi does not. |
-| Step cost vs EQquasi | **Not measured** — host was reserved for row-1 timing. |
-| Port | **No-go on the depth-gap motivation.** Fix EQquasi's BP8 discrepancy first (routed to lars-eriksson); revisit after the step-cost number. |
+| Step cost vs EQquasi | **~225-1600x cheaper per RSF step** (below), but not an apples comparison -- see caveats. |
+| Port | **No-go**, on both the depth-gap motivation and the step-cost gap (the latter is algorithmic, not language/library; see Q3). |
 
 ## Prototype
 
@@ -77,16 +77,39 @@ slip_2 at 30 d, % vs Kim (`taehoKim_ref`, `scratch/crescent/portal_bp8.json`):
 - Kim is not exact either: pressure at (0,+200) vs (+200,0) differs by 12 % at t_off
   (2.43 vs 2.71 MPa) in a radially symmetric diffusion problem; mirror stations differ by up to 2.2 %.
 
-## Q3 — step cost (open)
+## Q3 — step cost (closed, 2026-10-12)
 
-Not run, by instruction: row-1 timing had the host. This spike's own wall-clock figures are
-contended and are not evidence. What a clean measurement needs, on an idle host: the time for one
-FEniCSx MUMPS solve at EQquasi's 50 m size (141k nodes, full space, Q1, and the Q2 equivalent),
-against EQquasi at 2 solves per step, 5954 s / 5301 steps = 1.12 s/step at 8 ranks
-(`scratch/bp8.gs.50m.xz1500.y2000/result/cycle0/runInfo.json`). The 10 m figure of 13.6 s/step
-is contaminated by core sharing and needs a fresh run. For planar faults, the precomputed fault
-matrix used here makes an RSF step a dense matvec; whether that algorithm is in scope for "a port"
-is the owner's call.
+Run 2026-10-12 22:46-23:03, `bash pipeline.sh` (`green.log`, `rsf.log`), host load 0.15-1.19
+(`uptime` before/during) -- **contended, not host-exclusive** (CLAUDE.md: timing comparisons need
+the host to themselves); the fields below are the pipeline's own `wall_contended_s`, same label
+the prior session used. No exclusive rerun was done: the gap is wide enough (2-3 orders of
+magnitude) that ordinary background load cannot be the explanation.
+
+| | nfault (Omega_f) | per-step (RSF stepper) |
+|---|---|---|
+| FEniCSx Q1 h=100 | 81 | 0.71 ms (1.3 s / 1840 steps) |
+| FEniCSx Q1 h=50 | 289 | 1.25 ms (2.0 s / 1594 steps) |
+| FEniCSx Q1 h=25 | 1089 | 4.98 ms (7.1 s / 1426 steps) |
+| FEniCSx Q2 h=100 | 289 | 1.22 ms (2.0 s / 1642 steps) |
+| FEniCSx Q2 h=50 | 1089 | 4.70 ms (7.8 s / 1660 steps) |
+| EQquasi 50 m (8 ranks) | 3,721 | 1,123 ms (`scratch/bp8.gs.50m.xz1500.y2000`) |
+| EQquasi 10 m wide (8 ranks) | 10,201 | 13,632 ms (`scratch/bp8.gs.10m.wide.v1.21.0`) |
+
+Not an apples comparison, and the gap does not transfer to a port decision:
+
+- **Different problem per step.** The FEniCSx RSF step is a dense matvec against a precomputed
+  fault-only Green's matrix (81-1089 dof, planar fault, linear elasticity, quasi-static). EQquasi
+  solves the full 3D volume FEM system every step (380k-3.5M equations) and supports nonlinear and
+  dynamic physics the dense-G approach does not touch.
+- **The precompute is excluded from the per-step number and does not scale well**: building +
+  factoring G cost 1.8 s (Q1 100) up to 668 s (Q2 50, 19.3 GB peak RSS) -- it is the dominant cost
+  at this problem size and would dominate further for a non-planar fault or a larger Omega_f.
+- **Rank mismatch.** EQquasi's numbers are at 8 MPI ranks; FEniCSx ran single-threaded serial.
+  Neither EQquasi single-rank nor a parallelized dense solve was measured.
+
+The precomputed slip-to-traction matrix is a scaling idea for row 1 (already noted there and in
+row 4), not evidence for a port: it only applies where the fault problem is quasi-static-linear
+and planar, which is not EQquasi's general case.
 
 ## Provenance and caveat
 
@@ -96,3 +119,6 @@ Commands: `bash run.sh "split 1 100" "split 2 100" "split 1 50"`; `bash pipeline
 running. The scripts here are reconstructed verbatim from that session. The raw logs, G matrices
 and `rsf_*.npz` were lost. The numbers above are transcribed from that session's console output
 and can be reproduced in about 25 min serial (do not run during timing work).
+
+Q3's numbers (`green.log`, `rsf.log`) are from a fresh `bash pipeline.sh` run 2026-10-12
+22:46-23:03, `runs/20261009_fenicsx_spike/`, not host-exclusive (see Q3).

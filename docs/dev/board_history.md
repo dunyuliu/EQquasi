@@ -665,3 +665,18 @@ written and no `dz != dx` coupled two-fault cycle has been run. EQdyna's own
 writer does not yet emit `dip_node_spacing`, so every coupled restart
 (including `dz == dx` ones) will stop loudly until that side adds the
 attribute -- a follow-up for the EQdyna-side session, not this repo.
+
+## Row 2: FEniCSx feasibility spike (closed 2026-10-12)
+
+All three questions answered in `docs/dev/fenicsx_feasibility_2026-10-09.md`
+(updated with Q3 2026-10-12): split-node RSF works cleanly in dolfinx (Q1);
+P2 elements do not close the BP8-vs-Kim depth gap, that residual is
+EQquasi-specific and routed to row 3 (Q2); FEniCSx's precomputed-Green's-
+matrix RSF step is ~225-1600x cheaper per step than EQquasi's full-volume
+FEM step, but on a much smaller fault-only linear problem with no
+host-exclusive measurement and a steep, excluded precompute cost (Q3).
+Verdict: **no-go on a port**, both for the depth-gap motivation and for the
+step-cost gap (the latter is algorithmic -- precomputed dense operator for a
+planar quasi-static fault -- not a language/library win that transfers to
+EQquasi's general case). The precomputed-matrix idea is carried forward as a
+scaling idea for row 1 (PETSc scaling), not as port justification.

@@ -233,6 +233,16 @@ subroutine netcdf_write_on_fault(outfile)
     call check( nf90_put_att(ncid, lon_varid, UNITS, lon_units) )
     call check( nf90_put_att(ncid, flt_varid, UNITS, flt_units) )
 
+    ! Record the dip (z) node spacing this file was built with, as a global
+    ! attribute. netcdf_read_on_fault_restart recovers a node's (i,j) slot by
+    ! dividing by *its own* dx (int((z - fltxyz(1,3,ift))/dx + 0.5d0) + 1); a
+    ! restart file whose dip-axis spacing differs -- e.g. a coupled EQdyna
+    ! cycle, which uses its own dz for this axis -- would otherwise land data
+    ! on the wrong physical node with no shape mismatch to catch it, since
+    ! both codes pad to the same (nfxMax, nfzMax, ntotft) shape regardless
+    ! (PATHWAY_FORWARD.md row 5). Stamping dx here lets the reader verify it.
+    call check(nf90_put_att(ncid, NF90_GLOBAL, "dip_node_spacing", dx))
+
     ! Define the netcdf variables. The dimids array is used to pass the
     ! dimids of the dimensions of the netCDF variables.
     dimids = (/ lon_dimid, lat_dimid, flt_dimid /)
@@ -518,6 +528,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     integer (kind = 4) :: dimids3(3), dimlen1, dimlen2, dimlen3
     integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
     integer (kind = 4) :: nfxMax, nfzMax
+    integer (kind = 4) :: att_status
+    real (kind = dp) :: file_dip_spacing
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars4
 
@@ -613,6 +625,34 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
     lastNcPath = infile2
     call check( nf90_open(trim(infile2), NF90_NOWRITE, ncid))
+
+    ! Precondition: infile2's dip-axis node spacing must equal this run's dx.
+    ! The j-index loop below (and nfz above) assumes it is, by dividing by
+    ! dx; infile2 can be fault.dyna.r.nc copied from a coupled EQdyna cycle
+    ! (scripts/case.setup), and EQdyna uses an independent dz for the same
+    ! axis. A shape mismatch cannot catch this -- both codes pad to the same
+    ! (nfxMax, nfzMax, ntotft) regardless of dz -- so check the stamped
+    ! spacing explicitly rather than silently misaligning the fault grid
+    ! along dip (PROJECT_RULES.md rule 2; PATHWAY_FORWARD.md row 5).
+    ! netcdf_write_on_fault always stamps its own dx, so a same-code restart
+    ! cycle (infile2 written by this program) passes unchanged.
+    att_status = nf90_get_att(ncid, NF90_GLOBAL, "dip_node_spacing", file_dip_spacing)
+    if (att_status /= nf90_noerr) then
+        print *, 'netcdf_read_on_fault_restart: ', trim(infile2), &
+            ' carries no "dip_node_spacing" global attribute, so its dip-axis', &
+            ' node spacing cannot be verified against this run''s dx = ', dx, '.'
+        print *, 'A coupled restart (e.g. fault.dyna.r.nc from EQdyna) must', &
+            ' stamp this attribute with its own dz before EQquasi can read it.'
+        stop 'Stopped'
+    endif
+    if (abs(file_dip_spacing - dx) > 1.0d-6 * dx) then
+        print *, 'netcdf_read_on_fault_restart: ', trim(infile2), &
+            ' dip-axis node spacing (', file_dip_spacing, &
+            ') does not match this run''s dx (', dx, ').'
+        print *, 'A coupled restart with dz /= dx misaligns the fault grid', &
+            ' along dip; regenerate the restart with matching spacing.'
+        stop 'Stopped'
+    endif
 
     ! Get the varid of the data variables, based on their names.
     ! 'shear_strike', 'shear_dip', 'effective_normal', 'slip_rate' , 'state_variable', 'vxm', 'vym', 'vzm', 'vxs', 'vys', 'vzs'

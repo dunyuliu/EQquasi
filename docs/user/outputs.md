@@ -110,7 +110,7 @@ formats. The next cycle starts from them; `plotAccumulated` reads slip from
 `fault.r.nc`. `fault.r.nc` also carries a `dip_node_spacing` global
 attribute (the writer's `dx`); a coupled restart whose dip-axis spacing
 doesn't match this run's `dx` stops loudly at read rather than silently
-misaligning the fault grid along dip (board row 5).
+misaligning the fault grid along dip.
 
 ## Mesh: `eqquasi.mesh.coor.nc`, `eqquasi.mesh.ien.nc`, `eqquasi.mesh.nsmp.nc`
 

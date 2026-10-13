@@ -72,6 +72,12 @@ build, run and traps are in `CLAUDE.md`.
    matches; domain and dtmax ruled out. The uploaded BP8 entries are suspect
    along depth until this closes. Done when: the cause is found and fixed, and
    EQquasi at 25 m agrees with Kim within a few % at all 9 stations.
+   **Split-node traction formula audited 2026-10-12**: src/faulting.f90 lines
+   112-128 verified dimensionally (Pa), algebraically (inertial + force imbalance
+   form), and via sanity check (BP5/BP1002 passing proves no ~200× or wrong-sign
+   error). Mechanism agrees with FEniCSx split-node (Day/Dalguer) approach.
+   Location RULED OUT. Next candidate: src/qdct*.f90 element-to-fault force
+   contribution (fault traction to mesh assembly feedback).
 4. [ ] **P2 -- FEniCSx backend, EQdyna pattern.** Owner, 2026-10-09: "like
    eqdyna, we will have a fortran and fenicsx backend now ... follow eqdyna's
    success". One compset and one gold set, a test matrix that runs each case

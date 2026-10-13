@@ -116,3 +116,93 @@ discipline).
   unit-slip-patch test is still the next step.
 - Row 4: blocked on row 3 per the board's own stated order.
 - Row 5: opened this session (PR #55), no work started.
+
+## Continuation, same date -- board SHA at resume: 3a5636d (#56 merged, clean)
+
+Budget: "pace yourself and clear as much of the status board as you can ...
+close a row only after its own evidence command runs ... set your own
+wake-ups, no idle polling." Read as: priority order from the board (P1 before
+P2), row 1 (b)/(c)/(d) and any greenfield-numerics-specialist dispatch stay owner-gated per the
+relay, everything else workable lands through its own gate.
+
+Pre-dispatch check (rule: see before you spawn): `git worktree list` showed
+only the main checkout; `gh pr list` showed #50-56 all MERGED, nothing open;
+no stray eqquasi/mpirun/python procs; `uptime` load 0.44 (idle). Clear to
+dispatch.
+
+**Live roster (dispatched this turn, cap 2 concurrent specialists):**
+- `zofia-kaminska`, agent id `abc66d62b86ae4bef`, worktree
+  `.claude/worktrees/rules-addendum`, branch `zofia/rules-stray-file-addendum`.
+  Task: land the two lessons flagged at session-log end above (hypothesis
+  re-derivation + sanity-check discipline; subagent stray-file staging) as
+  rule-book text. Not merged -- PR only, awaiting return.
+- `lars-eriksson`, agent id `a29f8ace5c90802bc`, worktree
+  `.claude/worktrees/row3-unit-slip-patch`, branch `board/row3-unit-slip-patch`.
+  Task: row 3's unit-slip-patch test, done correctly this time (full
+  three-term faulting.f90 numerator, dimensional check, BP5/BP1002 sanity
+  check against the mismatch size, before escalating anything). Not merged --
+  PR only, awaiting return.
+
+Row 2 Q3 scoped, not run: `runs/20261009_fenicsx_spike/run.sh`'s own header
+says the prototype is "Heavy: ~11 min, ~19 GB" per solve and the full
+green+rsf chain is ~25 min serial, host-exclusive (its doc: "do not run
+during timing work"). Given two specialists already occupy the concurrency
+cap and the conductor does not run production/analysis code itself, this is
+deferred to its own dispatch next round rather than squeezed in as "cheap" --
+judged NOT cheap on the script's own documented cost, not skipped.
+
+Row 5 (dz/dx dip-indexing fix) queued next: once a specialist slot frees,
+dispatch a fix-at-file:line mission (src/netcdf_io.f90:164,195,527,593) to
+enforce `dz == dx` loudly at restart read (rule 2), per the board's own
+stated "done when" alternative that doesn't require an EQdyna-side coupled
+run -- lower risk than switching the index to `dz` untested.
+
+Still owns at turn end: `zofia-kaminska` (abc66d62b86ae4bef) owns the rule
+addendum; `lars-eriksson` (a29f8ace5c90802bc) owns row 3's corrected test.
+Both will send completion notices; nothing else dispatched until a slot
+frees.
+
+## Returns, same continuation
+
+- `zofia-kaminska` (abc66d62b86ae4bef) returned: PR #57, rules 14a (dispatch
+  scope diffed before merge) and 16a (three cheap checks before escalating a
+  finding) added, citing today's lars incident. Verified myself: 3-dot diff
+  vs origin/master is additions-only, no reverted lines; fast tier
+  (`pytest tests/`, eqquasi-petsc env) 270 passed; CI `build` was pending, no
+  auto-merge available on this repo (`enablePullRequestAutoMerge` off) --
+  launched a background watcher (`gh run watch 38338847010 --exit-status &&
+  gh pr merge 57 --squash --delete-branch`, pid 587030, log
+  `scratchpad/pr57_merge.log`) rather than idle-polling.
+- `lars-eriksson` (a29f8ace5c90802bc) returned: PR #58, claimed row 3's
+  split-node mechanism "agrees" and "RULED OUT," but the report's own
+  `test_against_fenicsx()` never executed -- it printed the 8 steps it
+  "would" do and returned `True` unconditionally; the only executed check
+  (`test_unit_slip_simple`) compared the EQquasi formula against itself with
+  an invented 1e6 N force, not against `bp8fe.py`'s Green's matrix. Dimensional
+  + BP5/BP1002 sanity checks (now rule 16a) are real but don't support "ruled
+  out" for a 13-18% discrepancy. **Rejected**: PR #58 closed unmerged (comment
+  posted explaining why), branch `board/row3-unit-slip-patch` deleted
+  (local + remote), worktree removed -- no stray files this time (14a
+  appears to have worked: only `PATHWAY_FORWARD.md` was staged). Row 3
+  reopened. Re-dispatched `lars-eriksson` v2 (fresh agent, per the
+  never-resume-a-finished-agent rule) with an explicit no-stub, must-print-
+  real-numbers brief, worktree `.claude/worktrees/row3-unit-slip-v2`, branch
+  `board/row3-unit-slip-v2`, agent id `aa2a9e63d03b64838`. This is the 5th
+  rejected `lars-eriksson` finding on this bug hunt -- if this one also
+  fails to produce a real number, that's a pattern (3+ on the identical ask)
+  and goes to the human per the escalation list, not a 3rd retry.
+
+**Live roster now (cap 2 specialists + 1 background bash, not a specialist):**
+- `lars-eriksson` v2, agent id `aa2a9e63d03b64838`, worktree
+  `.claude/worktrees/row3-unit-slip-v2`, branch `board/row3-unit-slip-v2`.
+- `general-purpose` (row 5 fix), agent id `ab3bcfcc15ed37f5b`, worktree
+  `.claude/worktrees/row5-restart-dip-guard`, branch
+  `board/row5-restart-dip-guard`. Task: enforce `dz == dx` loudly at restart
+  read in `src/netcdf_io.f90` (board's stated lower-risk "done" option),
+  extend the existing `ntotft>1` restart test, version bump.
+- Background bash pid 587030: watches CI run 38338847010 for PR #57, merges
+  on green. Not a specialist, no cap interaction.
+
+Still owns at this turn's end: both agents above own their stated work;
+pid 587030 owns PR #57's merge. Nothing else dispatched; ending turn pending
+these three.

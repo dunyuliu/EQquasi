@@ -31,7 +31,7 @@ below it is the record of why.
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
-| 21 | Release = green CI on the exact master SHA → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
+| 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
 | 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 5 MB. |
 
 Two habits that would have caught most violations of the above: read the file
@@ -487,15 +487,61 @@ The sequence, in order:
    minor = a new capability (solver, option, compset, utility); major = owner.
 2. After the squash-merge, CI green on that exact SHA
    (`gh run list --commit <sha>`). Never tag before, never over red (rule 17).
-3. `git tag -a vX.Y.Z <sha> -m "<one-line summary>"`, `git push origin vX.Y.Z`,
+3. **Audit or waiver, quoted in the release note (rule 21a).** Before the
+   notes file is written, either a `victor-reyes` audit of `last-tag..commit`
+   exists and is quoted in it, or the notes say the literal words
+   `audit waived by owner`. One or the other, every release, no exceptions.
+4. **Stranger-clone gate (rule 21b).** Clone the pushed SHA fresh into an
+   empty directory, follow `README.md` from scratch, run the documented
+   install and the documented first command. A failure here blocks the
+   release — fix and restart the sequence from step 2.
+5. `git tag -a vX.Y.Z <sha> -m "<one-line summary>"`, `git push origin vX.Y.Z`,
    and the very next command
    `gh release create vX.Y.Z --verify-tag --latest --notes-file <notes>`.
    Tag push and Release page are one action; never split them.
-4. `gh release view vX.Y.Z` shows it as Latest.
+6. `gh release view vX.Y.Z` shows it as Latest.
 
 *Incident, 2026-09-24.* v1.13.0 through v1.18.3 were pushed as tags only, so
 the repo's Latest release stayed on v1.3.2, 379 commits behind, until the
 owner noticed. The 34 missing pages were backfilled from the tag messages.
+
+**21a. No tag without a quoted audit or an explicit waiver.** The release
+note for every tag must quote a `victor-reyes` audit covering
+`last-tag..commit`, or say "audit waived by owner" — never neither, and never
+an audit for a different range standing in for this one.
+
+**Rationale**: an unaudited release is indistinguishable from an audited one
+once it has a Release page; the silence has to be visible in the note itself,
+not just in whoever remembers to have asked.
+
+**Incident (2026-10-11)**: consilium issue #128 ("owner fix 1A") flagged that
+rule 21's sequence named CI and the tag but never named the audit step or
+required it to appear in the note, so a release could (and had the latent
+ability to) ship with no audit and no record of why.
+
+**How to apply**: do not draft `--notes-file` until you have one of the two
+strings to put in it. No audit yet → run it or get the waiver first; neither
+is optional.
+
+**21b. Stranger-clone gate before the tag.** After the audit/waiver step and
+before `git tag`, clone the pushed commit into a directory with no prior
+checkout, environment, or cached state, and follow `README.md` start to
+finish: the documented install, then the documented first command. Treat any
+failure — a missing instruction, a wrong path, a command that only worked
+because of local state — as a release blocker, not a follow-up.
+
+**Rationale**: every other step in this sequence is run by someone who
+already has the repo built and the environment set up; nothing in it catches
+a README that silently stopped matching the repo.
+
+**Incident (2026-10-11)**: consilium issue #128, same finding as 21a — the
+sequence had no step that exercised the repo the way a new user or a fresh
+CI runner would, so a broken install path would not surface until someone
+outside the project hit it.
+
+**How to apply**: budget the clone-and-follow pass as part of the release,
+not as optional polish; a stranger-clone failure restarts the sequence at
+step 2, after the fix lands through its own gated PR.
 
 ## 22. The root is a whitelist, not a preference
 

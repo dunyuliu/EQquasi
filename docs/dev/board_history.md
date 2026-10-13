@@ -651,3 +651,17 @@ Adding `time` and `slips`/`slipd` to the restart file, restored when
   `interface` block in every caller. This codebase uses external subroutines
   with no module wrapper, so an implicit interface silently corrupts the
   descriptor under gfortran and surfaces as a segfault inside the callee.
+
+## Row 5: EQquasi/EQdyna coupled-restart dz != dx dip misalignment (closed 2026-10-12)
+
+Resolved via the loud-fail path, not the `dz`-indexing fix: `src/netcdf_io.f90`
+now writes a `dip_node_spacing` global attribute (the writer's `dx`) into
+`fault.r.nc` and checks it on restart read, stopping with a named-file,
+named-value error when a coupled restart's dip-axis spacing doesn't match
+(PR #61, v1.21.3). `src/netcdf_io.f90:164,195,527,593` still index the dip
+(z) coordinate with `dx`, not `dz` -- a `dz != dx` coupled restart is now a
+loud stop instead of a silent misalignment, but no `dz`-aware re-indexing was
+written and no `dz != dx` coupled two-fault cycle has been run. EQdyna's own
+writer does not yet emit `dip_node_spacing`, so every coupled restart
+(including `dz == dx` ones) will stop loudly until that side adds the
+attribute -- a follow-up for the EQdyna-side session, not this repo.

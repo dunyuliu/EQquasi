@@ -26,6 +26,26 @@ build, run and traps are in `CLAUDE.md`.
    Done when: 10 m BP8 wide <= 5 s/step at 32 ranks, or a measured reason it
    cannot be, with parity to the gold at every change.
    Evidence: the per-step table from (a) and the final run's runInfo.json.
+   **(a), re-verified 2026-10-12** (binary eqquasi-1.21.2, host theo4,
+   host-exclusive, 10-step profiling runs, native MUMPS `par.solver=1`;
+   `runs/20261009_petsc-profile/{bp1002,bp8wide}-r{8,16,32}/result/cycle0/runInfo.json`):
+   bp1002.qdc.2500 (127k eq) -- 8r 0.436 s/step, 16r 0.409, 32r 0.394 s/step
+   (flat; rank-0-only faulting/pressure work dominates at this size). BP8 10 m
+   wide (3.52M eq, scratch-only `fxmin/fxmax/fzmin/fzmax=-1500/1500`,
+   `enlarging_ratio_xz=1.2`, NOT the committed `compset/bp8.qdc.gs.10` which
+   is a smaller -500/500 box) -- 8r 11.01 s/step, 16r 8.01, 32r 6.91 s/step.
+   Correction to a prior conductor's note: an earlier pass flagged these as
+   possibly contaminated by a concurrent external job and claimed a rerun was
+   needed; on re-running r16 and r32 clean (host confirmed idle, `uptime`
+   load 0.35, no other eqquasi/python procs), the new numbers (8.01, 6.91)
+   match the flagged-contaminated ones (7.98, 6.76) to ~2-4%, i.e. within
+   normal run-to-run noise -- the contamination was not material here.
+   (b)/(c)/(d) not started. Finer solve / faulting+pressure / communication /
+   I/O split (as (a) asks) is NOT yet instrumented -- only aggregate
+   time-loop and factorization time exist today (`solveTimeLoopMUMPS.f90`'s
+   `cpu_time` calls). Recommendation (not acted on -- rule 1, new-compset
+   naming needs agreement): register the -1500/1500 wide box as its own
+   compset (e.g. `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
 2. [ ] **P2 -- FEniCSx feasibility spike.** Owner, 2026-10-09. Not a port: a
    one-fault quasi-static prototype (BP5 or BP8) outside src/, in runs/, to
    answer three questions before any port is considered: can split-node (or
@@ -35,6 +55,15 @@ build, run and traps are in `CLAUDE.md`.
    Uses the host's fenicsx conda env; no new file in the repo until the
    answer says so (rule 1). Done when: a one-page verdict with numbers, under
    docs/dev/, and a go / no-go for a port.
+   **Q1/Q2 done, 2026-10-09** (`docs/dev/fenicsx_feasibility_2026-10-09.md`,
+   merged in #52): split-node RSF works cleanly in dolfinx; P2 elements do
+   NOT close the BP8-vs-Kim depth gap (independently converges to Kim with
+   linear hexes; EQquasi's own 50 m/10 m runs sit at -18%/-13% and get worse
+   at the centre station with refinement) -- that finding is row 3's, not
+   row 2's. Lean verdict so far: no-go on a port for the depth-gap
+   motivation. **Q3 (step cost vs EQquasi) still open**, blocked on an idle
+   host; row 1's own timing above needed it too and the host is free now.
+   Row 2 isn't closed until Q3 has a number.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

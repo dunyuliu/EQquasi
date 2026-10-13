@@ -72,6 +72,16 @@ build, run and traps are in `CLAUDE.md`.
    matches; domain and dtmax ruled out. The uploaded BP8 entries are suspect
    along depth until this closes. Done when: the cause is found and fixed, and
    EQquasi at 25 m agrees with Kim within a few % at all 9 stations.
+   **Traction formula audit 2026-10-12** (FEniCSx Green's matrix p=1 h=100,
+   81 fault nodes, node 10 at (x,z)=(-300,-300) m): extracted unit-slip traction
+   tau_x = -3.227e+08 Pa for 1 m strike-slip; identified red-flag cross-term in
+   faulting.f90:125-126. Formula uses (mslav*F_master - mmast*F_slave) instead of
+   standard mass-weighted (mslav*F_slave + mmast*F_master). This cross-weighting
+   is structurally consistent with -13% systematic bias (not a sign flip, but a
+   magnitude/scaling error). Master/slave labels appear swapped relative to mass
+   weights. Requires code audit against elasticity theory (Freund 1979, Melosh-
+   Raefsky 1981) to confirm, then fix and re-test.
+
 4. [ ] **P2 -- FEniCSx backend, EQdyna pattern.** Owner, 2026-10-09: "like
    eqdyna, we will have a fortran and fenicsx backend now ... follow eqdyna's
    success". One compset and one gold set, a test matrix that runs each case

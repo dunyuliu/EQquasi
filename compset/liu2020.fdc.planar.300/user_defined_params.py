@@ -127,7 +127,7 @@ par.HPC_ncpu       = 20 # Number of CPUs requested.
 par.HPC_queue      = "normal" # q status. Depending on systems, job WALLTIME and Node requested.
 par.HPC_time       = "48:00:00" # WALLTIME, in hh:mm:ss format.
 par.HPC_account    = "EAR22012" # Project account to be charged SUs against.
-par.HPC_email      = ""#dliu@ig.utexas.edu" # Email to receive job status.
+par.HPC_email      = "" # Email to receive job status.
 
 ##############################################
 ##### Single station time series output ######

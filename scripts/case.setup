@@ -194,9 +194,10 @@ def create_batch_script():
         f.write("#SBATCH -p " + str(par.HPC_queue) + "\n")
         f.write("#SBATCH -t " + str(par.HPC_time) + "\n")
         f.write("#SBATCH -A " + str(par.HPC_account) + "\n")
-        f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
-        f.write("#SBATCH --mail-type=begin" + "\n")
-        f.write("#SBATCH --mail-type=end" + "\n")
+        if par.HPC_email:
+            f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
+            f.write("#SBATCH --mail-type=begin" + "\n")
+            f.write("#SBATCH --mail-type=end" + "\n")
         f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
         # The modules install.eqquasi.sh -m ls6 builds against.
         f.write("module load netcdf/4.6.2 mumps" + "\n")
@@ -351,9 +352,10 @@ def create_batch_script_cycle():
         f.write("#SBATCH -p " + str(par.HPC_queue)      + "\n")
         f.write("#SBATCH -t " + str(par.HPC_time)       + "\n")
         f.write("#SBATCH -A " + str(par.HPC_account)    + "\n")
-        f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
-        f.write("#SBATCH --mail-type=begin"         + "\n")
-        f.write("#SBATCH --mail-type=end"           + "\n")
+        if par.HPC_email:
+            f.write("#SBATCH --mail-user=" + str(par.HPC_email) + "\n")
+            f.write("#SBATCH --mail-type=begin" + "\n")
+            f.write("#SBATCH --mail-type=end" + "\n")
         # Executable part.
         f.write("export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}" + "\n")
         f.write("  module load mumps"               + "\n")

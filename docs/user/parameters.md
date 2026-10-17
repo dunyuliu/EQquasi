@@ -282,7 +282,7 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
   Project account to be charged SUs against.
 
-* **`HPC_email`** -- default `'dliu@ig.utexas.edu'`
+* **`HPC_email`** -- default `''`
 
   Email to receive job status.
 

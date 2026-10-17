@@ -274,7 +274,7 @@ par.HPC_ncpu = 3
 par.HPC_queue = "normal"
 par.HPC_time = "04:00:00"
 par.HPC_account = "EAR22013"
-par.HPC_email = "dliu@ig.utexas.edu"
+par.HPC_email = ""
 
 ##############################################
 ##### Single station time series output ######

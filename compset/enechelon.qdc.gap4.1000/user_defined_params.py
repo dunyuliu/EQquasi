@@ -287,7 +287,7 @@ par.HPC_ncpu = 20   # case.setup estimates 18 for this mesh; measure scaling
 par.HPC_queue = "normal"
 par.HPC_time = "48:00:00"
 par.HPC_account = "EAR22013"
-par.HPC_email = "dliu@ig.utexas.edu"
+par.HPC_email = ""
 
 ##############################################
 ##### Single station time series output ######

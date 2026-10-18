@@ -132,6 +132,13 @@ if [ -n "$MACH" ]; then
         # /mumps/build instead of $(pwd)/mumps/build.
         export EQQUASIROOT=$(pwd)
         cd src
+        # Start from no objects. The makefile deletes them only after a
+        # successful link, so a failed build (e.g. -m local without MUMPS)
+        # leaves .o/.mod files from another compiler and netCDF-Fortran;
+        # make then reuses them here, and a netcdf_io.o built against
+        # netCDF-Fortran 4.5 linked to 4.6 crashes reading on-fault input
+        # (issue #65).
+        rm -f *.o *.mod
         make || { echo "EQquasi build FAILED."; exit 1; }
         cd ..
         mkdir -p bin

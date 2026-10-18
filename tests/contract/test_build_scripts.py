@@ -61,6 +61,18 @@ def test_install_script_reports_build_failure():
         "a failing `make` must abort or report, not fall through to `mv`"
 
 
+def test_install_script_removes_stale_objects_before_make():
+    """A failed `-m local` build left netcdf_io.o (gfortran 11, netCDF-Fortran
+    4.5.4); the next `-m conda-linux` install reused it against 4.6.4 and the
+    binary crashed reading on_fault_vars_input.nc (issue #65).
+    """
+    src = read("install.eqquasi.sh")
+    m = re.search(r"\n\s*cd src\n(.*?)\n\s*make \|\|", src, re.S)
+    assert m, "could not locate the `cd src ... make ||` build step"
+    assert re.search(r"^\s*rm -f \*\.o \*\.mod\s*$", m.group(1), re.M), \
+        "remove *.o and *.mod between `cd src` and `make`"
+
+
 def test_makefile_local_scalapack_comes_from_local_mumps():
     """install.mumps.sh builds ScaLAPACK/BLACS into mumps/build/local/lib.
 

@@ -153,7 +153,7 @@ class parameters:
     # len(ntotft) tuples to place faults at different y (e.g. a step-over).
     faultgeom   = None
     solver      = 1 # solver option. MUMPS(1, recommended). PETSc(2).
-    nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold
+    nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold. In fdc's quasi-static phase (eqquasi_mode 2) the run continues until rupture, and nstep is a safety cap of at least 30000.
     nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
     bp          = 5 
     # currently supported cases

@@ -128,7 +128,7 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
 * **`nstep`** -- default `10000`
 
-  total num of time steps for exiting, if not exit via sliprate threshold
+  total num of time steps for exiting, if not exit via sliprate threshold. In fdc's quasi-static phase (eqquasi_mode 2) the run continues until rupture, and nstep is a safety cap of at least 30000.
 
 * **`nt_out`** -- default `100`
 

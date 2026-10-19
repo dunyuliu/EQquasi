@@ -184,3 +184,22 @@ def test_benchmark_file_parsing_is_not_reimplemented_per_script():
         f"{offenders} reimplement benchmark-file parsing; import read_table, "
         f"read_rows, read_array or read_profile from seasio instead."
     )
+
+
+def test_fdc_quasi_static_phase_runs_until_rupture():
+    """Mode 2 hardcoded nstep = 30000 over par.nstep: an fdc cycle that had
+    not ruptured by then (a two-fault step-over, 460 simulated years) ended
+    with no way to run longer, and its state went to the dynamic code as if
+    it were a rupture. nstep stays a cap of at least 30000 that par.nstep
+    can raise, and reaching it in mode 2 is reported in the log.
+    """
+    src = strip_fortran_comments(read("src/read_input.f90"))
+    m = re.search(r"if \(eqquasi_mode == 2\) then\s*\n\s*nstep\s*=\s*(.*)\n", src)
+    assert m, "could not locate the mode-2 nstep block in read_input.f90"
+    assert re.fullmatch(r"max\(nstep,\s*\d+\)\s*", m.group(1)), \
+        f"mode 2 must keep a larger input nstep, got `nstep = {m.group(1)}`"
+    for f in ("src/solveTimeLoopMUMPS.f90", "src/solveTimeLoopPETSc.f90"):
+        body = strip_fortran_comments(read(f)).split("'nstep_reached'")[1]
+        body = body.split("end subroutine")[0]
+        assert re.search(r"if \(eqquasi_mode == 2\) then\s*\n\s*write\(\*,\*\) 'WARNING",
+                         body), f"{f}: mode 2 reaching nstep must warn"

@@ -282,6 +282,12 @@ subroutine solveTimeLoopMUMPS
         else
             call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
                 'N/A', 'N/A', 'nstep_reached', -1, 0.0d0, -1)
+            ! fdc hands this cycle's state to the dynamic code as a rupture;
+            ! say plainly that it is not one (exit_reason is nstep_reached).
+            if (eqquasi_mode == 2) then
+                write(*,*) 'WARNING: eqquasi_mode 2 reached nstep without a rupture'
+                write(*,*) '         (no slip rate above exit_slip_rate); raise par.nstep.'
+            endif
         endif
     endif
     

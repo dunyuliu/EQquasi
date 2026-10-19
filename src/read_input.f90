@@ -301,10 +301,14 @@ subroutine readmodel
     dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
     dymax = min(12.0d0*dx, 3.0d3) ! The coarsest element size near ymax/ymin in m.
     
-    ! reset total # of time steps 'nstep' to an arbitrary large number for mode 2 - quasi-static in fdc. 
-    if (eqquasi_mode == 2) then 
-        nstep = 30000
-    endif 
+    ! Mode 2 (quasi-static phase of fdc) runs until the next rupture, i.e.
+    ! until exitCriteria sets stoptag; nstep is only a safety cap. It is at
+    ! least 30000, the cap this used to hardcode, and a larger par.nstep
+    ! raises it: a cycle that has not ruptured by step 30000 used to end
+    ! there and hand a non-rupture state to the dynamic code.
+    if (eqquasi_mode == 2) then
+        nstep = max(nstep, 30000)
+    endif
     
     !...time hostories output steps
     nplpts = 0    !initialize number of time history plot

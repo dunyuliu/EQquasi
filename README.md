@@ -1,305 +1,77 @@
-*EQquasi*
-=======
-*```EQquasi```* is a parallel finite-element software to simulate quasi-static/quasi-dynamic earthquake cycle deformation induced by fault slips governed by rate- and state- friction. It is part of the fully dynamic earthquake cycle simulator *```EQsimu```* [(*Liu et al.*, 2020, *GJI*)](https://doi.org/10.1093/gji/ggz475) to simulate deformation during the inter-seismic, nucleation, post-seismic, and dynamic rupture phases of earthquake cycles. It relies on parallel solvers [*MUMPS*](http://mumps-solver.org) or [*AZTEC*](https://trilinos.github.io/aztecoo.html#aztec-21-foundation-for-aztecoo) to handle the computing loads. It is written in FORTRAN90 with pre-staging and post-processing scripts in Python3.
+# EQquasi
 
-*MUMPS* is distributed under the [CeCILL-C license](http://www.cecill.info/licences/Licence_CeCILL-C_V1-en.html) and for proper ackowledgement, please read the LICENCE for *MUMPS*. The newest version of MUMPS can be downloaded through this [link](http://mumps-tech.com/mumps-2/). <br/>
-*AZTEC* now comes with [*Trilinos*](https://github.com/trilinos/Trilinos) in the name of *AZTECOO*, but the current *EQquasi* still uses the standalone *AZTEC2.1*. (To-do-list: need to update its license.)  <br/>
+EQquasi is a parallel finite-element code for simulating quasi-static and
+quasi-dynamic earthquake cycle deformation on faults governed by rate- and
+state-dependent friction. It is the quasi-dynamic half of the fully dynamic
+earthquake cycle simulator EQsimu ([Liu, Duan and Luo, 2020,
+*GJI*](https://doi.org/10.1093/gji/ggz475)), which pairs it with the dynamic
+rupture code EQdyna. The solver is Fortran 90; case setup and
+post-processing are Python 3. It solves its linear systems with
+[MUMPS](http://mumps-solver.org) (CeCILL-C license) or, on conda builds,
+PETSc.
 
-Documentation
----------------------
-The user guide -- installing, running a case, the parameter reference, output
-files, benchmarks, performance and troubleshooting -- is published with each
-release at https://dunyuliu.github.io/EQquasi/. Its source is `docs/user/`;
-to preview it locally:
-```
-pip install -r docs/user/requirements.txt
-mkdocs serve -f docs/user/mkdocs.yml
-```
-`docs/user/parameters.md` is generated from `scripts/defaultParameters.py`;
-rerun `python3 docs/user/gen_params.py` after changing a default.
+EQquasi is released under the [MIT License](LICENSE) and is still under
+development, without guaranteed functionality.
 
-Setup of computing environment
----------------------
-*```EQquasi```* relies on the following packages for pre-staging and computing. <br/>
-  - FORTRAN compilers and MPI <br/>
-  - python3 <br/>
-  - netCDF <br/>
-  - pip <br/>
-    - numpy=1.26.4 (or older, due to a change of dtype size in later versions.)
-    - netCDF4 (```scripts/case.setup``` imports it to write on_fault_vars_input.nc)
+Full documentation -- install options, the parameter reference, output
+files, benchmarks, performance and troubleshooting -- is published at
+https://dunyuliu.github.io/EQquasi/, built from `docs/user/`.
 
-For post-processing, additional Python packages are needed:
-  - xarray
-  - imageio
-  - pdf2image
-      
-```ubuntu.env.setup.sh``` is a bash shell script to install necessary packages for Ubuntu system.
+## Install
 
-Simply, 
-```
-sudo bash ubuntu.env.setup.sh
-```
+Requires a Fortran compiler, MPI, netCDF (with Fortran bindings), and
+Python 3 with numpy 1.26 (or older) and netCDF4 (`scripts/case.setup`
+imports it to write `on_fault_vars_input.nc`).
 
-Installation
----------------------
-To install and test *```EQquasi```*  on *Ubuntu*, 
-```
-git clone https://github.com/dunyuliu/EQquasi.git
-cd EQquasi
-bash make.scripts.executable.sh
-python3 -m pytest -m e2e
-```
-To install *```EQquasi```* without testing, try
-```
-./install.eqquasi.sh -m ubuntu
-```
-instead of ```python3 `pytest -m e2e```. In this case, *MUMPS* should have been installed via Ubuntu's apt-get. <br/>
+On any Linux host, with no admin rights, everything (compilers and MPI
+included) comes from conda-forge:
 
-To install *```EQquasi```* on TACC's HPC Lonestar6, try
-```
-./install.eqquasi.sh -m ls6
-```
-In this case, *MUMPS* has been installed by TACC admin. <br/>
-
-To install *```EQquasi```* with local installation of *MUMPS* on Ubuntu, try
-```
-./install.eqquasi.sh -m local
-```
-
-### Rebuilding just the Fortran
-
-`cd src && make` on its own does **not** work: the makefile selects all of its
-flags from `MACHINE`, so with it unset `FFLAGS` is empty, gfortran applies its
-default 132-column limit and the build fails with `Line truncated` errors in
-`globalvar.f90` that look like corrupted source. Both variables are required:
-
-```
-bash install.eqquasi.sh -m utig
-```
-(the installer runs the make above and records the MPI launcher in
-`bin/eqquasi-<version>.cfg`, which `case.setup` requires -- a bare
-`make -C src` no longer yields a usable install)
-
-The makefile now stops with an explicit message when `MACHINE` is unset.
-
-Two host-specific traps on the utig workstation, both handled automatically but
-worth knowing when a build breaks:
-
-  - **`dmumps_struc.h` not found.** The `utig` target takes MUMPS headers from
-    `${EQQUASIROOT}/mumps/build/_deps/mumps-src/include`. That directory holds
-    fetched *source*, and pruning it leaves the built `.a` libraries in place
-    while making the tree unbuildable. The header must match the libraries: check
-    the version in `mumps/build/CMakeCache.txt` against the `MUMPS x.y.z` string
-    in the header, since a mismatched `DMUMPS_STRUC` layout corrupts memory
-    silently rather than failing to link.
-  - **`cannot find -lscalapack-openmpi`.** This MUMPS is built with parallel-root
-    support and needs ScaLAPACK/BLACS, but the Debian package is not installed on
-    every host. The makefile falls back to AMD AOCL with an embedded rpath. Link
-    the AOCL *shared* library; its `libscalapack.a` is not built `-fPIC` and
-    cannot go into a PIE executable.
-
-**No admin rights, any Linux host: conda.** Everything, compilers and MPI
-included, comes from conda-forge (`environment.yml`):
 ```
 conda env create -f environment.yml
 conda activate eqquasi-petsc
 bash install.eqquasi.sh -m conda-linux
 ```
-The installer records the matching MPI launcher in `bin/eqquasi-<version>.cfg`,
-and every case's `run.sh` uses it (override with `MPIRUN=... bash run.sh`). It also records `MPIRUN_ARGS` (OpenMPI: `--bind-to none`, so two runs on one host do not share cores; conda adds shared-memory transport); override with `MPIRUN_ARGS=... bash run.sh`.
 
-To activate bash environment variables $EQQUASIROOT and add executable scripts to $PATH,
-```
-source install.eqquasi.sh
-```
-or manually add the paths to .bashrc:
-```
-export EQQUASIROOT=$(pwd)
-export PATH=$(pwd)/bin:$PATH
-export PATH=$(pwd)/scripts:$PATH
-```
-where $(pwd) is the root path for your *```EQquasi```* installation. <br/>
-<br/>
+Other targets for `install.eqquasi.sh -m <machine>`: `ubuntu` (system
+MUMPS via `sudo bash ubuntu.env.setup.sh` first), `local` (builds a private
+MUMPS), `ls6` (TACC Lonestar6, cluster modules), `utig` (UTIG
+workstations). Details and troubleshooting for each are in
+[Getting Started](https://dunyuliu.github.io/EQquasi/getting-started/).
 
-How-to-use
----------------------
-Only three steps are required to setup and run a new case <br/>
+Each new shell needs `EQQUASIROOT` and `bin/`/`scripts/` on its `PATH`:
+`source install.eqquasi.sh`, or add the equivalent `export` lines to your
+shell startup file.
+
+## Run an example
+
 ```
-create.newcase directoryForYourCase compset
-cd directoryForYourCase
-# modify user_defined_params.py
+create.newcase mycase bp5.qdc.2000
+cd mycase
 ./case.setup
 bash run.sh
 ```
-Here, ```compset``` stands for predefined cases with each defiend via a single parameter file ```user_defined_params.py``` under /compset. <br/>
-The register — every compset, what gates it, and its reference — lives in
-```compset/README.md```; it is the single list, checked against the directories
-on disk by a contract test. Names follow
-```<benchmark>.<mode>[.<variant>].<dx_m>[.<description>]```.
 
-```test.*``` compsets are small, fast versions used by the test suite and are
-listed separately in the same file. Their names follow the production grammar
-exactly — the `test.` prefix is the only difference.
+`bp5.qdc.2000` is SEAS benchmark BP5 at 2000 m on-fault resolution; the
+default `user_defined_params.py` runs one full earthquake cycle in about
+27 minutes on 4 MPI ranks. The full compset list is in
+[Benchmarks](https://dunyuliu.github.io/EQquasi/benchmarks/); see
+[Running a Case](https://dunyuliu.github.io/EQquasi/running-a-case/) for
+what each step does and how to configure, resume or plot a case.
 
-Where things run
----------------------
-Every scratch artifact -- generated cases, simulation output, build products --
-belongs under ```scratch/``` at the repository root, which is gitignored. Nothing
-scratch is written to the repo root itself.
+## Output
 
-```
-scratch/          # gitignored; create your cases here
-data/     # committed reference results; never wiped
-bin/           # gitignored build product
-```
+Each completed cycle's output lands in `result/cycle<N>/` inside the case
+directory; `log/cycle<N>.log` holds its screen output. Plot it from inside
+the case with `plotRuptureTime.py`, `plotPeakSliprateTime.py`,
+`plotOnFaultVars`, `plotAccumulated` and `plotStations.py`. File formats
+and columns are documented in [Output Files](https://dunyuliu.github.io/EQquasi/outputs/).
 
-A case created by ```create.newcase``` holds two files you touch and five
-folders:
+## Citing and help
 
-```
-<case>/
-    user_defined_params.py   the only file you edit
-    case.setup  case.submit  run.sh    what you run
-    input/                   everything a cycle consumes; frozen once a cycle has run
-    result/                  cycle0/ ... cycleN/, one per completed cycle
-    scratch/                 the cycle currently running, and nothing else
-    tool/                    machinery the case imports, not for editing
-    log/                     setup.log, run.log
-```
+If you use EQquasi in published work, please cite
+[Liu, Duan and Luo (2020, *GJI*)](https://doi.org/10.1093/gji/ggz475) and,
+for SEAS BP5 results, [Jiang et al. (2022, *JGR*)](https://doi.org/10.1029/2021JB023519);
+see [Citing](https://dunyuliu.github.io/EQquasi/citing/) for the full
+reference list and MUMPS acknowledgement.
 
-The solver reads ```input/``` and writes ```scratch/```; ```run.sh``` moves
-```scratch/``` into ```result/cycleN``` only once the cycle has succeeded, so a
-killed cycle can never be mistaken for a finished one and recovery is
-```rm -rf scratch```. The post-processing utilities discover cycles
-automatically, under ```result/cycle*``` or, for cases predating v1.13.0,
-```cycle*``` or ```Q*```.
-
-Post-processing
----------------------
-Five utilities cover a run. From inside a case, each takes cycle directories
-as arguments, or none to process every cycle:
-
-| tool | writes | scope |
-|---|---|---|
-| ```plotRuptureTime.py``` | ```rupture_time.png``` | per cycle |
-| ```plotPeakSliprateTime.py``` | ```peak_slip_rate_vs_time.png``` | all cycles, concatenated |
-| ```plotMagnitudeTime.py``` | ```mag_vs_time.png``` | all cycles: Mw vs time, one fault / joint (through-going), time since previous event |
-| ```plotOnFaultVars``` | ```fault.NNNNN.nc[.fN].png``` + gif | per cycle |
-| ```plotAccumulated``` | ```accumulatedSlip.{horizontal,vertical}.png``` | all cycles, stacked |
-| ```plotStations.py``` | on-/off-fault station time series | per cycle |
-
-```
-plotRuptureTime.py result/cycle2
-plotPeakSliprateTime.py result/cycle0 result/cycle1 result/cycle2
-plotMagnitudeTime.py <run> [<fork continued from it> ...]   # later dirs override repeated cycles
-plotAccumulated --fault 1 --depth-km -10 --ylim 0 18 result/cycle0 result/cycle2
-plotStations.py result/cycle2
-```
-
-**Multi-fault runs.** ```plotAccumulated``` takes ```--fault N``` and draws one
-fault per figure; pass the same ```--ylim``` to both so the two are comparable,
-since autoscaling otherwise invents a difference. ```plotOnFaultVars``` loops
-the faults itself and tags output ```.f0```, ```.f1```. ```plotStations.py```
-finds the ```fltst_ft<N>_*``` files faults 2+ write. ```plotRuptureTime.py```
-reads ```cplot_ft<N>_EQquasi.txt```, so it needs output from v1.13.0 or later;
-earlier runs wrote fault 1 only and the tool will report "nothing ruptured"
-for a cycle whose event was on another fault.
-```plotPeakSliprateTime.py``` is global by construction -- ```global.dat```
-records one peak slip rate for the whole model, not one per fault.
-
-**Reading accumulated slip.** The profile crosses the velocity-weakening zone,
-the velocity-strengthening margins and the non-rate-and-state creep region, so
-a plane-wide maximum is not the earthquake: on BP1002 the largest number in
-the file is the imposed creep at |x| > 50 km. Restrict to VW before quoting a
-coseismic slip. Each cycle's curves start from the sum of all previous cycles,
-so a cycle that adds nothing traces the previous total exactly -- that
-coincidence is the inherited initial state, not a duplicate.
-
-```plotAccumulated``` takes each cycle's end state from ```fault.r.nc```, so
-its totals do not depend on ```--ninterval```; thinning changes how many
-intermediate lines are drawn and nothing else.
-
-Example
----------------------
-A good starting example would be compset==bp5.qdc.2000 (benchmark problem 5, quasi-dynamic, 2000 m on-fault resolution). <br/>
-The case can be created by the following command:
-```
-create.newcase caseDir bp5.qdc.2000
-```
-With the default ```user_defined_params.py``` the first cycle takes about
-27 minutes on Lonestar6, or ~51 minutes on 4 MPI ranks of a shared
-workstation. <br/>
-
-Key progress
----------------------
-*v1.2.1* with *MUMPS* is benchmarked in [SEAS BP5](https://strike.scec.org/cvws/seas/benchmark_descriptions.html) and results are published in [*Jiang et al. (2022, JGR)*](https://doi.org/10.1029/2021JB023519).
-
-Verification
----------------------
-
-### Test suite
-
-Five tiers, selected by marker (`pytest.ini`). The first three read source and
-reference files only -- no MPI, no MUMPS, seconds. The `e2e` tiers build the
-code and run benchmarks.
-
-```
-python3 -m pytest tests/              # unit + contract + regression, ~1 min
-python3 -m pytest tests/ -m e2e_fast  # what CI runs on every push, ~20 min
-python3 -m pytest tests/ -m e2e       # adds the full BP5 cycle, ~75 min
-```
-
-| tier | checks | cost |
-|---|---|---|
-| `unit` | numerics in isolation: the pore-pressure operator against its analytic solution, initial conditions against the benchmark equations, physical invariants | ms |
-| `contract` | file formats and cross-file agreement: BP8 section 4 conformance, `model.txt`'s positional contract, compset registration, the CI gate, and that every reference file has a reader | ~1 s |
-| `regression` | one guard per defect that actually occurred here | ~2 s |
-| `e2e_fast` | BP5 and BP7 at 101 steps, BP8 over 30 days, BP1002's complete step-over event, and a clean `install.eqquasi.sh` build | ~20 min |
-| `e2e` | the above plus BP5's full first cycle | ~75 min |
-
-### References
-
-`data/<compset name>/` holds frozen results — each reference directory is
-named for the compset that produced it, so compset, e2e row and reference always
-agree. A reference is a **run**, not a
-file: `data/test.bp5.qdc.2000/cycle0/` is a full earthquake cycle,
-`data/test.bp5.qdc.2000/cycle0-step101-fast/` the same case stopped at step 101.
-
-`tests/e2e/cases.py` holds the case table and the single runner; a new
-benchmark is a row there plus a reference directory. What gets compared is
-decided by what the reference contains -- fault snapshots per fault, station
-and profile series in full, and the scalars each `summary.json` names.
-
-Comparison is relative, never bit-for-bit. Two runs of the same case, same
-binary, same host differ by ~2e-14 from MPI reduction ordering alone, so exact
-equality would fail on noise and could not distinguish it from a regression.
-Each value is judged against the size of the quantity it belongs to -- its
-column, for a table; its vector, for a fault variable -- so a component that
-vanishes by symmetry (dip shear on a strike-slip fault, fault opening under
-the contact condition) is measured against the component that does not.
-Columns the SEAS format stores as log10 are linearised first, since -30 and
--24 are both zero. A 1 mPa change in dip shear still fails. Results are
-reported per file:
-
-```
-SUCCESS fltst_strk000dp000.txt: 4483 rows x 9 cols, worst diff = 0.0e+00 of the file's scale
-FAIL    global.dat: 12 of 8964 entries outside rtol=1e-09; worst at row 40, column 6
-```
-
-References are **regression locks, not validations**. They detect unintended
-change; they do not establish that a benchmark is reproduced correctly. See
-`data/test.bp8.qdc.gs.10/README.md` for what BP8's does and does not establish.
-
-### BP8
-
-BP8-specific findings -- pore-pressure solver convergence, the domain-size
-sweep, the time-step study, the initial condition, and how to run and package a
-submission -- are in `data/test.bp8.qdc.gs.10/README.md` and `data/test.bp8.qdc.gs.10/`. They are
-kept there because they belong with the reference they describe, and because
-they change as the benchmark does.
-
-Note
-----
-*```EQquasi```* is still under development and comes without any guaranteed functionality.
-
-If you are interested in using *```EQquasi```*, please contact Dunyu Liu (dliu@ig.utexas.edu). 
+For questions, bug reports or feature requests, open a GitHub issue.

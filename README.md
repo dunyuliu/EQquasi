@@ -53,7 +53,8 @@ bash run.sh
 
 `bp5.qdc.2000` is SEAS benchmark BP5 at 2000 m on-fault resolution; the
 default `user_defined_params.py` runs one full earthquake cycle in about
-27 minutes on 4 MPI ranks. The full compset list is in
+27 minutes on TACC Lonestar6, or about 51 minutes on 4 MPI ranks of a
+shared workstation. The full compset list is in
 [Benchmarks](https://dunyuliu.github.io/EQquasi/benchmarks/); see
 [Running a Case](https://dunyuliu.github.io/EQquasi/running-a-case/) for
 what each step does and how to configure, resume or plot a case.

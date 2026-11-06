@@ -83,6 +83,7 @@ subroutine readmodel
     include 'mpif.h'
 
     character (len = 50) :: fileName
+    real (kind = dp) :: vpmax
     logical::file_exists
     integer (kind = 4) :: ios
     integer (kind = 4) :: ift
@@ -248,6 +249,31 @@ subroutine readmodel
     endif
 
     close(1002)
+
+    ! Optional heterogeneous shear modulus (see shear_modulus_at in
+    ! globalvar). Its own file, not more appended model.txt lines: absent
+    ! means uniform, and no older case can misread it.
+    INQUIRE(FILE=trim(inputDir)//"mat_het.txt", EXIST=file_exists)
+    if (file_exists) then
+        open(unit = 1009, file = trim(inputDir)//'mat_het.txt', form = 'formatted', status = 'old')
+        read(1009,*) mat_het_amp, mat_het_lx, mat_het_lz, mat_het_z0
+        read(1009,*) mat_het_box(1), mat_het_box(2), mat_het_box(3)
+        close(1009)
+        if (mat_het_lx <= 0.0d0 .or. mat_het_lz <= 0.0d0) then
+            if (me == 0) write(*,*) 'mat_het.txt: wavelengths must be > 0, got ', mat_het_lx, mat_het_lz
+            stop 'Stopped'
+        endif
+        if (abs(mat_het_amp) >= mat0(1,3)*mat0(1,2)**2) then
+            if (me == 0) write(*,*) 'mat_het.txt: |amp| must be < mu0 so mu stays positive.'
+            stop 'Stopped'
+        endif
+        mat_het = 1
+        if (me == 0) then
+            write(*,*) '= Heterogeneous shear modulus (mat_het.txt):'
+            write(*,*) '=   amp, lx, lz, z0 =', mat_het_amp, mat_het_lx, mat_het_lz, mat_het_z0
+            write(*,*) '=   box |x|,|y|,|z| <=', mat_het_box
+        endif
+    endif
     
     ! The rate-and-state box must lie inside the model. A bare `stop` here
     ! printed nothing at all, which is the least useful thing a guard can do:
@@ -298,7 +324,11 @@ subroutine readmodel
         enddo
     endif
 
-    dt = min(0.5d0*dx/mat0(1,1), 0.5d0*400.0d0/mat0(1,1)) ! minimum time step size based on CFL criteria with alpha = 0.5.
+    ! CFL on the fastest P wave in the model: with mat_het, mu reaches
+    ! mu0 + |amp|, and vp scales with sqrt(mu) (vp/vs is kept).
+    vpmax = mat0(1,1)
+    if (mat_het == 1) vpmax = mat0(1,1)*sqrt((mat0(1,3)*mat0(1,2)**2 + abs(mat_het_amp))/(mat0(1,3)*mat0(1,2)**2))
+    dt = min(0.5d0*dx/vpmax, 0.5d0*400.0d0/vpmax) ! minimum time step size based on CFL criteria with alpha = 0.5.
     dymax = min(12.0d0*dx, 3.0d3) ! The coarsest element size near ymax/ymin in m.
     
     ! Mode 2 (quasi-static phase of fdc) runs until the next rupture, i.e.

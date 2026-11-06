@@ -138,6 +138,11 @@ class parameters:
     # Isotropic material propterty.
     # Vp, Vs, Rou
     vp, vs, rou = 6.0e3, 3.464e3, 2.67e3
+    # Optional heterogeneous shear modulus. None = uniform. Otherwise
+    # dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m):
+    # mu = rou*vs**2 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz) inside
+    # |x| <= bx, |y| <= by, |z| <= bz; density and vp/vs stay uniform.
+    mat_het = None
     init_norm = -25.0e6 # initial normal stress in Pa. Negative compressive.
 
     # Controlling switches for EQquasi system

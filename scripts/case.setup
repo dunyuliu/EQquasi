@@ -636,9 +636,33 @@ def report_normal_stress_caps():
     print("  that regularisation is wanted (Liu et al. 2020, section 3.5).")
 
 
+def create_mat_het_input_file():
+    """Write input/mat_het.txt iff par.mat_het is set; otherwise remove it.
+
+    par.mat_het = dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m) gives
+    mu = mu0 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz) inside
+    |x| <= bx, |y| <= by, |z| <= bz, and mu0 = rou*vs**2 elsewhere.
+    """
+    path = inp('mat_het.txt')
+    m = getattr(par, 'mat_het', None)
+    if not m:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    mu0 = par.rou*par.vs**2
+    if abs(m['amp']) >= mu0:
+        raise SystemExit(f"case.setup: |par.mat_het['amp']| = {abs(m['amp'])} Pa must be < mu0 = {mu0} Pa.")
+    with open(path, 'w') as f:
+        f.write(f"{m['amp']!r} {m['lx']!r} {m['lz']!r} {m.get('z0', 0.0)!r}\n")
+        bx, by, bz = m['box']
+        f.write(f"{bx!r} {by!r} {bz!r}\n")
+    print(f"Heterogeneous shear modulus: {(mu0-abs(m['amp']))/1e9:.1f}-{(mu0+abs(m['amp']))/1e9:.1f} GPa "
+          f"inside |x|<={bx/1e3:g} km, |y|<={by/1e3:g} km, depth<={bz/1e3:g} km; {mu0/1e9:.1f} GPa outside.")
+
 def _main_func(description):
   refuse_if_case_has_run()
   create_model_input_file()
+  create_mat_het_input_file()
   create_batch_script()
   create_batch_script_cycle()
   create_run_sh()

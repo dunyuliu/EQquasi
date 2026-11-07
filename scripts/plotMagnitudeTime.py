@@ -12,7 +12,8 @@ event.
     Mw = 2/3 (log10 M0 - 9.1),   M0 = mu * sum(area * coseismic slip)
 
 over the nodes that ruptured, from cplot[_ftN]_ruptarea_trac_slip.txt, with
-mu = rho * vs**2 from the case's user_defined_params.py. Output that predates
+mu = rho * vs**2 from the case's user_defined_params.py; with par.mat_het set,
+mu is taken node by node at (x, y = 0, depth), as the solver does. Output that predates
 that file falls back to end-of-cycle slip on the ruptured nodes times dx*dz,
 and says so. A fault whose per-fault rupture-time file is missing (output older
 than v1.13) is reported as unknown, never as quiet.
@@ -35,6 +36,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plotutils as pu
 from seasio import read_array
+from defaultParameters import mat_het_checked, shear_modulus_at
 
 pu.apply_style()
 import matplotlib.pyplot as plt
@@ -69,18 +71,26 @@ def cycle_events(rdir, par, mu, nft):
         if cp is None:
             unknown.append(ift)
             continue
-        fnft = np.atleast_2d(np.loadtxt(cp))[:, FNFT_COL]
+        cpa = np.atleast_2d(np.loadtxt(cp))
+        fnft = cpa[:, FNFT_COL]
         hit = fnft > UNRUPTURED / 2.0
         if not hit.any():
             continue
         if mu is None:
             pu.die(f"{TOOL}: {rdir} has a seismic event but no "
                    "user_defined_params.py to take mu from; pass --mu.")
+        # Per-node mu under par.mat_het (columns 0, 1 of cplot are x and depth;
+        # ruptarea rows are the same nodes in the same order).
+        het = mu == "het"
+        mu_n = shear_modulus_at(par, cpa[:, 0], 0.0, cpa[:, 1]) if het else mu
         ra = find(rdir, f"cplot_{tag(ift)}ruptarea_trac_slip")
         if ra is not None:
             a = np.atleast_2d(np.loadtxt(ra))
-            m0, note = mu * np.sum(a[:, 0] * a[:, 1]), ""
+            m0, note = np.sum(mu_n * a[:, 0] * a[:, 1]), ""
         else:
+            if het:
+                pu.die(f"{TOOL}: {rdir} has no ruptarea file, and par.mat_het "
+                       "needs per-node slip for the moment; pass --mu.")
             if par is None:
                 pu.die(f"{TOOL}: {rdir} has no ruptarea file and no case "
                        "parameters for the node area; cannot compute a moment.")
@@ -108,7 +118,7 @@ def main():
                         "mag_vs_time.png in the case root (above result/cycleN).",
                         PATTERNS)
     ap.add_argument("--mu", type=float, default=None,
-                    help="shear modulus, Pa (default: rho*vs**2 from the case)")
+                    help="shear modulus, Pa (default: rho*vs**2 from the case, or per node under par.mat_het)")
     ap.add_argument("--pair-yr", type=float, default=5.0,
                     help="lower-panel band for a triggered partner, yr "
                          "(default 5)")
@@ -129,8 +139,17 @@ def main():
                   for d in here) else None)
     nft = (int(getattr(par, "ntotft", 1)) if par is not None else
            1 + len(glob.glob(os.path.join(d0, "cplot_ft[0-9]*_EQquasi.*"))))
-    mu = (args.mu if args.mu is not None else
-          par.rou * par.vs ** 2 if par is not None else None)
+    if args.mu is not None:
+        mu = args.mu
+    elif par is None:
+        mu = None
+    elif mat_het_checked(par) is not None:
+        if nft > 1:
+            pu.die(f"{TOOL}: par.mat_het with {nft} faults: fault-normal "
+                   "offsets are not in the output, so pass --mu.")
+        mu = "het"
+    else:
+        mu = par.rou * par.vs ** 2
 
     rows, notes, t0 = [], set(), 0.0
     for c in cycles:

@@ -98,7 +98,7 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
 * **`mat_het`** -- default `None`
 
-  Optional heterogeneous shear modulus. None = uniform. Otherwise dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m): mu = rou*vs**2 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz) inside |x| <= bx, |y| <= by, |z| <= bz; density and vp/vs stay uniform.
+  Optional heterogeneous shear modulus. None = uniform. Otherwise dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m), all five required: mu = rou*vs**2 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz) inside |x| <= bx, |y| <= by, |z| <= bz; density and vp/vs stay uniform. mu jumps at the box edge unless the cosine is zero there.
 
 * **`init_norm`** -- default `-25000000.0`
 

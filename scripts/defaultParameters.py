@@ -139,9 +139,10 @@ class parameters:
     # Vp, Vs, Rou
     vp, vs, rou = 6.0e3, 3.464e3, 2.67e3
     # Optional heterogeneous shear modulus. None = uniform. Otherwise
-    # dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m):
+    # dict(amp=Pa, lx=m, lz=m, z0=m, box=(bx, by, bz) m), all five required:
     # mu = rou*vs**2 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz) inside
-    # |x| <= bx, |y| <= by, |z| <= bz; density and vp/vs stay uniform.
+    # |x| <= bx, |y| <= by, |z| <= bz; density and vp/vs stay uniform. mu jumps
+    # at the box edge unless the cosine is zero there.
     mat_het = None
     init_norm = -25.0e6 # initial normal stress in Pa. Negative compressive.
 
@@ -320,3 +321,55 @@ class parameters:
     az_tol = 1.0e-7 # tolerance for solution in AZTEC.
 
 
+
+MAT_HET_KEYS = ("amp", "lx", "lz", "z0", "box")
+
+
+def mat_het_checked(par):
+    """par.mat_het validated, or None when unset.
+
+    All five keys are required and no others are allowed, so a typo (Z0,
+    z_0) stops setup instead of running with a default. Wavelengths and box
+    extents must be positive and |amp| < rou*vs**2, the same limits the
+    solver enforces.
+    """
+    m = getattr(par, "mat_het", None)
+    if not m:
+        return None
+    keys = set(m)
+    if keys != set(MAT_HET_KEYS):
+        raise SystemExit(
+            f"par.mat_het needs exactly the keys {', '.join(MAT_HET_KEYS)}; "
+            f"missing {sorted(set(MAT_HET_KEYS) - keys)}, "
+            f"unknown {sorted(keys - set(MAT_HET_KEYS))}.")
+    mu0 = par.rou * par.vs ** 2
+    if abs(m["amp"]) >= mu0:
+        raise SystemExit(f"par.mat_het: |amp| = {abs(m['amp'])} Pa must be "
+                         f"< mu0 = rou*vs**2 = {mu0} Pa.")
+    if m["lx"] <= 0 or m["lz"] <= 0:
+        raise SystemExit("par.mat_het: lx and lz must be > 0.")
+    if len(m["box"]) != 3 or min(m["box"]) <= 0:
+        raise SystemExit("par.mat_het: box must be three extents (bx, by, bz) > 0 m.")
+    return m
+
+
+def shear_modulus_at(par, x, y, depth):
+    """Shear modulus (Pa) at x, y (m) and depth >= 0 (m); mirrors the solver."""
+    x, y, depth = (np.asarray(v, dtype=float) for v in (x, y, depth))
+    mu0 = par.rou * par.vs ** 2
+    m = mat_het_checked(par)
+    if m is None:
+        return np.full(np.broadcast(x, y, depth).shape, mu0)
+    bx, by, bz = m["box"]
+    inside = (np.abs(x) <= bx) & (np.abs(y) <= by) & (np.abs(depth) <= bz)
+    pert = m["amp"] * np.cos(2 * pi * x / m["lx"]) \
+        * np.cos(2 * pi * (np.abs(depth) + m["z0"]) / m["lz"])
+    return mu0 + np.where(inside, pert, 0.0)
+
+
+def shear_modulus_range(par):
+    """(min, max) shear modulus over the model, Pa."""
+    mu0 = par.rou * par.vs ** 2
+    m = mat_het_checked(par)
+    amp = abs(m["amp"]) if m else 0.0
+    return mu0 - amp, mu0 + amp

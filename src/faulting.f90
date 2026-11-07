@@ -249,7 +249,9 @@ do ift = 1, ntotft
                 fric(FR_THETA_PC_TRIAL,i,ift) = theta_pc_tmp
                 call rate_state_normal_stress(v_trial, fric(FR_THETA_PC_TRIAL,i,ift), theta_pc_dot, tnrm0, fric(1,i,ift))
                 
-                eta            = mat0(1,2)*mat0(1,3)/2.0d0 
+                ! Radiation damping eta = mu/(2 cs) = sqrt(mu*rho)/2 with the
+                ! local mu at this fault node (uniform unless mat_het).
+                eta            = sqrt(shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))*mat0(1,3))/2.0d0
                 
                 ! Newton-Raphson method to solve the slip_rate from RSF given the tractions and other params for every on-fault grids. Tractions are calculated from the finite element volume and projected to the fault surface. 
                 ! x_n+1 = x_n - f(x_n)/f'(x_n)
@@ -354,11 +356,11 @@ do ift = 1, ntotft
                     fric(FR_THETA_PC,i,ift)      = fric(FR_THETA_PC_TRIAL,i,ift)  ! update state2 at itag == 1
                     ma_bar_ku_arr(i,ift)    = (v_trial - fric(FR_V_FINAL,i,ift)) / dtev1 * mmast * mslav / (mmast + mslav) / fric(FR_ABS_KU,i,ift)
                     ma_bar_ku_arr(i,ift)    = abs(ma_bar_ku_arr(i,ift))
-                    momrate_arr(i,ift)      = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                    momrate_arr(i,ift)      = shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))*v_trial*dx*dx
                                         momRateVW(i,ift)        = 0.0d0
                                         if (bp == 7) then 
                                           if (sqrt(x(1,isn)**2+x(3,isn)**2)<200.0d0) then 
-                                            momRateVW(i,ift)    = mat0(1,2)**2*mat0(1,3)*v_trial*dx*dx
+                                            momRateVW(i,ift)    = shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))*v_trial*dx*dx
                                           endif
                                         endif
                     ruptarea_arr(i,ift)     = 0.0d0
@@ -405,7 +407,7 @@ do ift = 1, ntotft
                 ! boundary artefact -- do not read it as one. Section 4.3
                 ! profiles span exactly +-400 m, and the branch above takes
                 ! x = +-l_f inclusive, so submitted output never contains it.
-                call rsf_rd(tstk0, tnrm0, fric(FR_RSF_A,i,ift), fric(FR_RSF_B,i,ift), fric(FR_RSF_F0,i,ift), fric(FR_RSF_V0,i,ift), mat0(1,2), mat0(1,3), load_slip_rate)
+                call rsf_rd(tstk0, tnrm0, fric(FR_RSF_A,i,ift), fric(FR_RSF_B,i,ift), fric(FR_RSF_F0,i,ift), fric(FR_RSF_V0,i,ift), sqrt(shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))/mat0(1,3)), mat0(1,3), load_slip_rate)
                 
                 v_trial = load_slip_rate
                 fric(FR_V_TRIAL,i,ift) = v_trial

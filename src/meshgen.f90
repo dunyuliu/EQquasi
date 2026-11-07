@@ -441,8 +441,10 @@ subroutine meshgen
                         center(3)=center(3)+x(3,ien(kkk,nelement))
                     enddo
                     center=center/8.0d0
-                    mat(nelement,1) = mat0(1,1) !Vp
-                    mat(nelement,2) = mat0(1,2) !Vs
+                    ! Local mu at the element centre (uniform unless mat_het);
+                    ! density and vp/vs (Poisson's ratio) stay uniform.
+                    mat(nelement,2) = sqrt(shear_modulus_at(center(1), center(2), center(3))/mat0(1,3)) !Vs
+                    mat(nelement,1) = mat(nelement,2)*mat0(1,1)/mat0(1,2) !Vp
                     mat(nelement,3) = mat0(1,3) !Rou
                     mat(nelement,4) = 0.0d0
                     mat(nelement,5) = 0.0d-5                

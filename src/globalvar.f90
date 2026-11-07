@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.21.4'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.22.0'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -172,6 +172,16 @@ MODULE globalvar
     real (kind=dp) :: fluid_WI        ! Peaceman well index, m^3/(Pa s).
     real (kind=dp) :: fluid_pwell = 0.0d0 ! well pressure, Pa.
     real (kind=dp) :: dtmax = 0.0d0   ! cap on the adaptive time step, s. 0 means no cap.
+    ! Optional heterogeneous shear modulus, read from input/mat_het.txt when
+    ! that file exists (scripts/case.setup writes it iff par.mat_het is set).
+    ! Inside the box |x| <= mat_het_box(1), |y| <= mat_het_box(2),
+    ! |z| <= mat_het_box(3):
+    !   mu = mu0 + amp*cos(2 pi x/lx)*cos(2 pi (|z| + z0)/lz),
+    ! with mu0 = rou*vs**2 from model.txt; outside, mu = mu0. Density and
+    ! Poisson's ratio stay uniform (vp/vs is kept). See shear_modulus_at.
+    integer (kind=4) :: mat_het = 0
+    real (kind=dp) :: mat_het_amp = 0.0d0, mat_het_lx = 1.0d0, mat_het_lz = 1.0d0, &
+        mat_het_z0 = 0.0d0, mat_het_box(3) = 0.0d0
     ! Prakash-Clifton relaxation distance for the normal-stress state variable, m.
     !   0.0 : default. No state; strength uses the instantaneous effective
     !         normal stress. This is the zero-relaxation-distance limit and what
@@ -216,4 +226,24 @@ MODULE globalvar
     !        params(AZ_drop) = 0.0d0; options(AZ_solver) = AZ_gmres; options(AZ_precond) = AZ_dom_decomp
     !        options(AZ_subdomain_solve) = AZ_ilu; params(AZ_ilut_fill) = 0;
     !AZTEC_OPTIONS == 3: 
-end MODULE globalvar 
+
+contains
+
+    ! Shear modulus, Pa, at (xc, yc, zc) in m (z negative down). Used for the
+    ! element stiffness (meshgen) and for the fault's radiation damping and
+    ! moment rate (faulting), so both always see the same mu.
+    function shear_modulus_at(xc, yc, zc) result(mu)
+        real (kind=dp), intent(in) :: xc, yc, zc
+        real (kind=dp) :: mu
+        real (kind=dp), parameter :: twopi = 6.283185307179586d0
+        mu = mat0(1,3)*mat0(1,2)**2
+        if (mat_het == 1) then
+            if (abs(xc) <= mat_het_box(1) .and. abs(yc) <= mat_het_box(2) &
+                .and. abs(zc) <= mat_het_box(3)) then
+                mu = mu + mat_het_amp*cos(twopi*xc/mat_het_lx) &
+                    *cos(twopi*(abs(zc) + mat_het_z0)/mat_het_lz)
+            endif
+        endif
+    end function shear_modulus_at
+
+end MODULE globalvar

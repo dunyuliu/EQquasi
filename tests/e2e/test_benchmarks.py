@@ -264,3 +264,47 @@ def test_restart_rejects_mismatched_dip_spacing():
     assert rc_bad != 0, "a mismatched dip-axis spacing did not fail loudly"
     assert "dip-axis node spacing" in log_bad and "does not match" in log_bad, (
         f"failed, but not with the expected message:\n{log_bad[-3000:]}")
+
+
+@pytest.mark.e2e_fast
+def test_mat_het_constant_field_equals_uniform_material():
+    """par.mat_het (v1.22.0) feeds a position-dependent shear modulus to the
+    element stiffness (src/meshgen.f90), the fault's radiation damping and
+    creeping-zone traction (src/faulting.f90) and the CFL step
+    (src/read_input.f90). A field that is constant everywhere -- wavelengths
+    of 1e15 m, a box larger than the model -- must therefore reproduce a
+    uniform model with that same mu bit for bit. It caught a CFL step still
+    using the background vp: 1e-3 relative error after 60 steps.
+    """
+    netCDF4 = pytest.importorskip("netCDF4")
+    compset = "test.bp5.qdc.2000"
+    tail = {
+        "const": "par.nstep = 60\n"
+                 "par.mat_het = dict(amp=4e9, lx=1e15, lz=1e15, z0=0.0, "
+                 "box=(1e9, 1e9, 1e9))\n",
+        "unif": "par.nstep = 60\n"
+                "_mu = par.rou*par.vs**2 + 4e9\n"
+                "_r = par.vp/par.vs\n"
+                "par.vs = (_mu/par.rou)**0.5\n"
+                "par.vp = _r*par.vs\n",
+    }
+    out = {}
+    for name, extra in tail.items():
+        workdir = os.path.join(WORK_ROOT, f"e2e.mat_het_{name}")
+        e = C.env()
+        shutil.rmtree(workdir, ignore_errors=True)
+        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                       cwd=str(ROOT), env=e, check=True, capture_output=True)
+        with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+            f.write(extra)
+        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
+                       capture_output=True)
+        assert os.path.exists(os.path.join(workdir, "input", "mat_het.txt")) == (name == "const")
+        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
+                           capture_output=True, text=True)
+        assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+        out[name] = os.path.join(workdir, "result", "cycle0", "fault.00060.nc")
+
+    with netCDF4.Dataset(out["const"]) as a, netCDF4.Dataset(out["unif"]) as b:
+        for v in ("shear_strike", "slip_rate", "state_variable"):
+            assert (a[v][:] == b[v][:]).all(), f"{v} differs between a constant mat_het field and the uniform model"

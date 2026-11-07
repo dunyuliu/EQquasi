@@ -18,7 +18,8 @@ sys.pycache_prefix = os.path.join(_CASE, "tool", "__pycache__")
 
 from user_defined_params import par
 from defaultParameters import (FR_RSF_A, FR_RSF_B, FR_RSF_DC, FR_RSF_V0,
-    FR_RSF_F0, FR_VINIT, FR_TSTK0, FR_TNRM0, FR_STATE)
+    FR_RSF_F0, FR_VINIT, FR_TSTK0, FR_TNRM0, FR_STATE, mat_het_checked,
+    shear_modulus_range)
 import netCDF4 as nc
 import numpy as np
 
@@ -444,7 +445,8 @@ def report_cohesive_zone():
         print(f"  cohesive zone: not computed, {', '.join(missing)} unset")
         return
 
-    mu_star = par.rou * par.vs ** 2          # shear modulus, Pa
+    # The smallest shear modulus gives the smallest cohesive zone.
+    mu_star = shear_modulus_range(par)[0]    # shear modulus, Pa
     c1 = 9.0 * 3.141592653589793 / 32.0      # Lapusta & Liu (2009), mode III
     lam = c1 * mu_star * par.fric_rsf_Dc / (par.fric_rsf_b * abs(par.init_norm))
     ratio = lam / par.dx
@@ -521,7 +523,7 @@ def report_dtmax_criterion():
     w_vw = min(widths)
     a_vw = float(a_all[vw].min())
     dc_vw = float(dc_all[vw].min())
-    mu = par.rou * par.vs ** 2
+    mu = shear_modulus_range(par)[1]    # the stiffest material loads fastest
     v_pl = max(par.creep_slip_rate, 2.0 * par.far_vel_load)
     caps_on = getattr(par, "C_normal_stress_caps", 0) == 1
     sigma_min = abs(par.min_norm) if caps_on else abs(par.init_norm)
@@ -644,20 +646,20 @@ def create_mat_het_input_file():
     |x| <= bx, |y| <= by, |z| <= bz, and mu0 = rou*vs**2 elsewhere.
     """
     path = inp('mat_het.txt')
-    m = getattr(par, 'mat_het', None)
-    if not m:
+    m = mat_het_checked(par)
+    if m is None:
         if os.path.exists(path):
             os.remove(path)
         return
     mu0 = par.rou*par.vs**2
-    if abs(m['amp']) >= mu0:
-        raise SystemExit(f"case.setup: |par.mat_het['amp']| = {abs(m['amp'])} Pa must be < mu0 = {mu0} Pa.")
+    bx, by, bz = m['box']
     with open(path, 'w') as f:
-        f.write(f"{m['amp']!r} {m['lx']!r} {m['lz']!r} {m.get('z0', 0.0)!r}\n")
-        bx, by, bz = m['box']
+        f.write(f"{m['amp']!r} {m['lx']!r} {m['lz']!r} {m['z0']!r}\n")
         f.write(f"{bx!r} {by!r} {bz!r}\n")
-    print(f"Heterogeneous shear modulus: {(mu0-abs(m['amp']))/1e9:.1f}-{(mu0+abs(m['amp']))/1e9:.1f} GPa "
-          f"inside |x|<={bx/1e3:g} km, |y|<={by/1e3:g} km, depth<={bz/1e3:g} km; {mu0/1e9:.1f} GPa outside.")
+    lo, hi = shear_modulus_range(par)
+    print(f"Heterogeneous shear modulus: {lo/1e9:.1f}-{hi/1e9:.1f} GPa "
+          f"inside |x|<={bx/1e3:g} km, |y|<={by/1e3:g} km, depth<={bz/1e3:g} km; {mu0/1e9:.1f} GPa outside. "
+          "mu jumps at the box edge unless the cosine is zero there.")
 
 def _main_func(description):
   refuse_if_case_has_run()

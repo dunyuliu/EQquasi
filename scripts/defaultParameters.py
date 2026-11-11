@@ -173,7 +173,7 @@ class parameters:
     # in peak slip rate. 0.2 is the default; tighten it per compset if a problem
     # needs it.
     xi = 0.2
-    # Per-node time-step factor of Lapusta et al. (2000), eqs. 11-15. 0.0 : default. Off; every node uses the constant xi above. > 0 : gamma in the single-cell stiffness k = gamma*mu/dx (pi/4 = 0.785 in Lapusta et al. 2000 and Lapusta & Liu 2009); each fault node then gets its own factor from a, b, effective normal stress, Dc and the local shear modulus, capped at xi, so the step shrinks with dx and with stiffer rock. The solver stops (code 13) at a node whose cell is larger than h* = gamma*mu*Dc/((b-a)*sigma).
+    # Per-node time-step factor of Lapusta et al. (2000), eqs. 11-15. 0.0 : default. Off; every node uses the constant xi above. > 0 : gamma in the single-cell stiffness k = gamma*mu/dx (Lapusta et al. 2000, 2D antiplane: pi/4 = 0.785 for the spectral basis, 2/pi = 0.637 for piecewise-uniform cells; neither paper gives a value for 3D hex split nodes, so the choice is the user's); each fault node then gets its own factor from a, b, effective normal stress, Dc and the local shear modulus, capped at xi, so the step shrinks with dx and with stiffer rock. The solver stops (code 13) at a node whose cell is larger than h* = gamma*mu*Dc/((b-a)*sigma).
     xi_gamma = 0.0
     minDc = 0.13 # meters
 

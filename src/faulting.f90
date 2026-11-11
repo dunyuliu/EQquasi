@@ -12,7 +12,7 @@ tmp1,tmp2,tmp3,tmp4,tnrm0,xmu1,xmu2
 
 real (kind = dp) :: dtev1D(maxval(nftnd),ntotft)
 real (kind = dp),dimension(6,2,4)::fvd=0.0d0
-real (kind = dp)::fa, fb, phi
+real (kind = dp)::fa, fb, phi, xi_node
 real (kind = dp) :: rr,R0,T,dtao0, dtao, mr!RSF
 real (kind = dp) :: statetmp, eta!RSF
 integer (kind=4) :: iv
@@ -449,7 +449,21 @@ do ift = 1, ntotft
             endif
             
             ! update new time step size according to new slip rate v_trial.
-            dtev1D(i,ift) = ksi * fric(FR_RSF_DC,i,ift)/v_trial
+            ! xi_gamma > 0: the factor is the node's own, from single-cell
+            ! stability (Lapusta et al. 2000, eq. 15), capped at ksi.
+            xi_node = ksi
+            if (xi_gamma > 0.0d0) then
+                call lapusta_xi(xi_gamma*shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))/dx*fric(FR_RSF_DC,i,ift), &
+                    fric(FR_RSF_A,i,ift)*abs(fric(FR_TNRM,i,ift)), fric(FR_RSF_B,i,ift)*abs(fric(FR_TNRM,i,ift)), &
+                    ksi, xi_node)
+                if (xi_node <= 0.0d0) then
+                    write(*,*) 'lapusta_xi: no stable step at fault node x,z = ', x(1,isn), x(3,isn)
+                    write(*,*) 'a*sigma <= 0, or the cell is larger than h* = gamma*mu*Dc/((b-a)*sigma).'
+                    write(*,*) 'Refine dx, or set par.xi_gamma = 0 to use the constant par.xi.'
+                    stop 13
+                endif
+            endif
+            dtev1D(i,ift) = xi_node * fric(FR_RSF_DC,i,ift)/v_trial
             
             ! [WARNING]: exit the code if time step size is negative.
             if (dtev1D(i,ift) < 0) then

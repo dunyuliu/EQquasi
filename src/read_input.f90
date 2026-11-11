@@ -215,6 +215,25 @@ subroutine readmodel
             write(*,*) 'model.txt: enlarging_ratio_xz must be >= 1, got ', ratxz
             stop 11
         endif
+        ! Lapusta et al. (2000) per-node time-step factor (1.23). A KEYWORD
+        ! line, 'xi_gamma <value>', after enlarging_ratio_xz and before
+        ! faultgeom: counting numbers cannot tell another bare scalar from
+        ! the one above. Absent (a model.txt from before 1.23, or the next
+        ! record is faultgeom) -> put the line back, xi_gamma stays 0 = off.
+        xi_gamma = 0.0d0
+        read(1002,'(A)',iostat=ios) capsLine
+        if (ios == 0) then
+            if (index(adjustl(capsLine), 'xi_gamma') == 1) then
+                capsLine = adjustl(capsLine)
+                read(capsLine(9:),*,iostat=iosCaps) xi_gamma
+                if (iosCaps /= 0 .or. xi_gamma < 0.0d0) then
+                    write(*,*) 'model.txt: expected "xi_gamma <value >= 0>", got: ', trim(capsLine)
+                    stop 13
+                endif
+            else
+                backspace(1002)
+            endif
+        endif
         ! Optional per-fault geometry block, one line per fault:
         !   xlo xhi ycoor zlo zhi   (meters)
         ! Appended after the bp8 block and read with iostat so a model.txt
@@ -236,6 +255,8 @@ subroutine readmodel
         enddo
     ! One explicit switch. No C_elastic gate, no rough_fault coupling.
     capsActive = (C_normal_stress_caps == 1)
+    if (me == 0 .and. xi_gamma > 0.0d0) write(*,'(X,A,F6.3,A,F6.3,A)') &
+        '= time step: Lapusta et al. (2000) per-node xi, gamma = ', xi_gamma, ', cap ', ksi, ' ='
     if (me == 0 .and. ratxz /= 1.0d0) write(*,'(X,A,F6.3,A)') &
         '= x/z cells grow by ', ratxz, ' per step outside the fault box ='
     ! Always state it: the only way to know caps are on is to be told.

@@ -133,3 +133,32 @@ SUBROUTINE rate_state_slip_law(V2,psi,fricsgl,xmu,dxmudv)
 
 end SUBROUTINE rate_state_slip_law
 
+
+!================================================
+
+SUBROUTINE lapusta_xi(kL, A, B, xic, xi)
+  ! Per-cell time-step factor of Lapusta, Rice, Ben-Zion & Zheng (2000, JGR
+  ! 105, 23765), eqs. 15a-c: the largest xi in dt = xi*L/V for which a
+  ! perturbation of ONE cell about steady sliding still decays under explicit
+  ! quasi-static stepping.
+  !   kL = k*L, k = gamma*mu/h the single-cell stiffness (their eq. 9-10)
+  !   A  = a*sigma (A* = V dtau/dV), B = b*sigma (A* - B* = V dtau_ss/dV)
+  !   xic = cap (1/2 in the paper; Lapusta & Liu 2009 use 1/5)
+  ! Returns xi <= 0 when the rule gives no stable step: A <= 0 (eq. 12 assumes
+  ! a direct effect) or kL <= B - A (the cell is larger than h*). The caller
+  ! stops; nothing is substituted here (rule 2).
+  use globalvar, only : dp
+  implicit none
+  real (kind = dp), intent(in)  :: kL, A, B, xic
+  real (kind = dp), intent(out) :: xi
+  real (kind = dp) :: chi
+  xi = -1.0d0
+  if (A <= 0.0d0 .or. kL <= 0.0d0) return
+  chi = 0.25d0*(kL/A - (B - A)/A)**2 - kL/A
+  if (chi > 0.0d0) then
+    if (kL - (B - A) <= 0.0d0) return
+    xi = min(A/(kL - (B - A)), xic)
+  else
+    xi = min(1.0d0 - (B - A)/kL, xic)
+  endif
+end SUBROUTINE lapusta_xi

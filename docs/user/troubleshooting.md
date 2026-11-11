@@ -34,6 +34,7 @@ codes. The launcher normally passes the code through as the exit status.
 | 10 | BP8 Peaceman well: the equivalent radius is not larger than `fluid_rwell`. | Increase `dx` or decrease `fluid_rwell`. |
 | 11 | `model.txt` has a malformed `enlarging_ratio_xz` line, or the value is below 1. | Set `enlarging_ratio_xz >= 1` and rerun `case.setup`. |
 | 12 | BP8: the fault's node count is not a whole number of columns, so the pore-pressure stencil would use the wrong neighbours. | Check that the fault's z extent is a whole multiple of `dx`. |
+| 13 | `model.txt` has a malformed `xi_gamma` line, or `xi_gamma > 0` and a fault node has no stable time step: `a*sigma <= 0`, or its cell is larger than h* = gamma*mu*Dc/((b-a)*sigma) (Lapusta et al. 2000, eq. 10). | Refine `dx`, or set `xi_gamma = 0` to use the constant `xi`. |
 | 501 | Zero mass at a fault node. The message prints the node's coordinates. | Check the fault geometry and mesh near that point. |
 | 502 | A negative time step was computed from a negative trial slip rate: the run has become unstable at that node. | The message prints the location and the slip rate; inspect the fault state there. |
 | 508 | The effective normal stress at a node is no longer compressive, so rate-and-state friction has no solution. The message prints the time, location, and stresses. | Common at the tips of step-overs, bends and rough faults. Normal-stress caps (`C_normal_stress_caps = 1`) are the regularization `case.setup` suggests. |

@@ -56,6 +56,9 @@ slipruptarea_arr = 0.0d0
 dtev1D = huge(1.0d0)
 do ift = 1, ntotft
     do i=1,nftnd(ift)    !just fault nodes
+        if (ddActive) then
+            if (.not. fltMine(i,ift)) cycle ! par.solver = 3: another rank owns it.
+        endif
         fnfault = fric(FR_TNRM0,i,ift) !initial forces on the fault node
         fsfault = fric(FR_TSTK0,i,ift) !norm, strike, dip components directly
         if (icstart ==1) then
@@ -520,7 +523,7 @@ do ift = 1, ntotft
     enddo    !ending i
 enddo ! ending ift
 
-    if (me == 0) call output_prof
+    if (me == 0 .and. .not. ddActive) call output_prof ! solver 3 gathers first, then calls it.
 
     if (itag==1) then
         pma             = maxval(ma_bar_ku_arr)

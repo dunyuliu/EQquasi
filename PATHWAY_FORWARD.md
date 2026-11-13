@@ -1,6 +1,6 @@
 # Pathway forward
 
-Open work only. Updated 2026-10-08, at v1.21.2.
+Open work only. Updated 2026-11-13, at v1.22.0.
 
 Close an item by deleting it, and record what was learned where it will be
 read again: `PROJECT_RULES.md` for a rule, `data/<bench>/README.md` for a
@@ -46,6 +46,57 @@ build, run and traps are in `CLAUDE.md`.
    `cpu_time` calls). Recommendation (not acted on -- rule 1, new-compset
    naming needs agreement): register the -1500/1500 wide box as its own
    compset (e.g. `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
+   **Owner direction, 2026-11-13**: "i think we can domain decompose from the
+   beginning with petcs?"; on the three changes below, "all three changes
+   sounds great". Why: the time loop is two triangular solves per step and
+   those do not scale (above; Wang 2026 Case 3a, 3.61M eq, 24 ranks, v1.22.0:
+   factorization 137 s, time loop 15093 s per cycle, ~6.5 s/step). The PETSc
+   path today is not a domain decomposition: rows are split by `PETSC_DECIDE`,
+   rank 0 builds the whole RHS and receives the whole solution
+   (`VecScatterCreateToZero`), and the default solve is still MUMPS. The
+   three changes, in the Fortran PETSc path, replacing (c)/(d):
+   (e) each rank owns a block of the mesh: it generates only its own
+   elements (the generator is analytic, no partitioner), assembles its own
+   rows and RHS, and runs friction and pore pressure on its own fault nodes;
+   (f) memory scales out: no rank holds the full mesh or the global factors
+   (79 GB at 10 m BP8 wide, 141 GB in-core estimate at Case 3);
+   (g) subdomain matrices kept unassembled (`MATIS`) and solved with
+   `PCBDDC`, the setup built once and reused every step (K is constant).
+   (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
+   One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
+   `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS
+   matches the gold on every gated compset and is no slower per step than
+   native MUMPS; PETSc builds on every supported machine (today only
+   `conda-linux` links it); one assembly path serves both `MATIS` and AIJ;
+   what `par.solver` then means is agreed first (rule 1).
+   Two design principles for all of (e)-(h), owner 2026-11-13: "things
+   parallelize from beginning, and thing that can armotize once should be
+   done that way".
+   Parallel from the beginning: no rank-0 phase anywhere -- mesh, numbering,
+   assembly, initial conditions, friction, pore pressure, station and fault
+   output are all per-rank.
+   Amortize once: whatever does not change is built once and reused -- the
+   solver setup across steps (K is constant); mesh, partition and setup
+   across the cycles of a run (each cycle rebuilds and refactorizes today,
+   137 s per cycle at Case 3); and, as a candidate to measure, the fault
+   slip-to-traction operator (row 4's note), which would amortize the volume
+   solve itself across steps and across runs on one mesh and modulus.
+   Design choices shown to the owner 2026-11-13, answer "go":
+   a new distributed time loop beside the two existing ones, which retire
+   only at (h), so the gold gate stays meaningful throughout; a regular
+   x-y-z block decomposition from the analytic generator, not `DMPlex`;
+   split fault nodes may cross subdomain boundaries, with a ghost exchange
+   per step for friction; the fault slip-to-traction operator is a measured
+   side experiment, outside (e)-(h); an iterative solve is held to parity
+   within a stated tolerance, shown not to move event times. Still to
+   agree at (h): what `par.solver` means, and PETSc as a hard dependency.
+   Evidence: parity to the gold at each of (e)-(h), and the per-step table
+   against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
+   Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).
+   Host, owner 2026-11-13: "do it on cotopaxi" (64 cores, the
+   `eqquasi-petsc` env is on the shared home). Timings there are not
+   comparable with the theo4 numbers above: re-measure native MUMPS on
+   cotopaxi as the baseline first.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

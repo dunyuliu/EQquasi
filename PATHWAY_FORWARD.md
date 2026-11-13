@@ -47,26 +47,26 @@ build, run and traps are in `CLAUDE.md`.
    naming needs agreement): register the -1500/1500 wide box as its own
    compset (e.g. `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
    **Owner direction, 2026-11-13**: "i think we can domain decompose from the
-   beginning with petcs?"; on the three-step plan below, "all three changes
+   beginning with petcs?"; on the three changes below, "all three changes
    sounds great". Why: the time loop is two triangular solves per step and
    those do not scale (above; Wang 2026 Case 3a, 3.61M eq, 24 ranks, v1.22.0:
    factorization 137 s, time loop 15093 s per cycle, ~6.5 s/step). The PETSc
    path today is not a domain decomposition: rows are split by `PETSC_DECIDE`,
    rank 0 builds the whole RHS and receives the whole solution
-   (`VecScatterCreateToZero`), and the default solve is still MUMPS. These
-   steps follow (b) and replace (c)/(d) where they overlap:
-   (e) on the FEniCSx prototype (distributed from the start), measure
-   BDDC vs AMG vs MUMPS per-solve time at 8/16/32 ranks on the Case 3 and
-   10 m BP8 wide meshes. This is a solver timing, not backend parity, so it
-   does not wait on row 3;
-   (f) in the Fortran, geometric ownership: each rank generates its own block
-   of the mesh, assembles its own rows and RHS, and runs friction and pore
-   pressure on its own fault nodes; MUMPS kept, parity to the gold;
-   (g) `MATIS` + `PCBDDC` with the setup reused across steps, only if (e)
-   shows it beats MUMPS at the BP8 10 m size.
-   Not yet agreed: the fault-condensed slip-to-traction operator (row 4's
-   note) as a fourth route. Blocked today: every timing run needs theo4, and
-   this session has no SSH to it.
+   (`VecScatterCreateToZero`), and the default solve is still MUMPS. The
+   three changes, in the Fortran PETSc path, replacing (c)/(d):
+   (e) each rank owns a block of the mesh: it generates only its own
+   elements (the generator is analytic, no partitioner), assembles its own
+   rows and RHS, and runs friction and pore pressure on its own fault nodes;
+   (f) memory scales out: no rank holds the full mesh or the global factors
+   (79 GB at 10 m BP8 wide, 141 GB in-core estimate at Case 3);
+   (g) subdomain matrices kept unassembled (`MATIS`) and solved with
+   `PCBDDC`, the setup built once and reused every step (K is constant).
+   Evidence: parity to the gold at each of (e)-(g), and the per-step table
+   against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
+   Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).
+   Blocked today: every build and timing run needs theo4, and this session
+   has no SSH to it.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

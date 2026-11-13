@@ -131,3 +131,22 @@ build, run and traps are in `CLAUDE.md`.
    after row 3 (the Fortran gold must be right); BP5 and step-over parity
    first, BP8 against Kim. The prototype's precomputed slip-to-traction matrix
    (quasi-static, linear) is also a scaling idea for row 1.
+6. [ ] **P2 -- Time-step factor xi above the stability limit.** Owner,
+   2026-11-13: "that ksi lesson, put on board". Lesson: a constant `par.xi`
+   above the Lapusta et al. (2000) eq. 15 limit makes the time step
+   oscillate between events. Reported by the session that ran the
+   comparison, unaudited here: Wang 2026 Case 3 at 1 km with xi 0.2
+   (`runs/20261106_wang2026_case3/{c3a,c3b}`, `result/cycle*/global.dat`),
+   90-97 % of interseismic steps reverse the sign of the step-to-step change
+   in log10 Vmax; with per-node xi (PR #72, `par.xi_gamma = pi/4`) 0-1 %.
+   The eq. 15 limit with k = gamma mu / h, a 0.005, b 0.01, L 0.05 m,
+   sigma 25 MPa, 36 GPa is 0.097 at 1 km and 0.046 at 500 m, so xi 0.2 at
+   1 km is about twice too large. Event times at 1 km moved by at most
+   0.8 yr over five events; the defect is between events, not in the cycles.
+   Open, owner's call: (a) `case.setup` computes the eq. 15 limit from
+   material, h and friction and warns or stops when `par.xi` exceeds it;
+   (b) per-node xi as the default with `par.xi` as the cap; (c) PR #72's
+   open audit items -- `xi_gamma = NaN` silently off, the stop-13 check also
+   runs at creeping nodes, stop 13 exits without `MPI_Abort`.
+   Done when: PR #72 is merged or closed with (c) resolved, and (a) and (b)
+   are each decided and, if yes, landed with a test.

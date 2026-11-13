@@ -638,8 +638,8 @@ subroutine solveTimeLoopPETScDD
             endif
         enddo
 
-        ! bp5 profile file (output_prof, same schedule as inside faulting).
-        wantProf = (bp == 5) .and. ((status1 == 0 .and. mod(it,20) == 1) .or. &
+        ! bp5/bp7 profile files (output_prof, same schedule as inside faulting).
+        wantProf = (bp == 5 .or. bp == 7) .and. ((status1 == 0 .and. mod(it,20) == 1) .or. &
             (status1 == 1 .and. mod(it,10) == 0))
         if (wantProf) then
             call ddGatherFault

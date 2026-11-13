@@ -62,7 +62,14 @@ build, run and traps are in `CLAUDE.md`.
    (79 GB at 10 m BP8 wide, 141 GB in-core estimate at Case 3);
    (g) subdomain matrices kept unassembled (`MATIS`) and solved with
    `PCBDDC`, the setup built once and reused every step (K is constant).
-   Evidence: parity to the gold at each of (e)-(g), and the per-step table
+   (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
+   One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
+   `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS
+   matches the gold on every gated compset and is no slower per step than
+   native MUMPS; PETSc builds on every supported machine (today only
+   `conda-linux` links it); one assembly path serves both `MATIS` and AIJ;
+   what `par.solver` then means is agreed first (rule 1).
+   Evidence: parity to the gold at each of (e)-(h), and the per-step table
    against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
    Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).
    Blocked today: every build and timing run needs theo4, and this session

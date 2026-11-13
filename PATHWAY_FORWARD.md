@@ -84,8 +84,10 @@ build, run and traps are in `CLAUDE.md`.
    Evidence: parity to the gold at each of (e)-(h), and the per-step table
    against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
    Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).
-   Blocked today: every build and timing run needs theo4, and this session
-   has no SSH to it.
+   Host, owner 2026-11-13: "do it on cotopaxi" (64 cores, the
+   `eqquasi-petsc` env is on the shared home). Timings there are not
+   comparable with the theo4 numbers above: re-measure native MUMPS on
+   cotopaxi as the baseline first.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

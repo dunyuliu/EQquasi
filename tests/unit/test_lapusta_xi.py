@@ -81,3 +81,15 @@ def test_call_site_passes_the_right_quantities():
     f = " ".join(read("src/faulting.f90").split())
     assert ("call lapusta_xi(xi_gamma*shear_modulus_at(x(1,isn), x(2,isn), x(3,isn))/dx*fric(FR_RSF_DC,i,ift), & "
             "fric(FR_RSF_A,i,ift)*abs(fric(FR_TNRM,i,ift)), fric(FR_RSF_B,i,ift)*abs(fric(FR_TNRM,i,ift)), & ksi, xi_node)") in f
+
+
+def test_audit_fixes_pinned():
+    """PR #72 audit: NaN xi_gamma refused (Python and Fortran), per-node xi only at
+    frictional nodes, and a failed per-node rule aborts every rank."""
+    f = read("src/faulting.f90")
+    assert "call MPI_Abort(MPI_COMM_WORLD, 13, ierr_abort)" in f
+    assert "stop 13" not in f
+    assert ("if (xi_gamma > 0.0d0 .and. abs(x(3,isn)) <= abs(zminc) &" in f
+            and ".and. x(1,isn) <= xmaxc .and. x(1,isn) >= xminc) then" in f)
+    assert ".not. (xi_gamma >= 0.0d0 .and. xi_gamma <= 1.0d6)" in read("src/read_input.f90")
+    assert "math.isfinite(float(par.xi_gamma))" in read("scripts/case.setup")

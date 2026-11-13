@@ -226,8 +226,11 @@ subroutine readmodel
             if (index(adjustl(capsLine), 'xi_gamma') == 1) then
                 capsLine = adjustl(capsLine)
                 read(capsLine(9:),*,iostat=iosCaps) xi_gamma
-                if (iosCaps /= 0 .or. xi_gamma < 0.0d0) then
-                    write(*,*) 'model.txt: expected "xi_gamma <value >= 0>", got: ', trim(capsLine)
+                ! .not.(>= 0) also rejects NaN, which fails every comparison and
+                ! would otherwise pass "< 0" and then turn the feature off at
+                ! "xi_gamma > 0" without a word. Huge values are caught too.
+                if (iosCaps /= 0 .or. .not. (xi_gamma >= 0.0d0 .and. xi_gamma <= 1.0d6)) then
+                    write(*,*) 'model.txt: expected "xi_gamma <finite value >= 0>", got: ', trim(capsLine)
                     stop 13
                 endif
             else

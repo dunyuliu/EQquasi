@@ -4,6 +4,7 @@ Script to setup the case via user_defined_params.py.
 """
 import os
 import sys
+import math
 
 # The case root holds only user_defined_params.py and this script; the modules
 # they import (defaultParameters.py, lib.py) live under tool/, and the files
@@ -88,6 +89,9 @@ def create_model_input_file():
         # Lapusta et al. (2000) per-node time-step factor (1.23). A keyword
         # line, so read_input.f90 can tell it from the bare scalar above and
         # from faultgeom below; 0 = off, the constant par.xi everywhere.
+        # NaN would fail every Fortran comparison; refuse it (and inf, < 0) here.
+        if not (math.isfinite(float(par.xi_gamma)) and float(par.xi_gamma) >= 0.0):
+            raise SystemExit(f"case.setup: par.xi_gamma must be finite and >= 0 (0 = off), got {par.xi_gamma!r}")
         f.write("xi_gamma  " + str(par.xi_gamma) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the

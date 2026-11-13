@@ -1,6 +1,6 @@
 # Pathway forward
 
-Open work only. Updated 2026-10-08, at v1.21.2.
+Open work only. Updated 2026-11-13, at v1.22.0.
 
 Close an item by deleting it, and record what was learned where it will be
 read again: `PROJECT_RULES.md` for a rule, `data/<bench>/README.md` for a
@@ -46,6 +46,27 @@ build, run and traps are in `CLAUDE.md`.
    `cpu_time` calls). Recommendation (not acted on -- rule 1, new-compset
    naming needs agreement): register the -1500/1500 wide box as its own
    compset (e.g. `bp8.qdc.gs.10.wide`) instead of leaving it only in `scratch/`.
+   **Owner direction, 2026-11-13**: "i think we can domain decompose from the
+   beginning with petcs?"; on the three-step plan below, "all three changes
+   sounds great". Why: the time loop is two triangular solves per step and
+   those do not scale (above; Wang 2026 Case 3a, 3.61M eq, 24 ranks, v1.22.0:
+   factorization 137 s, time loop 15093 s per cycle, ~6.5 s/step). The PETSc
+   path today is not a domain decomposition: rows are split by `PETSC_DECIDE`,
+   rank 0 builds the whole RHS and receives the whole solution
+   (`VecScatterCreateToZero`), and the default solve is still MUMPS. These
+   steps follow (b) and replace (c)/(d) where they overlap:
+   (e) on the FEniCSx prototype (distributed from the start), measure
+   BDDC vs AMG vs MUMPS per-solve time at 8/16/32 ranks on the Case 3 and
+   10 m BP8 wide meshes. This is a solver timing, not backend parity, so it
+   does not wait on row 3;
+   (f) in the Fortran, geometric ownership: each rank generates its own block
+   of the mesh, assembles its own rows and RHS, and runs friction and pore
+   pressure on its own fault nodes; MUMPS kept, parity to the gold;
+   (g) `MATIS` + `PCBDDC` with the setup reused across steps, only if (e)
+   shows it beats MUMPS at the BP8 10 m size.
+   Not yet agreed: the fault-condensed slip-to-traction operator (row 4's
+   note) as a fourth route. Blocked today: every timing run needs theo4, and
+   this session has no SSH to it.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

@@ -69,6 +69,18 @@ build, run and traps are in `CLAUDE.md`.
    native MUMPS; PETSc builds on every supported machine (today only
    `conda-linux` links it); one assembly path serves both `MATIS` and AIJ;
    what `par.solver` then means is agreed first (rule 1).
+   Two design principles for all of (e)-(h), owner 2026-11-13: "things
+   parallelize from beginning, and thing that can armotize once should be
+   done that way".
+   Parallel from the beginning: no rank-0 phase anywhere -- mesh, numbering,
+   assembly, initial conditions, friction, pore pressure, station and fault
+   output are all per-rank.
+   Amortize once: whatever does not change is built once and reused -- the
+   solver setup across steps (K is constant); mesh, partition and setup
+   across the cycles of a run (each cycle rebuilds and refactorizes today,
+   137 s per cycle at Case 3); and, as a candidate to measure, the fault
+   slip-to-traction operator (row 4's note), which would amortize the volume
+   solve itself across steps and across runs on one mesh and modulus.
    Evidence: parity to the gold at each of (e)-(h), and the per-step table
    against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
    Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).

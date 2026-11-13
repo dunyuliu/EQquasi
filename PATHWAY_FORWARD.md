@@ -81,6 +81,15 @@ build, run and traps are in `CLAUDE.md`.
    137 s per cycle at Case 3); and, as a candidate to measure, the fault
    slip-to-traction operator (row 4's note), which would amortize the volume
    solve itself across steps and across runs on one mesh and modulus.
+   Design choices shown to the owner 2026-11-13, answer "go":
+   a new distributed time loop beside the two existing ones, which retire
+   only at (h), so the gold gate stays meaningful throughout; a regular
+   x-y-z block decomposition from the analytic generator, not `DMPlex`;
+   split fault nodes may cross subdomain boundaries, with a ghost exchange
+   per step for friction; the fault slip-to-traction operator is a measured
+   side experiment, outside (e)-(h); an iterative solve is held to parity
+   within a stated tolerance, shown not to move event times. Still to
+   agree at (h): what `par.solver` means, and PETSc as a hard dependency.
    Evidence: parity to the gold at each of (e)-(h), and the per-step table
    against native MUMPS at 8/16/32 ranks on bp1002 and 10 m BP8 wide.
    Unmeasured: whether BDDC beats MUMPS at these sizes (CG+GAMG did not).

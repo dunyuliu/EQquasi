@@ -70,6 +70,9 @@ build, run and traps are in `CLAUDE.md`.
    subdomain you can use mumps with much less memory cost, then it also
    sounds a good strategy." (verbatim; read as: a subdomain-wise direct
    solve under an outer Krylov iteration is also a candidate.)
+   Owner, 2026-11-14: "you can just factorize once and just solve for each
+   subdomain and then piece them together. But you just factorize once."
+   (verbatim.)
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

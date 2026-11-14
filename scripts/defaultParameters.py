@@ -173,6 +173,8 @@ class parameters:
     # in peak slip rate. 0.2 is the default; tighten it per compset if a problem
     # needs it.
     xi = 0.2
+    # Per-node time-step factor of Lapusta et al. (2000), eqs. 11-15. 0.0 : default. Off; every node uses the constant xi above. > 0 : gamma in the single-cell stiffness k = gamma*mu/dx (Lapusta et al. 2000, 2D antiplane: pi/4 = 0.785 for the spectral basis, 2/pi = 0.637 for piecewise-uniform cells; neither paper gives a value for 3D hex split nodes, so the choice is the user's); each fault node then gets its own factor from a, b, effective normal stress, Dc and the local shear modulus, capped at xi, so the step shrinks with dx and with stiffer rock. The solver stops (code 13) at a node whose cell is larger than h* = gamma*mu*Dc/((b-a)*sigma).
+    xi_gamma = 0.0
     minDc = 0.13 # meters
 
     # loading 
@@ -365,6 +367,19 @@ def shear_modulus_at(par, x, y, depth):
     pert = m["amp"] * np.cos(2 * pi * x / m["lx"]) \
         * np.cos(2 * pi * (np.abs(depth) + m["z0"]) / m["lz"])
     return mu0 + np.where(inside, pert, 0.0)
+
+
+def lapusta_xi(kL, A, B, xic):
+    """Per-cell time-step factor of Lapusta et al. (2000), eqs. 15a-c; the
+    mirror of lapusta_xi in src/fric.f90. kL = gamma*mu/dx*Dc, A = a*sigma,
+    B = b*sigma, xic the cap. Returns a value <= 0 when the rule gives no
+    stable step (A <= 0, or the cell is larger than h*)."""
+    if A <= 0.0 or kL <= 0.0:
+        return -1.0
+    chi = 0.25 * (kL / A - (B - A) / A) ** 2 - kL / A
+    if chi > 0.0:
+        return min(A / (kL - (B - A)), xic) if kL > B - A else -1.0
+    return min(1.0 - (B - A) / kL, xic)
 
 
 def shear_modulus_range(par):

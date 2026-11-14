@@ -146,6 +146,10 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
   xi, minimum Dc Lapusta et al. (2009) time-step factor, dtev = xi*Dc/Vmax. Measured for BP8 at dx = 50 m: 0.05, 0.1 and 0.2 cost the same wall clock for a given step count but reach 6.0, 17.0 and 22.3 days, agreeing to 0.003 log units in peak slip rate. 0.2 is the default; tighten it per compset if a problem needs it.
 
+* **`xi_gamma`** -- default `0.0`
+
+  Per-node time-step factor of Lapusta et al. (2000), eqs. 11-15. 0.0 : default. Off; every node uses the constant xi above. > 0 : gamma in the single-cell stiffness k = gamma*mu/dx (Lapusta et al. 2000, 2D antiplane: pi/4 = 0.785 for the spectral basis, 2/pi = 0.637 for piecewise-uniform cells; neither paper gives a value for 3D hex split nodes, so the choice is the user's); each fault node then gets its own factor from a, b, effective normal stress, Dc and the local shear modulus, capped at xi, so the step shrinks with dx and with stiffer rock. The solver stops (code 13) at a node whose cell is larger than h* = gamma*mu*Dc/((b-a)*sigma).
+
 * **`minDc`** -- default `0.13`
 
   meters

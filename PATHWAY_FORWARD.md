@@ -66,6 +66,10 @@ build, run and traps are in `CLAUDE.md`.
    It's symmetric. You can use maybe just a regular CG or GRMS." (verbatim;
    read as: try plain Krylov, CG or GMRES, on the distributed matrix, not
    only BDDC with direct local solves.)
+   Owner, 2026-11-14: "If you cut the domain into subdomains, and each
+   subdomain you can use mumps with much less memory cost, then it also
+   sounds a good strategy." (verbatim; read as: a subdomain-wise direct
+   solve under an outer Krylov iteration is also a candidate.)
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

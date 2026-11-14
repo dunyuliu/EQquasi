@@ -97,6 +97,42 @@ build, run and traps are in `CLAUDE.md`.
    `eqquasi-petsc` env is on the shared home). Timings there are not
    comparable with the theo4 numbers above: re-measure native MUMPS on
    cotopaxi as the baseline first.
+   **State, 2026-11-14** (MEASURED, not VERIFIED; no independent oracle).
+   (e) stack, nothing merged, held on the owner's answer for `par.solver = 3`
+   and `src/solveTimeLoopPETScDD.f90`: #76 (v1.24.0) <- #77 <- #82 <- #83
+   <- #85 (v1.24.4: coverage of z and corner blocks, the well path, an abort;
+   `nsmp` padding zeroed). #85 own gate at 81629ad from a fresh clone: fast
+   287 passed, `-m e2e_fast` 53 passed / 21 skipped (data absence in the
+   reference), CI run 43583429026 success. (g) `MATIS` + `PCBDDC`: first
+   spike run was invalid (stopped on an absolute tolerance at iteration 1,
+   wrong output), probe being fixed; no BDDC number yet.
+   Evidence, binary eqquasi-1.24.3 (`dd-2c` ae7e3b1), host cotopaxi, NOT
+   exclusive (loadavg of other users 4-13 before each run, rank-0
+   `cpu_time`; `runs/20261114_row1-evidence/table.csv`, `matrix.out`,
+   `load.log`). bp1002 101 steps, time loop s; wide = 10 m BP8 wide, 10 steps,
+   s/step; solver 1 native MUMPS, solver 3 distributed loop:
+   | case | ranks | s1 | s3 | max RSS per rank GB, s1 / s3 |
+   |---|---|---|---|---|
+   | bp1002 | 8 | 66.5 | 20.2 | 0.64 / 0.49 |
+   | bp1002 | 16 | 65.6 | 18.6 | 0.56 / 0.33 |
+   | bp1002 | 32 | 64.2 | 14.5 | 0.44 / 0.21 |
+   | wide | 8 | 14.80 | 11.01 | 25.7 / 21.0 |
+   | wide | 16 | 11.58 | 9.01 | 16.7 / 11.9 |
+   | wide | 32 | 9.43 | 6.36 | 11.2 / 6.9 |
+   Single rank, solver 3: bp1002 56.9 s loop, 1.95 GB; wide 101.3 GB, 62 s/step
+   over 3 steps, factorization 3269 s. (f): the largest rank holds 21 / 12 /
+   7 % of the single-rank total on wide at 8 / 16 / 32 ranks (25 / 17 / 11 %
+   on bp1002 at 0.49 / 0.33 / 0.21 of 1.95 GB), so no rank holds the whole
+   problem; the sum over ranks is 1.5-1.8x the single-rank total (150 / 176
+   / 185 GB), the factors' fill grows with ranks. Peak RSS is the process
+   total (MUMPS factors dominate), the mesh-only share is not separated.
+   Not at the target: wide solver 3 at 32 ranks is 6.36 s/step against
+   <= 5 s, on a loaded host. bp1002 solver 1 is flat in rank count (66.5 /
+   65.6 / 64.2); solver 3 falls 28 % over 4x ranks but a conductor's earlier
+   run of the same case measured 13.7 / 13.5 / 13.1 at lower load, so the
+   rank-count trend is not established. What dominates bp1002 at 8 ranks:
+   KSPSolve is 95 % of the solver 3 time loop (spike log, one run). A
+   host-exclusive repeat is needed before any scaling claim.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

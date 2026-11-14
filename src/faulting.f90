@@ -633,6 +633,7 @@ subroutine check_effective_normal(tnrm0, i, ift, isn)
 
     use globalvar
     implicit none
+    include 'mpif.h'
 
     real (kind = dp), intent(in) :: tnrm0
     integer (kind = 4), intent(in) :: i, ift, isn
@@ -650,6 +651,11 @@ subroutine check_effective_normal(tnrm0, i, ift, isn)
     write(*,*) '= Clamping this to zero would return NaN from the Newton solve and  ='
     write(*,*) '= silently corrupt every later output row, so the run stops here.   ='
     write(*,*) '===================================================================='
+    ! par.solver = 3: only the rank that owns the node gets here; stop them all.
+    if (ddActive) then
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 508, IERR)
+    endif
     stop 508
 
 end subroutine check_effective_normal

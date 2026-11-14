@@ -508,6 +508,14 @@ def _dd_station_series(gpath, rpath):
     ncols = g.shape[1]
     if ncols not in layouts:
         return False, f"{ncols} columns: not a station layout this comparison knows"
+    # A non-finite reference entry makes its column's scale, hence its
+    # tolerance, infinite: the column would pass whatever the run holds. No
+    # committed reference holds an inf or nan and no case documents one
+    # (rg over data/), so there is no both-inf exemption (rule 2).
+    if not np.isfinite(g).all():
+        i, j = (int(k[0]) for k in np.nonzero(~np.isfinite(g)))
+        return False, (f"{os.path.basename(gpath)}: reference column {j+1} holds {g[i, j]} at row {i}; "
+                       f"a non-finite reference disables the column's check")
     col_rtol = C.column_printed_rtol(gpath, ncols, DD_RTOL)
     with np.errstate(invalid="ignore", over="ignore"):
         diff = np.abs(r - g)
@@ -516,6 +524,13 @@ def _dd_station_series(gpath, rpath):
         for j, vec, log10 in layouts[ncols]:
             lin = (lambda a: 10.0 ** a) if log10 else (lambda a: a)
             vscale = max(np.abs(lin(g[:, c])).max() for c in vec)
+            # ATOL_MACHINE_NOISE (1e-18) is added here, in linear units, to the
+            # dip column j only: on the log10 slip-rate column it is 1e-18 m/s,
+            # the MPI-reduction noise of a rate that is zero by symmetry (cases.
+            # _scaled_tol), nine orders above +-1e-27 and nine below creep.
+            # The strike column never enters this `&=`; `own` judges it, in
+            # log10 units, where 1e-18 is inert (test_dd_station_series_noise_
+            # floor_applies_to_dip_rate_column_only).
             bad[:, j] &= ~(np.abs(lin(r[:, j]) - lin(g[:, j]))
                            <= DD_RTOL * vscale + C.ATOL_MACHINE_NOISE)
         ratio = np.where(bad, diff / np.maximum(own, 1e-300), 0.0)
@@ -698,6 +713,23 @@ def test_distributed_loop_matches_petsc_loop_z_and_corner_blocks(case):
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)
 
 
+DD_KILL_GRACE = 30   # s a SIGKILLed process group has to close its stdout
+
+
+def _kill_group_and_collect(p, grace):
+    """SIGKILL p's process group and return what it printed. A member that left
+    the group (its own session) keeps the pipe open and communicate() would
+    block forever: past `grace` seconds that is a failure naming the pid."""
+    import signal
+    os.killpg(p.pid, signal.SIGKILL)
+    try:
+        out, _ = p.communicate(timeout=grace)
+    except subprocess.TimeoutExpired:
+        pytest.fail(f"process group {p.pid} still holds the output pipe {grace} s after SIGKILL: "
+                    f"a member left the group and is still running")
+    return out
+
+
 @pytest.mark.e2e_fast
 def test_distributed_abort_on_one_rank_stops_every_rank():
     """check_effective_normal (src/faulting.f90) is reached only by the rank
@@ -712,7 +744,6 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     A run that ends cleanly, ends with another message or code, or hangs
     fails.
     """
-    import signal
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 3 unavailable)")
     compset, nranks = "test.bp8.qdc.gs.10", 8
@@ -730,8 +761,7 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     try:
         out, _ = p.communicate(timeout=600)
     except subprocess.TimeoutExpired:
-        os.killpg(p.pid, signal.SIGKILL)
-        out, _ = p.communicate()
+        out = _kill_group_and_collect(p, DD_KILL_GRACE)
         pytest.fail(f"par.solver = 3 did not stop within 600 s: a rank-local abort hangs the job\n{out[-3000:]}")
     # run.sh echoes only the tail of a failed cycle's log; the summary and
     # the message are in the log itself.
@@ -743,3 +773,101 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     assert p.returncode != 0, "the run printed the abort message and still exited 0"
     assert "MPI_ABORT" in out and re.search(r"[Ee]rrorcode:?\s*508\b", out), \
         f"no MPI_ABORT with error code 508 in the output (exit {p.returncode}):\n{out[-3000:]}"
+
+
+# --- the comparison's own contracts: milliseconds, no run, part of the sweep ---
+
+def _write_station_file(path, rows):
+    """An 11-column fltst_ file (t, slip_2, slip_3, log10 rate_2, log10 rate_3,
+    tau_2, tau_3, pore pressure, Darcy 2, 3, log10 state) in the solver's
+    seven-significant-figure exponential format."""
+    with open(path, "w") as f:
+        for row in rows:
+            f.write("".join(f"{v:21.13E}" if k == 0 else f"{v:15.6E}" for k, v in enumerate(row)) + "\n")
+
+
+def _station_row(t, log_rate_strike, log_rate_dip):
+    return [t, 1.0, 1.0, log_rate_strike, log_rate_dip, 1.0e6, 1.0e6, 1.0, 1.0, 1.0, -5.0]
+
+
+def _station_pair(tmp_path, ref_rows, run_rows):
+    g, r = str(tmp_path / "ref" / "fltst_a.txt"), str(tmp_path / "run" / "fltst_a.txt")
+    for p, rows in ((g, ref_rows), (r, run_rows)):
+        os.makedirs(os.path.dirname(p))
+        _write_station_file(p, rows)
+    return g, r
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("ref_value", [float("inf"), float("-inf"), float("nan")])
+def test_dd_station_series_non_finite_reference_is_a_failure_naming_file_and_column(tmp_path, ref_value):
+    """An inf in a reference column made its scale inf, hence its tolerance
+    inf, and the column passed whatever the run held (rule 2). Here the run
+    holds a finite, wildly different rate, and the reference is non-finite in
+    the dip log10 slip-rate column (column 5)."""
+    ref = [_station_row(1.0, -9.0, -9.0), _station_row(2.0, -9.0, ref_value)]
+    run = [_station_row(1.0, -9.0, -9.0), _station_row(2.0, -9.0, -3.0)]
+    g, r = _station_pair(tmp_path, ref, run)
+    ok, msg = _dd_station_series(g, r)
+    assert not ok and "fltst_a.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_dd_station_series_equal_finite_files_pass(tmp_path):
+    """Control of the tests around it: identical finite files pass."""
+    rows = [_station_row(1.0, -9.0, -9.0), _station_row(2.0, -8.0, -9.5)]
+    g, r = _station_pair(tmp_path, rows, rows)
+    ok, msg = _dd_station_series(g, r)
+    assert ok, msg
+
+
+@pytest.mark.e2e_fast
+def test_dd_station_series_noise_floor_applies_to_dip_rate_column_only(tmp_path):
+    """Both runs hold a rate of 1e-20 m/s (log10 -20 against -19.9: 2.6e-21 m/s
+    apart, under the 1e-18 m/s machine-noise floor). In the dip column (5) that
+    is noise and passes; the same pair in the strike column (4) is a 0.1 shift
+    of a log10 value, the floor does not reach it, and it fails."""
+    ref = [_station_row(1.0, -20.0, -20.0), _station_row(2.0, -20.0, -20.0)]
+    dip = [_station_row(1.0, -20.0, -20.0), _station_row(2.0, -20.0, -19.9)]
+    strike = [_station_row(1.0, -20.0, -20.0), _station_row(2.0, -19.9, -20.0)]
+    ok_dip, msg_dip = _dd_station_series(*_station_pair(tmp_path / "d", ref, dip))
+    ok_strike, msg_strike = _dd_station_series(*_station_pair(tmp_path / "s", ref, strike))
+    assert ok_dip, f"dip column under the floor must pass: {msg_dip}"
+    assert not ok_strike and "columns [4]" in msg_strike, f"strike column must fail: {msg_strike}"
+
+
+@pytest.mark.e2e_fast
+def test_dd_station_series_dip_rate_above_noise_floor_fails(tmp_path):
+    """The floor is 1e-18 m/s and no more: -16 against -15.9 is 2.6e-17 m/s."""
+    ref = [_station_row(1.0, -20.0, -16.0), _station_row(2.0, -20.0, -16.0)]
+    run = [_station_row(1.0, -20.0, -16.0), _station_row(2.0, -20.0, -15.9)]
+    ok, msg = _dd_station_series(*_station_pair(tmp_path, ref, run))
+    assert not ok and "columns [5]" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_kill_group_and_collect_returns_output_of_a_killed_group():
+    p = subprocess.Popen(["bash", "-c", "echo before; sleep 60"], stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    assert p.stdout.readline() == "before\n"
+    _kill_group_and_collect(p, 10)
+    assert p.returncode == -9, f"returncode {p.returncode}"
+
+
+@pytest.mark.e2e_fast
+def test_kill_group_and_collect_fails_when_a_member_escaped_the_group():
+    """The launcher's child is in its own session, so killpg misses it and it
+    holds the pipe: a bare communicate() after killpg waits for its 60 s."""
+    import signal
+    child = ("import subprocess, time; "
+             "c = subprocess.Popen(['sleep', '60'], start_new_session=True); "
+             "print(c.pid, flush=True); time.sleep(60)")
+    p = subprocess.Popen(["python3", "-I", "-c", child], stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    escaped = int(p.stdout.readline())
+    try:
+        with pytest.raises(pytest.fail.Exception, match=f"process group {p.pid} still holds"):
+            _kill_group_and_collect(p, 2)
+    finally:
+        os.kill(escaped, signal.SIGKILL)
+        p.communicate(timeout=10)

@@ -177,3 +177,8 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 - Controls from the coordinator (entry 21 continued, tool calls 36-42): exact against exact on wide passes 33 of 33 at 1e-9 (comparator floor below 1e-9); BLR PC rtol 1e-12 leaves `disp.00001.nc` at 1.4e-8 despite a true relative residual of 4e-13, rtol 1e-15 passes 33 of 33 at 3 iterations; BLR application is 1.95x cheaper than exact (1.28 against 2.50 s), the tie is the iteration count. `runs/20261114_blr-pc-wide2/DONE`. #112 merged as 25db447 (CI run 43646826188 success).
 - Audit of #112/#113 (quantitative-claim auditor, 11 tool calls): every figure recomputes; two wordings fixed (which run has loop 25.5 s; the 200-step exact-against-exact `fltst` columns are compared at rtol 2e-6). Wide GAMG CG at rtol 1e-14 / 1e-15 passes the comparator, 33 of 33 (`runs/20261114_gamg-wide-tight/DONE`), 7-9x slower than exact, 4.8x less memory. Open at this point: no job, no agent; tool calls 43-50 of 100.
 
+
+## Entry 22, 2026-11-14 (conductor 12, tool calls 1-16 of 100, times CST)
+- Took over the full `e2e` tier on `dd-2d` c0a3160 (PID 2870084, `runs/20261114_gate-full/`, closes on `DONE`); own watcher on `DONE` armed 16:47 (`scratch/bench/watch12.out`). Nothing pushed to the stack branches while it runs.
+- Board row 1: code-audit findings (0 BLOCKER, 0 MAJOR, 9 MINOR, desk read), the ICNTL(14) route (`PETSC_OPTIONS`, from source), and the independent audit of #114: iteration/loop/failure numbers recompute, the exact baseline figures did not (8.32 s/step, 343.6 s, 12.25 GB against the stated 5.3-6.9, 318-336, 12.1-13.5); ratio corrected to 6.0-6.4x.
+- Roster: auditor agent finished (19 tool calls, no files written). Still owns: PID 2870084 (tier), watcher PID 2879960.

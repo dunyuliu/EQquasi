@@ -266,8 +266,19 @@ build, run and traps are in `CLAUDE.md`.
    Per step: one matvec streaming the matrix, ~0.6 s at an assumed 160 GB/s
    against 7.18 s now, i.e. ~10x if the build is paid. bp1002 gains ~5x at
    most (0.03 s matvec against 0.15 s). Feasible in memory, open in build time;
-   next measurable: `MatMatSolve` seconds per right-hand side on wide at 16
-   ranks, 32 columns.
+   **Measured 2026-11-14** (`runs/20261114_matmat/`, spike branch `spike-mm`, not
+   merge-bound, binary 1.24.4 plus a timer; PETSc `MatMatSolve` on the MUMPS
+   Cholesky factor, dense random right-hand sides, `-eq_spike_log -eq_matmat 32`,
+   host load 15 after launch, indicative). Wide, 16 ranks: 1 column 4.41 s, 8
+   columns 3.41 s (0.426 s each), 32 columns 7.40 s (**0.231 s each**); the
+   1-column call is the first solve and includes warm-up. bp1002, 8 ranks: 0.0636
+   s, 0.0127 s each (8), 0.0083 s each (32). So the build for wide is 108 k x
+   0.231 s = ~25,000 s = ~6.9 h at 16 ranks (bp1002: 15 k x 0.0083 = ~2 min),
+   not the ~108 h of the arithmetic above; sparse fault-only right-hand sides
+   and more columns per call are untested and may lower it. Break-even against
+   7.18 s/step with a ~0.6 s matvec (assumed, not measured): ~3,800 steps. The
+   matvec, the dense memory (93 GB) and whether the operator is valid under the
+   moving-load terms are still not measured.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

@@ -85,6 +85,13 @@ subroutine solveTimeLoopPETScDD
     KSPConvergedReason         :: kspReason
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     character (len = 16)       :: kspTypeStr, pcTypeStr
+    ! SPIKE (g), not for merge: -eq_mat_is, -eq_near_null, -eq_spike_log.
+    PetscBool                  :: useIS, useNN, useLog
+    Vec                        :: cvec
+    MatNullSpace               :: nsp
+    PetscInt                   :: p3, idx3(3)
+    PetscScalar                :: val3(3)
+    real (kind = 8)            :: wall0, wall1, wallSetup, wallLoop, wallSolve
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
@@ -456,8 +463,26 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call MatSetSizes(Amat, pnOwn, pnOwn, pneq, pneq, perr)
     CHKERRA(perr)
-    call MatSetType(Amat, MATAIJ, perr)
+    ! SPIKE (g): -eq_mat_is keeps the subdomain matrices unassembled (MATIS,
+    ! one local matrix per rank from its own elements) and defaults to CG+BDDC.
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_mat_is', useIS, perr)
     CHKERRA(perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_near_null', useNN, perr)
+    CHKERRA(perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_spike_log', useLog, perr)
+    CHKERRA(perr)
+    wallSolve = 0.0d0
+    if (useIS) then
+        call MatSetType(Amat, MATIS, perr)
+        CHKERRA(perr)
+        call MatSetFromOptions(Amat, perr)
+        CHKERRA(perr)
+        call MatSetLocalToGlobalMapping(Amat, l2g, l2g, perr)
+        CHKERRA(perr)
+    else
+        call MatSetType(Amat, MATAIJ, perr)
+        CHKERRA(perr)
+    endif
     ! A hex8 row couples to at most 27 nodes = 81 dofs. Uniform bound, not
     ! exact; an insufficient bound fails loudly in MatSetValuesLocal.
     allocate(nnzD(max(1,nOwnEq)), nnzO(max(1,nOwnEq)))
@@ -467,9 +492,15 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call MatMPIAIJSetPreallocation(Amat, 0, nnzD, 0, nnzO, perr)
     CHKERRA(perr)
+    if (useIS) then
+        call MatISSetPreallocation(Amat, 0, nnzD, 0, nnzO, perr)
+        CHKERRA(perr)
+    endif
     deallocate(nnzD, nnzO)
-    call MatSetLocalToGlobalMapping(Amat, l2g, l2g, perr)
-    CHKERRA(perr)
+    if (.not. useIS) then
+        call MatSetLocalToGlobalMapping(Amat, l2g, l2g, perr)
+        CHKERRA(perr)
+    endif
 
     ! ---- 5. Assembly of own elements; cache what each step reuses ----------
     if (me == 0) write(*,*) '= Assembling own elements on every rank        ='
@@ -531,6 +562,42 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call MatSetOption(Amat, MAT_SYMMETRIC, PETSC_TRUE, perr)
     CHKERRA(perr)
+    if (useNN) then
+        ! Rigid-body near-null space from the node coordinates (3 per node).
+        p3 = 3
+        call VecCreate(PETSC_COMM_WORLD, cvec, perr)
+        CHKERRA(perr)
+        call VecSetSizes(cvec, pnOwn, pneq, perr)
+        CHKERRA(perr)
+        call VecSetBlockSize(cvec, p3, perr)
+        CHKERRA(perr)
+        call VecSetType(cvec, VECMPI, perr)
+        CHKERRA(perr)
+        call VecSetLocalToGlobalMapping(cvec, l2g, perr)
+        CHKERRA(perr)
+        do n = 1, numnp
+            if (id(1,n) > 0) then
+                do j = 1, 3
+                    idx3(j) = lbase(n) + j - 1
+                    val3(j) = x(j,n)
+                enddo
+                call VecSetValuesLocal(cvec, p3, idx3, val3, INSERT_VALUES, perr)
+                CHKERRA(perr)
+            endif
+        enddo
+        call VecAssemblyBegin(cvec, perr)
+        CHKERRA(perr)
+        call VecAssemblyEnd(cvec, perr)
+        CHKERRA(perr)
+        call MatNullSpaceCreateRigidBody(cvec, nsp, perr)
+        CHKERRA(perr)
+        call MatSetNearNullSpace(Amat, nsp, perr)
+        CHKERRA(perr)
+        call MatNullSpaceDestroy(nsp, perr)
+        CHKERRA(perr)
+        call VecDestroy(cvec, perr)
+        CHKERRA(perr)
+    endif
     ! Fault-node mass is constant: sum the per-rank parts at the owner, once.
     call ddFltReverse(consm)
 
@@ -538,6 +605,14 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call KSPSetOperators(ksp, Amat, Amat, perr)
     CHKERRA(perr)
+    if (useIS) then
+        call KSPSetType(ksp, KSPCG, perr)
+        CHKERRA(perr)
+        call KSPGetPC(ksp, pc, perr)
+        CHKERRA(perr)
+        call PCSetType(pc, PCBDDC, perr)
+        CHKERRA(perr)
+    else
     call KSPSetType(ksp, KSPPREONLY, perr)
     CHKERRA(perr)
     call KSPGetPC(ksp, pc, perr)
@@ -546,6 +621,7 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
     CHKERRA(perr)
+    endif
     call KSPSetFromOptions(ksp, perr)
     CHKERRA(perr)
     call PetscObjectTypeCompare(ksp, KSPPREONLY, isPreonly, perr)
@@ -554,7 +630,7 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
     CHKERRA(perr)
-    if (.not. (isPreonly .and. isCholesky)) then
+    if (.not. useIS .and. .not. (isPreonly .and. isCholesky)) then
         if (me == 0) write(*,*) 'par.solver=3: only KSPPREONLY + PCCHOLESKY ', &
             '(MUMPS) is verified for the distributed loop. Refusing.'
         flush(6)
@@ -562,10 +638,17 @@ subroutine solveTimeLoopPETScDD
     endif
     kspTypeStr = 'preonly'
     pcTypeStr = 'cholesky'
+    if (useIS) then
+        kspTypeStr = 'spike-is'
+        pcTypeStr = 'spike-is'
+    endif
 
     call cpu_time(startTime)
+    wall0 = MPI_Wtime()
     call KSPSetUp(ksp, perr)
     CHKERRA(perr)
+    wallSetup = MPI_Wtime() - wall0
+    wallLoop = MPI_Wtime()
     call cpu_time(endTime)
     timeUsedInFactorization = endTime - startTime
 
@@ -644,8 +727,11 @@ subroutine solveTimeLoopPETScDD
             call VecAssemblyEnd(bvec, perr)
             CHKERRA(perr)
 
+            wall0 = MPI_Wtime()
             call KSPSolve(ksp, bvec, xvec, perr)
             CHKERRA(perr)
+            wall1 = MPI_Wtime() - wall0
+            wallSolve = wallSolve + wall1
             call KSPGetConvergedReason(ksp, kspReason, perr)
             CHKERRA(perr)
             if (kspReason%v < 0) then
@@ -660,6 +746,8 @@ subroutine solveTimeLoopPETScDD
             nKSPSolves = nKSPSolves + 1
             minKSPIts = min(minKSPIts, kspIts)
             maxKSPIts = max(maxKSPIts, kspIts)
+            if (useLog .and. me == 0) write(*,'(A,I8,I2,I7,I4,ES12.4)') 'EQ_KSP ', it, iiTag, &
+                kspIts, kspReason%v, wall1
 
             ! Displacements of own elements' nodes: owned + ghost values.
             call VecGhostUpdateBegin(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
@@ -787,6 +875,9 @@ subroutine solveTimeLoopPETScDD
     enddo
     call cpu_time(endTime)
     timeUsedInComputing = endTime-startTime
+    wallLoop = MPI_Wtime() - wallLoop
+    if (useLog .and. me == 0) write(*,'(A,3ES13.5,I8)') 'EQ_WALL setup loop kspsolve steps ', &
+        wallSetup, wallLoop, wallSolve, it-1
 
     ! The whole-fault text files, each rank its own nodes' lines. ddActive
     ! stays set: writeResults then has every rank write the stations it owns.

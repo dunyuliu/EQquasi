@@ -529,6 +529,9 @@ subroutine initOnFaultKinematics
     do ift = 1, ntotft
         if (nftnd(ift) > 0) then !RSF
             do i=1,nftnd(ift)
+                if (ddActive) then
+                    if (.not. fltMine(i,ift)) cycle ! par.solver = 3: the owner sets it and sends it on.
+                endif
                 if (icstart == 1) then
                     consv(1,nsmp(1,i,ift)) =  -fric(FR_VINIT,i,ift)/2.0d0
                     consv(1,nsmp(2,i,ift)) =  fric(FR_VINIT,i,ift)/2.0d0

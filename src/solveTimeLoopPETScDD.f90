@@ -5,7 +5,10 @@ subroutine solveTimeLoopPETScDD
 ! not touch.
 !
 ! Each rank owns one block of a regular x-y-z decomposition of the analytic
-! grid (cells split evenly per direction; no partitioner). A rank
+! grid (cells split evenly per direction; no partitioner) and holds only that
+! block's mesh: ddMeshBox (below) sets the block before allocAndInit, meshgen
+! then generates the block's own nodes and elements, and the initial
+! conditions are read for the fault nodes the rank owns. A rank
 !   - assembles the stiffness of its own elements through the local-to-global
 !     mapping (MatSetValuesLocal), so the same loop can later fill a MATIS;
 !   - builds its own part of the right-hand side each step (VecSetValuesLocal);
@@ -19,22 +22,29 @@ subroutine solveTimeLoopPETScDD
 ! MPI_Allreduce'd, so every rank advances time itself; nothing is broadcast
 ! from rank 0.
 !
+! Numbering. A grid point is owned by the block of the cell it is the lower
+! corner of. Equations are contiguous per rank, in the rank's own node order;
+! a rank asks the owners for the equation numbers of its ghost nodes, once.
+! Whole-mesh node and element numbers (meshgen's, for the output files) are
+! closed-form in the grid indices.
+!
 ! Built once and reused (K is constant): the factorization, the stiffness of
 ! every boundary/fault element (et = 2, 3) that the RHS and the fault force
-! need each step, and the fault-node mass.
+! need each step, the fault-node mass and the fault-node area.
 !
 ! The solve is unchanged from solveTimeLoopPETSc: KSPPREONLY + PCCHOLESKY
 ! through MUMPS, so the two agree to round-off (equations are renumbered so
 ! each rank's are contiguous, which changes the MUMPS ordering, not the
 ! system).
 !
-! What is NOT distributed yet (stage 2 of step (e)):
-!   - mesh storage: mesh4num/meshgen/allocAndInit still run on every rank and
-!     hold the full mesh, numbering and fault arrays (replicated, not rank-0);
-!     ownership below is derived from that replicated mesh;
-!   - initial conditions are read by every rank for the whole fault;
-!   - file output: owners' values are gathered to rank 0, which writes
-!     disp/fault netCDF and the station/global text files;
+! What is NOT distributed yet:
+!   - the fault arrays (fric, nsmp, un, ...) keep the whole fault's index
+!     range on every rank; a rank fills only its own block's entries;
+!   - file output: owners' values are gathered to rank 0, which writes the
+!     mesh, disp and fault netCDF and the station/global text files. For that
+!     rank 0 alone holds the coordinates of every fault node, and a
+!     whole-mesh nodal (or element) buffer for the duration of each write;
+!   - mesh4num still counts the whole grid on every rank (a loop, no arrays);
 !   - pore pressure (bp == 8) is refused here, not distributed.
 
 #include <petsc/finclude/petscksp.h>
@@ -60,19 +70,21 @@ subroutine solveTimeLoopPETScDD
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     character (len = 16)       :: kspTypeStr, pcTypeStr
 
-    integer (kind = 4) :: pdim(3), ncell(3), dimsS(3), ord(3)
-    integer (kind = 4), allocatable :: nodeOwner(:), lnode(:), lbase(:), pidn(:), &
-        myNodes(:), myElems(:), beEl(:), beIdx(:,:), locFlt(:,:), fpid(:,:), &
-        cntR(:), offR(:), cntF(:), offF(:)
-    logical, allocatable :: isMaster(:), fltLocal(:,:)
-    real (kind = dp), allocatable :: beEs(:,:,:), uloc(:), uprev(:), rloc(:)
-    integer (kind = 4) :: nMyNodes, nMyElems, nBE, nOwnEq, nGhostNodes, nLocDof, &
-        nOwnF, nGhostF, nLocF
+    integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3)
+    integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
+        pidn(:), beEl(:), beIdx(:,:), locFlt(:,:), fpid(:,:), cntR(:), offR(:), &
+        cntF(:), offF(:), scnt(:), sdsp(:), rcnt(:), rdsp(:), sbuf(:), rbuf(:), &
+        reqNode(:), stnNode(:), stnOwn(:), stnOwnG(:)
+    logical, allocatable :: fltLocal(:,:)
+    real (kind = dp), allocatable :: beEs(:,:,:), uloc(:), uprev(:), rloc(:), gbuf(:,:), hold(:,:)
+    integer (kind = 4) :: nBE, nOwnEq, nGhostNodes, nLocDof, nOwnF, nGhostF, nLocF, &
+        nOwnNodes, nOwnFree
 
-    integer (kind = 4) :: i, j, k, l, m, n, ne, r, ix, iy, iz, ift, ie, ib, nel, &
+    integer (kind = 4) :: i, j, k, l, n, r, ix, iy, iz, ift, ib, nel, &
         node_num, ntag, iiTag, itmp
     real (kind = dp) :: elemmat(5), elemx(ndof,nen), es(nee,nee), em(nee), ef(nee), &
-        elemu(nee), Vol, rmax(2+ntotft), rmaxG(2+ntotft), rsum(5), rsumG(5), dtevG
+        elemu(nee), Vol, rmax(2+ntotft), rmaxG(2+ntotft), rsum(5), rsumG(5), dtevG, &
+        hwm(2), hwmG(2)
     real (kind = dp) :: startTime, endTime, timeUsedInFactorization, &
         timeUsedInComputing, progressStartTime
     character (len = 50) :: netcdf_outfile, output_type
@@ -87,86 +99,91 @@ subroutine solveTimeLoopPETScDD
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
-
-    call getScalarOnFaultQuant
-    call initOnFaultKinematics
-
-    ! ---- 1. Block decomposition of the analytic grid ----------------------
-    ! Cells per direction are (nxt-1, nyt-1, nzt-1). MPI_Dims_create factors
-    ! nprocs into three non-increasing factors; the largest goes to the
-    ! direction with the most cells.
-    ncell = (/ nxt-1, nyt-1, nzt-1 /)
-    dimsS = 0
-    call MPI_Dims_create(nprocs, 3, dimsS, IERR)
-    ord = (/ 1, 2, 3 /)
-    do i = 1, 2
-        do j = i+1, 3
-            if (ncell(ord(j)) > ncell(ord(i))) then
-                itmp = ord(i); ord(i) = ord(j); ord(j) = itmp
-            endif
-        enddo
-    enddo
-    do i = 1, 3
-        pdim(ord(i)) = dimsS(i)
-    enddo
-    if (any(pdim > ncell)) then
-        if (me == 0) write(*,*) 'par.solver=3: more blocks than cells in a ', &
-            'direction. blocks (x,y,z) =', pdim, ' cells (x,y,z) =', ncell, &
-            '. Use fewer MPI ranks.'
+    if (.not. ddActive) then
+        if (me == 0) write(*,*) 'par.solver=3: the per-rank mesh was not set up ', &
+            '(ddMeshBox did not run).'
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
 
-    allocate(nodeOwner(numnp), isMaster(numnp), myElems(numel))
-    isMaster = .false.
-    do ift = 1, ntotft
-        do i = 1, nftnd(ift)
-            isMaster(nsmp(2,i,ift)) = .true.
-        enddo
-    enddo
-    ! Replay meshgen's node/element numbering (ix, iz, iy; a master node
-    ! follows its slave immediately). A grid point belongs to the block of
-    ! the cell it is the lower corner of; an element to the block of its cell.
+    ! Peak resident memory of this rank with its mesh and initial conditions
+    ! in place, before anything this routine allocates.
+    hwm(1) = dble(ddPeakRSSkB())/1024.0d0
+    hwm(2) = hwm(1)
+
+    ! ---- 1. This block's nodes: owner and whole-mesh number ----------------
+    ! Replays meshgen's numbering over the block (ix, iz, iy; a master node
+    ! follows its slave immediately).
+    call ddBlocks(pdim, ncell)
+    if (dble(nxt)*dble(nyt)*dble(nzt) + 2.0d0*sum(nftnd(1:ntotft)) > dble(huge(1))) then
+        if (me == 0) write(*,*) 'par.solver=3: more grid points than a 4-byte node number holds.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+    allocate(nodeAt(ddBox(1,1):ddBox(2,1), ddBox(1,2):ddBox(2,2), ddBox(1,3):ddBox(2,3)), &
+        nodeOwner(numnp), gnode(numnp))
+    nodeOwner = -1   ! stays -1 on rank 0's coordinate-only fault entries
+    gnode = 0
     n = 0
-    ne = 0
-    nMyElems = 0
-    do ix = 1, nxt
-        do iz = 1, nzt
-            do iy = 1, nyt
-                n = n + 1
-                if (n > numnp) exit
+    nOwnNodes = 0
+    do ix = ddBox(1,1), ddBox(2,1)
+        do iz = ddBox(1,3), ddBox(2,3)
+            do iy = ddBox(1,2), ddBox(2,2)
                 r = blockRank(min(ix,ncell(1)), min(iy,ncell(2)), min(iz,ncell(3)))
-                nodeOwner(n) = r
-                if (n < numnp) then
-                    if (isMaster(n+1)) then
-                        n = n + 1
-                        nodeOwner(n) = r
-                    endif
-                endif
-                if (ix >= 2 .and. iy >= 2 .and. iz >= 2) then
-                    ne = ne + 1
-                    if (ne <= numel) then
-                        if (blockRank(ix-1, iy-1, iz-1) == me) then
-                            nMyElems = nMyElems + 1
-                            myElems(nMyElems) = ne
-                        endif
-                    endif
-                endif
+                l = 1
+                if (faultAt(ix, iy, iz) > 0) l = 2
+                do k = 1, l
+                    n = n + 1
+                    nodeOwner(n) = r
+                    gnode(n) = ((ix-1)*nzt + (iz-1))*nyt + iy + splitsBefore(ix, iy, iz) + k - 1
+                    if (r == me) nOwnNodes = nOwnNodes + 1
+                enddo
+                nodeAt(ix,iy,iz) = n - l + 1
             enddo
         enddo
     enddo
-    if (n /= numnp .or. ne /= numel) then
-        write(*,*) 'par.solver=3: ownership replay disagrees with meshgen. nodes', &
-            n, numnp, ' elements', ne, numel
+    if (n > numnp .or. (me /= 0 .and. n /= numnp)) then
+        write(*,*) 'par.solver=3: rank', me, 'numbering replay disagrees with meshgen', n, numnp
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+
+    ! Every node and element of the whole mesh on exactly one rank; element
+    ! types summed over ranks (report_element_types leaves this to us).
+    icnt = (/ nOwnNodes, numel, count(et(1:numel) == 1), count(et(1:numel) == 2), &
+        count(et(1:numel) == 3), 0 /)
+    call MPI_Allreduce(icnt, icntG, 6, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+    if (icntG(1) /= ddGlobal(1) .or. icntG(2) /= ddGlobal(2)) then
+        if (me == 0) write(*,*) 'par.solver=3: the blocks do not add up to the mesh. nodes', &
+            icntG(1), ddGlobal(1), ' elements', icntG(2), ddGlobal(2)
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+    nloc = (/ numnp, numel, neq /)
+    call MPI_Allreduce(nloc, icnt, 3, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, IERR)
+    call MPI_Allreduce(hwm(1), hwmG(1), 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+    call MPI_Allreduce(hwm(2), hwmG(2), 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+    if (me == 0) then
+        write(*,'(X,A,40X,i7,4X,A)') '= Interior elements (et=1)  = ', icntG(3), '='
+        write(*,'(X,A,40X,i7,4X,A)') '= Fault elements    (et=2)  = ', icntG(4), '='
+        write(*,'(X,A,40X,i7,4X,A)') '= Far-field elements(et=3)  = ', icntG(5), '='
+        write(*,'(X,A,2i12)')   '= Nodes on the largest rank, in the mesh    = ', icnt(1), ddGlobal(1)
+        write(*,'(X,A,2i12)')   '= Elements on the largest rank, in the mesh = ', icnt(2), ddGlobal(2)
+        write(*,'(X,A,2f12.1)') '= Peak RSS after mesh setup, MB: largest rank, sum = ', hwmG(1), hwmG(2)
+    endif
+    if (icntG(4) == 0 .and. any(nftnd(1:ntotft) > 0)) then
+        if (me == 0) write(*,*) 'par.solver=3: no fault-adjacent elements (et=2) were tagged, ', &
+            'so every fault node would carry zero mass. Reduce dx or widen the model along y.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 3, IERR)
     endif
 
     ! ---- 2. Equation and fault-pair numbering, contiguous per rank --------
     allocate(cntR(0:nprocs-1), offR(0:nprocs-1), cntF(0:nprocs-1), offF(0:nprocs-1), &
-        pidn(numnp), fpid(nftmx,ntotft), fltLocal(nftmx,ntotft))
-    if (.not. allocated(fltMine)) allocate(fltMine(nftmx,ntotft))
-    cntR = 0
+        pidn(numnp), lbase(numnp), fpid(nftmx,ntotft), fltLocal(nftmx,ntotft), &
+        scnt(0:nprocs-1), sdsp(0:nprocs-1), rcnt(0:nprocs-1), rdsp(0:nprocs-1))
+    nOwnFree = 0
+    scnt = 0
     do n = 1, numnp
         if (id(1,n) > 0) then
             if (id(2,n) /= id(1,n)+1 .or. id(3,n) /= id(1,n)+2) then
@@ -174,15 +191,20 @@ subroutine solveTimeLoopPETScDD
                 flush(6)
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif
-            cntR(nodeOwner(n)) = cntR(nodeOwner(n)) + 1
+            if (nodeOwner(n) == me) then
+                nOwnFree = nOwnFree + 1
+            else
+                scnt(nodeOwner(n)) = scnt(nodeOwner(n)) + 1
+            endif
         elseif (id(2,n) > 0 .or. id(3,n) > 0) then
             write(*,*) 'par.solver=3: a partly constrained node, node', n
             flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
     enddo
-    if (3*sum(cntR) /= neq) then
-        write(*,*) 'par.solver=3: equation count mismatch', 3*sum(cntR), neq
+    call MPI_Allgather(nOwnFree, 1, MPI_INTEGER, cntR, 1, MPI_INTEGER, MPI_COMM_WORLD, IERR)
+    if (3*sum(cntR) /= ddGlobal(3)) then
+        if (me == 0) write(*,*) 'par.solver=3: equation count mismatch', 3*sum(cntR), ddGlobal(3)
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
@@ -190,82 +212,119 @@ subroutine solveTimeLoopPETScDD
     do r = 1, nprocs-1
         offR(r) = offR(r-1) + cntR(r-1)
     enddo
-    nOwnEq = 3*cntR(me)
-    cntR = 0
+    nOwnEq = 3*nOwnFree
     pidn = -1
+    k = 0
     do n = 1, numnp
-        if (id(1,n) > 0) then
-            r = nodeOwner(n)
-            pidn(n) = 3*(offR(r) + cntR(r))
-            cntR(r) = cntR(r) + 1
+        if (id(1,n) > 0 .and. nodeOwner(n) == me) then
+            pidn(n) = 3*(offR(me) + k)
+            k = k + 1
         endif
     enddo
 
-    cntF = 0
-    do ift = 1, ntotft
-        do i = 1, nftnd(ift)
-            r = nodeOwner(nsmp(1,i,ift))
-            cntF(r) = cntF(r) + 1
+    ! Ghost nodes: ask each owner, by grid point, for the equation number.
+    nGhostNodes = sum(scnt)
+    call MPI_Alltoall(scnt, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, IERR)
+    sdsp(0) = 0
+    rdsp(0) = 0
+    do r = 1, nprocs-1
+        sdsp(r) = sdsp(r-1) + scnt(r-1)
+        rdsp(r) = rdsp(r-1) + rcnt(r-1)
+    enddo
+    allocate(sbuf(max(1,nGhostNodes)), reqNode(max(1,nGhostNodes)), rbuf(max(1,sum(rcnt))))
+    scnt = 0
+    do ix = ddBox(1,1), ddBox(2,1)
+        do iz = ddBox(1,3), ddBox(2,3)
+            do iy = ddBox(1,2), ddBox(2,2)
+                n = nodeAt(ix,iy,iz)
+                if (id(1,n) > 0 .and. nodeOwner(n) /= me) then
+                    r = nodeOwner(n)
+                    scnt(r) = scnt(r) + 1
+                    sbuf(sdsp(r)+scnt(r)) = ((ix-1)*nzt + (iz-1))*nyt + iy
+                    reqNode(sdsp(r)+scnt(r)) = n
+                endif
+            enddo
         enddo
     enddo
+    call MPI_Alltoallv(sbuf, scnt, sdsp, MPI_INTEGER, rbuf, rcnt, rdsp, MPI_INTEGER, &
+        MPI_COMM_WORLD, IERR)
+    do i = 1, sum(rcnt)
+        k = rbuf(i) - 1
+        iy = mod(k, nyt) + 1
+        k = k/nyt
+        iz = mod(k, nzt) + 1
+        ix = k/nzt + 1
+        n = 0
+        if (ix >= ddBox(1,1) .and. ix <= ddBox(2,1) .and. iy >= ddBox(1,2) .and. &
+            iy <= ddBox(2,2) .and. iz >= ddBox(1,3) .and. iz <= ddBox(2,3)) n = nodeAt(ix,iy,iz)
+        rbuf(i) = -1
+        if (n > 0) rbuf(i) = pidn(n)
+    enddo
+    call MPI_Alltoallv(rbuf, rcnt, rdsp, MPI_INTEGER, sbuf, scnt, sdsp, MPI_INTEGER, &
+        MPI_COMM_WORLD, IERR)
+    do i = 1, nGhostNodes
+        if (sbuf(i) < 0) then
+            write(*,*) 'par.solver=3: rank', me, 'has a ghost node its owner does not solve for'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        pidn(reqNode(i)) = sbuf(i)
+    enddo
+    deallocate(sbuf, rbuf, reqNode, scnt, sdsp, rcnt, rdsp)
+
+    ! Fault pairs. fltMine was set with the mesh (ddMeshFinish); a pair is
+    ! local when its grid point is in this block.
+    fltLocal = .false.
+    do ift = 1, ntotft
+        iy = ddFlt(1,2,ift)
+        if (iy < ddBox(1,2) .or. iy > ddBox(2,2)) cycle
+        do ix = max(ddFlt(1,1,ift), ddBox(1,1)), min(ddFlt(2,1,ift), ddBox(2,1))
+            do iz = max(ddFlt(1,3,ift), ddBox(1,3)), min(ddFlt(2,3,ift), ddBox(2,3))
+                fltLocal(fltIndex(ix, iz, ift), ift) = .true.
+            enddo
+        enddo
+    enddo
+    nOwnF = 0
+    nGhostF = 0
+    do ift = 1, ntotft
+        do i = 1, nftnd(ift)
+            if (fltMine(i,ift)) then
+                nOwnF = nOwnF + 1
+                if (.not. fltLocal(i,ift)) then
+                    write(*,*) 'par.solver=3: rank', me, 'owns a fault node outside its block'
+                    flush(6)
+                    call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+                endif
+            elseif (fltLocal(i,ift)) then
+                nGhostF = nGhostF + 1
+            endif
+        enddo
+    enddo
+    call MPI_Allgather(nOwnF, 1, MPI_INTEGER, cntF, 1, MPI_INTEGER, MPI_COMM_WORLD, IERR)
     offF(0) = 0
     do r = 1, nprocs-1
         offF(r) = offF(r-1) + cntF(r-1)
     enddo
-    nOwnF = cntF(me)
-    cntF = 0
-    fltMine = .false.
     fpid = -1
+    k = 0
     do ift = 1, ntotft
         do i = 1, nftnd(ift)
-            r = nodeOwner(nsmp(1,i,ift))
-            fpid(i,ift) = offF(r) + cntF(r)
-            cntF(r) = cntF(r) + 1
-            fltMine(i,ift) = (r == me)
+            if (fltMine(i,ift)) then
+                fpid(i,ift) = offF(me) + k
+                k = k + 1
+            endif
         enddo
+    enddo
+    call MPI_Allreduce(MPI_IN_PLACE, fpid, nftmx*ntotft, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, IERR)
+    do ift = 1, ntotft
+        if (sum(cntF) /= sum(nftnd(1:ntotft)) .or. any(fpid(1:nftnd(ift),ift) < 0)) then
+            if (me == 0) write(*,*) 'par.solver=3: a fault node without exactly one owner, fault', ift
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
     enddo
 
-    ! ---- 3. Local sets: nodes of own elements, plus owned and touched fault pairs
-    allocate(lnode(numnp), lbase(numnp))
-    lnode = 0
-    nMyNodes = 0
-    do ie = 1, nMyElems
-        do k = 1, nen
-            n = ien(k, myElems(ie))
-            if (lnode(n) == 0) then
-                nMyNodes = nMyNodes + 1
-                lnode(n) = nMyNodes
-            endif
-        enddo
-    enddo
-    fltLocal = .false.
-    nGhostF = 0
-    do ift = 1, ntotft
-        do i = 1, nftnd(ift)
-            if (fltMine(i,ift) .or. lnode(nsmp(1,i,ift)) > 0 .or. lnode(nsmp(2,i,ift)) > 0) then
-                fltLocal(i,ift) = .true.
-                if (.not. fltMine(i,ift)) nGhostF = nGhostF + 1
-            endif
-        enddo
-    enddo
-    do ift = 1, ntotft
-        do i = 1, nftnd(ift)
-            if (fltLocal(i,ift)) then
-                do k = 1, 2
-                    n = nsmp(k,i,ift)
-                    if (lnode(n) == 0) then
-                        nMyNodes = nMyNodes + 1
-                        lnode(n) = nMyNodes
-                    endif
-                enddo
-            endif
-        enddo
-    enddo
-    allocate(myNodes(max(1,nMyNodes)))
-    do n = 1, numnp
-        if (lnode(n) > 0) myNodes(lnode(n)) = n
-    enddo
-
+    ! ---- 3. Local sets ----------------------------------------------------
     nLocF = nOwnF + nGhostF
     allocate(locFlt(2,max(1,nLocF)), ghostF(max(1,nGhostF)))
     l = 0
@@ -285,27 +344,9 @@ subroutine solveTimeLoopPETScDD
     enddo
 
     lbase = -1
-    nGhostNodes = 0
-    k = 0
-    do i = 1, nMyNodes
-        n = myNodes(i)
-        if (id(1,n) > 0) then
-            if (nodeOwner(n) == me) then
-                k = k + 1
-            else
-                nGhostNodes = nGhostNodes + 1
-            endif
-        endif
-    enddo
-    if (3*k /= nOwnEq) then
-        write(*,*) 'par.solver=3: rank', me, 'owns free nodes outside its own elements', 3*k, nOwnEq
-        flush(6)
-        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
-    endif
     allocate(ghostIdx(max(1,3*nGhostNodes)))
     l = 0
-    do i = 1, nMyNodes
-        n = myNodes(i)
+    do n = 1, numnp
         if (id(1,n) > 0) then
             if (nodeOwner(n) == me) then
                 lbase(n) = pidn(n) - 3*offR(me)
@@ -327,16 +368,35 @@ subroutine solveTimeLoopPETScDD
         allLoc(i) = i - 1
     enddo
 
-    nBE = 0
-    do ie = 1, nMyElems
-        if (et(myElems(ie)) == 2 .or. et(myElems(ie)) == 3) nBE = nBE + 1
-    enddo
+    nBE = count(et(1:numel) == 2 .or. et(1:numel) == 3)
     allocate(beEl(max(1,nBE)), beIdx(nee,max(1,nBE)), beEs(nee,nee,max(1,nBE)))
+
+    ! Off-fault stations: each is recorded by the rank that owns its node, and
+    ! a station no rank owns stops the run here.
+    if (allocated(dout)) then
+        allocate(stnNode(n4out), stnOwn(n4out), stnOwnG(n4out))
+        stnNode = 0
+        do i = 1, n4out
+            j = an4nds(2,i)
+            if (j > 0) then
+                if (nodeOwner(j) == me) stnNode(i) = j
+            endif
+        enddo
+        stnOwn = merge(1, 0, stnNode > 0)
+        call MPI_Allreduce(stnOwn, stnOwnG, n4out, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+        if (any(stnOwnG /= 1)) then
+            if (me == 0) write(*,*) 'par.solver=3: an off-fault station without exactly one ', &
+                'owning rank. owners per station =', stnOwnG
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        deallocate(stnOwn, stnOwnG)
+    endif
 
     ! ---- 4. PETSc objects -------------------------------------------------
     pnOwn = nOwnEq
     pnGhost = 3*nGhostNodes
-    pneq = neq
+    pneq = ddGlobal(3)
     pnLoc = nLocDof
     pnOwnF = 6*nOwnF
     pnGhostF = nGhostF
@@ -357,6 +417,22 @@ subroutine solveTimeLoopPETScDD
         ghostF, fvec, perr)
     CHKERRA(perr)
 
+    ! Initial state. The largest initial slip rate sets the first time step on
+    ! every rank; each owner sets its pairs' velocities and sends them to the
+    ! ranks whose elements touch them.
+    call getScalarOnFaultQuant
+    call MPI_Allreduce(maxSlipRate, dtevG, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+    maxSlipRate = dtevG
+    call initOnFaultKinematics
+    call ddFltForward(consv)
+    ! Fault-node area: meshgen left each rank's own quads' parts; sum them at
+    ! the owner.
+    call ddFltArea
+
+    ! Mesh files, whole-mesh numbering, written by rank 0.
+    call ddWriteMeshFiles
+    deallocate(nodeAt)
+
     call MatCreate(PETSC_COMM_WORLD, Amat, perr)
     CHKERRA(perr)
     call MatSetSizes(Amat, pnOwn, pnOwn, pneq, pneq, perr)
@@ -367,7 +443,7 @@ subroutine solveTimeLoopPETScDD
     ! exact; an insufficient bound fails loudly in MatSetValuesLocal.
     allocate(nnzD(max(1,nOwnEq)), nnzO(max(1,nOwnEq)))
     nnzD = min(81, nOwnEq)
-    nnzO = min(81, neq - nOwnEq)
+    nnzO = min(81, ddGlobal(3) - nOwnEq)
     call MatSeqAIJSetPreallocation(Amat, 0, nnzD, perr)
     CHKERRA(perr)
     call MatMPIAIJSetPreallocation(Amat, 0, nnzD, 0, nnzO, perr)
@@ -378,12 +454,9 @@ subroutine solveTimeLoopPETScDD
 
     ! ---- 5. Assembly of own elements; cache what each step reuses ----------
     if (me == 0) write(*,*) '= Assembling own elements on every rank        ='
-    do i = 1, nMyNodes
-        consm(:,myNodes(i)) = 0.0d0
-    enddo
+    consm = 0.0d0
     ib = 0
-    do ie = 1, nMyElems
-        nel = myElems(ie)
+    do nel = 1, numel
         do j = 1, nen
             node_num = ien(j,nel)
             do i = 1, ndof
@@ -484,7 +557,6 @@ subroutine solveTimeLoopPETScDD
     maxKSPIts = 0
     itsAtLastProgress = 0
     solvesAtLastProgress = 0
-    ddActive = .true.
 
     call cpu_time(startTime)
     progressStartTime = startTime
@@ -522,9 +594,8 @@ subroutine solveTimeLoopPETScDD
         if (allocated(dout)) then
             if (me == 0) dout(1,it) = time
             do i = 1, ndout
-                j = idhist(1,i)
-                if (j <= 0) j = 1
-                if (nodeOwner(j) == me) then
+                j = stnNode((i-1)/(ndof*noid) + 1)
+                if (j > 0) then
                     k = idhist(2,i)
                     l = idhist(3,i)
                     if (l == 1) then
@@ -585,8 +656,7 @@ subroutine solveTimeLoopPETScDD
             CHKERRA(perr)
 
             if (iiTag == 0) then
-                do i = 1, nMyNodes
-                    n = myNodes(i)
+                do n = 1, numnp
                     if (id(1,n) > 0) then
                         do j = 1, ndof
                             constmp(j,n) = uloc(lbase(n)+j)
@@ -594,8 +664,7 @@ subroutine solveTimeLoopPETScDD
                     endif
                 enddo
             else
-                do i = 1, nMyNodes
-                    n = myNodes(i)
+                do n = 1, numnp
                     if (id(1,n) > 0) then
                         do j = 1, ndof
                             cons(j,n) = uloc(lbase(n)+j)
@@ -649,8 +718,7 @@ subroutine solveTimeLoopPETScDD
         status0 = status1
         dtev1 = max(dt,int8(dtev/dt)*dt)
 
-        do i = 1, nMyNodes
-            n = myNodes(i)
+        do n = 1, numnp
             if (id(1,n) > 0) then
                 do j = 1, ndof
                     consv(j,n) = (uloc(lbase(n)+j) - uprev(lbase(n)+j))/dtev1
@@ -667,18 +735,29 @@ subroutine solveTimeLoopPETScDD
 
         if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1) .or. (it==nstep)) then
             call ddGatherFault
-            call ddGatherNodal(cons)
+            call ddNodalToRoot(cons, gbuf)
             if (me == 0) then
                 write(proc_str,'(I5.5)') it
+                ! netcdf_write writes cons(ndof,numnp): lend it the gathered
+                ! whole-mesh field for the write.
+                call move_alloc(cons, hold)
+                call move_alloc(gbuf, cons)
+                itmp = numnp
+                numnp = ddGlobal(1)
                 netcdf_outfile = trim(outDir)//'disp.'//trim(proc_str)//'.nc'
                 output_type = 'disp'
                 call netcdf_write(netcdf_outfile, output_type)
-                netcdf_outfile = trim(outDir)//'fault.'//trim(proc_str)//'.nc'
-                call netcdf_write_on_fault(netcdf_outfile)
                 if ((stoptag == 1) .or. (it==nstep)) then
                     netcdf_outfile = trim(outDir)//'disp.r.nc'
                     output_type = 'disp'
                     call netcdf_write(netcdf_outfile, output_type)
+                endif
+                numnp = itmp
+                deallocate(cons)
+                call move_alloc(hold, cons)
+                netcdf_outfile = trim(outDir)//'fault.'//trim(proc_str)//'.nc'
+                call netcdf_write_on_fault(netcdf_outfile)
+                if ((stoptag == 1) .or. (it==nstep)) then
                     netcdf_outfile = trim(outDir)//'fault.r.nc'
                     call netcdf_write_on_fault(netcdf_outfile)
                 endif
@@ -707,14 +786,19 @@ subroutine solveTimeLoopPETScDD
     if (allocated(dout)) call ddReduceFlat(dout, size(dout))
     ddActive = .false.
 
+    hwm(1) = dble(ddPeakRSSkB())/1024.0d0
+    hwm(2) = hwm(1)
+    call MPI_Allreduce(hwm(1), hwmG(1), 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+    call MPI_Allreduce(hwm(2), hwmG(2), 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+
     if (me == 0) then
         write(*,*) '====================================================================='
         write(*,*) '=                        RUN SUMMARY                                ='
         write(*,'(X,A,40X,i7,4X,A)')     '= MPI ranks                = ', nprocs, '='
         write(*,'(X,A,28X,3i6,5X,A)')    '= Blocks (x, y, z)         = ', pdim, '='
-        write(*,'(X,A,40X,i7,4X,A)')     '= Nodes                    = ', numnp, '='
-        write(*,'(X,A,40X,i7,4X,A)')     '= Elements                 = ', numel, '='
-        write(*,'(X,A,40X,i7,4X,A)')     '= Equations                = ', neq, '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Nodes                    = ', ddGlobal(1), '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Elements                 = ', ddGlobal(2), '='
+        write(*,'(X,A,40X,i7,4X,A)')     '= Equations                = ', ddGlobal(3), '='
         do i = 1, ntotft
             write(*,'(X,A,I3,A,E13.5,A,I7,4X,A)') '= Fault ', i, ' (y = ', fltxyz(1,2,i), &
                 ' m) nodes = ', nftnd(i), '='
@@ -729,7 +813,13 @@ subroutine solveTimeLoopPETScDD
             dble(totalKSPIts)/dble(max(1,nKSPSolves)), '='
         write(*,'(X,A,40X,E15.7,4X,A)')  '= KSP rtol                 = ', &
             kspRtol, '='
+        write(*,'(X,A,2f12.1)') '= Peak RSS at the end, MB: largest rank, sum       = ', hwmG(1), hwmG(2)
         write(*,*) '====================================================================='
+        ! The run metadata reports the whole mesh, not rank 0's block.
+        nloc = (/ numnp, numel, neq /)
+        numnp = ddGlobal(1)
+        numel = ddGlobal(2)
+        neq = ddGlobal(3)
         if (it-1 < nstep) then
             call output_run_metadata(timeUsedInComputing, timeUsedInFactorization, &
                 kspTypeStr, pcTypeStr, 'stoptag', minKSPIts, &
@@ -743,6 +833,9 @@ subroutine solveTimeLoopPETScDD
                 write(*,*) '         (no slip rate above exit_slip_rate); raise par.nstep.'
             endif
         endif
+        numnp = nloc(1)
+        numel = nloc(2)
+        neq = nloc(3)
     endif
 
     call VecDestroy(fvec, perr)
@@ -767,13 +860,69 @@ contains
             + pdim(2)*(((cz-1)*pdim(3))/ncell(3)))
     end function blockRank
 
+    integer (kind = 4) function faultAt(jx, jy, jz)
+        ! The fault whose node rectangle holds grid point (jx, jy, jz), or 0.
+        integer (kind = 4), intent(in) :: jx, jy, jz
+        integer (kind = 4) :: jft
+        faultAt = 0
+        do jft = 1, ntotft
+            if (jy == ddFlt(1,2,jft) .and. jx >= ddFlt(1,1,jft) .and. jx <= ddFlt(2,1,jft) &
+                .and. jz >= ddFlt(1,3,jft) .and. jz <= ddFlt(2,3,jft)) then
+                faultAt = jft
+                return
+            endif
+        enddo
+    end function faultAt
+
+    integer (kind = 4) function fltIndex(jx, jz, jft)
+        ! Index of fault jft's node at grid lines (jx, jz): strike outer, dip
+        ! inner, as meshgen counts them.
+        integer (kind = 4), intent(in) :: jx, jz, jft
+        fltIndex = (jx-ddFlt(1,1,jft))*(ddFlt(2,3,jft)-ddFlt(1,3,jft)+1) + jz-ddFlt(1,3,jft)+1
+    end function fltIndex
+
+    integer (kind = 4) function splitsBefore(jx, jy, jz)
+        ! Number of fault nodes meshgen meets before grid point (jx, jy, jz) in
+        ! its ix, iz, iy order: each adds one master node to the numbering.
+        integer (kind = 4), intent(in) :: jx, jy, jz
+        integer (kind = 4) :: jft, nzf
+        splitsBefore = 0
+        do jft = 1, ntotft
+            nzf = ddFlt(2,3,jft) - ddFlt(1,3,jft) + 1
+            splitsBefore = splitsBefore + nzf*max(0, min(jx-1, ddFlt(2,1,jft)) - ddFlt(1,1,jft) + 1)
+            if (jx >= ddFlt(1,1,jft) .and. jx <= ddFlt(2,1,jft)) then
+                splitsBefore = splitsBefore + max(0, min(jz-1, ddFlt(2,3,jft)) - ddFlt(1,3,jft) + 1)
+                if (jz >= ddFlt(1,3,jft) .and. jz <= ddFlt(2,3,jft) .and. ddFlt(1,2,jft) < jy) &
+                    splitsBefore = splitsBefore + 1
+            endif
+        enddo
+    end function splitsBefore
+
+    integer (kind = 4) function ddPeakRSSkB()
+        ! This process's peak resident set size (VmHWM of /proc/self/status),
+        ! in kB; -1 where the file is not there.
+        character (len = 128) :: line
+        integer (kind = 4) :: u, ios
+        ddPeakRSSkB = -1
+        open(newunit = u, file = '/proc/self/status', status = 'old', action = 'read', iostat = ios)
+        if (ios /= 0) return
+        do
+            read(u, '(A)', iostat = ios) line
+            if (ios /= 0) exit
+            if (line(1:6) == 'VmHWM:') then
+                read(line(7:), *, iostat = ios) ddPeakRSSkB
+                exit
+            endif
+        enddo
+        close(u)
+    end function ddPeakRSSkB
+
     subroutine ddBoundLoad
         ! bound_load on this rank: prescribed displacements of the local
         ! constrained nodes, then this rank's part of the RHS into rloc.
         integer (kind = 4) :: ii, jj, nn, code, b
         rloc = 0.0d0
-        do ii = 1, nMyNodes
-            nn = myNodes(ii)
+        do nn = 1, numnp
             if (id(1,nn) > 0) then
                 constmp(:,nn) = 0.0d0
                 cycle
@@ -825,9 +974,7 @@ contains
         ! bound_ft_ku on this rank: -K u at the constrained nodes of own
         ! fault elements; the parts are then summed at each pair's owner.
         integer (kind = 4) :: ii, jj, mm, nn, b
-        do ii = 1, nMyNodes
-            consf(:,myNodes(ii)) = 0.0d0
-        enddo
+        consf = 0.0d0
         do b = 1, nBE
             if (et(beEl(b)) /= 2) cycle
             ntag = 0
@@ -917,6 +1064,39 @@ contains
         call ddFltUnpack(a, nOwnF+1, nLocF)
     end subroutine ddFltForward
 
+    subroutine ddFltArea
+        ! Sum every rank's part of the fault-node area arn at the node's owner
+        ! (first of the six exchange slots; the rest travel as zero).
+        integer (kind = 4) :: ll
+        call VecGhostGetLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGetArray(floc, parr, perr)
+        CHKERRA(perr)
+        do ll = 1, nLocF
+            parr(6*(ll-1)+1:6*ll) = 0.0d0
+            parr(6*(ll-1)+1) = arn(locFlt(1,ll),locFlt(2,ll))
+        enddo
+        call VecRestoreArray(floc, parr, perr)
+        CHKERRA(perr)
+        call VecGhostRestoreLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGhostUpdateBegin(fvec, ADD_VALUES, SCATTER_REVERSE, perr)
+        CHKERRA(perr)
+        call VecGhostUpdateEnd(fvec, ADD_VALUES, SCATTER_REVERSE, perr)
+        CHKERRA(perr)
+        call VecGhostGetLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGetArray(floc, parr, perr)
+        CHKERRA(perr)
+        do ll = 1, nOwnF
+            arn(locFlt(1,ll),locFlt(2,ll)) = parr(6*(ll-1)+1)
+        enddo
+        call VecRestoreArray(floc, parr, perr)
+        CHKERRA(perr)
+        call VecGhostRestoreLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+    end subroutine ddFltArea
+
     subroutine ddReduceFlat(a, nn)
         ! Sum a over ranks onto rank 0 (entries are zero off their owner).
         integer (kind = 4), intent(in) :: nn
@@ -946,19 +1126,392 @@ contains
         call ddReduceFlat(slp4fri, size(slp4fri))
     end subroutine ddGatherFault
 
-    subroutine ddGatherNodal(a)
-        ! Owners' nodal values onto rank 0, for output.
-        real (kind = dp), intent(inout) :: a(ndof,numnp)
-        real (kind = dp), allocatable :: s(:,:)
-        integer (kind = 4) :: nn
-        allocate(s(ndof,numnp))
-        s = 0.0d0
-        do nn = 1, numnp
-            if (nodeOwner(nn) == me) s(:,nn) = a(:,nn)
+    subroutine ddNodalToRoot(a, g)
+        ! Owners' nodal values into g(ndof, whole-mesh nodes) on rank 0, one
+        ! rank at a time. g exists on rank 0 only.
+        real (kind = dp), intent(in) :: a(ndof,numnp)
+        real (kind = dp), allocatable, intent(inout) :: g(:,:)
+        integer (kind = 4), allocatable :: gi(:)
+        real (kind = dp), allocatable :: gv(:,:)
+        integer (kind = 4) :: nn, q, rr, cnt(1)
+        if (me == 0) then
+            if (.not. allocated(g)) allocate(g(ndof,ddGlobal(1)))
+            do nn = 1, numnp
+                if (nodeOwner(nn) == 0) g(:,gnode(nn)) = a(:,nn)
+            enddo
+            do rr = 1, nprocs-1
+                call MPI_Recv(cnt, 1, MPI_INTEGER, rr, 71, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
+                allocate(gi(cnt(1)), gv(ndof,cnt(1)))
+                call MPI_Recv(gi, cnt(1), MPI_INTEGER, rr, 72, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
+                call MPI_Recv(gv, ndof*cnt(1), MPI_DOUBLE_PRECISION, rr, 73, MPI_COMM_WORLD, &
+                    MPI_STATUS_IGNORE, IERR)
+                do q = 1, cnt(1)
+                    g(:,gi(q)) = gv(:,q)
+                enddo
+                deallocate(gi, gv)
+            enddo
+        else
+            cnt(1) = nOwnNodes
+            allocate(gi(cnt(1)), gv(ndof,cnt(1)))
+            q = 0
+            do nn = 1, numnp
+                if (nodeOwner(nn) == me) then
+                    q = q + 1
+                    gi(q) = gnode(nn)
+                    gv(:,q) = a(:,nn)
+                endif
+            enddo
+            call MPI_Send(cnt, 1, MPI_INTEGER, 0, 71, MPI_COMM_WORLD, IERR)
+            call MPI_Send(gi, cnt(1), MPI_INTEGER, 0, 72, MPI_COMM_WORLD, IERR)
+            call MPI_Send(gv, ndof*cnt(1), MPI_DOUBLE_PRECISION, 0, 73, MPI_COMM_WORLD, IERR)
+            deallocate(gi, gv)
+        endif
+    end subroutine ddNodalToRoot
+
+    subroutine ddWriteMeshFiles
+        ! eqquasi.mesh.{coor,ien,nsmp}.nc in whole-mesh numbering, as solvers
+        ! 1 and 2 write them from checkAndReport. Each rank sends its own
+        ! nodes and elements; rank 0 holds one whole-mesh buffer per write.
+        real (kind = dp), allocatable :: g(:,:), xHold(:,:)
+        integer (kind = 4), allocatable :: eb(:,:), er(:,:), gien(:,:), ienHold(:,:), &
+            ns(:), nsG(:), nsmpHold(:,:,:)
+        integer (kind = 4) :: jx, jy, jz, ee, kk, rr, q, jft, ii, cnt(1), keep
+        character (len = 50) :: fname, ftype
+
+        call ddNodalToRoot(x, g)
+        if (me == 0) then
+            call move_alloc(x, xHold)
+            call move_alloc(g, x)
+            keep = numnp
+            numnp = ddGlobal(1)
+            fname = trim(outDir)//'eqquasi.mesh.coor.nc'
+            ftype = 'coor'
+            call netcdf_write(fname, ftype)
+            numnp = keep
+            deallocate(x)
+            call move_alloc(xHold, x)
+        endif
+
+        ! Elements: whole-mesh element number, then its eight whole-mesh nodes.
+        allocate(eb(nen+1,max(1,numel)))
+        ee = 0
+        do jx = ddBox(1,1)+1, ddBox(2,1)
+            do jz = ddBox(1,3)+1, ddBox(2,3)
+                do jy = ddBox(1,2)+1, ddBox(2,2)
+                    ee = ee + 1
+                    eb(1,ee) = ((jx-2)*(nzt-1) + (jz-2))*(nyt-1) + jy - 1
+                    do kk = 1, nen
+                        eb(kk+1,ee) = gnode(ien(kk,ee))
+                    enddo
+                enddo
+            enddo
         enddo
-        call ddReduceFlat(s, size(s))
-        if (me == 0) a = s
-        deallocate(s)
-    end subroutine ddGatherNodal
+        if (me == 0) then
+            allocate(gien(nen,ddGlobal(2)))
+            do q = 1, numel
+                gien(:,eb(1,q)) = eb(2:nen+1,q)
+            enddo
+            do rr = 1, nprocs-1
+                call MPI_Recv(cnt, 1, MPI_INTEGER, rr, 74, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
+                allocate(er((nen+1),cnt(1)))
+                call MPI_Recv(er, (nen+1)*cnt(1), MPI_INTEGER, rr, 75, MPI_COMM_WORLD, &
+                    MPI_STATUS_IGNORE, IERR)
+                do q = 1, cnt(1)
+                    gien(:,er(1,q)) = er(2:nen+1,q)
+                enddo
+                deallocate(er)
+            enddo
+            call move_alloc(ien, ienHold)
+            call move_alloc(gien, ien)
+            keep = numel
+            numel = ddGlobal(2)
+            fname = trim(outDir)//'eqquasi.mesh.ien.nc'
+            ftype = 'ien'
+            call netcdf_write(fname, ftype)
+            numel = keep
+            deallocate(ien)
+            call move_alloc(ienHold, ien)
+        else
+            cnt(1) = numel
+            call MPI_Send(cnt, 1, MPI_INTEGER, 0, 74, MPI_COMM_WORLD, IERR)
+            call MPI_Send(eb, (nen+1)*cnt(1), MPI_INTEGER, 0, 75, MPI_COMM_WORLD, IERR)
+        endif
+        deallocate(eb)
+
+        ! Split-node pairs: whole-mesh node numbers from each pair's owner.
+        allocate(ns(2*nftmx*ntotft), nsG(2*nftmx*ntotft))
+        ns = 0
+        do jft = 1, ntotft
+            do ii = 1, nftnd(jft)
+                if (fltMine(ii,jft)) then
+                    ns(2*(ii-1+nftmx*(jft-1))+1) = gnode(nsmp(1,ii,jft))
+                    ns(2*(ii-1+nftmx*(jft-1))+2) = gnode(nsmp(2,ii,jft))
+                endif
+            enddo
+        enddo
+        call MPI_Reduce(ns, nsG, 2*nftmx*ntotft, MPI_INTEGER, MPI_MAX, 0, MPI_COMM_WORLD, IERR)
+        if (me == 0) then
+            allocate(nsmpHold(2,nftmx,ntotft))
+            nsmpHold = nsmp
+            nsmp = reshape(nsG, (/ 2, nftmx, ntotft /))
+            fname = trim(outDir)//'eqquasi.mesh.nsmp.nc'
+            ftype = 'nsmp'
+            call netcdf_write(fname, ftype)
+            nsmp = nsmpHold
+            deallocate(nsmpHold)
+        endif
+        deallocate(ns, nsG)
+    end subroutine ddWriteMeshFiles
 
 end subroutine solveTimeLoopPETScDD
+
+subroutine ddBlocks(pdim, ncell)
+! par.solver = 3: the regular block decomposition of the analytic grid. Cells
+! per direction are (nxt-1, nyt-1, nzt-1). MPI_Dims_create factors nprocs into
+! three non-increasing factors; the largest goes to the direction with the
+! most cells. Rank r holds block (bx, by, bz), r = bx + pdim(1)*(by + pdim(2)*bz).
+    use globalvar
+    implicit none
+    include 'mpif.h'
+    integer (kind = 4), intent(out) :: pdim(3), ncell(3)
+    integer (kind = 4) :: dimsS(3), ord(3), i, j, itmp
+
+    ncell = (/ nxt-1, nyt-1, nzt-1 /)
+    dimsS = 0
+    call MPI_Dims_create(nprocs, 3, dimsS, IERR)
+    ord = (/ 1, 2, 3 /)
+    do i = 1, 2
+        do j = i+1, 3
+            if (ncell(ord(j)) > ncell(ord(i))) then
+                itmp = ord(i); ord(i) = ord(j); ord(j) = itmp
+            endif
+        enddo
+    enddo
+    do i = 1, 3
+        pdim(ord(i)) = dimsS(i)
+    enddo
+    if (any(pdim > ncell)) then
+        if (me == 0) write(*,*) 'par.solver=3: more blocks than cells in a ', &
+            'direction. blocks (x,y,z) =', pdim, ' cells (x,y,z) =', ncell, &
+            '. Use fewer MPI ranks.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+end subroutine ddBlocks
+
+subroutine ddMeshBox
+! par.solver = 3, after mesh4num and before allocAndInit: sets this rank's
+! block (ddBox), every fault's node rectangle (ddFlt), and replaces numnp,
+! numel, neq by the block's own counts (the whole mesh's go to ddGlobal), so
+! allocAndInit and meshgen size and fill this rank's part only. meshgen's
+! consistency check then holds the counts made here against what it generates.
+!
+! The block's grid lines along a direction are its cells' lower lines plus
+! the one line above (the ghost layer); a grid point is owned by the block of
+! the cell it is the lower corner of. Rank 0 also keeps a coordinate-only
+! entry for every fault node outside its block (see meshgen).
+    use globalvar
+    implicit none
+    include 'mpif.h'
+
+    interface
+        subroutine build_yline_belt(ylinet, nyt)
+            use globalvar, only: dp
+            real (kind = dp), allocatable, intent(out) :: ylinet(:)
+            integer (kind = 4), intent(out) :: nyt
+        end subroutine build_yline_belt
+        subroutine build_xzlines(fltx1, fltx2, fltz1, fltz2, xlinet, nxt, zlinet, nzt)
+            use globalvar, only: dp
+            real (kind = dp), intent(in) :: fltx1, fltx2, fltz1, fltz2
+            real (kind = dp), allocatable, intent(out) :: xlinet(:), zlinet(:)
+            integer (kind = 4), intent(out) :: nxt, nzt
+        end subroutine build_xzlines
+    end interface
+
+    integer (kind = 4) :: pdim(3), ncell(3), b(3), npt(3), idir, ift, jft, k, n1, n2, n3, &
+        nb, nfb, nbnd
+    real (kind = dp), allocatable :: xl(:), yl(:), zl(:)
+    real (kind = dp) :: tol, fltx1, fltx2, fltz1, fltz2
+    logical :: bad
+
+    call ddBlocks(pdim, ncell)
+    b = (/ mod(me, pdim(1)), mod(me/pdim(1), pdim(2)), me/(pdim(1)*pdim(2)) /)
+    do idir = 1, 3
+        ddBox(1,idir) = (b(idir)*ncell(idir) + pdim(idir) - 1)/pdim(idir) + 1
+        ddBox(2,idir) = ((b(idir)+1)*ncell(idir) + pdim(idir) - 1)/pdim(idir) + 1
+    enddo
+
+    ! The node lines, as mesh4num and meshgen build them.
+    fltx1 = minval(fltxyz(1,1,:))
+    fltx2 = maxval(fltxyz(2,1,:))
+    fltz1 = minval(fltxyz(1,3,:))
+    fltz2 = maxval(fltxyz(2,3,:))
+    call build_xzlines(fltx1, fltx2, fltz1, fltz2, xl, n1, zl, n3)
+    call build_yline_belt(yl, n2)
+    npt = (/ nxt, nyt, nzt /)
+    if (n1 /= nxt .or. n2 /= nyt .or. n3 /= nzt) then
+        if (me == 0) write(*,*) 'par.solver=3: node lines disagree with mesh4num', n1, n2, n3, npt
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+
+    ! Each fault's node rectangle, by meshgen's own coordinate test. The
+    ! closed-form numbering needs a fault to lie on one interior y line and
+    ! no two faults to share a node; anything else is refused.
+    tol = dx/100.d0
+    allocate(ddFlt(2,3,ntotft))
+    bad = .false.
+    do ift = 1, ntotft
+        ddFlt(1,:,ift) = huge(1)
+        ddFlt(2,:,ift) = 0
+        do k = 1, nxt
+            if (xl(k) >= fltxyz(1,1,ift)-tol .and. xl(k) <= fltxyz(2,1,ift)+tol) then
+                ddFlt(1,1,ift) = min(ddFlt(1,1,ift), k)
+                ddFlt(2,1,ift) = max(ddFlt(2,1,ift), k)
+            endif
+        enddo
+        do k = 1, nyt
+            if (yl(k) >= fltxyz(1,2,ift)-tol .and. yl(k) <= fltxyz(2,2,ift)+tol) then
+                ddFlt(1,2,ift) = min(ddFlt(1,2,ift), k)
+                ddFlt(2,2,ift) = max(ddFlt(2,2,ift), k)
+            endif
+        enddo
+        do k = 1, nzt
+            if (zl(k) >= fltxyz(1,3,ift)-tol .and. zl(k) <= fltxyz(2,3,ift)+tol) then
+                ddFlt(1,3,ift) = min(ddFlt(1,3,ift), k)
+                ddFlt(2,3,ift) = max(ddFlt(2,3,ift), k)
+            endif
+        enddo
+        if (ddFlt(1,2,ift) /= ddFlt(2,2,ift) .or. ddFlt(1,2,ift) <= 1 .or. ddFlt(1,2,ift) >= nyt) then
+            bad = .true.
+        elseif (abs(yl(ddFlt(1,2,ift)) - fltxyz(1,2,ift)) >= tol) then
+            bad = .true.
+        elseif ((ddFlt(2,1,ift)-ddFlt(1,1,ift)+1)*(ddFlt(2,3,ift)-ddFlt(1,3,ift)+1) /= nftnd(ift)) then
+            bad = .true.
+        endif
+        do jft = 1, ift-1
+            if (ddFlt(1,2,jft) == ddFlt(1,2,ift) .and. &
+                ddFlt(1,1,jft) <= ddFlt(2,1,ift) .and. ddFlt(1,1,ift) <= ddFlt(2,1,jft) .and. &
+                ddFlt(1,3,jft) <= ddFlt(2,3,ift) .and. ddFlt(1,3,ift) <= ddFlt(2,3,jft)) bad = .true.
+        enddo
+        if (bad) then
+            if (me == 0) write(*,*) 'par.solver=3: fault', ift, 'is not one rectangle of nodes on ', &
+                'a single interior y line, or shares nodes with another fault. Node lines (x, y, z):', &
+                ddFlt(:,:,ift), ' nodes counted by mesh4num:', nftnd(ift), '. Use par.solver = 1 or 2.'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+    enddo
+
+    ! This block's counts.
+    nb = product(ddBox(2,:) - ddBox(1,:) + 1)
+    nbnd = 0   ! grid points on the y edges of the model: no equations
+    if (ddBox(1,2) == 1) nbnd = nbnd + 1
+    if (ddBox(2,2) == nyt) nbnd = nbnd + 1
+    nbnd = nbnd*(ddBox(2,1)-ddBox(1,1)+1)*(ddBox(2,3)-ddBox(1,3)+1)
+    nfb = 0    ! fault nodes in the block
+    do ift = 1, ntotft
+        k = 1
+        do idir = 1, 3
+            k = k*max(0, min(ddFlt(2,idir,ift), ddBox(2,idir)) - max(ddFlt(1,idir,ift), ddBox(1,idir)) + 1)
+        enddo
+        nfb = nfb + k
+    enddo
+    ddGlobal = (/ numnp, numel, neq /)
+    numnp = nb + nfb
+    if (me == 0) numnp = numnp + sum(nftnd(1:ntotft)) - nfb
+    numel = product(ddBox(2,:) - ddBox(1,:))
+    neq = 3*(nb - nbnd - nfb)
+    ddActive = .true.
+end subroutine ddMeshBox
+
+subroutine ddMeshFinish
+! par.solver = 3, after meshgen: what the block-wise mesh pass cannot settle
+! on its own. Which fault nodes this rank owns (fltMine), and one station
+! numbering for all ranks -- meshgen matched stations within each block, so
+! the lists are merged here and every rank gets the same slots.
+    use globalvar
+    implicit none
+    include 'mpif.h'
+    integer (kind = 4) :: own(2,3), npt(3), idir, ift, i, k, l, ix, iz, nzf, mx, ns
+    integer (kind = 4), allocatable :: hit(:), hitG(:), node4(:)
+    real (kind = dp), allocatable :: key(:)
+    real (kind = dp) :: kk
+
+    ! Grid lines whose points this rank owns.
+    npt = (/ nxt, nyt, nzt /)
+    do idir = 1, 3
+        own(1,idir) = ddBox(1,idir)
+        own(2,idir) = ddBox(2,idir) - 1
+        if (ddBox(2,idir) == npt(idir)) own(2,idir) = npt(idir)
+    enddo
+    allocate(fltMine(nftmx,ntotft))
+    fltMine = .false.
+    do ift = 1, ntotft
+        if (ddFlt(1,2,ift) < own(1,2) .or. ddFlt(1,2,ift) > own(2,2)) cycle
+        nzf = ddFlt(2,3,ift) - ddFlt(1,3,ift) + 1
+        do ix = max(ddFlt(1,1,ift), own(1,1)), min(ddFlt(2,1,ift), own(2,1))
+            do iz = max(ddFlt(1,3,ift), own(1,3)), min(ddFlt(2,3,ift), own(2,3))
+                fltMine((ix-ddFlt(1,1,ift))*nzf + iz-ddFlt(1,3,ift)+1, ift) = .true.
+            enddo
+        enddo
+    enddo
+
+    ! On-fault stations: anonfs(1,k) is already the node's index on the whole
+    ! fault. Merge the ranks' matches, then order the slots as the whole-mesh
+    ! pass meets the nodes (ix, iz, iy), which is the order solvers 1 and 2 use.
+    mx = maxval(nonfs)
+    ns = max(1, mx*ntotft)
+    allocate(hit(ns), hitG(ns), key(ns))
+    hit = 0
+    do k = 1, n4onf
+        hit((anonfs(3,k)-1)*mx + anonfs(2,k)) = anonfs(1,k)
+    enddo
+    call MPI_Allreduce(hit, hitG, ns, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, IERR)
+    n4onf = 0
+    do ift = 1, ntotft
+        nzf = ddFlt(2,3,ift) - ddFlt(1,3,ift) + 1
+        do i = 1, nonfs(ift)
+            l = hitG((ift-1)*mx + i)
+            if (l == 0) cycle
+            ix = ddFlt(1,1,ift) + (l-1)/nzf
+            iz = ddFlt(1,3,ift) + mod(l-1, nzf)
+            kk = (dble(ix-1)*nzt + dble(iz-1))*nyt + dble(ddFlt(1,2,ift))
+            k = n4onf
+            do while (k >= 1)
+                if (key(k) <= kk) exit
+                key(k+1) = key(k)
+                anonfs(:,k+1) = anonfs(:,k)
+                k = k - 1
+            enddo
+            key(k+1) = kk
+            anonfs(1,k+1) = l
+            anonfs(2,k+1) = i
+            anonfs(3,k+1) = ift
+            n4onf = n4onf + 1
+        enddo
+    enddo
+    deallocate(hit, hitG, key)
+
+    ! Off-fault stations: one slot per matched station, in station order, on
+    ! every rank. an4nds(2,k) is this rank's node for it, 0 when the node is
+    ! not in this block; solveTimeLoopPETScDD checks that exactly one rank
+    ! owns each.
+    if (n4nds > 0) then
+        allocate(node4(n4nds), hitG(n4nds))
+        node4 = 0
+        do k = 1, n4out
+            node4(an4nds(1,k)) = an4nds(2,k)
+        enddo
+        call MPI_Allreduce(n4yn, hitG, n4nds, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, IERR)
+        n4out = 0
+        do i = 1, n4nds
+            if (hitG(i) > 0) then
+                n4out = n4out + 1
+                an4nds(1,n4out) = i
+                an4nds(2,n4out) = node4(i)
+            endif
+        enddo
+        deallocate(node4, hitG)
+    endif
+end subroutine ddMeshFinish

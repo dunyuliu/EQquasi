@@ -392,7 +392,7 @@ subroutine netcdf_read_on_fault(infile)
     integer (kind = 4) :: ncid, var_id(20), i, j, n, ift, nvar, ndims_var
     integer (kind = 4) :: dimids3(3), dimlen1, dimlen2, dimlen3
     integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
-    integer (kind = 4) :: nfxMax, nfzMax
+    integer (kind = 4) :: nfxMax, nfzMax, i0, i1, j0, j1
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
 
     nvar = 9
@@ -407,7 +407,10 @@ subroutine netcdf_read_on_fault(infile)
     nfxMax = maxval(nfx)
     nfzMax = maxval(nfz)
 
-    allocate(on_fault_vars(nfxMax,nfzMax,ntotft,nvar))
+    ! Read the whole (strike, dip) grid, or with par.solver = 3 only the
+    ! rectangle that holds the fault nodes this rank owns.
+    call on_fault_read_range(nfxMax, nfzMax, i0, i1, j0, j1)
+    allocate(on_fault_vars(i0:i1,j0:j1,ntotft,nvar))
     on_fault_vars = 0.0d0
 
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
@@ -449,7 +452,8 @@ subroutine netcdf_read_on_fault(infile)
             stop 'Stopped'
         endif
         do i = 1, nvar
-            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfx(1), 1:nfz(1), 1, i)))
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:, :, 1, i), &
+                start = (/ i0, j0 /), count = (/ i1-i0+1, j1-j0+1 /)))
         enddo
     elseif (ndims_var == 3) then
         call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
@@ -463,7 +467,8 @@ subroutine netcdf_read_on_fault(infile)
             stop 'Stopped'
         endif
         do i = 1, nvar
-            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfxMax, 1:nfzMax, 1:ntotft, i)))
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:, :, :, i), &
+                start = (/ i0, j0, 1 /), count = (/ i1-i0+1, j1-j0+1, ntotft /)))
         enddo
     else
         print *, 'netcdf_read_on_fault: ', trim(infile), &
@@ -473,6 +478,9 @@ subroutine netcdf_read_on_fault(infile)
 
     do ift = 1, ntotft
         do n = 1, nftnd(ift)
+            if (ddActive) then
+                if (.not. fltMine(n,ift)) cycle ! par.solver = 3: another rank reads it.
+            endif
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
             fric(FR_RSF_A,  n, ift) = on_fault_vars(i,j,ift,1) ! a
@@ -527,7 +535,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     integer (kind = 4)    :: ncid,  var_id(20), i, j, n, ift, nvar, ndims_var
     integer (kind = 4) :: dimids3(3), dimlen1, dimlen2, dimlen3
     integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
-    integer (kind = 4) :: nfxMax, nfzMax
+    integer (kind = 4) :: nfxMax, nfzMax, i0, i1, j0, j1
     integer (kind = 4) :: att_status
     real (kind = dp) :: file_dip_spacing
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
@@ -544,7 +552,10 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 
     ! Read in 5 variables a, b, Dc, v0, r0.
     nvar = 5
-    allocate(on_fault_vars(nfxMax,nfzMax,ntotft,nvar))
+    ! Read the whole (strike, dip) grid, or with par.solver = 3 only the
+    ! rectangle that holds the fault nodes this rank owns.
+    call on_fault_read_range(nfxMax, nfzMax, i0, i1, j0, j1)
+    allocate(on_fault_vars(i0:i1,j0:j1,ntotft,nvar))
     on_fault_vars = 0.0d0
 
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
@@ -578,7 +589,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
             stop 'Stopped'
         endif
         do i = 1, nvar
-            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfx(1), 1:nfz(1), 1, i)))
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:, :, 1, i), &
+                start = (/ i0, j0 /), count = (/ i1-i0+1, j1-j0+1 /)))
         enddo
     elseif (ndims_var == 3) then
         call check( nf90_inquire_dimension(ncid, dimids3(1), len = dimlen1))
@@ -592,7 +604,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
             stop 'Stopped'
         endif
         do i = 1, nvar
-            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(1:nfxMax, 1:nfzMax, 1:ntotft, i)))
+            call check( nf90_get_var(ncid, var_id(i), on_fault_vars(:, :, :, i), &
+                start = (/ i0, j0, 1 /), count = (/ i1-i0+1, j1-j0+1, ntotft /)))
         enddo
     else
         print *, 'netcdf_read_on_fault_restart: ', trim(infile1), &
@@ -602,6 +615,9 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 
     do ift = 1, ntotft
         do n = 1, nftnd(ift)
+            if (ddActive) then
+                if (.not. fltMine(n,ift)) cycle ! par.solver = 3: another rank reads it.
+            endif
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
             fric(FR_RSF_A,  n, ift) = on_fault_vars(i,j,ift,1) ! a
@@ -621,7 +637,7 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     ! dimension of size ntotft and per-fault local (strike, dip) grids -- see
     ! that subroutine's header comment).
     nvar = 12
-    allocate(on_fault_vars4(nfxMax,nfzMax,nvar,ntotft))
+    allocate(on_fault_vars4(i0:i1,j0:j1,nvar,ntotft))
     ! Open the file. NF90_NOWRITE tells netCDF we want read-only access to the file.
     lastNcPath = infile2
     call check( nf90_open(trim(infile2), NF90_NOWRITE, ncid))
@@ -670,11 +686,15 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
     call check( nf90_inq_varid(ncid, "vzs", var_id(12)))
     ! Read the data
     do i = 1, nvar
-        call check( nf90_get_var(ncid, var_id(i), on_fault_vars4(:,:,i,:)))
+        call check( nf90_get_var(ncid, var_id(i), on_fault_vars4(:,:,i,:), &
+            start = (/ i0, j0, 1 /), count = (/ i1-i0+1, j1-j0+1, ntotft /)))
     enddo
 
     do ift = 1, ntotft
         do n = 1, nftnd(ift)
+            if (ddActive) then
+                if (.not. fltMine(n,ift)) cycle ! par.solver = 3: another rank reads it.
+            endif
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
             fric(FR_TSTK0,  n, ift) = on_fault_vars4(i,j,1,ift)! tstk0
@@ -701,14 +721,56 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
 
 end subroutine netcdf_read_on_fault_restart
 
+! on_fault_read_range gives the (strike, dip) index range of the on-fault
+! input files that a rank reads: all of it, or with par.solver = 3 the
+! rectangle that holds the fault nodes the rank owns.
+subroutine on_fault_read_range(nfxMax, nfzMax, i0, i1, j0, j1)
+    use globalvar
+    implicit none
+    integer (kind = 4), intent(in)  :: nfxMax, nfzMax
+    integer (kind = 4), intent(out) :: i0, i1, j0, j1
+    integer (kind = 4) :: n, ift, i, j
+
+    i0 = 1
+    i1 = nfxMax
+    j0 = 1
+    j1 = nfzMax
+    if (.not. ddActive) return
+
+    i0 = nfxMax + 1
+    i1 = 0
+    j0 = nfzMax + 1
+    j1 = 0
+    do ift = 1, ntotft
+        do n = 1, nftnd(ift)
+            if (.not. fltMine(n,ift)) cycle
+            i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+            j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+            i0 = min(i0, i)
+            i1 = max(i1, i)
+            j0 = min(j0, j)
+            j1 = max(j1, j)
+        enddo
+    enddo
+    if (i1 < i0) then ! this rank owns no fault node: read one value, use none
+        i0 = 1
+        i1 = 1
+        j0 = 1
+        j1 = 1
+    endif
+end subroutine on_fault_read_range
+
 subroutine check(status)
     use netcdf
-    use globalvar, only: lastNcPath
+    use globalvar, only: lastNcPath, ddActive, IERR
+    include 'mpif.h'
     integer, intent ( in) :: status
     
     if(status /= nf90_noerr) then 
       print *, 'netCDF error: ', trim(nf90_strerror(status))
       print *, 'while handling: ', trim(lastNcPath)
+      flush(6)
+      if (ddActive) call MPI_ABORT(MPI_COMM_WORLD, 1, IERR) ! par.solver = 3: a rank reads its own part
       stop "Stopped"
     end if
 end subroutine check  

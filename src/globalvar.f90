@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.24.0'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.24.1'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -200,10 +200,18 @@ MODULE globalvar
     ! rather than (2*l_f)^2 -- 850 m instead of 800 m at dx = 50.
     real (kind=dp), allocatable :: pfFx(:), pfFz(:)
     integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
-    ! par.solver = 3 only: while ddActive, faulting skips the fault nodes this
-    ! rank does not own (fltMine(i,ift) false). Never set by solver 1 or 2.
+    ! par.solver = 3 only; never set by solver 1 or 2. While ddActive, every
+    ! rank holds its own block of the mesh only: numnp, numel, neq and the
+    ! node/element arrays are that block's (ddGlobal keeps numnp, numel, neq
+    ! of the whole mesh), meshgen covers grid lines ddBox(1,d)..ddBox(2,d)
+    ! along x, y, z (d = 1, 2, 3), and faulting skips the fault nodes this
+    ! rank does not own (fltMine(i,ift) false). ddFlt(1:2,d,ift) are the grid
+    ! lines that bound fault ift's node rectangle; a fault node keeps its
+    ! whole-mesh index i on every rank.
     logical :: ddActive = .false.
     logical, allocatable :: fltMine(:,:)
+    integer (kind=4) :: ddBox(2,3), ddGlobal(3)
+    integer (kind=4), allocatable :: ddFlt(:,:,:)
 
     ! Section 4.3 of SEAS BP8: slip, shear stress and pore pressure recorded
     ! along the two cross-section lines through the injection point, at a

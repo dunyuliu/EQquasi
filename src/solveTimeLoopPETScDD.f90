@@ -103,7 +103,11 @@ subroutine solveTimeLoopPETScDD
     ! SPIKE (slip-to-traction cost): -eq_matmat <n> times MatMatSolve on the factor.
     Mat                        :: Fmm, Bmm, Xmm
     PetscInt                   :: nmm, imm, kmm
-    PetscBool                  :: flgmm
+    PetscBool                  :: flgmm, usePlain, useGuess, useSym
+    Vec                        :: xg(0:1)
+    Mat                        :: Atr
+    PetscReal                  :: nrmDiff, nrmA
+    PetscScalar                :: mone2
     real (kind = 8)            :: wmm
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -483,6 +487,9 @@ subroutine solveTimeLoopPETScDD
     call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_near_null', useNN, perr)
     CHKERRA(perr)
     call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_spike_log', useLog, perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_plain_ksp', usePlain, perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_guess_per_tag', useGuess, perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_check_sym', useSym, perr)
     CHKERRA(perr)
     wallSolve = 0.0d0
     if (useIS) then
@@ -652,16 +659,24 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
     CHKERRA(perr)
+    if (usePlain) then
+        call KSPSetType(ksp, KSPCG, perr)
+        call PCSetType(pc, PCJACOBI, perr)
+    endif
     endif
     call KSPSetFromOptions(ksp, perr)
     CHKERRA(perr)
+    if (useGuess) then
+        call KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, perr)
+        CHKERRA(perr)
+    endif
     call PetscObjectTypeCompare(ksp, KSPPREONLY, isPreonly, perr)
     CHKERRA(perr)
     call PetscObjectTypeCompare(pc, PCCHOLESKY, isCholesky, perr)
     CHKERRA(perr)
     call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
     CHKERRA(perr)
-    if (.not. useIS .and. .not. (isPreonly .and. isCholesky)) then
+    if (.not. useIS .and. .not. usePlain .and. .not. (isPreonly .and. isCholesky)) then
         if (me == 0) write(*,*) 'par.solver=3: only KSPPREONLY + PCCHOLESKY ', &
             '(MUMPS) is verified for the distributed loop. Refusing.'
         flush(6)
@@ -680,6 +695,19 @@ subroutine solveTimeLoopPETScDD
         if (me == 0) write(*,'(A,3ES12.4,I8)') 'EQ_TOL rtol atol dtol maxit ', kspRtol, kspAtol, &
             kspDtol, kspMaxIts
     endif
+    if (useSym .and. .not. useIS) then
+        call MatTranspose(Amat, MAT_INITIAL_MATRIX, Atr, perr)
+        mone2 = -1.0d0
+        call MatAXPY(Atr, mone2, Amat, DIFFERENT_NONZERO_PATTERN, perr)
+        call MatNorm(Atr, NORM_FROBENIUS, nrmDiff, perr)
+        call MatNorm(Amat, NORM_FROBENIUS, nrmA, perr)
+        if (me == 0) write(*,'(A,2ES14.5)') 'EQ_SYM |A^T-A|_F |A|_F ', nrmDiff, nrmA
+        call MatDestroy(Atr, perr)
+    endif
+    call VecDuplicate(xvec, xg(0), perr)
+    call VecDuplicate(xvec, xg(1), perr)
+    call VecZeroEntries(xg(0), perr)
+    call VecZeroEntries(xg(1), perr)
     call cpu_time(startTime)
     wall0 = MPI_Wtime()
     call KSPSetUp(ksp, perr)
@@ -792,9 +820,11 @@ subroutine solveTimeLoopPETScDD
             call VecAssemblyEnd(bvec, perr)
             CHKERRA(perr)
 
+            if (useGuess) call VecCopy(xg(iiTag), xvec, perr)
             wall0 = MPI_Wtime()
             call KSPSolve(ksp, bvec, xvec, perr)
             CHKERRA(perr)
+            if (useGuess) call VecCopy(xvec, xg(iiTag), perr)
             wall1 = MPI_Wtime() - wall0
             wallSolve = wallSolve + wall1
             call KSPGetConvergedReason(ksp, kspReason, perr)

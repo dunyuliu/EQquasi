@@ -508,7 +508,7 @@ build, run and traps are in `CLAUDE.md`.
      Reading: only the tolerance and the smoother change the iteration count; the threshold, a second
      smoothing step and the coarse limit leave it at 10.2. Even rtol 1e-10 (13.2 iterations) leaves
      3 of 25 files above the gold comparator's 1e-9, so passing it needs a tighter rtol than any run here
-     (an extrapolation of ~3 iterations per decade suggests 1e-11 to 1e-12; not run): the cost of
+     (iterations rise 1.5 per decade of rtol, 7.3 / 10.2 / 13.2 at 1e-6 / 1e-8 / 1e-10; whether 1e-11 or 1e-12 passes the comparator is not run and not estimated): the cost of
      exactness looks small in iterations, and is not shown in wall time. The two 1.1e-7 rows are float32-floor `slip_rate` differences, not a
      convergence figure (the residual tolerance is the same as the reference). Exact 0.94 s loop
      against GAMG 1.4-3.4 s: GAMG is slower at this size in every variant. Wide tuning and the
@@ -518,34 +518,35 @@ build, run and traps are in `CLAUDE.md`.
      from existing runs of the same case: 8 and 32 ranks `prof/`, 16 ranks `krylov4/`; host load
      shown, it was 10-20 and other sessions' jobs ran beside every run, so absolute times are
      indicative and the curve shape is the finding). s/step = loop / 3; s per iteration =
-     kspsolve / (3 x iterations per solve), assuming one CG solve per step (not checked against the
-     solve count).
+     kspsolve / (6 x iterations per solve): 2 CG solves per step, 6 `KSP Object` blocks per 3-step
+     log (corrected 2026-11-14 audit; first posted with one solve per step, 2x too high); kspsolve
+     is the in-code `EQ_WALL` line, loop and setup are `runInfo.json`.
 
      | ranks | option | setup s | loop s | s/step | its/solve (min-max) | s per iteration | peak RSS GB per rank | load before |
      |---|---|---|---|---|---|---|---|---|
-     | 8 | GAMG CG | 18.5 | 138.7 | 46.2 | 63.0 (60-67) | 0.72 | 4.80 | 10.11 |
+     | 8 | GAMG CG | 18.5 | 138.7 | 46.2 | 63.0 (60-67) | 0.361 | 4.80 | 10.11 |
      | 8 | exact MUMPS | 640.4 | 38.2 | 12.7 | 1 | n/a | 20.91 | n/a |
-     | 16 | GAMG CG | 10.6 | 98.4 | 32.8 | 63.0 (60-67) | 0.51 | 2.54 | 16.49 |
+     | 16 | GAMG CG | 10.6 | 98.4 | 32.8 | 63.0 (60-67) | 0.255 | 2.54 | 16.49 |
      | 16 | exact MUMPS | 331.3 | 20.6 | 6.9 | 1 | n/a | 12.07 | 13.27 |
-     | 32 | GAMG CG | 5.5 | 55.4 | 18.5 | 63.2 (61-67) | 0.28 | 1.35 | 19.89 |
+     | 32 | GAMG CG | 5.5 | 55.4 | 18.5 | 63.2 (61-67) | 0.142 | 1.35 | 19.89 |
      | 32 | exact MUMPS | 255.6 | 21.2 | 7.1 | 1 | n/a | 6.79 | n/a |
      | 64 | both | not run: load1 was 30.8 at 12:47 (other sessions), 64 ranks would oversubscribe the 64 cores | | | | | | |
 
      Reading: GAMG CG scales and MUMPS does not. From 8 to 32 ranks GAMG's loop falls 2.5x (63 %
      parallel efficiency, ranks^-0.66; s per iteration halves per doubling, the iteration count stays
-     at 63 so the cost is the work per iteration, not convergence), setup 3.4x, memory per rank 3.6x;
+     at 63 so the cost is the work per iteration, not convergence), setup 3.4x, memory per rank 3.5x;
      exact's loop falls 38.2 to 20.6 s and then stays flat (21.2 s at 32), its setup
      falls 2.5x. The GAMG/exact loop ratio is 3.6x, 4.8x, 2.6x at 8, 16, 32 ranks. Extrapolating
      GAMG's ranks^-0.66 against exact's flat ~21 s puts the crossing near 140 ranks (an
-     extrapolation from three noisy points, not a measurement), beyond this node; GAMG's setup
-     advantage (5.5 s against 255.6 s) is already 46x at 32 ranks and memory 5x, but the solve is
+     extrapolation from three noisy points, anchored at the 32-rank point: 139; a 3-point fit gives 147; not a measurement; the exact 16-rank baseline is 20.6 s in `krylov4/`, a second run `20261114_prof/` np16 gave 27.8 s, so "flat" rests on one of two 16-rank runs), beyond this node; GAMG's setup
+     advantage (5.5 s against 255.6 s) is already 47x at 32 ranks and memory 5x, but the solve is
      inexact (9 of 33 files fail at 8 and 32 ranks, worst 1.1e-7, float32 floor) and over a 200-step
      run the loop, not setup, dominates (exact wide at 16 ranks: loop 1103 s for 200 steps), so the
      verdict at this size and rank count is unchanged. The 64-rank point is the one that would test the
      extrapolation; it is queued for a quiet window.
    - **GAMG CG tuning on wide, 16 ranks, 3 steps, and the iteration-count control, MEASURED
      2026-11-14 13:05** (`runs/20261114_scaling/`, rtol 1e-8 unless stated, comparator = the table's,
-     33 files; exact at 16 ranks: loop 20.6 s; load before each run 16-29, so iterations carry the
+     33 files; exact at 16 ranks: loop 20.6 s; load before each run 16-29 (13.7 for the gs10 control), so iterations carry the
      comparison and loops are indicative):
 
      | variant | its/solve (min-max) | setup s | loop s | peak RSS GB per rank | worst diff from exact | files failing |
@@ -558,7 +559,7 @@ build, run and traps are in `CLAUDE.md`.
      | Richardson + SOR smoothers | 35.2 (34-37) | 10.0 | 80.8 | 2.54 | 1.1e-07 | 9 of 33 |
 
      Same ordering as on bp1002: the smoother (SOR, 1.8x fewer iterations) and the tolerance move the
-     iteration count (about 20 iterations per decade here against 3 on bp1002); the threshold only
+     iteration count (about 10 iterations per decade of rtol here, 42.2 / 63.0 / 83.5, against 1.5 on bp1002); the threshold only
      raises setup (4x) and unsmoothed aggregation raises iterations 1.5x. No tolerance tested reaches
      the gold comparator (rtol 1e-10: 6 of 33 files still fail). SOR smoothers scale with ranks the same way:
      35.2, 35.2, 35.3 iterations at 8, 16, 32 ranks (rank-independent), loop 115.6 (load 28), 80.8, 50.7 s

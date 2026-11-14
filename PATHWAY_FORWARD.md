@@ -105,7 +105,7 @@ build, run and traps are in `CLAUDE.md`.
    287 passed, `-m e2e_fast` 53 passed / 21 skipped (data absence in the
    reference), CI run 43583429026 success. (g) `MATIS` + `PCBDDC`, spike only (draft PR #87, not for merge): see below.
    Evidence, binary eqquasi-1.24.3 (`dd-2c` ae7e3b1), host cotopaxi, NOT
-   exclusive (loadavg of other users 4-13 before each run, rank-0
+   exclusive (1-min load 4.1-32.9 before each run, all users, rank-0
    `cpu_time`; `runs/20261114_row1-evidence/table.csv`, `matrix.out`,
    `load.log`). bp1002 101 steps, time loop s; wide = 10 m BP8 wide, 10 steps,
    s/step; solver 1 native MUMPS, solver 3 distributed loop:
@@ -127,9 +127,9 @@ build, run and traps are in `CLAUDE.md`.
    Not at the target: wide solver 3 at 32 ranks is 6.36 s/step against
    <= 5 s, on a loaded host. bp1002 solver 1 is flat in rank count (66.5 /
    65.6 / 64.2); solver 3 falls 28 % over 4x ranks but a conductor's earlier
-   run of the same case measured 13.7 / 13.5 / 13.1 at lower load, so the
+   run of the same case measured 13.7 / 13.5 / 13.1 at lower load (`runs/20261113_baseline/`, binary 1.22.0), so the
    rank-count trend is not established. What dominates bp1002 at 8 ranks:
-   KSPSolve is 95 % of the solver 3 time loop (spike log, one run). A
+   KSPSolve is 93.7 % of the solver 3 time loop (`runs/20261114_prof/results.txt`; 95 % was the wide 8-rank share). A
    host-exclusive repeat is needed before any scaling claim.
    (g) BDDC spike (CG + `PCBDDC`, MUMPS local and coarse solves, `-eq_mat_is`,
    branch `dd-3g-spike2` 7b77221; an earlier run was void: the `MATIS` map was
@@ -137,13 +137,13 @@ build, run and traps are in `CLAUDE.md`.
    Repaired probe, control: relative residual 7.5e-09 / 5.8e-13 at rtol 1e-8 /
    1e-12, solution within 5.3e-10 / 3.7e-14 of the MUMPS solve at the same
    step. bp1002, 8 ranks, 101 steps: 27 / 41 iterations per solve (flat over
-   all 202 solves), 3.17 / 3.71 s/step against 0.15-0.18 for MUMPS (~17x
+   all 202 solves), 3.17 / 3.71 s/step against 0.15-0.18 for MUMPS (17-25x
    slower), setup 1.0 s against 3.3 s, parity to MUMPS 5.6e-07 (rtol 1e-8) and
    1.0e-11 (1e-12) on the fault, station and cplot files, step count and
    peak-slip-rate step identical, no event inside 101 steps. 10 m BP8 wide,
    16 ranks, 3 steps, rtol 1e-8 (`runs/20261114_bddc-wide/`): BDDC 74
    iterations per solve, 339.7 s/step against 7.18 s/step for MUMPS (~47x
-   slower), setup 60 s against 362 s, peak RSS of the largest rank 6.9 against
+   slower), setup 60 s against 359.6 s, peak RSS of the largest rank 6.9 against
    11.9 GB; parity on wide not checked. Host not exclusive (load 7-22). So
    BDDC with these options does not beat MUMPS at either size: its gain is
    setup time and memory, its cost is ~0.06 s (bp1002) to ~2.3 s (wide, corrected
@@ -152,7 +152,7 @@ build, run and traps are in `CLAUDE.md`.
    Mesh-only memory (stage 2 per-rank mesh), solver 3 on wide at 16 ranks:
    peak RSS after mesh setup 90.8 MB for the largest rank, 1.44 GB summed,
    against 11.9 GB per rank at the end: factors are >99 % of the footprint.
-   **2026-11-14, fourth conductor** (MEASURED, indicative: host load 18-43 on
+   **2026-11-14, fourth conductor** (MEASURED, indicative: host load 4-43 on
    every wide run; binary 1.24.4 of `dd-3g-spike2`, solver 3, no code change,
    runtime PETSc options only; no `par.` parameter).
    Where a step goes (`-eq_profile`, branch `dd-prof` eabe30a, spike, not for
@@ -177,28 +177,29 @@ build, run and traps are in `CLAUDE.md`.
    | 32 | BLR 1e-4 | 2.47 | 135 | 5.0 |
    Ordering and threads do not help: METIS 8.11 s/step (= none), PORD 13.0 and
    26.5 GB, 8 ranks x 2 threads 12.8 s/step. Parity against the uncompressed
-   run on the same binary: wide, 3 steps, worst relative difference over the
-   result files 1.4e-13 (1e-8), 4.6e-11 (1e-6), but 3 aseismic steps barely
-   test it. `test.bp5.qdc.2000`, 8 ranks, 4483 steps to the stop tag (an event
+   run on the same binary: wide, 3 steps, worst relative difference over
+   `cplot_EQquasi.txt` 1.4e-13 (1e-8), 4.6e-11 (1e-6), but 3 aseismic steps barely
+   test it (the `fltst` log10 slip-rate column differs 2.1e-3 / 3.9e-3, its floor
+   value is -20 against -30: a sentinel, excluded; audit 2026-11-14). `test.bp5.qdc.2000`, 8 ranks, 4483 steps to the stop tag (an event
    is included; `runs/20261114_blr-small/`): 1e-8 worst 4.5e-8, step count and
    time column identical; 1e-6 worst 5.7e-6 (`global.dat`), same step count and
    time column; 1e-4 worst 3.4e-3 and 4486 steps against 4483: REJECTED. bp1002
    101 steps: 1e-8 3e-11, 1e-6 4.6e-8, 1e-4 5.7e-6. So at the 5 s target: wide
-   at 16 and at 32 ranks is below 5 s with BLR 1e-8 or 1e-6 (indicative, loaded
+   at 16 and at 32 ranks is below 5 s with BLR 1e-8 or 1e-6 at 16 ranks and 1e-6 at 32 (no 32-rank 1e-8 run; indicative, loaded
    host), the loop is still ~flat from 16 to 32 ranks. Not done: parity of BLR
    against the gold compsets through `-m e2e_fast` (needs a solver 3 gate case
    with these options), a wide run long enough to include slip-rate change, a
    host-exclusive repeat. Reaching the options in production needs the owner's
    answer on `par.solver = 3` (the options act on the PETSc loops only; native
    `par.solver = 1` has its own MUMPS controls).
-   **BLR against the gold, 2026-11-14 09:40** (`runs/20261114_gate-blr/`, the
+   **BLR against the gold, 2026-11-14 09:31** (`runs/20261114_gate-blr/`, the
    `e2e_fast` reference tests unchanged, `par.solver = 3` forced in a throwaway
    branch, binary 1.24.4 of `dd-2d` 81629ad, 4-rank compsets, host load 3-12):
    exact solver 3: 39 passed, 21 skipped (data absence: no summary.json,
    section 4.3 profiles, offfault, perfault in the references), rc 0.
    BLR 1e-8: 21 failed / 18 passed, rc 1; BLR 1e-6: 32 failed / 7 passed,
    rc 1. Failures are at the gate's rtol 1e-9 in cplot, global, onfault,
-   profile, restart and snapshot categories (e.g. a fltst column 1.115424e-05
+   offfault, perfault, profile, restart and snapshot categories (e.g. a fltst column 1.115424e-05
    against 1.1154279e-05), i.e. the compressed solve differs from the gold at
    the level of its own tolerance, not at round-off. So BLR is NOT verified:
    it does not pass the gold comparator, and loosening that tolerance is not
@@ -211,9 +212,49 @@ build, run and traps are in `CLAUDE.md`.
    run 3.7-5.1, own 16 ranks bring it to ~19, so near-quiet): none 5.52 s/step
    (setup 336 s), BLR 1e-8 2.87 (140 s), BLR 1e-6 2.48 (133 s); max slip rate
    at the end identical to 7 digits (1e-8) and 6 digits (1e-6, 1.47935e-07);
-   worst difference over the result files against none 3.3e-9 (1e-8), 6.8e-7
-   (1e-6). Speedup 1.9-2.2x at 200 steps, smaller than the 3x of 3 steps (the
+   worst difference over `cplot_EQquasi.txt` against none 3.3e-9 (1e-8), 6.8e-7
+   (1e-6); `fltst` floor sentinel 1.1e-4 / 1.3e-4. Speedup 1.9-2.2x at 200 steps, smaller than the 2.3x / 3.1x (1e-8 / 1e-6) of 3 steps (the
    first steps' solves were cheaper to compress or the load differed).
+   **BDDC tuning, 2026-11-14 fifth conductor** (MEASURED, indicative; spike
+   binary 1.24.4 of `dd-3g-spike2`, runtime PETSc options only;
+   `runs/20261114_bddc-tune/`, total 1-min load 6-13 before each bp1002 run).
+   bp1002, 8 ranks, 11 steps = 22 solves, rtol 1e-8, exact MUMPS local and
+   coarse solves, all converged on reason 2; MUMPS reference 0.15-0.18 s/step
+   = 1.7-2.0 s per 11 steps:
+   | variant | iterations per solve | time loop s | setup s |
+   |---|---|---|---|
+   | default | 27 | 29.5 | 1.03 |
+   | + rigid-body near-null space (`-eq_near_null`) | 16 | 17.5 | 1.08 |
+   | + faces, edges, vertices primal | 25 | 26.1 | 1.05 |
+   | + deluxe scaling | 27 | 39.9 | 2.45 |
+   | near-null + deluxe | 16 | 22.4 | 2.54 |
+   | near-null + faces/edges/vertices | 15 | 15.7 | 1.09 |
+   | default, 16 ranks | 37 | 23.2 | 0.45 |
+   | default, 32 ranks | KSP reason -8 (indefinite PC) at step 1, run aborts | | |
+   | near-null + adaptive threshold 5 | `PCSetUp_BDDC` error (`bddc.c:1528`), rc 56 | | |
+   Best variant is ~8x slower than MUMPS on bp1002. Wide, 16 ranks, 3 steps,
+   near-null + faces/edges/vertices: 31 iterations per solve (74 with default
+   options), 125.9 s/step, setup 61.9 s, 2.02 s per iteration, against 339.7
+   (default BDDC) and 7.18 (MUMPS), i.e. 17.5x slower. Why it cannot win with
+   exact local solves: one iteration applies a local Neumann and a local
+   Dirichlet triangular solve (~2 s on wide at 16 ranks) and one MUMPS solve of
+   the whole system costs ~3.6 s, so BDDC would need fewer than two iterations
+   per solve. Verdict: BDDC with direct local solves is measured negative for
+   time per step at both sizes; its gains are setup time (62 s against 360 s)
+   and memory. Remaining levers (inexact local solves, more ranks above the
+   32-rank breakdown) are untested and unlikely to change this bound.
+   Setup is built once and reused: `PCSetUp` 1, `KSPSetUp` 1, `PCApply` 151
+   over 2 solves (`-log_view`, `runs/20261114_prof/bp8.qdc.gs.10.wide_s3_np16_bddc`;
+   `KSPSetUp` is called once before the loop, `solveTimeLoopPETScDD.f90:680` at
+   7b77221). Independent re-derivation of every figure above in this row
+   against `runs/`, 2026-11-14: corrections folded in place (a mixed-up 95 %,
+   17x as 17-25x, 362 s as 359.6 s, no 32-rank BLR 1e-8 run, parity metric
+   named, load ranges, 3x as 2.3x / 3.1x, gate categories and time).
+   **`KSPConvergedReason = -11` (`PCSETUP_FAILED`) at the first solve, 8-rank
+   BP8**: 1 of 11 runs reported, 0 of 40 in `runs/20261114_ksp-stress/`. Not
+   reproduced. Closes when `KSPSetUp` reads the MUMPS INFOG(1)/(2) on failure
+   (the native loop does, `solveTimeLoopMUMPS.f90:60,153`) so a recurrence names
+   its cause, or on 60 clean runs; until then it stays an open observation.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

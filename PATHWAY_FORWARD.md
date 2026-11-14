@@ -191,6 +191,29 @@ build, run and traps are in `CLAUDE.md`.
    host-exclusive repeat. Reaching the options in production needs the owner's
    answer on `par.solver = 3` (the options act on the PETSc loops only; native
    `par.solver = 1` has its own MUMPS controls).
+   **BLR against the gold, 2026-11-14 09:40** (`runs/20261114_gate-blr/`, the
+   `e2e_fast` reference tests unchanged, `par.solver = 3` forced in a throwaway
+   branch, binary 1.24.4 of `dd-2d` 81629ad, 4-rank compsets, host load 3-12):
+   exact solver 3: 39 passed, 21 skipped (data absence: no summary.json,
+   section 4.3 profiles, offfault, perfault in the references), rc 0.
+   BLR 1e-8: 21 failed / 18 passed, rc 1; BLR 1e-6: 32 failed / 7 passed,
+   rc 1. Failures are at the gate's rtol 1e-9 in cplot, global, onfault,
+   profile, restart and snapshot categories (e.g. a fltst column 1.115424e-05
+   against 1.1154279e-05), i.e. the compressed solve differs from the gold at
+   the level of its own tolerance, not at round-off. So BLR is NOT verified:
+   it does not pass the gold comparator, and loosening that tolerance is not
+   mine to do. Open, owner's call: what parity tolerance an approximate solve
+   is held to (the row's own text: "within a stated tolerance, shown not to
+   move event times"); the bp5 event run above shows event steps and times
+   unmoved at 1e-8 and 1e-6.
+   Long wide run (`runs/20261114_blr-widelong/`, 16 ranks, 200 steps = 1e5 s,
+   slip rate rises from 1.3e-12 at step 3 to 1.479e-07 m/s; load before each
+   run 3.7-5.1, own 16 ranks bring it to ~19, so near-quiet): none 5.52 s/step
+   (setup 336 s), BLR 1e-8 2.87 (140 s), BLR 1e-6 2.48 (133 s); max slip rate
+   at the end identical to 7 digits (1e-8) and 6 digits (1e-6, 1.47935e-07);
+   worst difference over the result files against none 3.3e-9 (1e-8), 6.8e-7
+   (1e-6). Speedup 1.9-2.2x at 200 steps, smaller than the 3x of 3 steps (the
+   first steps' solves were cheaper to compress or the load differed).
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

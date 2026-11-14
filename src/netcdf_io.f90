@@ -67,10 +67,15 @@ subroutine netcdf_write(outfile, outtype)
             enddo 
         enddo 
     endif 
-    allocate(lat_index(nlat))
     allocate(lon_index(nlon))
-    lat_index = (/ (i, i = 1, nlat) /)
     lon_index = (/ (i, i = 1, nlon) /)
+    ! par.solver = 3 (ddActive): rank 0 writes the header only, with numnp or
+    ! numel set to the whole mesh's. The entries of lat_name and of the
+    ! variable follow from the ranks, each its own (ddColsToFile).
+    if (.not. ddActive) then
+        allocate(lat_index(nlat))
+        lat_index = (/ (i, i = 1, nlat) /)
+    endif
     ! Create the netCDF file.
     lastNcPath = outfile
     call check(nf90_create(trim(outfile), NF90_CLOBBER, ncid))
@@ -108,12 +113,14 @@ subroutine netcdf_write(outfile, outtype)
     ! Write data.
     ! Write the coordinate variable data. This will put the x, and y 
     ! of our data grid into the netCDF file.
-    call check(nf90_put_var(ncid, lat_varid, lat_index))
+    if (.not. ddActive) call check(nf90_put_var(ncid, lat_varid, lat_index))
     call check(nf90_put_var(ncid, lon_varid, lon_index))
     
     ! Write the data. This will write our displacement fields "cons" which is defined 
     ! globally. Its dimension is 3 by numnp (row by column).
-    if (outtype == 'disp') then 
+    if (ddActive) then
+        continue
+    elseif (outtype == 'disp') then
         call check(nf90_put_var(ncid, var_1_id, cons))
     elseif (outtype == 'coor') then 
         call check(nf90_put_var(ncid, var_1_id, x))
@@ -145,6 +152,7 @@ subroutine netcdf_write_on_fault(outfile)
     use netcdf
     use globalvar
     implicit none
+    include 'mpif.h'
     character (len = 50 ) :: outfile, lat_name, lon_name, flt_name, lat_units, lon_units, flt_units, UNITS
     character (len = 50), allocatable, dimension(:) :: var_name, var_unit
     integer (kind = 4) :: ncid, lat_dimid, lon_dimid, flt_dimid, lat_varid, lon_varid, flt_varid, &
@@ -154,6 +162,9 @@ subroutine netcdf_write_on_fault(outfile)
     integer (kind = 4), allocatable, dimension(:) :: nfx, nfz
     integer (kind = 4) :: nfxMax, nfzMax
     real (kind = dp), allocatable, dimension(:,:,:,:) :: on_fault_vars
+    real (kind = dp), allocatable, dimension(:) :: piece, zcol
+    integer (kind = 4), allocatable :: own(:,:)
+    integer (kind = 4) :: rr, p, ni, nj, npiece, mpistat(MPI_STATUS_SIZE)
 
     nvar = 15 ! nvar variables.
 
@@ -166,7 +177,35 @@ subroutine netcdf_write_on_fault(outfile)
     nfxMax = maxval(nfx)
     nfzMax = maxval(nfz)
 
-    allocate(var_name(nvar), var_unit(nvar), on_fault_vars(nfxMax, nfzMax, nvar, ntotft)) ! on_fault_vars(lon,lat,nvar,fault)
+    ! par.solver = 3 (ddActive): every rank calls this. A rank fills only the
+    ! fault nodes it owns, which on each fault are one rectangle, strike
+    ! own(1,ift)..own(2,ift) by dip own(3,ift)..own(4,ift), and sends them to
+    ! rank 0. Rank 0 writes the header and then one rank's rectangles at a
+    ! time, so no rank holds a whole fault's fields.
+    allocate(own(4,ntotft))
+    own(1,:) = 1
+    own(2,:) = nfxMax
+    own(3,:) = 1
+    own(4,:) = nfzMax
+    if (ddActive) then
+        own(1,:) = nfxMax + 1
+        own(2,:) = 0
+        own(3,:) = nfzMax + 1
+        own(4,:) = 0
+        do ift = 1, ntotft
+            do n = 1, nftnd(ift)
+                if (.not. fltMine(n,ift)) cycle
+                i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
+                j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
+                own(1,ift) = min(own(1,ift), i)
+                own(2,ift) = max(own(2,ift), i)
+                own(3,ift) = min(own(3,ift), j)
+                own(4,ift) = max(own(4,ift), j)
+            enddo
+        enddo
+    endif
+    allocate(var_name(nvar), var_unit(nvar), on_fault_vars(minval(own(1,:)):maxval(own(2,:)), &
+        minval(own(3,:)):maxval(own(4,:)), nvar, ntotft)) ! on_fault_vars(lon,lat,nvar,fault)
     on_fault_vars = 0.0d0
 
     UNITS     = 'units'
@@ -191,6 +230,9 @@ subroutine netcdf_write_on_fault(outfile)
 
     do ift = 1, ntotft
         do n = 1, nftnd(ift)
+            if (ddActive) then
+                if (.not. fltMine(n,ift)) cycle ! par.solver = 3: the rank that owns it sends it.
+            endif
             i = int((x(1,nsmp(1,n,ift)) - fltxyz(1,1,ift))/dx + 0.5d0) + 1
             j = int((x(3,nsmp(1,n,ift)) - fltxyz(1,3,ift))/dx + 0.5d0) + 1
             on_fault_vars(i,j,1,ift)  = fric(FR_TSTK, n, ift) ! tstk0
@@ -210,6 +252,33 @@ subroutine netcdf_write_on_fault(outfile)
             on_fault_vars(i,j,15,ift) = fric(FR_SLIP_N, n, ift) ! vzs
         enddo
     enddo
+    ! par.solver = 3: this rank's rectangles in one message, own(4,ntotft)
+    ! first, then per fault and variable the rectangle's values.
+    if (ddActive) then
+        npiece = 4*ntotft
+        do ift = 1, ntotft
+            ni = own(2,ift) - own(1,ift) + 1
+            nj = own(4,ift) - own(3,ift) + 1
+            if (ni > 0) npiece = npiece + ni*nj*nvar
+        enddo
+        allocate(piece(npiece))
+        piece(1:4*ntotft) = reshape(dble(own), (/ 4*ntotft /))
+        p = 4*ntotft
+        do ift = 1, ntotft
+            ni = own(2,ift) - own(1,ift) + 1
+            nj = own(4,ift) - own(3,ift) + 1
+            if (ni <= 0) cycle
+            do i = 1, nvar
+                piece(p+1:p+ni*nj) = reshape(on_fault_vars(own(1,ift):own(2,ift), &
+                    own(3,ift):own(4,ift), i, ift), (/ ni*nj /))
+                p = p + ni*nj
+            enddo
+        enddo
+        if (me /= 0) then
+            call MPI_Send(piece, npiece, MPI_DOUBLE_PRECISION, 0, 76, MPI_COMM_WORLD, IERR)
+            return
+        endif
+    endif
     ! Create the netCDF file.
     lastNcPath = outfile
     call check(nf90_create(trim(outfile), NF90_CLOBBER, ncid))
@@ -266,9 +335,46 @@ subroutine netcdf_write_on_fault(outfile)
 
     ! Write the data. This will write our displacement fields "cons" which is defined
     ! globally. Its dimension is 3 by numnp (row by column).
-    do i = 1,nvar
-        call check(nf90_put_var(ncid, var_id(i), on_fault_vars(:,:,i,:)))
-    enddo
+    if (.not. ddActive) then
+        do i = 1,nvar
+            call check(nf90_put_var(ncid, var_id(i), on_fault_vars(:,:,i,:)))
+        enddo
+    else
+        ! Zero everywhere first, one strike line at a time, as on_fault_vars
+        ! starts above (a smaller fault's padding stays zero); then each
+        ! rank's rectangles, rank 0's own first.
+        allocate(zcol(nfzMax))
+        zcol = 0.0d0
+        do ift = 1, ntotft
+            do i = 1, nvar
+                do j = 1, nfxMax
+                    call check(nf90_put_var(ncid, var_id(i), zcol, start = (/ j, 1, ift /), &
+                        count = (/ 1, nfzMax, 1 /)))
+                enddo
+            enddo
+        enddo
+        do rr = 0, nprocs-1
+            if (rr > 0) then
+                call MPI_Probe(rr, 76, MPI_COMM_WORLD, mpistat, IERR)
+                call MPI_Get_count(mpistat, MPI_DOUBLE_PRECISION, npiece, IERR)
+                deallocate(piece)
+                allocate(piece(npiece))
+                call MPI_Recv(piece, npiece, MPI_DOUBLE_PRECISION, rr, 76, MPI_COMM_WORLD, mpistat, IERR)
+            endif
+            own = reshape(int(piece(1:4*ntotft)), (/ 4, ntotft /))
+            p = 4*ntotft
+            do ift = 1, ntotft
+                ni = own(2,ift) - own(1,ift) + 1
+                nj = own(4,ift) - own(3,ift) + 1
+                if (ni <= 0) cycle
+                do i = 1, nvar
+                    call check(nf90_put_var(ncid, var_id(i), reshape(piece(p+1:p+ni*nj), (/ ni, nj /)), &
+                        start = (/ own(1,ift), own(3,ift), ift /), count = (/ ni, nj, 1 /)))
+                    p = p + ni*nj
+                enddo
+            enddo
+        enddo
+    endif
 
     ! Close the file.
     call check(nf90_close(ncid))

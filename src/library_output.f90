@@ -27,6 +27,9 @@ subroutine output_onfault_st
     if(n4onf > 0) then
         do i = 1,n4onf
             ift = anonfs(3,i)
+            if (ddActive) then
+                if (.not. fltMine(anonfs(1,i),ift)) cycle ! par.solver = 3: the rank that owns the node writes it.
+            endif
             ! Every station gets a file, on whichever fault it sits.
             !
             ! This used to open one only when j==1. Stations on faults 2+ then
@@ -204,6 +207,9 @@ subroutine output_offfault_st
     
     if(n4out>0) then
         do i=1,n4out
+            if (ddActive) then
+                if (an4nds(2,i) == 0) cycle ! par.solver = 3: the rank that owns the node writes it.
+            endif
             bodytmp = '      '
             sttmp = '      '
             dptmp = '      '

@@ -237,7 +237,7 @@ subroutine checkAndReport(currentProcID)
     ! silently clamping" held at cold start alone.
     call checkNormalStressCaps 
     
-    ! par.solver = 3 writes the mesh files itself, gathered from the ranks.
+    ! par.solver = 3 writes the mesh files itself, each rank its own part.
     if (currentProcID == 0 .and. .not. ddActive) then
         write(*,'(X,A,40X,i7,4X,A)') '= Total nodes = ',numnp,'='            
         write(*,'(X,A,40X,i7,4X,A)') '= Total elems = ',numel,'='            
@@ -323,16 +323,24 @@ subroutine allocAndInit
 end subroutine allocAndInit
 
 subroutine writeResults(currentProcID)
+    use globalvar, only: ddActive
     integer (kind = 4) :: currentProcID
-    if (currentProcID == 0) then 
+    ! par.solver = 3 (ddActive): a station file is written by the rank that
+    ! owns the station, and the cplot files were written by every rank, each
+    ! its own nodes' lines (ddWriteCplot).
+    if (ddActive .and. currentProcID /= 0) then
         call output_onfault_st
         call output_offfault_st
-        call output_onfault_transfer 
+    endif
+    if (currentProcID == 0) then
+        call output_onfault_st
+        call output_offfault_st
+        if (.not. ddActive) call output_onfault_transfer
         call output_timedy
         call output_globaldat
         call output_peak_sliprate_per_fault
         call output_bp8_profiles
-        call output_ruptarea_trac_slip
+        if (.not. ddActive) call output_ruptarea_trac_slip
         write(*,*) 'Done.'
     endif 
 end subroutine writeResults

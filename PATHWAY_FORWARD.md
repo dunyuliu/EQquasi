@@ -543,6 +543,35 @@ build, run and traps are in `CLAUDE.md`.
      run the loop, not setup, dominates (exact wide at 16 ranks: loop 1103 s for 200 steps), so the
      verdict at this size and rank count is unchanged. The 64-rank point is the one that would test the
      extrapolation; it is queued for a quiet window.
+   - **GAMG CG tuning on wide, 16 ranks, 3 steps, and the iteration-count control, MEASURED
+     2026-11-14 13:05** (`runs/20261114_scaling/`, rtol 1e-8 unless stated, comparator = the table's,
+     33 files; exact at 16 ranks: loop 20.6 s; load before each run 16-29, so iterations carry the
+     comparison and loops are indicative):
+
+     | variant | its/solve (min-max) | setup s | loop s | peak RSS GB per rank | worst diff from exact | files failing |
+     |---|---|---|---|---|---|---|
+     | reference | 63.0 (60-67) | 10.6 | 98.4 | 2.54 | 1.1e-07 | 9 of 33 |
+     | rtol 1e-6 | 42.2 (40-46) | 9.9 | 62.7 | 2.54 | 1.3e-06 | 15 of 33 |
+     | rtol 1e-10 | 83.5 (81-87) | 9.9 | 122.6 | 2.54 | 3.4e-08 | 6 of 33 |
+     | aggregation threshold 0.02 | 60.5 (58-64) | 42.9 | 133.5 | 2.34 | 1.1e-07 | 9 of 33 |
+     | unsmoothed aggregation | 93.0 (90-97) | 7.2 | 125.8 | 2.54 | 1.1e-07 | 9 of 33 |
+     | Richardson + SOR smoothers | 35.2 (34-37) | 10.0 | 80.8 | 2.54 | 1.1e-07 | 9 of 33 |
+
+     Same ordering as on bp1002: the smoother (SOR, 1.8x fewer iterations) and the tolerance move the
+     iteration count (about 20 iterations per decade here against 3 on bp1002); the threshold only
+     raises setup (4x) and unsmoothed aggregation raises iterations 1.5x. No tolerance tested reaches
+     the gold comparator (rtol 1e-10: 6 of 33 files still fail). SOR smoothers scale with ranks the same way:
+     35.2, 35.2, 35.3 iterations at 8, 16, 32 ranks (rank-independent), loop 115.6 (load 28), 80.8, 50.7 s
+     against the reference 138.7, 98.4, 55.4 s (SOR 8 to 32 ranks: 2.3x, ranks^-0.60; same ~140-rank
+     crossing against exact's flat ~21 s, an extrapolation).
+     **Why wide needs 63 iterations and bp1002 10:** not wide-specific. The control `bp8.qdc.gs.10`
+     (1.96 M equations, no enlarged box) at 16 ranks takes 64.0 iterations per solve (62-67), the same
+     as wide's 63.0; GAMG CG on it: setup 5.6 s against 80.8 s exact, loop 49.3 s against 8.1 s (6.1x),
+     RSS 1.44 against 4.47 GB, worst diff 1.1e-07, 9 of 33 files fail. The AMG hierarchy has 5 levels on
+     wide against 4 on bp1002 with operator complexity ~1.15 on both, so the growth is not coarse-grid
+     cost; what separates bp1002 (163 k equations, 10 iterations) from the BP8 meshes is size or the
+     BP8 fault geometry, which these two points cannot separate (a mesh-refinement series of one geometry
+     would; not run). Not examined: the near-null space quality on fault split nodes.
    - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,
      ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt

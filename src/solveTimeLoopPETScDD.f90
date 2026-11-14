@@ -100,6 +100,11 @@ subroutine solveTimeLoopPETScDD
     ISLocalToGlobalMapping     :: l2gIS
     PetscInt                   :: p1
     PetscInt, allocatable      :: isIdx(:)
+    ! SPIKE (slip-to-traction cost): -eq_matmat <n> times MatMatSolve on the factor.
+    Mat                        :: Fmm, Bmm, Xmm
+    PetscInt                   :: nmm, imm, kmm
+    PetscBool                  :: flgmm
+    real (kind = 8)            :: wmm
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
@@ -683,6 +688,34 @@ subroutine solveTimeLoopPETScDD
     wallLoop = MPI_Wtime()
     call cpu_time(endTime)
     timeUsedInFactorization = endTime - startTime
+
+    call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_matmat', nmm, flgmm, perr)
+    if (flgmm .and. .not. useIS) then
+        call PCFactorGetMatrix(pc, Fmm, perr)
+        CHKERRA(perr)
+        do imm = 1, 3
+            if (imm == 1) kmm = 1
+            if (imm == 2) kmm = max(1, nmm/4)
+            if (imm == 3) kmm = nmm
+            call MatCreateDense(PETSC_COMM_WORLD, pnOwn, PETSC_DECIDE, pneq, kmm, &
+                PETSC_NULL_SCALAR_ARRAY, Bmm, perr)
+            CHKERRA(perr)
+            call MatSetRandom(Bmm, PETSC_NULL_RANDOM, perr)
+            CHKERRA(perr)
+            call MatDuplicate(Bmm, MAT_DO_NOT_COPY_VALUES, Xmm, perr)
+            CHKERRA(perr)
+            call MPI_Barrier(PETSC_COMM_WORLD, IERR)
+            wmm = MPI_Wtime()
+            call MatMatSolve(Fmm, Bmm, Xmm, perr)
+            CHKERRA(perr)
+            call MPI_Barrier(PETSC_COMM_WORLD, IERR)
+            wmm = MPI_Wtime() - wmm
+            if (me == 0) write(*,'(A,I6,2ES14.5)') 'EQ_MM nrhs sec sec_per_rhs ', kmm, wmm, wmm/kmm
+            flush(6)
+            call MatDestroy(Bmm, perr)
+            call MatDestroy(Xmm, perr)
+        enddo
+    endif
 
     stoptag = 0
     totalKSPIts = 0

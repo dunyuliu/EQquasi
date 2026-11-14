@@ -478,6 +478,56 @@ def _dd_profile_series(gpath, rpath):
     return True, f"{g.shape[0]} rows x {g.shape[1]} cols, worst diff = {worst:.1e} of the column scales"
 
 
+def _dd_station_series(gpath, rpath):
+    """compare_series for fltst_ (no header, so compare_series scales each
+    column by its own largest value). A dip component that vanishes by
+    symmetry (bp 8 at the well node, bp 7) is round-off of either solver and
+    its own maximum is no scale: an entry of a dip column also passes when it
+    differs by no more than DD_RTOL of the vector it is a component of, the
+    largest magnitude among that vector's columns in the same file (slip:
+    strike, dip; slip rate: strike or magnitude, dip, compared in m/s where
+    the file holds log10; traction: strike, dip, and normal where the file
+    holds it). Every other column, and a dip entry above that floor, is
+    judged as compare_series judges it: its own scale and its printed
+    precision (2e-6 for the 7-digit columns, DD_RTOL otherwise)."""
+    import numpy as np
+    g, r = C.read_any(gpath), C.read_any(rpath)
+    if g.shape != r.shape:
+        return False, f"shape {r.shape} vs reference {g.shape}"
+    g, r = np.atleast_2d(np.array(g, float)), np.atleast_2d(np.array(r, float))
+    # Columns (0-based) by column count, src/library_output.f90: the dip
+    # column, the columns of its vector, whether they hold log10.
+    layouts = {
+        # t, slip_2, slip_3, log10 slip_rate_2, log10 slip_rate_3,
+        # shear_stress_2, shear_stress_3, pore pressure, Darcy 2, 3, log10 state
+        11: ((2, (1, 2), False), (4, (3, 4), True), (6, (5, 6), False)),
+        # t, slip_s, slip_d, slip rate magnitude, slip rate along dip, tstk,
+        # tdip, effective normal stress, log10 state
+        9: ((2, (1, 2), False), (4, (3, 4), False), (6, (5, 6, 7), False)),
+    }
+    ncols = g.shape[1]
+    if ncols not in layouts:
+        return False, f"{ncols} columns: not a station layout this comparison knows"
+    col_rtol = C.column_printed_rtol(gpath, ncols, DD_RTOL)
+    with np.errstate(invalid="ignore", over="ignore"):
+        diff = np.abs(r - g)
+        own = C._scaled_tol(g, col_rtol, DD_RTOL, np.abs(g).max(axis=0))
+        bad = ~(diff <= own)
+        for j, vec, log10 in layouts[ncols]:
+            lin = (lambda a: 10.0 ** a) if log10 else (lambda a: a)
+            vscale = max(np.abs(lin(g[:, c])).max() for c in vec)
+            bad[:, j] &= ~(np.abs(lin(r[:, j]) - lin(g[:, j]))
+                           <= DD_RTOL * vscale + C.ATOL_MACHINE_NOISE)
+        ratio = np.where(bad, diff / np.maximum(own, 1e-300), 0.0)
+    if bad.any():
+        i, j = np.unravel_index(int(np.argmax(np.nan_to_num(ratio, nan=np.inf))), g.shape)
+        cols = sorted({int(c) + 1 for c in np.nonzero(bad)[1]})
+        return False, (f"{int(bad.sum())} of {g.size} entries outside rtol={col_rtol[j]:g}, "
+                       f"in columns {cols}; worst at row {i}, column {j+1}: "
+                       f"{r[i, j]:.8g} vs {g[i, j]:.8g}")
+    return True, f"{g.shape[0]} rows x {ncols} cols"
+
+
 def _dd_differences(s2, s3, expected):
     """Every way solver 3's cycle directory `s3` differs from solver 2's `s2`,
     one line each: the text series, the mesh files and the disp and fault
@@ -509,6 +559,8 @@ def _dd_differences(s2, s3, expected):
             if ab:
                 if p in ("p1output", "p2output"):
                     ok, msg = _dd_profile_series(*ab)
+                elif p == "fltst_":
+                    ok, msg = _dd_station_series(*ab)
                 else:
                     ok, msg = C.compare_series(*ab, rtol=DD_RTOL, floor_rtol=DD_RTOL)
                 if not ok:
@@ -623,8 +675,10 @@ def test_distributed_loop_matches_petsc_loop_z_and_corner_blocks(case):
     z; more than one block along x and along z, so four blocks meet at a line
     through the fault plane (y is its normal) and a fault node there has
     diagonal neighbours on another rank; bp 8 with its section 4.3 depth line
-    (z from -400 to 400 m at x = 0) cut by the z boundary at z = 0, so its
-    slots are recorded by more than one rank; and the fluid_src = 2 well.
+    (z from -400 to 400 m at x = 0), which a z boundary at z = 0 would split
+    between ranks (expected from the geometry only: the code does not print
+    which ranks record its slots and nothing here asserts it); and the
+    fluid_src = 2 well.
     Same comparison and tolerances as the 4-rank test. The layout is read
     from the run summary: a run that fell back to one block in z fails.
     """
@@ -649,12 +703,14 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     """check_effective_normal (src/faulting.f90) is reached only by the rank
     that owns the unclamped fault node. Under par.solver = 3 a bare `stop`
     there would leave the other ranks blocked in the next collective; it
-    calls MPI_ABORT instead. test.bp8.qdc.gs.10 at 8 ranks, blocks (2, 2, 2),
-    with Q0 raised from 0.003 to 1 m^3/s: the pore pressure at the injection
+    calls MPI_ABORT instead. test.bp8.qdc.gs.10 at 8 ranks (the run summary
+    with the block layout is printed at the end of a run, so an aborted run
+    has none and the layout is not asserted here), with Q0 raised from 0.003 to 1 m^3/s: the pore pressure at the injection
     node passes the 25 MPa of initial effective normal stress in the first
-    steps. The whole mpirun must then exit nonzero, with the routine's own
-    message, within the timeout. A run that ends cleanly, ends with another
-    message, or hangs fails.
+    steps. The whole mpirun must then exit nonzero within the timeout, with
+    the routine's own message and MPI_ABORT's error code 508 in the output.
+    A run that ends cleanly, ends with another message or code, or hangs
+    fails.
     """
     import signal
     if not _binary_has_petsc():
@@ -681,8 +737,9 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     # the message are in the log itself.
     with open(os.path.join(workdir, "log", "cycle0.log")) as f:
         out += f.read()
-    blocks = _assert_distributed_mesh(out, nranks=nranks)
-    banners =out.count("EFFECTIVE NORMAL STRESS IS NO LONGER COMPRESSIVE")
-    print(f"\nabort: blocks (x, y, z) = {tuple(blocks)}, exit {p.returncode}, {banners} rank(s) printed the message")
+    banners = out.count("EFFECTIVE NORMAL STRESS IS NO LONGER COMPRESSIVE")
+    print(f"\nabort: exit {p.returncode}, the message appears {banners} time(s) in run.sh output plus log")
     assert banners >= 1, f"check_effective_normal was not reached (exit {p.returncode}):\n{out[-3000:]}"
     assert p.returncode != 0, "the run printed the abort message and still exited 0"
+    assert "MPI_ABORT" in out and re.search(r"[Ee]rrorcode:?\s*508\b", out), \
+        f"no MPI_ABORT with error code 508 in the output (exit {p.returncode}):\n{out[-3000:]}"

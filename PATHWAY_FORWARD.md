@@ -301,6 +301,43 @@ build, run and traps are in `CLAUDE.md`.
    matvec, the dense memory (93 GB) and whether the operator is valid under the
    moving-load terms are still not measured.
 
+
+   **Plain Krylov, subdomain-direct, exact substructuring (2026-11-14;
+   `runs/20261114_krylov*`, spike branch `spike-mm` ddd36b2, not merge-bound,
+   indicative: host load 13-21 during runs).** Owner lines: plain CG/GMRES; direct
+   solves per subdomain under an outer iteration; factorize once. MEASURED
+   (same-script re-run), not VERIFIED. K is symmetric to round-off (`-eq_check_sym`).
+   - bp1002, 8 ranks: CG+GAMG with rigid-body near-null space is the best plain
+     Krylov, ~3-4x slower than MUMPS, 0.32 GB against 0.50 GB peak, setup 0.97 s
+     against 3.23 s. Jacobi and block-Jacobi+ICC are slower still. CG breaks
+     down only in the BDDC inexact variants (KSP -8), where GMRES with right
+     preconditioning was used instead.
+   - GAMG+near-null+previous-step guess, bp1002 3 steps: 10.2 iterations per
+     solve (max 11), relative residual 9e-9, at 16 ranks (loop 2.46 s, setup
+     0.54 s, peak RSS 200 MB per rank by unit inference) and 32 ranks (loop 1.33
+     s, setup 0.34 s, 140 MB). Worst parity against exact at 32 ranks 5e-11.
+   - **Wide, 16 ranks, 3 steps:** exact MUMPS setup 337 s, loop 20.8 s (6.9
+     s/step), peak RSS 12.1 GB per rank; GAMG CG setup 10.6 s, loop 97.4 s
+     (32 s/step, 4.7x slower), 63 iterations per solve (max 67), 2.5 GB per rank
+     (4.8x less), relative residual 9e-9; per-file parity against exact printed
+     as <=4e-15 on the files listed last (full worst-case table not computed).
+     Conclusion: the iterative route trades 4.7x time for 4.8x memory and a
+     30x shorter setup; it does not beat MUMPS on time at 3.5 M equations.
+   - Subdomain-direct (CG, block Jacobi / additive Schwarz, exact MUMPS blocks,
+     bp1002 8 ranks): factorized once (`-log_view`: setup 1, apply per
+     iteration); a single block pass leaves residual 3.6e-2 / 3.1e-1 / 7.1e-2
+     (per variant); one-level variants need a coarse space (iteration counts grow
+     with block count). Not measured: wide, and a slip-rate-change case (the
+     11-step bp1002 runs are aseismic).
+   - Inexact BDDC local solves (GMRES, BLR 1e-4, ICC, ILU, GAMG): none beats
+     exact local solves; BLR 1e-4 15 iterations in 22 s, ICC/ILU 69 iterations in
+     16-18 s; np32 fails (-8) and adaptive threshold errors at `bddc.c:1528`.
+   - **Exact substructuring: ARITHMETIC ONLY, not measured, not built.** Wide:
+     16 blocks ~170 k interface equations, ~231 GB dense Schur; 32 blocks ~240 k,
+     ~460 GB; ~2.9 s per step marginal. Spike not started; runtime route to try
+     first (unverified): BDDC with all interface dofs primal, then code.
+   - Open: `-11` 60-run batch (not started); the unmeasured wide subdomain-direct
+     and slip-change cases above.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
    converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);

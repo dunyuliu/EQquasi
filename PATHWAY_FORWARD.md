@@ -483,6 +483,36 @@ build, run and traps are in `CLAUDE.md`.
      | wide (10 m BP8), 16 ranks, 200 steps | BLR 1e-6 | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_blr6 | 132.91 | 495.6 (2.478/step, 200 st) | 9.25 | 1.0 | 2.0e-04 | 19 of 33 files fail | no: 32 failed, gate-blr | 5.10 |
      | wide (10 m BP8), 16 ranks, 200 steps | all-primal, GAMG CG, subdomain-direct, BDDC | not run: not run at 200 steps | not run | not run | not run | not run | not run | not run | not run | not run |
 
+   - **GAMG CG tuning on bp1002, 16 ranks, 11 steps, MEASURED 2026-11-14 (runtime options only)**
+     (`runs/20261114_scaling/`, spike binary, CG on the unpreconditioned norm, `-eq_near_null`;
+     exact at 16 ranks: setup 2.19 s, loop 0.94 s, 0.33 GB per rank; comparator = the table's,
+     25 files). Setup is `-ksp_view`-confirmed to be GAMG V-cycle, 4 levels, aggressive coarsening
+     on level 0 and 1 smoothing step in the prolongator. Block size 3 and the rigid-body near-null space
+     are not printed by `-ksp_view`: they are set at `src/solveTimeLoopPETSc.f90:199` and `:354`, and the
+     effect is shown by the control without `-eq_near_null` (8 ranks): 78.0 iterations per solve
+     against 10.5 with it. Timings below ran at load 4.4 to 9.2 rising through the sequence (one
+     1-minute figure per run, 1-2 s loops), so iterations, the load-independent figure, carry the
+     comparison; loops are indicative.
+
+     | variant | KSP its/solve (max) | setup s | loop s | peak RSS GB per rank | worst diff from exact | files failing |
+     |---|---|---|---|---|---|---|
+     | reference (rtol 1e-8) | 10.2 (11) | 0.53 | 2.13 | 0.200 | 1.9e-08 | 13 of 25 |
+     | rtol 1e-6 | 7.3 (8) | 0.55 | 1.42 | 0.200 | 5.4e-07 | 21 of 25 |
+     | rtol 1e-10 | 13.2 (14) | 0.54 | 2.17 | 0.200 | 3.8e-09 | 3 of 25 |
+     | aggregation threshold 0.02 | 10.2 (11) | 0.79 | 2.32 | 0.165 | 1.9e-08 | 13 of 25 |
+     | unsmoothed aggregation (`-pc_gamg_agg_nsmooths 0`) | 22.0 (25) | 0.42 | 3.40 | 0.198 | 1.1e-07 | 16 of 25 |
+     | Richardson + SOR smoothers | 8.3 (9) | 0.54 | 1.64 | 0.201 | 1.1e-07 | 16 of 25 |
+     | 2 smoother iterations | 10.2 (11) | 0.53 | 1.68 | 0.202 | 1.9e-08 | 13 of 25 |
+     | coarse equation limit 1000 | 10.2 (11) | 0.60 | 1.72 | 0.200 | 1.9e-08 | 13 of 25 |
+
+     Reading: only the tolerance and the smoother change the iteration count; the threshold, a second
+     smoothing step and the coarse limit leave it at 10.2. Even rtol 1e-10 (13.2 iterations) leaves
+     3 of 25 files above the gold comparator's 1e-9, so passing it needs a tighter rtol than any run here
+     (an extrapolation of ~3 iterations per decade suggests 1e-11 to 1e-12; not run): the cost of
+     exactness looks small in iterations, and is not shown in wall time. The two 1.1e-7 rows are float32-floor `slip_rate` differences, not a
+     convergence figure (the residual tolerance is the same as the reference). Exact 0.94 s loop
+     against GAMG 1.4-3.4 s: GAMG is slower at this size in every variant. Wide tuning and the
+     scaling curve are running (`runs/20261114_scaling/`).
    - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,
      ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt

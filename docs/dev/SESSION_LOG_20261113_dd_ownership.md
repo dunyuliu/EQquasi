@@ -128,3 +128,8 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 - #99 merged as 6e46fcd after entry 11's corrections (CI run 43625086041, `build` success on the PR head e3a28c2; squash).
 - sub3 closed (`DONE`, 12:16): bp5 GAMG CG harvested (board row 1 and table): loop 1500.8 s, RSS 0.35 GB per rank, 6.8 iterations per solve, worst diff 1.5e-7, 116 of 120 fail. Load confound stated on the board (exact 573 s at load 5.8, 799 s at load 25.7; GAMG at 19.2). Comparison via `compare_series` / `compare_netcdf` and `runInfo.json`, `rss.*` of the run dirs; PID 2370074 no longer alive.
 - Still running: PID 2370771 (sub4: bj16r, then bj_wide, 3000 s timeout, behind the non-FIFO heavy lock), PID 2377489 (`-11` batch).
+
+## Entry 13, 2026-11-14 (conductor 8, tool calls 32-36 of 100, times CST)
+- #100 merged as 622fd32 (CI run 43625789208 success on e7a2320). Housekeeping: worktrees `bench-2c`, `dd-mesh-rebase`, `dd-ownership` removed with `git worktree remove --force` and their local branches (tips on origin; ignored contents were e2e scratch case dirs and built binaries, cited by no board row); `gate-sub`, `gate-blr`, `spike-mm` kept (jobs and possible gold-gate cells).
+- sub4 closed (`DONE`, 12:33; PID 2370771 gone): bj16r and bj_wide harvested to the table with `runInfo.json`, `rss.*` and the same comparator. Wide subdomain-direct 48x slower than exact, 3.6x less memory, inexact. Both table cells for wide and 16-rank bp1002 now filled.
+- Still running: PID 2377489 (`-11` batch, `ALLDONE` absent at 12:33).

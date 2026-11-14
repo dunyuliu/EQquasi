@@ -451,6 +451,7 @@ build, run and traps are in `CLAUDE.md`.
      | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks | krylov2/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.00 | 26.8 (2.435/step, 11 st) | 0.14 | 144.4 | 3.7e-08 | 15 of 25 files fail | not run | 13.45 |
      | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks (rerun) | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.01 | 31.3 (2.843/step, 11 st) | 0.23 | 66.5 | 1.9e-08 | 14 of 25 files fail | not run | 13.07 |
      | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 64 blocks | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj64 | 0.01 | 27.5 (2.500/step, 11 st) | 0.17 | 107.7 | 7.5e-08 | 14 of 25 files fail | not run | 11.61 |
+     | bp1002, 16 ranks, 11 steps | subdomain-direct CG, 1 block per rank | subdirect/test.bp1002.qdc.zone.2500_s3_np16_bj16r | 0.00 | 15.7 (1.425/step, 11 st) | 0.14 | 66.0 | 1.9e-08 | 14 of 25 files fail | not run | 11.77 |
      | bp1002, 8 ranks, 11 steps | BDDC default | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_base | 1.03 | 29.4 (2.675/step, 11 st) | 0.40 | 27.0 | 1.5e-08 | 13 of 25 files fail | not run | 2.82 |
      | bp1002, 8 ranks, 11 steps | BDDC near-null + faces/edges/vertices | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_nn_fev | 1.09 | 15.7 (1.428/step, 11 st) | 0.41 | 15.0 | 9.3e-09 | 12 of 25 files fail | not run | 10.83 |
      | bp1002, 8 ranks, 101 steps | exact MUMPS | blr-small/test.bp1002.qdc.zone.2500_s3_np8_base | 3.43 | 19.2 (0.191/step, 101 st) | 0.50 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 20.05 |
@@ -474,7 +475,7 @@ build, run and traps are in `CLAUDE.md`.
      | wide (10 m BP8), 16 ranks, 3 steps | BLR 1e-6 | blr-wide/bp8.qdc.gs.10.wide_s3_np16_blr6 | 128.59 | 8.1 (2.690/step, 3 st) | 9.66 | 1.0 | 1.6e-04 | 15 of 33 files fail | no: 32 failed, gate-blr | 17.02 |
      | wide (10 m BP8), 16 ranks, 3 steps | all-primal substructuring | not run: not run: dense Schur 270-295 GB, ~11 h build (sizing) | not run | not run | not run | not run | not run | not run | not run | not run |
      | wide (10 m BP8), 16 ranks, 3 steps | GAMG CG | krylov4/bp8.qdc.gs.10.wide_s3_np16_gamgg | 10.61 | 97.2 (32.416/step, 3 st) | 2.54 | 63.0 | 1.1e-07 | 9 of 33 files fail | not run | 21.47 |
-     | wide (10 m BP8), 16 ranks, 3 steps | subdomain-direct CG | not run: not run (queued, sub4 bj_wide) | not run | not run | not run | not run | not run | not run | not run | not run |
+     | wide (10 m BP8), 16 ranks, 3 steps | subdomain-direct CG, 1 block per rank | subdirect/bp8.qdc.gs.10.wide_s3_np16_bj_wide | 0.00 | 1000.6 (333.5/step, 3 st) | 3.36 | 229.3 | 1.1e-07 | 9 of 33 files fail | not run | 13.53 |
      | wide (10 m BP8), 16 ranks, 3 steps | BDDC default | bddc-wide/bp8.qdc.gs.10.wide_s3_np16_bddc | 60.19 | 1019.2 (339.720/step, 3 st) | 6.95 | 74.2 | 1.1e-07 | 9 of 33 files fail | not run | 20.86 |
      | wide (10 m BP8), 16 ranks, 3 steps | BDDC near-null + faces/edges/vertices | bddc-tune/bp8.qdc.gs.10.wide_s3_np16_nnfev | 61.91 | 377.6 (125.883/step, 3 st) | 6.97 | 31.0 | 1.1e-07 | 9 of 33 files fail | not run | 9.82 |
      | wide (10 m BP8), 16 ranks, 200 steps | exact MUMPS | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_base | 335.57 | 1103.4 (5.517/step, 200 st) | 11.66 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 4.17 |
@@ -483,8 +484,7 @@ build, run and traps are in `CLAUDE.md`.
      | wide (10 m BP8), 16 ranks, 200 steps | all-primal, GAMG CG, subdomain-direct, BDDC | not run: not run at 200 steps | not run | not run | not run | not run | not run | not run | not run | not run |
 
    - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,
-     ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); wide subdomain-direct, further blocks per rank and the
-     bp5 GAMG CG event run queued (`runs/20261114_subdirect/`, `runs/20261114_substruct-bp5/`, `DONE` files); results go to the session log.
+     ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
    converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);

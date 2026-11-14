@@ -267,7 +267,7 @@ build, run and traps are in `CLAUDE.md`.
    Setup is built once and reused: `PCSetUp` 1, `KSPSetUp` 1, `PCApply` 151
    over 2 solves (`-log_view`, `runs/20261114_prof/bp8.qdc.gs.10.wide_s3_np16_bddc`;
    `KSPSetUp` is called once before the loop, `solveTimeLoopPETScDD.f90:680` at
-   7b77221). Independent re-derivation of every figure above in this row
+   7b77221). Independent re-derivation of the 2026-11-14 clean 64-rank pair, ICNTL(14) test and 200-step pair against `runs/`: setup of the clean pair is `runInfo.json` 7.4 / 169.6 s (8.1 / 182.1 were `EQ_WALL`), exact 64-rank loops 22.8-25.1 s, station-failure wording; the other figures recompute. Independent re-derivation of every figure above in this row
    against `runs/`, 2026-11-14: corrections folded in place (a mixed-up 95 %,
    17x as 17-25x, 362 s as 359.6 s, no 32-rank BLR 1e-8 run, parity metric
    named, load ranges, 3x as 2.3x / 3.1x, gate categories and time).
@@ -577,14 +577,14 @@ build, run and traps are in `CLAUDE.md`.
      | 16 | 9.7 / 60.4 | 35.2 (34-37) | 2.54 | 14.96 | 330.1 / 19.5 | 12.28 | 18.76 | 3.1x |
      | 32 | 5.4 / 40.5 | 35.3 (34-38) | 1.36 | 25.66 | 194.0 / 16.2 | 6.81 | 29.56 | 2.5x |
      | 64 | 8.3 / 52.2 (4.60); repeat `..._g64b` 8.3 / 47.1 (load 4.81; foreign jobs on the host not checked) | 37.2 (36-39) | 0.78 | 4.60 | first run aborted (-11, see below); rerun `e64b` 177.9 / 25.1 | 3.77 | 18.84 | 1.9x vs the repeat (47.1 / 25.1) |
-     | 64, clean pair 2026-11-14 14:51-14:57 (`runs/20261114_clean64/`, `g64c`, `e64c`; load 4.77 before GAMG) | 8.1 / 50.7 | 37.2 (36-39) | 0.78 | 4.77 | 182.1 / 24.3 (ICNTL(14)=100, INFOG(1)=0) | 5.06 | 44.1 (contains the GAMG run) | 2.1x |
+     | 64, clean pair 2026-11-14 14:51-14:57 (`runs/20261114_clean64/`, `g64c`, `e64c`; load 4.77 before GAMG) | 7.4 / 50.7 | 37.2 (36-39) | 0.78 | 4.77 | 169.6 / 24.3 (ICNTL(14)=100, INFOG(1)=0) | 5.06 | 44.1 (contains the GAMG run) | 2.1x |
 
      Reading: 16 to 32 ranks GAMG's loop falls 1.49x (ranks^-0.58) against exact's 1.20x; at 64 ranks GAMG's
      loop does not fall: 52.2, 47.1 and 50.7 s in three runs (the last two started at load 4.8; all three above the
-     32-rank 40.5 s, 1.2-1.3x). The 64-rank run has no spare core on this 64-core node (the host owner's other jobs, about 4
+     32-rank 40.5 s, 1.16-1.29x). The 64-rank run has no spare core on this 64-core node (the host owner's other jobs, about 4
      cores, share cores with it, and a bulk-synchronous run waits for its slowest rank), so the 64-rank point is
      a node-saturated result, reproduced in three runs, not a clean scaling point; whether foreign cores were
-     busy during `g64c` was not recorded. Exact's loop, same node: 19.5 s (16 ranks), 16.2 s (32), 24.3-25.3 s (64: e64c, e64b, w1-w3), so exact also slows from 32 to 64 ranks, by 1.5x; the GAMG to exact loop ratio at 64 ranks is 2.1x against 2.5x at 32. Earlier unmatched SOR 32-rank figure was 50.7 s at
+     busy during `g64c` was not recorded. Exact's loop, same node: 19.5 s (16 ranks), 16.2 s (32), 22.8-25.1 s (64: e64c, e64b, w1-w3), so exact also slows from 32 to 64 ranks, by 1.5x; the GAMG to exact loop ratio at 64 ranks is 2.1x against 2.5x at 32. Earlier unmatched SOR 32-rank figure was 50.7 s at
      load 18-28; this run 40.5 s: run-to-run spread on this node is of order 25 %. Crossing re-derived from the
      matched 16/32 pair, an extrapolation: with exact flat at 16.2 s it is near 32 x (40.5/16.2)^(1/0.576) = 157
      ranks (the unmatched estimate was 139); if exact keeps falling at its measured -0.26 exponent the
@@ -631,8 +631,8 @@ build, run and traps are in `CLAUDE.md`.
      output steps only; the run is aseismic-to-accelerating, not an event with rupture). Output against the
      exact baseline (repo comparator, `compare_series` / `compare_netcdf`, rtol 1e-9, 33 compared files):
      13 of 33 fail; worst per-file max|a-b|/max|a| 1.1e-4 (`fltst_strk+000dp+000.dat`, and 1.0e-7 to 3e-8
-     for netCDF `disp`/`fault` fields: float32 floor). The station-file failures are columns near zero
-     (the comparator message names row 200 column 7, `2.466e-10` against the reference), not diagnosed
+     for netCDF `disp`/`fault` fields: float32 floor). Most station-file failures are entries near zero
+     (first message: row 200 column 7, `2.466e-10` against the reference; two files fail on non-zero values, see the matched-pair table below), not diagnosed
      further. So the SOR variant is inexact over 200 steps as it is over 3, and not by a margin that the
      tolerance of the gold gate covers.
      Slip-rate-change summary (200 steps, wide, 32 ranks, MEASURED 2026-11-14 15:11-15:41 CST, matched pair back to back,
@@ -641,7 +641,7 @@ build, run and traps are in `CLAUDE.md`.
 
      | solver | its/solve through the change | setup / loop s | s/step (loop / 200) | host load before | accuracy against the exact run of the same ranks |
      |---|---|---|---|---|---|
-     | GAMG CG (SOR), `ev32b` | 27.275 mean, 25-38 (identical to `ev32`'s count, a deterministic solve; loops differ, 2035.7 s there, so not a wrong-file read) | 5.6 / 1747.7 | 8.74 | 67.9 | 13 of 36 compared files fail (rtol 1e-9 netCDF, 2e-6 station files); worst netCDF 1.1e-7 of field scale (`disp.00001.nc`, float32 floor), station files fail on a near-zero column (row 200, column 7: 2.466e-10 against 4.19e-17) |
+     | GAMG CG (SOR), `ev32b` | 27.275 mean, 25-38 (identical to `ev32`'s count, a deterministic solve; loops differ, 2035.7 s there, so not a wrong-file read) | 5.6 / 1747.7 | 8.74 | 67.9 | 13 of 36 compared files fail (rtol 1e-9 netCDF, 2e-6 station files); worst netCDF 1.1e-7 of field scale (`disp.00001.nc`, float32 floor), station files fail mostly on near-zero entries (`fltst_strk+000dp+000`, row 200, column 7: 2.466e-10 against 4.19e-17; `srfst` rows 166 and 199, column 4; `cplot_EQquasi.txt` row 5099, column 6) and two at 5.7e-4 to 1.4e-3 relative on non-zero values (`fltst_strk+200dp+000` row 106, `fltst_strk-200dp+000` row 166, column 7) |
      | exact MUMPS (ICNTL(14)=100), `ex32` | 1 (preonly) | 191.8 / 725.8 | 3.63 | 36.5 (contains the GAMG run's tail) | reference |
 
      Loop ratio 2.4x (GAMG slower), against 2.5x in the 3-step matched pair at 32 ranks: no change in the ratio through the

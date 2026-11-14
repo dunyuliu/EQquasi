@@ -21,13 +21,13 @@ below it is the record of why.
 | 8 | `data/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
 | 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
 | 10 | Docs move with the code, in the same commit. |
-| 11 | Comparing two runs? Check both `runInfo.json` versions first. |
+| 11 | Comparing two runs? Check both `runInfo.json` versions first. Rows agreeing to 3+ digits while a controlled variable changed: investigate, not a result (11a). Relaxed comparator column: audit the others (11b). |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
 | 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). |
-| 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. |
+| 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. `flock <lock> timeout N cmd`, never `timeout` around `flock`; shared-lock holders are bounded (15a). |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. Before escalating: re-derive against file:line, a dimensional check, and against already-passing gates (16a). |
-| 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. |
+| 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. A `src/` change must also link without PETSc (17a); workflows pin `python-version` (17b); land with `gh api` + `gh run watch`, not `gh pr edit` or auto-merge (17c). |
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
@@ -285,6 +285,23 @@ Three ways a comparison here has produced a wrong conclusion:
   inputs are never byte-identical — MPI reduction ordering gives 1e-15 to
   1e-21. Only a numeric comparator can answer "did this change anything".
 
+**11a. Rows that agree across variants while a controlled variable changed are
+a flag, not a result.** A BDDC probe stopped on an absolute tolerance at
+iteration 1 and so gave the identical wrong parity for `rtol` 1e-8 and 1e-12;
+the table looked like robustness. When two or more variants differ in a
+tolerance or option and their rows agree to 3+ digits, first read each
+variant's own log for the iteration count and the stop reason; the table is not
+evidence until those differ the way the variable should make them differ.
+Check: per variant, `grep -iE 'iterations|converged|reason' <log>`, with the
+control variable and its effect on the count recorded beside the table.
+
+**11b. A comparator relaxation needs an audit of everything it did not
+relax.** Judging a column against its vector scale instead of per entry is a
+change to the pass definition for that column only; before it merges, a
+check (test or script, named in the PR) must show every other column still
+fails on its exact tolerance, e.g. by perturbing each by one tolerance unit
+and seeing it fail. Without that, the relaxation is a widened gate.
+
 ---
 
 ## 12. The regression gate must include a multi-fault case
@@ -402,6 +419,18 @@ Three shell footguns, each of which has cost a run:
   inside the command.
 - **Killed runs leave NFS `.nfs*` files.** Kill the ranks, wait, then `rm -rf`.
 
+**15a. `timeout` goes inside `flock`; a lock holder is bounded.** Write
+`flock <lock> timeout N cmd`, never `timeout N flock <lock> cmd`: a timeout
+around a waiting `flock` expires while queued and reports a failure the command
+never had (2026-11-13, once). Check:
+`grep -rnE 'timeout[^|;&]*flock' scripts tests .github` returns nothing.
+Holding a shared lock is bounded too: a gate that waits on
+`scratch/locks/heavy.lock` assumes its holder finishes in bounded time, and a
+single-core run of about an hour held it for 60 minutes and starved a parallel
+job (2026-11-13). Runs of at most 8 ranks and under a minute take
+`scratch/locks/light.lock`; anything long or single-core runs outside the heavy
+lock, or last. The holder states its expected duration when it takes the lock.
+
 ---
 
 ## 16. A finding is a hypothesis until checked against source
@@ -474,6 +503,27 @@ requirement (see rule 3). The numerics gate for a given PR is the LOCAL
 A red CI run stops work. Do not commit, tag or release on top of one. Check
 after pushing: `gh run list --limit 5`, and `gh run view <id> --log-failed`
 when red. `gh` is not on PATH on these hosts — use its full path.
+
+**17a. A `src/` change is not gated until the non-PETSc object set links.** CI
+builds `-m ubuntu` without PETSc, so a symbol defined only in a PETSc-only
+object (`OBJ_PETSC` in `src/makefile`) breaks CI while the local `conda-linux`
+gate stays green. Before calling a `src/` change gated, either the head SHA has
+a green CI `build`, or the non-PETSc build links locally:
+`make OBJ_PETSC= PETSC_DEFINE= PETSC_LIB= PETSC_INC=` in `src/`, exit 0.
+
+**17b. Workflows pin the Python version.** No floating `python-version: '3.x'`;
+every `setup-python` step names the same minor `test.yml` pins. Check:
+`grep -rn "python-version" .github/workflows` shows one value, a pinned minor,
+on every line. (`docs.yml` floated until 2026-11-14.)
+
+**17c. Landing mechanics on this repo.** `gh pr edit` fails here (Projects-classic
+GraphQL error): edit a PR body with
+`gh api -X PATCH repos/<owner>/<repo>/pulls/N -F body=@file`. Auto-merge is not
+enabled, so the landing command is
+`gh run watch <id> --exit-status && gh pr merge <N> --squash --delete-branch`,
+run as its own foreground or background command, not inside a backgrounded
+subshell (the harness reports that subshell's exit early, before the merge).
+Check: `gh pr view <N> --json state` reads `MERGED`.
 
 *Incident, 2026-08-12.* CI went red on the `mfault` merge and stayed red
 through five tagged releases because the local suite was green and nobody

@@ -635,14 +635,20 @@ build, run and traps are in `CLAUDE.md`.
      (the comparator message names row 200 column 7, `2.466e-10` against the reference), not diagnosed
      further. So the SOR variant is inexact over 200 steps as it is over 3, and not by a margin that the
      tolerance of the gold gate covers.
-     Slip-rate-change summary (200 steps, wide, MEASURED; the matched-load pair at one rank count, `runs/20261114_event2/`
-     `ev32b` GAMG CG against `ex32` exact, both 32 ranks, is queued as `scratch/bench/sub13.sh`, PID 2705259, 14:51; until it
-     lands the two columns below differ in ranks and host load, so the s/step ratio is not a result):
+     Slip-rate-change summary (200 steps, wide, 32 ranks, MEASURED 2026-11-14 15:11-15:41 CST, matched pair back to back,
+     `runs/20261114_event2/`, `scratch/bench/sub13.sh`; the earlier unmatched `..._ev32` and 16-rank `np16_base` runs
+     are superseded by it):
 
-     | solver | ranks | its/solve through the change | s/step (loop / 200) | host load before | accuracy against the 200-step exact baseline |
+     | solver | its/solve through the change | setup / loop s | s/step (loop / 200) | host load before | accuracy against the exact run of the same ranks |
      |---|---|---|---|---|---|
-     | GAMG CG (SOR), `..._ev32` | 32 | 27.3 mean, 32.15 to 25.0 by 20-step block, 25-38 | 10.18 (2035.7 s) | 62.9 | 13 of 33 files fail 1e-9; worst per-file 1.1e-4 |
-     | exact MUMPS, `..np16_base` | 16 | 1 (preonly) | 5.52 (1103.4 s) | 4.2 | reference |
+     | GAMG CG (SOR), `ev32b` | 27.275 mean, 25-38 (identical to `ev32`'s count, a deterministic solve; loops differ, 2035.7 s there, so not a wrong-file read) | 5.6 / 1747.7 | 8.74 | 67.9 | 13 of 36 compared files fail (rtol 1e-9 netCDF, 2e-6 station files); worst netCDF 1.1e-7 of field scale (`disp.00001.nc`, float32 floor), station files fail on a near-zero column (row 200, column 7: 2.466e-10 against 4.19e-17) |
+     | exact MUMPS (ICNTL(14)=100), `ex32` | 1 (preonly) | 191.8 / 725.8 | 3.63 | 36.5 (contains the GAMG run's tail) | reference |
+
+     Loop ratio 2.4x (GAMG slower), against 2.5x in the 3-step matched pair at 32 ranks: no change in the ratio through the
+     slip-rate rise (1e-12 to 1.5e-7 m/s), where GAMG's iterations per solve fall from 32.15 to 25.0 per 20-step block.
+     Exact's setup is 191.8 s against GAMG's 5.6 s, but at 5.1 s/step less in the loop (8.74 - 3.63) exact is ahead
+     after 37 steps, so GAMG does not win on total time past that. Comparator: `compare_series`/`compare_netcdf` of
+     `tests/e2e/cases.py` on `result/cycle0`, one-off script, not committed.
 
      Spike-run reporting defect, 2026-11-14 (audit): `runInfo.json` of the GAMG runs reads `ksp_type` preonly, `pc_type`
      cholesky (g64b checked), not the solver used; the real iteration counts (`ksp_iterations_*`) are right. Merge-bound

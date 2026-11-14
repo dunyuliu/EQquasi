@@ -142,3 +142,9 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 ## Entry 15, 2026-11-14 (conductor 8, tool calls 58-66 of 100, times CST)
 - #102 merged as 8793e70 (CI run 43628233222 success on e2f071b). Wide scaling of GAMG CG harvested (board row 1): loop 138.7, 98.4, 55.4 s at 8, 16, 32 ranks (ranks^-0.66) against exact 38.2, 20.6, 21.2 s (flat after 16); iterations 63 at every rank count; memory per rank 4.8 / 2.5 / 1.35 against 20.9 / 12.1 / 6.8 GB. The 64-rank run was skipped by the script's own guard (load1 30.8); loads of 10-20 and unmatched exact runs make the times indicative. Crossing near 140 ranks is an extrapolation and says so on the board.
 - Still running: PID 2508024 (`sub6.sh`, wide tuning block), PID 2377489 (`-11` batch).
+
+## Entry 16, 2026-11-14 (conductor 8, tool calls 67-80 of 100, times CST)
+- #103 merged as 14f2565 (CI run 43628839918 success on 66581d7). `sub6.sh` (PID 2508024) and `sub7.sh` (PID 2536394) both closed (`DONE`, `DONE7`).
+- Wide GAMG tuning, gs10 control and SOR scaling harvested (board row 1): SOR 35.2 iterations at 8, 16, 32 ranks; gs10 control 64.0 iterations equals wide's 63.0, so the iteration growth over bp1002 (10) is not wide-specific. Open: size against BP8 geometry (a refinement series would separate them).
+- Rules agent dispatched for entries 8, 10, 11 lessons (branch `rules-lessons-1`, PR to master, not merged by it); the next conductor reads its report and merges under the gate.
+- Open for a quiet window: 64-rank wide GAMG, host-quiet repeat of exact / BLR 1e-8 / GAMG CG (load stayed 11-30 all afternoon); tuned BDDC scaling not run (GAMG's curve does not cross exact below ~140 ranks).

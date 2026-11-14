@@ -565,6 +565,36 @@ build, run and traps are in `CLAUDE.md`.
      35.2, 35.2, 35.3 iterations at 8, 16, 32 ranks (rank-independent), loop 115.6 (load 28), 80.8, 50.7 s
      against the reference 138.7, 98.4, 55.4 s (SOR 8 to 32 ranks: 2.3x, ranks^-0.60; same ~140-rank
      crossing against exact's flat ~21 s, an extrapolation).
+     **Matched-load pairs, wide, 3 steps, 2026-11-14 13:07-13:24** (MEASURED, indicative; `runs/20261114_matched/`,
+     `scratch/bench/sub8.sh`, spike binary, GAMG CG with Richardson+SOR smoothers rtol 1e-8 run
+     immediately before exact MUMPS, same case and rank count, one heavy-lock hold; loop = `runInfo.json`
+     `time_loop_seconds`, RSS = maximum over rank files, load = 1-minute load before the run, which at 32
+     and 16 ranks still contains the previous run of the pair; other jobs of the host owner, about 4
+     cores, ran beside every run):
+
+     | ranks | GAMG CG (SOR) setup / loop s | its/solve | RSS GB | load | exact setup / loop s | RSS GB | load | loop ratio |
+     |---|---|---|---|---|---|---|---|---|
+     | 16 | 9.7 / 60.4 | 35.2 (34-37) | 2.54 | 14.96 | 330.1 / 19.5 | 12.28 | 18.76 | 3.1x |
+     | 32 | 5.4 / 40.5 | 35.3 (34-38) | 1.36 | 25.66 | 194.0 / 16.2 | 6.81 | 29.56 | 2.5x |
+     | 64 | 8.3 / 52.2 | 37.2 (36-39) | 0.78 | 4.60 | aborted (see below) | | | n/a |
+
+     Reading: 16 to 32 ranks GAMG's loop falls 1.49x (ranks^-0.58) against exact's 1.20x; at 64 ranks GAMG's
+     loop does not fall (52.2 s, 1.3x slower than at 32; the 64-rank run had no spare core, so the host owner's
+     4 cores of other jobs ran on shared cores and a 64-rank bulk-synchronous run waits for the slowest
+     rank: the point is contaminated, not a scaling result). Earlier unmatched SOR 32-rank figure was 50.7 s at
+     load 18-28; this run 40.5 s: run-to-run spread on this node is of order 25 %. Crossing re-derived from the
+     matched 16/32 pair, an extrapolation: with exact flat at 16.2 s it is near 32 x (40.5/16.2)^(1/0.576) = 157
+     ranks (the unmatched estimate was 139); if exact keeps falling at its measured -0.27 exponent the
+     ratio shrinks only as ranks^-0.31 and the crossing is near 630 ranks. Either way it is beyond this 64-core
+     node. A test would need a cluster run at 256 to 512 ranks (4 to 8 nodes of 64 cores, low-latency
+     interconnect, exclusive nodes): GAMG needs about 0.1-0.2 GB per rank at those counts (0.78 GB at 64
+     ranks, scaled as 1/ranks), exact MUMPS about 7 GB per rank or more at 32 and needs its 190 s-plus
+     setup repeated; and the exact 64-rank reference itself failed here. Accuracy of the SOR variant against
+     exact at these runs was not compared (comparator not run on `runs/20261114_matched/`).
+     **Exact MUMPS at 64 ranks aborted**: `MPI_ABORT` on rank 59 (reported by prterun as rank 27) after
+     129 s, during setup, no error text in `run.log` or `log/cycle0.log`
+     (`runs/20261114_matched/bp8.qdc.gs.10.wide_s3_np64_e64`); a rerun with MUMPS ICNTL(4)=2 to print the
+     cause is queued (`..._e64b`).
      **Why wide needs 63 iterations and bp1002 10:** not wide-specific. The control `bp8.qdc.gs.10`
      (1.96 M equations, no enlarged box) at 16 ranks takes 64.0 iterations per solve (62-67), the same
      as wide's 63.0; GAMG CG on it: setup 5.6 s against 80.8 s exact, loop 49.3 s against 8.1 s (6.1x),
@@ -573,8 +603,7 @@ build, run and traps are in `CLAUDE.md`.
      cost; what separates bp1002 (163 k equations, 10 iterations) from the BP8 meshes is size or the
      BP8 fault geometry, which these two points cannot separate (a mesh-refinement series of one geometry
      would; not run). Not examined: the near-null space quality on fault split nodes.
-   - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,
-     ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
+   - Open (2026-11-14 12:15): `-11` 60-run batch FINISHED 2026-11-14 12:34, 60 of 60 clean (`runs/20261114_ksp-stress2/results.txt`: `rc=0`, zero DIVERGED/`KSPConvergedReason` lines, zero negative `INFOG(1)` lines per run log; `ALLDONE` in `rc`; binary 1.24.4, 8 ranks, `test.bp8.qdc.gs.10`, 3 steps, solver 3, MUMPS ICNTL(4)=3): the row's second closing condition (60 clean runs) is met; with the 0 of 40 earlier and 1 of 11 reported, the `-11` stays an unreproduced single observation (closing the row is the board owner's); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
    converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);

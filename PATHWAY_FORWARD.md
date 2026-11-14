@@ -62,6 +62,10 @@ build, run and traps are in `CLAUDE.md`.
    (79 GB at 10 m BP8 wide, 141 GB in-core estimate at Case 3);
    (g) subdomain matrices kept unassembled (`MATIS`) and solved with
    `PCBDDC`, the setup built once and reused every step (K is constant).
+   Owner, 2026-11-14, on the solver under (g): "This is a really simple system.
+   It's symmetric. You can use maybe just a regular CG or GRMS." (verbatim;
+   read as: try plain Krylov, CG or GMRES, on the distributed matrix, not
+   only BDDC with direct local solves.)
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

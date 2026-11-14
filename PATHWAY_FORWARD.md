@@ -105,7 +105,7 @@ build, run and traps are in `CLAUDE.md`.
    matches; domain and dtmax ruled out. The uploaded BP8 entries are suspect
    along depth until this closes. Done when: the cause is found and fixed, and
    EQquasi at 25 m agrees with Kim within a few % at all 9 stations.
-   **Escalation, 2026-10-12**: 6 `lars-eriksson` findings on this hunt
+   **Escalation, 2026-10-12**: 6 code-audit findings on this hunt
    rejected after a source/gate check (4 before today: nodal area/dx^2, GS
    z-symmetry, and two more per the 2026-10-09 brief; 2 today, PRs #58 and
    #59, closed unmerged -- see `docs/dev/SESSION_LOG_2026-10-12_board-sweep.md`

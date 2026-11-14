@@ -103,9 +103,7 @@ build, run and traps are in `CLAUDE.md`.
    <- #85 (v1.24.4: coverage of z and corner blocks, the well path, an abort;
    `nsmp` padding zeroed). #85 own gate at 81629ad from a fresh clone: fast
    287 passed, `-m e2e_fast` 53 passed / 21 skipped (data absence in the
-   reference), CI run 43583429026 success. (g) `MATIS` + `PCBDDC`: first
-   spike run was invalid (stopped on an absolute tolerance at iteration 1,
-   wrong output), probe being fixed; no BDDC number yet.
+   reference), CI run 43583429026 success. (g) `MATIS` + `PCBDDC`, spike only (draft PR #87, not for merge): see below.
    Evidence, binary eqquasi-1.24.3 (`dd-2c` ae7e3b1), host cotopaxi, NOT
    exclusive (loadavg of other users 4-13 before each run, rank-0
    `cpu_time`; `runs/20261114_row1-evidence/table.csv`, `matrix.out`,
@@ -133,6 +131,27 @@ build, run and traps are in `CLAUDE.md`.
    rank-count trend is not established. What dominates bp1002 at 8 ranks:
    KSPSolve is 95 % of the solver 3 time loop (spike log, one run). A
    host-exclusive repeat is needed before any scaling claim.
+   (g) BDDC spike (CG + `PCBDDC`, MUMPS local and coarse solves, `-eq_mat_is`,
+   branch `dd-3g-spike2` 7b77221; an earlier run was void: the `MATIS` map was
+   on `PETSC_COMM_SELF`, BDDC saw no interface and stopped at iteration 1).
+   Repaired probe, control: relative residual 7.5e-09 / 5.8e-13 at rtol 1e-8 /
+   1e-12, solution within 5.3e-10 / 3.7e-14 of the MUMPS solve at the same
+   step. bp1002, 8 ranks, 101 steps: 27 / 41 iterations per solve (flat over
+   all 202 solves), 3.17 / 3.71 s/step against 0.15-0.18 for MUMPS (~17x
+   slower), setup 1.0 s against 3.3 s, parity to MUMPS 5.6e-07 (rtol 1e-8) and
+   1.0e-11 (1e-12) on the fault, station and cplot files, step count and
+   peak-slip-rate step identical, no event inside 101 steps. 10 m BP8 wide,
+   16 ranks, 3 steps, rtol 1e-8 (`runs/20261114_bddc-wide/`): BDDC 74
+   iterations per solve, 339.7 s/step against 7.18 s/step for MUMPS (~47x
+   slower), setup 60 s against 362 s, peak RSS of the largest rank 6.9 against
+   11.9 GB; parity on wide not checked. Host not exclusive (load 7-22). So
+   BDDC with these options does not beat MUMPS at either size: its gain is
+   setup time and memory, its cost is ~0.06 s (bp1002) to ~4.6 s (wide) per CG
+   iteration; untested: tuned BDDC options (coarse space, local solvers,
+   vertex/edge primal sets), more ranks.
+   Mesh-only memory (stage 2 per-rank mesh), solver 3 on wide at 16 ranks:
+   peak RSS after mesh setup 90.8 MB for the largest rank, 1.44 GB summed,
+   against 11.9 GB per rank at the end: factors are >99 % of the footprint.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

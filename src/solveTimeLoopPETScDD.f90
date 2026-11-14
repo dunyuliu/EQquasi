@@ -169,7 +169,9 @@ subroutine solveTimeLoopPETScDD
         write(*,'(X,A,40X,i7,4X,A)') '= Far-field elements(et=3)  = ', icntG(5), '='
         write(*,'(X,A,2i12)')   '= Nodes on the largest rank, in the mesh    = ', icnt(1), ddGlobal(1)
         write(*,'(X,A,2i12)')   '= Elements on the largest rank, in the mesh = ', icnt(2), ddGlobal(2)
-        write(*,'(X,A,2f12.1)') '= Peak RSS after mesh setup, MB: largest rank, sum = ', hwmG(1), hwmG(2)
+        ! No line where /proc/self/status is not there (ddPeakRSSkB = -1).
+        if (hwmG(1) > 0.0d0) write(*,'(X,A,2f12.1)') &
+            '= Peak RSS after mesh setup, MB: largest rank, sum = ', hwmG(1), hwmG(2)
     endif
     if (icntG(4) == 0 .and. any(nftnd(1:ntotft) > 0)) then
         if (me == 0) write(*,*) 'par.solver=3: no fault-adjacent elements (et=2) were tagged, ', &
@@ -813,7 +815,8 @@ subroutine solveTimeLoopPETScDD
             dble(totalKSPIts)/dble(max(1,nKSPSolves)), '='
         write(*,'(X,A,40X,E15.7,4X,A)')  '= KSP rtol                 = ', &
             kspRtol, '='
-        write(*,'(X,A,2f12.1)') '= Peak RSS at the end, MB: largest rank, sum       = ', hwmG(1), hwmG(2)
+        if (hwmG(1) > 0.0d0) write(*,'(X,A,2f12.1)') &
+            '= Peak RSS at the end, MB: largest rank, sum       = ', hwmG(1), hwmG(2)
         write(*,*) '====================================================================='
         ! The run metadata reports the whole mesh, not rank 0's block.
         nloc = (/ numnp, numel, neq /)

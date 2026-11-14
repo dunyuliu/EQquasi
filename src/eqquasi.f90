@@ -146,6 +146,7 @@ subroutine checkNormalStressCaps
     ! produces numbers. Refuse instead, and say which cap and by how much.
     use globalvar
     implicit none
+    include 'mpif.h'
     integer (kind = 4) :: ift, i
     real (kind = dp)   :: lo, hi
 
@@ -182,6 +183,10 @@ subroutine checkNormalStressCaps
                 write(*,*) '= Forking a run into caps mid-history hits this: ='
                 write(*,*) '= restart from a cycle still inside the range.  ='
                 write(*,*) '====================================================='
+                ! par.solver = 3: only the rank that owns the node gets here,
+                ! and the others are already waiting in a collective call.
+                flush(6)
+                if (ddActive) call MPI_ABORT(MPI_COMM_WORLD, 7, IERR)
                 stop 7
             endif
         enddo

@@ -568,8 +568,19 @@ subroutine meshgen
         write(*,*) 'Consistancy check'
         write(*,*) 'mesh4:meshgen(nnode)',numnp,nnode
         write(*,*) 'mesh4:meshgen(nelem)',numel,nelement
-        write(*,*) 'mesh4:meshgen(nftnd)',nftnd0(1:ntotft),nftnd(1:ntotft)
+        if (ddActive) then
+            ! par.solver = 3: the counts above are this rank's block; nftnd0 is
+            ! the index of the last fault node met, not a count, and nftnd is
+            ! the whole fault, so the two are not compared.
+            write(*,*) 'mesh4:meshgen(rank, block ix, iy, iz)',me,ix0,ix1,iy0,iy1,iz0,iz1
+            write(*,*) 'mesh4:meshgen(nftnd) not checked per block; whole faults hold',nftnd(1:ntotft)
+        else
+            write(*,*) 'mesh4:meshgen(nftnd)',nftnd0(1:ntotft),nftnd(1:ntotft)
+        endif
         write(*,*) 'mesh4:meshgen(neq)',neq0,neq
+        ! par.solver = 3: one rank's block can fail alone, the others go on.
+        flush(6)
+        if (ddActive) call MPI_ABORT(MPI_COMM_WORLD, 2, IERR)
         stop 2
     endif
     !for multiple faults. B.D. 1/7/12

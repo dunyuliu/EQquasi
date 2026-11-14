@@ -762,12 +762,15 @@ end subroutine on_fault_read_range
 
 subroutine check(status)
     use netcdf
-    use globalvar, only: lastNcPath
+    use globalvar, only: lastNcPath, ddActive, IERR
+    include 'mpif.h'
     integer, intent ( in) :: status
     
     if(status /= nf90_noerr) then 
       print *, 'netCDF error: ', trim(nf90_strerror(status))
       print *, 'while handling: ', trim(lastNcPath)
+      flush(6)
+      if (ddActive) call MPI_ABORT(MPI_COMM_WORLD, 1, IERR) ! par.solver = 3: a rank reads its own part
       stop "Stopped"
     end if
 end subroutine check  

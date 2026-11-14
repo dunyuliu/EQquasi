@@ -389,9 +389,16 @@ def _binary_has_petsc():
     return "libpetsc" in r.stdout
 
 
-# Double-precision text outputs only: the fault/disp netCDF fields are stored
-# as float32 and cannot show a round-off difference.
-DD_TEXT_OUTPUTS = ("fltst_", "p1output", "p2output", "global", "peak_sliprate_per_fault")
+# Double-precision text outputs. srfst_ is the off-fault stations, each
+# recorded by the rank that owns its node.
+DD_TEXT_OUTPUTS = ("fltst_", "srfst_", "p1output", "p2output", "global",
+                   "peak_sliprate_per_fault")
+# The whole-mesh numbering solver 3 computes in closed form, gathered from the
+# ranks: integers and grid coordinates, so equal arrays and no tolerance.
+DD_MESH_FILES = ("eqquasi.mesh.coor.nc", "eqquasi.mesh.ien.nc", "eqquasi.mesh.nsmp.nc")
+# disp.*.nc is stored as float32 (eps 1.2e-7): a round-off difference can move
+# the last digit, a node written under another node's number moves the field.
+DD_DISP_RTOL = 1e-6
 # Measured 2026-11-13 over 101 steps at 1, 4 and 8 ranks: worst 1.6e-13 of a
 # column's scale. 1e-10 leaves room for a different MUMPS ordering.
 DD_RTOL = 1e-10
@@ -423,6 +430,61 @@ def _assert_distributed_mesh(stdout, nranks):
         f"a rank holds {largest_el} of the mesh's {whole_el} elements"
 
 
+def _dd_differences(s2, s3):
+    """Every way solver 3's cycle directory `s3` differs from solver 2's `s2`,
+    one line each: the text series, the mesh files and the disp snapshots.
+    A kind of output solver 2 did not write is itself a line (rule 2)."""
+    import numpy as np
+    netCDF4 = pytest.importorskip("netCDF4")
+    bad = []
+
+    def pair(f):
+        if not os.path.exists(os.path.join(s3, f)):
+            bad.append(f"{f}: not written by solver 3")
+            return None
+        return os.path.join(s2, f), os.path.join(s3, f)
+
+    for p in DD_TEXT_OUTPUTS:
+        files = C.station_files(s2, p)
+        if not files and p in ("fltst_", "srfst_", "global"):
+            bad.append(f"{p}*: solver 2 wrote none, nothing to compare")
+        for f in files:
+            ab = pair(f)
+            if ab:
+                ok, msg = C.compare_series(*ab, rtol=DD_RTOL, floor_rtol=DD_RTOL)
+                if not ok:
+                    bad.append(f"{f}: {msg}")
+
+    for f in DD_MESH_FILES:
+        if not os.path.exists(os.path.join(s2, f)):
+            bad.append(f"{f}: not written by solver 2, nothing to compare")
+            continue
+        ab = pair(f)
+        if not ab:
+            continue
+        with netCDF4.Dataset(ab[0]) as a, netCDF4.Dataset(ab[1]) as b:
+            if set(a.variables) != set(b.variables):
+                bad.append(f"{f}: variables {sorted(b.variables)} vs {sorted(a.variables)}")
+                continue
+            for v in a.variables:
+                x, y = np.asarray(a[v][:]), np.asarray(b[v][:])
+                if x.shape != y.shape:
+                    bad.append(f"{f}: {v} has shape {y.shape} vs {x.shape}")
+                elif not np.array_equal(x, y):
+                    bad.append(f"{f}: {v} differs in {int((x != y).sum())} of {x.size} entries")
+
+    disp = sorted(f for f in os.listdir(s2) if f.startswith("disp.") and f.endswith(".nc"))
+    if not disp:
+        bad.append("disp.*.nc: solver 2 wrote none, nothing to compare")
+    for f in disp:
+        ab = pair(f)
+        if ab:
+            ok, msg = C.compare_netcdf(*ab, rtol=DD_DISP_RTOL, floor_rtol=DD_DISP_RTOL)
+            if not ok:
+                bad.append(f"{f}: {msg}")
+    return bad
+
+
 @pytest.mark.e2e_fast
 @pytest.mark.parametrize("compset", ["test.bp5.qdc.2000", "test.bp1002.qdc.zone.2500"])
 def test_distributed_loop_matches_petsc_loop(compset):
@@ -432,6 +494,8 @@ def test_distributed_loop_matches_petsc_loop(compset):
     ranks -- blocks (2, 2, 1), which cut every fault along strike and put the
     block boundary on the fault plane -- against solver 2 at the compset's own
     rank count, 31 steps each. The two-fault compset is here for rule 12.
+    Compared (_dd_differences): the text series, the mesh files in whole-mesh
+    numbering, and the disp snapshots.
 
     Not in e2e_ci: CI builds -m ubuntu, which has no PETSc.
     """
@@ -456,16 +520,5 @@ def test_distributed_loop_matches_petsc_loop(compset):
         if name == "s3":
             _assert_distributed_mesh(r.stdout, nranks=4)
 
-    files = [f for p in DD_TEXT_OUTPUTS for f in C.station_files(cyc["s2"], p)]
-    assert files, f"solver 2 wrote none of {DD_TEXT_OUTPUTS}"
-    bad = []
-    for f in files:
-        run = os.path.join(cyc["s3"], f)
-        if not os.path.exists(run):
-            bad.append(f"{f}: not written by solver 3")
-            continue
-        ok, msg = C.compare_series(os.path.join(cyc["s2"], f), run,
-                                   rtol=DD_RTOL, floor_rtol=DD_RTOL)
-        if not ok:
-            bad.append(f"{f}: {msg}")
+    bad = _dd_differences(cyc["s2"], cyc["s3"])
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)

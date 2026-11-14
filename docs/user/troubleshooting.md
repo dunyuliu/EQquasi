@@ -48,8 +48,13 @@ codes. The launcher normally passes the code through as the exit status.
   message names the file. A message that `on_fault_vars_input.nc` has no
   `nid_fault` dimension means it was written by an old `case.setup`;
   regenerate it.
-* `par.solver=2 (PETSc) needs MACHINE=conda-linux`: this binary was built
-  without PETSc. Use `solver = 1` (MUMPS) or the conda build.
+* `par.solver=2 (PETSc) needs MACHINE=conda-linux` (or the same for
+  `par.solver=3`): this binary was built without PETSc. Use `solver = 1`
+  (MUMPS) or the conda build.
+* `par.solver=3 ... does not distribute pore pressure yet`: the distributed
+  loop does not run `bp = 8`. Use `solver = 1` or `2`.
+* `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
+  for the mesh. Lower `HPC_ncpu`.
 * `ON-FAULT STATIONS REQUESTED BUT NOT FOUND`: a warning, not a stop. Some
   requested stations do not lie on a fault node; see [Output
   files](outputs.md).

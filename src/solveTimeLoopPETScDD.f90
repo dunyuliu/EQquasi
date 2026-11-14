@@ -92,6 +92,14 @@ subroutine solveTimeLoopPETScDD
     PetscInt                   :: p3, idx3(3)
     PetscScalar                :: val3(3)
     real (kind = 8)            :: wall0, wall1, wallSetup, wallLoop, wallSolve
+    ! Probe of the solve itself (with -eq_spike_log): |b|, |x|, |b - K x|.
+    Vec                        :: rvec
+    PetscReal                  :: nrmB, nrmX, nrmR
+    PetscScalar                :: mone
+    ! The MATIS map, on the world communicator (see where it is created).
+    ISLocalToGlobalMapping     :: l2gIS
+    PetscInt                   :: p1
+    PetscInt, allocatable      :: isIdx(:)
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
@@ -477,7 +485,25 @@ subroutine solveTimeLoopPETScDD
         CHKERRA(perr)
         call MatSetFromOptions(Amat, perr)
         CHKERRA(perr)
-        call MatSetLocalToGlobalMapping(Amat, l2g, l2g, perr)
+        ! Not the ghosted Vec's map (l2g): VecCreateGhost builds that one on
+        ! PETSC_COMM_SELF, so MATIS/BDDC find no neighbour through it, every
+        ! dof counts as interior, and CG stops at iteration 1 (beta = 0) on
+        ! eight uncoupled block solves. Same indices, world communicator.
+        allocate(isIdx(max(1,nLocDof)))
+        do i = 1, nOwnEq
+            isIdx(i) = 3*offR(me) + i - 1
+        enddo
+        do i = 1, 3*nGhostNodes
+            isIdx(nOwnEq+i) = ghostIdx(i)
+        enddo
+        p1 = 1
+        call ISLocalToGlobalMappingCreate(PETSC_COMM_WORLD, p1, pnLoc, isIdx, PETSC_COPY_VALUES, &
+            l2gIS, perr)
+        CHKERRA(perr)
+        deallocate(isIdx)
+        call MatSetLocalToGlobalMapping(Amat, l2gIS, l2gIS, perr)
+        CHKERRA(perr)
+        call ISLocalToGlobalMappingDestroy(l2gIS, perr)
         CHKERRA(perr)
     else
         call MatSetType(Amat, MATAIJ, perr)
@@ -643,6 +669,12 @@ subroutine solveTimeLoopPETScDD
         pcTypeStr = 'spike-is'
     endif
 
+    if (useLog) then
+        call VecDuplicate(bvec, rvec, perr)
+        CHKERRA(perr)
+        if (me == 0) write(*,'(A,3ES12.4,I8)') 'EQ_TOL rtol atol dtol maxit ', kspRtol, kspAtol, &
+            kspDtol, kspMaxIts
+    endif
     call cpu_time(startTime)
     wall0 = MPI_Wtime()
     call KSPSetUp(ksp, perr)
@@ -746,8 +778,23 @@ subroutine solveTimeLoopPETScDD
             nKSPSolves = nKSPSolves + 1
             minKSPIts = min(minKSPIts, kspIts)
             maxKSPIts = max(maxKSPIts, kspIts)
-            if (useLog .and. me == 0) write(*,'(A,I8,I2,I7,I4,ES12.4)') 'EQ_KSP ', it, iiTag, &
-                kspIts, kspReason%v, wall1
+            if (useLog) then
+                ! The residual of the solve, from K and b directly (not the
+                ! norm the Krylov method reports).
+                mone = -1.0d0
+                call MatMult(Amat, xvec, rvec, perr)
+                CHKERRA(perr)
+                call VecAYPX(rvec, mone, bvec, perr)
+                CHKERRA(perr)
+                call VecNorm(bvec, NORM_2, nrmB, perr)
+                CHKERRA(perr)
+                call VecNorm(xvec, NORM_2, nrmX, perr)
+                CHKERRA(perr)
+                call VecNorm(rvec, NORM_2, nrmR, perr)
+                CHKERRA(perr)
+                if (me == 0) write(*,'(A,I8,I2,I7,I4,ES12.4,2ES24.16,ES12.4)') 'EQ_KSP ', it, iiTag, &
+                    kspIts, kspReason%v, wall1, nrmB, nrmX, nrmR
+            endif
 
             ! Displacements of own elements' nodes: owned + ghost values.
             call VecGhostUpdateBegin(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)

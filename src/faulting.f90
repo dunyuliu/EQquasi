@@ -120,7 +120,8 @@ do ift = 1, ntotft
         if (mmast==0.0d0.or.mslav==0.0d0) then 
             write(*,*) 'ZERO MASS IN FAULTING, MMAST & MSLAV',mmast,mslav
             write(*,*) 'PROBLEMATIC COORDS ARE, X,Z =',x(1,isn)/1.0d3,x(3,isn)/1.0d3
-            stop 501
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 501, IERR)
         endif 
         !
         mtotl = mtotl * arn(i,ift)
@@ -481,7 +482,8 @@ do ift = 1, ntotft
             if (dtev1D(i,ift) < 0) then
                 write(*,*) 'NEGATIVE SLIPRATE, ITS LOC = ', x(1,isn),x(3,isn)
                 write(*,*) 'PROBLEMATIC V_TRIAL = ', v_trial
-                stop 502
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 502, IERR)
             endif
             ! Record rupture area, average stress vector, slip
             if (itag==1) then

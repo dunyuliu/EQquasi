@@ -42,8 +42,15 @@ program eqquasi3d
     call readstations2
 
     call mesh4num
+#ifdef HAVE_PETSC
+    ! par.solver = 3: from here on a rank holds its own block of the mesh only.
+    if (sol_op == 3) call ddMeshBox
+#endif
     call allocAndInit
     call meshgen
+#ifdef HAVE_PETSC
+    if (sol_op == 3) call ddMeshFinish
+#endif
 
     ! A requested station that matches no fault node used to vanish without a
     ! word. BP1002 asked for three and got one: two sat at x = +-2.0 km and
@@ -93,7 +100,8 @@ program eqquasi3d
 #else
         write(*,*) 'par.solver=2 (PETSc) needs MACHINE=conda-linux (or ', &
             'another PETSc-enabled build); not available on this binary.'
-        stop
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
 #endif
     elseif (sol_op == 3) then
 #ifdef HAVE_PETSC
@@ -101,7 +109,8 @@ program eqquasi3d
 #else
         write(*,*) 'par.solver=3 (PETSc, distributed) needs MACHINE=conda-linux (or ', &
             'another PETSc-enabled build); not available on this binary.'
-        stop
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
 #endif
     endif
     
@@ -147,6 +156,9 @@ subroutine checkNormalStressCaps
 
     do ift = 1, ntotft
         do i = 1, nftnd(ift)
+            if (ddActive) then
+                if (.not. fltMine(i,ift)) cycle ! par.solver = 3: another rank reads and checks it.
+            endif
             if (fric(FR_TNRM0,i,ift) < lo .or. fric(FR_TNRM0,i,ift) > hi) then
                 write(*,*) '====================================================='
                 write(*,*) '= Initial normal stress lies outside the caps       ='
@@ -220,7 +232,8 @@ subroutine checkAndReport(currentProcID)
     ! silently clamping" held at cold start alone.
     call checkNormalStressCaps 
     
-    if (currentProcID == 0) then 
+    ! par.solver = 3 writes the mesh files itself, gathered from the ranks.
+    if (currentProcID == 0 .and. .not. ddActive) then
         write(*,'(X,A,40X,i7,4X,A)') '= Total nodes = ',numnp,'='            
         write(*,'(X,A,40X,i7,4X,A)') '= Total elems = ',numel,'='            
         

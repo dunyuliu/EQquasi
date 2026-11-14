@@ -31,6 +31,7 @@ row in `cases.CASES` plus a reference directory.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 
@@ -394,6 +395,32 @@ DD_TEXT_OUTPUTS = ("fltst_", "p1output", "p2output", "global", "peak_sliprate_pe
 # Measured 2026-11-13 over 101 steps at 1, 4 and 8 ranks: worst 1.6e-13 of a
 # column's scale. 1e-10 leaves room for a different MUMPS ordering.
 DD_RTOL = 1e-10
+# The largest rank's share of the whole mesh's nodes at 4 ranks. A block is a
+# quarter of the cells plus one ghost line per cut direction (and, on rank 0,
+# the other blocks' fault nodes); a rank that held the whole mesh would be 1.
+# Measured 2026-11-13 at 4 ranks: 0.279 and 0.268 of the nodes, 0.25 of the
+# elements.
+DD_MAX_NODE_SHARE = 0.35
+
+
+def _assert_distributed_mesh(stdout, nranks):
+    """The run summary of par.solver = 3 must show the distributed loop on
+    `nranks` ranks, one block each, and no rank holding the whole mesh."""
+    def ints(label):
+        m = re.search(re.escape(label) + r"\s*=\s*((?:\d+\s+)+)", stdout)
+        assert m, f"solver 3 did not print '{label}': not the distributed loop\n{stdout[-2000:]}"
+        return [int(v) for v in m.group(1).split()]
+
+    assert ints("= MPI ranks") == [nranks]
+    blocks = ints("= Blocks (x, y, z)")
+    assert len(blocks) == 3 and blocks[0] * blocks[1] * blocks[2] == nranks, \
+        f"blocks {blocks} do not make {nranks} ranks"
+    largest, whole = ints("= Nodes on the largest rank, in the mesh")
+    assert largest <= DD_MAX_NODE_SHARE * whole, \
+        f"a rank holds {largest} of the mesh's {whole} nodes: the mesh is not distributed"
+    largest_el, whole_el = ints("= Elements on the largest rank, in the mesh")
+    assert largest_el <= DD_MAX_NODE_SHARE * whole_el, \
+        f"a rank holds {largest_el} of the mesh's {whole_el} elements"
 
 
 @pytest.mark.e2e_fast
@@ -427,7 +454,7 @@ def test_distributed_loop_matches_petsc_loop(compset):
         assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
         cyc[name] = os.path.join(workdir, "result", "cycle0")
         if name == "s3":
-            assert "Blocks (x, y, z)" in r.stdout, "solver 3 did not run the distributed loop"
+            _assert_distributed_mesh(r.stdout, nranks=4)
 
     files = [f for p in DD_TEXT_OUTPUTS for f in C.station_files(cyc["s2"], p)]
     assert files, f"solver 2 wrote none of {DD_TEXT_OUTPUTS}"

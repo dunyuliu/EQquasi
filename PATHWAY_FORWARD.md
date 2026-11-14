@@ -255,6 +255,19 @@ build, run and traps are in `CLAUDE.md`.
    reproduced. Closes when `KSPSetUp` reads the MUMPS INFOG(1)/(2) on failure
    (the native loop does, `solveTimeLoopMUMPS.f90:60,153`) so a recurrence names
    its cause, or on 60 clean runs; until then it stays an open observation.
+   **Slip-to-traction operator, sizing only (2026-11-14, arithmetic from the
+   run logs, NOT a measurement)**: fault elements 7,440 (bp1002) and 53,868
+   (10 m BP8 wide), so about 15 k and 108 k slip unknowns (two components per
+   fault node). Dense operator 15 k^2 x 8 B = 1.8 GB (bp1002), 108 k^2 x 8 B =
+   93 GB (wide; ~6 GB per rank at 16 ranks, half that symmetric or in float32).
+   Build cost is one volume solve per unknown: 108 k x ~3.6 s (a MUMPS solve on
+   wide, 16 ranks) = ~108 h one rank-group, unless batched (`MatMatSolve`),
+   whose per-right-hand-side throughput is the one number not yet measured.
+   Per step: one matvec streaming the matrix, ~0.6 s at an assumed 160 GB/s
+   against 7.18 s now, i.e. ~10x if the build is paid. bp1002 gains ~5x at
+   most (0.03 s matvec against 0.15 s). Feasible in memory, open in build time;
+   next measurable: `MatMatSolve` seconds per right-hand side on wide at 16
+   ranks, 32 columns.
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

@@ -308,3 +308,73 @@ def test_mat_het_constant_field_equals_uniform_material():
     with netCDF4.Dataset(out["const"]) as a, netCDF4.Dataset(out["unif"]) as b:
         for v in ("shear_strike", "slip_rate", "state_variable"):
             assert (a[v][:] == b[v][:]).all(), f"{v} differs between a constant mat_het field and the uniform model"
+
+
+@pytest.mark.e2e_fast
+def test_xi_gamma_per_node_step_runs_and_matches_eq15():
+    """par.xi_gamma (v1.23.0) runs the per-node time-step factor of Lapusta et
+    al. (2000), eq. 15, in src/faulting.f90 -- the real Fortran path, not a
+    source-string pin (PR #72 audit, MAJOR).
+
+    test.bp5.qdc.2000 with the cap par.xi raised to 0.5 (its own 0.015 sits
+    below every node's eq. 15 value, so the cap would mask the feature) is run
+    for 3 steps with xi_gamma = 0 and with xi_gamma = pi/4 from the same state.
+    Step 2 is the first step past the base dt: the constant run takes
+    dt = 0.5 L/V, the per-node run dt = xi_node L/V at the governing node, so
+    their ratio must equal min over velocity-weakening nodes of
+    eq. 15 / 0.5 (here 0.18-0.20), up to EQquasi's rounding of dt down to a
+    multiple of the base step. A per-node path that is off gives ratio 1.
+
+    Then xi_gamma = 1e-4 makes every velocity-weakening cell larger than h*:
+    the run must stop with code 13 and its message, within the timeout, i.e.
+    through MPI_Abort rather than a rank-local stop that leaves the others hung.
+    """
+    import math
+    import sys
+    import numpy as np
+    from defaultParameters import lapusta_xi
+    compset, cap, gamma = "test.bp5.qdc.2000", 0.5, math.pi / 4
+
+    def run(name, extra, timeout=900):
+        workdir = os.path.join(WORK_ROOT, f"e2e.xi_gamma_{name}")
+        e = C.env()
+        shutil.rmtree(workdir, ignore_errors=True)
+        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                       cwd=str(ROOT), env=e, check=True, capture_output=True)
+        with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+            f.write(f"par.nstep = 3\npar.xi = {cap}\n" + extra)
+        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True,
+                           text=True, timeout=timeout)
+        return workdir, r
+
+    w_off, r_off = run("off", "")
+    w_on, r_on = run("on", f"par.xi_gamma = {gamma!r}\n")
+    for w, r in ((w_off, r_off), (w_on, r_on)):
+        assert r.returncode == 0, f"{w}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+    assert "per-node xi" in r_on.stdout and "per-node xi" not in r_off.stdout
+
+    t = {k: np.loadtxt(os.path.join(w, "result", "cycle0", "global.dat"), usecols=(0,))
+         for k, w in (("off", w_off), ("on", w_on))}
+    dt = {k: np.diff(v) for k, v in t.items()}
+    base = min(dt["off"].min(), dt["on"].min())
+    assert dt["off"][0] > 2 * base, "step 2 of the constant run is still at the base dt"
+    ratio = dt["on"][0] / dt["off"][0]
+
+    # eq. 15 at every velocity-weakening node of this compset (uniform mu, sigma, b).
+    sys.path.insert(0, w_on)
+    from user_defined_params import par  # the case's own parameters
+    sys.path.remove(w_on)
+    v = par.on_fault_vars[0]
+    mu = par.rou * par.vs ** 2
+    xs = [lapusta_xi(gamma * mu / par.dx * L, a * abs(s), b * abs(s), cap)
+          for a, b, L, s in zip(v[..., 9].ravel(), v[..., 10].ravel(), v[..., 11].ravel(), v[..., 7].ravel())
+          if a < b]
+    tol = 2 * base / dt["off"][0]
+    assert min(xs) / cap - tol <= ratio <= max(xs) / cap + tol, (
+        f"per-node/constant step ratio {ratio:.4f} outside eq. 15 range "
+        f"[{min(xs) / cap:.4f}, {max(xs) / cap:.4f}] +- {tol:.4f}")
+
+    w_bad, r_bad = run("abort", "par.xi_gamma = 1e-4\n", timeout=600)
+    assert r_bad.returncode != 0, "xi_gamma = 1e-4 (cells larger than h*) did not fail"
+    assert "lapusta_xi: no stable step" in r_bad.stdout + r_bad.stderr

@@ -64,6 +64,10 @@ codes. The launcher normally passes the code through as the exit status.
   node matched to an off-fault station is owned by no rank, or by more than
   one. This is a fault in the block bookkeeping, not in the case: report it
   and use `solver = 1` or `2`.
+* `par.solver=3: rank N MPI-IO failed on <file>`: a rank could not open or
+  write one of the text files every rank writes its own lines of (`cplot_*`,
+  `p1output.txt`, `p2output.txt`). Check that the output directory is
+  writable and on a file system all ranks see.
 * `ON-FAULT STATIONS REQUESTED BUT NOT FOUND`: a warning, not a stop. Some
   requested stations do not lie on a fault node; see [Output
   files](outputs.md).

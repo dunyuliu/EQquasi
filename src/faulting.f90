@@ -525,7 +525,7 @@ do ift = 1, ntotft
     enddo    !ending i
 enddo ! ending ift
 
-    if (me == 0 .and. .not. ddActive) call output_prof ! solver 3 gathers first, then calls it.
+    if (me == 0 .and. .not. ddActive) call output_prof ! solver 3: each rank writes its own lines (ddWriteProf).
 
     if (itag==1) then
         pma             = maxval(ma_bar_ku_arr)

@@ -123,3 +123,8 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 - Local order 18.1-19.0 k is supported: MUMPS `JOB, N, NNZ` lines, 18,135 to 18,972 (not an "order" line, hence the earlier miss).
 - Owner question (no dispatch, rule 1): nothing in `tests/` pins any figure of row 1; whether a regression test should read these from the committed run results is the test owner's call.
 - Lessons for the rules agent (new): a figure quoted from a log needs its source named when two counters exist (in-code line against `rss.*`); a denominator is stated with the rule that counts it; audit before landing, not after.
+
+## Entry 12, 2026-11-14 (conductor 8, tool calls 13-26 of 100, times CST)
+- #99 merged as 6e46fcd after entry 11's corrections (CI run 43625086041, `build` success on the PR head e3a28c2; squash).
+- sub3 closed (`DONE`, 12:16): bp5 GAMG CG harvested (board row 1 and table): loop 1500.8 s, RSS 0.35 GB per rank, 6.8 iterations per solve, worst diff 1.5e-7, 116 of 120 fail. Load confound stated on the board (exact 573 s at load 5.8, 799 s at load 25.7; GAMG at 19.2). Comparison via `compare_series` / `compare_netcdf` and `runInfo.json`, `rss.*` of the run dirs; PID 2370074 no longer alive.
+- Still running: PID 2370771 (sub4: bj16r, then bj_wide, 3000 s timeout, behind the non-FIFO heavy lock), PID 2377489 (`-11` batch).

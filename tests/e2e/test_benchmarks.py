@@ -450,6 +450,7 @@ def _assert_distributed_mesh(stdout, nranks):
     largest_el, whole_el = ints("= Elements on the largest rank, in the mesh")
     assert largest_el <= DD_MAX_NODE_SHARE * whole_el, \
         f"a rank holds {largest_el} of the mesh's {whole_el} elements"
+    return blocks
 
 
 def _dd_profile_series(gpath, rpath):
@@ -569,10 +570,20 @@ def test_distributed_loop_matches_petsc_loop(compset):
     """
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 2, 3 unavailable)")
-    cyc = {}
-    for name, extra in {"s2": "par.solver = 2\npar.nstep = 31\n",
-                        "s3": "par.solver = 3\npar.nstep = 31\npar.HPC_ncpu = 4\n"}.items():
-        workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{compset}")
+    cyc, out = _dd_run_pair(compset, compset, "par.solver = 2\npar.nstep = 31\n",
+                            "par.solver = 3\npar.nstep = 31\npar.HPC_ncpu = 4\n")
+    _assert_distributed_mesh(out, nranks=4)
+    bad = _dd_differences(cyc["s2"], cyc["s3"], DD_EXPECTED_KINDS[compset])
+    assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)
+
+
+def _dd_run_pair(compset, tag, s2, s3):
+    """Run `compset` twice through the workflow, with the parameter lines `s2`
+    and `s3` appended, in scratch/e2e.dd_s2.<tag> and scratch/e2e.dd_s3.<tag>.
+    Returns the two cycle directories and the s3 run's stdout."""
+    cyc, out = {}, {}
+    for name, extra in {"s2": s2, "s3": s3}.items():
+        workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{tag}")
         e = C.env()
         shutil.rmtree(workdir, ignore_errors=True)
         subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
@@ -584,9 +595,94 @@ def test_distributed_loop_matches_petsc_loop(compset):
         r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
                            capture_output=True, text=True)
         assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
-        cyc[name] = os.path.join(workdir, "result", "cycle0")
-        if name == "s3":
-            _assert_distributed_mesh(r.stdout, nranks=4)
+        cyc[name], out[name] = os.path.join(workdir, "result", "cycle0"), r.stdout
+    return cyc, out["s3"]
 
+
+# Layouts the 4-rank test above does not reach (its blocks are (2, 2, 1)):
+# id -> compset, ranks of the solver 3 run, parameter lines for both runs.
+# MPI_Dims_create gives (2, 2, 2) at 8 ranks and (3, 2, 2) at 12, the 3 in
+# the direction with the most cells. Solver 2 runs at 4 ranks: its result
+# does not depend on the rank count, and the host is shared (rule 15).
+DD_LAYOUT_CASES = {
+    "bp1002.12": ("test.bp1002.qdc.zone.2500", 12, ""),
+    "bp7.8": ("test.bp7.qdc.a.10", 8, ""),
+    "bp8.gs.8": ("test.bp8.qdc.gs.10", 8, ""),
+    # The Peaceman well of BP8-QD-PW on the GS test mesh, with Table 1's Q0
+    # for PW. The well node (0, 0) is the grid point where the four in-plane
+    # blocks meet.
+    "bp8.pw.8": ("test.bp8.qdc.gs.10", 8, "par.fluid_src = 2\npar.fluid_q0 = 0.0015\n"),
+}
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(DD_LAYOUT_CASES))
+def test_distributed_loop_matches_petsc_loop_z_and_corner_blocks(case):
+    """test_distributed_loop_matches_petsc_loop on the layouts it leaves out
+    (PR #83 audit): more than one block along z, so the halo exchange crosses
+    z; more than one block along x and along z, so four blocks meet at a line
+    through the fault plane (y is its normal) and a fault node there has
+    diagonal neighbours on another rank; bp 8 with its section 4.3 depth line
+    (z from -400 to 400 m at x = 0) cut by the z boundary at z = 0, so its
+    slots are recorded by more than one rank; and the fluid_src = 2 well.
+    Same comparison and tolerances as the 4-rank test. The layout is read
+    from the run summary: a run that fell back to one block in z fails.
+    """
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 3 unavailable)")
+    compset, nranks, extra = DD_LAYOUT_CASES[case]
+    cyc, out = _dd_run_pair(compset, case,
+                            "par.solver = 2\npar.nstep = 31\npar.HPC_ncpu = 4\n" + extra,
+                            f"par.solver = 3\npar.nstep = 31\npar.HPC_ncpu = {nranks}\n" + extra)
+    blocks = _assert_distributed_mesh(out, nranks=nranks)
+    print(f"\n{case}: {nranks} ranks, blocks (x, y, z) = {tuple(blocks)}")
+    assert blocks[2] > 1, f"blocks {blocks}: one block along z, no z halo exchange"
+    assert blocks[0] > 1, f"blocks {blocks}: one block along x, no in-plane block corner"
+    if "fluid_src = 2" in extra:
+        assert "well index" in out, "fluid_src = 2 did not report its well index: not the well path"
     bad = _dd_differences(cyc["s2"], cyc["s3"], DD_EXPECTED_KINDS[compset])
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_distributed_abort_on_one_rank_stops_every_rank():
+    """check_effective_normal (src/faulting.f90) is reached only by the rank
+    that owns the unclamped fault node. Under par.solver = 3 a bare `stop`
+    there would leave the other ranks blocked in the next collective; it
+    calls MPI_ABORT instead. test.bp8.qdc.gs.10 at 8 ranks, blocks (2, 2, 2),
+    with Q0 raised from 0.003 to 1 m^3/s: the pore pressure at the injection
+    node passes the 25 MPa of initial effective normal stress in the first
+    steps. The whole mpirun must then exit nonzero, with the routine's own
+    message, within the timeout. A run that ends cleanly, ends with another
+    message, or hangs fails.
+    """
+    import signal
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 3 unavailable)")
+    compset, nranks = "test.bp8.qdc.gs.10", 8
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_abort")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(f"par.solver = 3\npar.HPC_ncpu = {nranks}\npar.fluid_q0 = 1.0\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    # Its own process group: on a hang, every rank is killed with the launcher.
+    p = subprocess.Popen(["bash", "run.sh"], cwd=workdir, env=e, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        out, _ = p.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL)
+        out, _ = p.communicate()
+        pytest.fail(f"par.solver = 3 did not stop within 600 s: a rank-local abort hangs the job\n{out[-3000:]}")
+    # run.sh echoes only the tail of a failed cycle's log; the summary and
+    # the message are in the log itself.
+    with open(os.path.join(workdir, "log", "cycle0.log")) as f:
+        out += f.read()
+    blocks = _assert_distributed_mesh(out, nranks=nranks)
+    banners =out.count("EFFECTIVE NORMAL STRESS IS NO LONGER COMPRESSIVE")
+    print(f"\nabort: blocks (x, y, z) = {tuple(blocks)}, exit {p.returncode}, {banners} rank(s) printed the message")
+    assert banners >= 1, f"check_effective_normal was not reached (exit {p.returncode}):\n{out[-3000:]}"
+    assert p.returncode != 0, "the run printed the abort message and still exited 0"

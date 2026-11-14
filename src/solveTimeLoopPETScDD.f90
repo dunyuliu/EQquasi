@@ -114,7 +114,7 @@ subroutine solveTimeLoopPETScDD
     IS                         :: primIS
     PetscInt, allocatable      :: primIdx(:)
     PetscScalar, pointer       :: sarr(:)
-    PetscInt                   :: nPrim, ip
+    PetscInt                   :: nPrim, ip, nOwnShared
     real (kind = 8)            :: wmm
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -682,6 +682,7 @@ subroutine solveTimeLoopPETScDD
                     nPrim = nPrim + 1
                 endif
             enddo
+            nOwnShared = nPrim
             do ip = nOwnEq + 1, nLocDof
                 primIdx(nPrim+1) = ip - 1
                 nPrim = nPrim + 1
@@ -692,7 +693,7 @@ subroutine solveTimeLoopPETScDD
             call PCBDDCSetPrimalVerticesLocalIS(pc, primIS, perr)
             CHKERRA(perr)
             if (useLog) write(*,'(A,I6,A,I8,A,I8)') 'EQ_PRIMAL rank ', me, ' interface dofs ', nPrim, &
-                ' of local ', nLocDof
+                ' owned-shared ', nOwnShared
             deallocate(primIdx)
             call ISDestroy(primIS, perr)
             call VecDestroy(svec, perr)

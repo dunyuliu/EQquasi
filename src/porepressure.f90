@@ -615,3 +615,37 @@ contains
     end function pfOwner
 
 end subroutine ddPfHalo
+
+subroutine ddBlocks(pdim, ncell)
+! par.solver = 3: the regular block decomposition of the analytic grid. Cells
+! per direction are (nxt-1, nyt-1, nzt-1). MPI_Dims_create factors nprocs into
+! three non-increasing factors; the largest goes to the direction with the
+! most cells. Rank r holds block (bx, by, bz), r = bx + pdim(1)*(by + pdim(2)*bz).
+    use globalvar
+    implicit none
+    include 'mpif.h'
+    integer (kind = 4), intent(out) :: pdim(3), ncell(3)
+    integer (kind = 4) :: dimsS(3), ord(3), i, j, itmp
+
+    ncell = (/ nxt-1, nyt-1, nzt-1 /)
+    dimsS = 0
+    call MPI_Dims_create(nprocs, 3, dimsS, IERR)
+    ord = (/ 1, 2, 3 /)
+    do i = 1, 2
+        do j = i+1, 3
+            if (ncell(ord(j)) > ncell(ord(i))) then
+                itmp = ord(i); ord(i) = ord(j); ord(j) = itmp
+            endif
+        enddo
+    enddo
+    do i = 1, 3
+        pdim(ord(i)) = dimsS(i)
+    enddo
+    if (any(pdim > ncell)) then
+        if (me == 0) write(*,*) 'par.solver=3: more blocks than cells in a ', &
+            'direction. blocks (x,y,z) =', pdim, ' cells (x,y,z) =', ncell, &
+            '. Use fewer MPI ranks.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+end subroutine ddBlocks

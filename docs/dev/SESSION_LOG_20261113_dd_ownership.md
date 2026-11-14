@@ -28,16 +28,16 @@ Time loop is flat in rank count for both (the triangular solves do not scale at 
 
 ## Still owns (as of this entry)
 - Gate job on #77 39ec587: bash PID 857757 (`runs/20261113_gate-77/`, files `rc`, `e2e_fast.log`, `fast.log`, `job.log`): build, fast tier, `-m e2e_fast` (PID 860689), then bp7 solver 3 at 4 ranks. Wait task `birjanze0` returns when `rc` has ALLDONE. Compare the bp7 s3 run to `runs/20261113_baseline/test.bp7.qdc.a.10_s2_np4` with `scratch/dd-ownership/cmp.py`.
-- Fix agent `dunyu-liu` task `a1f095e6caffd6cc1`, worktree `.claude/worktrees/agent-a1f095e6caffd6cc1`, branch `dd-mesh-fix`, pushes a fast-forward to `dd-mesh`; queued on the heavy lock (parity run PID 873305). Do not dispatch onto `dd-mesh` meanwhile.
+- Fix agent senior-researcher agent task `a1f095e6caffd6cc1`, worktree `.claude/worktrees/agent-a1f095e6caffd6cc1`, branch `dd-mesh-fix`, pushes a fast-forward to `dd-mesh`; queued on the heavy lock (parity run PID 873305). Do not dispatch onto `dd-mesh` meanwhile.
 - Worktrees: `board-dd`, `ci-pin`, `owner-relays` (all merged, reap after confirming no live child), `gate-77`, `log-handoff`, `baseline-76` (reap; evidence is in `runs/`), `agent-a5ec6fe5d7e4cc36c` (copy `runs/` and `scratch/dd-mesh/` out before removal: its runs and notes live inside it).
 - Heavy-run lock: `scratch/locks/heavy.lock`, `flock`, timeout INSIDE the flock (a timeout around flock expired while waiting and produced a false failure once).
 
 ## Next, in order (fresh conductor)
 1. Owner confirms `par.solver = 3` and `src/solveTimeLoopPETScDD.f90` (not decided; ask).
-2. Rebase `dd-ownership` on master, bump 1.24.0, rebase `dd-mesh` onto it, retarget #77, re-gate each (fast tier, own `-m e2e_fast` with `MACHINE=conda-linux`, victor delta only), merge #76 then #77 serially.
+2. Rebase `dd-ownership` on master, bump 1.24.0, rebase `dd-mesh` onto it, retarget #77, re-gate each (fast tier, own `-m e2e_fast` with `MACHINE=conda-linux`, auditor on the delta only), merge #76 then #77 serially.
 3. Stage 2b (per-rank output, no rank-0 gather), then 2c (bp == 8 pore pressure), each a stacked PR, one agent at a time.
 4. Follow-up MINORs, none blocking: #72: test asserts nonzero exit not exactly 13; `parameters.md` says "each node" but creeping nodes keep constant xi; `case.setup` has no upper bound while `read_input.f90:232` caps at 1e6; mu vs mu/(1-nu) in eq. 15 unchecked against the paper. #76: off-fault `srfst_*` untested, `if (j <= 0) j = 1` silent fallback at `eqquasi.f90:74,86` still live for solvers 1/2, test does not assert rank count. #77: `check()` exit at `netcdf_io.f90:771`, `ddPeakRSSkB` -1 line, 501/502 text.
-5. Rule-book lesson for `zofia-kaminska`: no floating `python-version: '3.x'` in workflows (`docs.yml:32` still has it); a wrapped `timeout` around `flock` is not a test timeout.
+5. Rule-book lesson for the rules agent: no floating `python-version: '3.x'` in workflows (`docs.yml:32` still has it); a wrapped `timeout` around `flock` is not a test timeout.
 
 ## Owner rows (unchanged, not decided here)
 `par.solver` meaning at (h); PETSc hard dependency on ls6/utig/ubuntu; retiring `solveTimeLoopMUMPS.f90` (major bump); row 6 sub-items (a)-(c); carried-over list in the brief.

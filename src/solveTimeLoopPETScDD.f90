@@ -120,6 +120,17 @@ subroutine solveTimeLoopPETScDD
         timeUsedInComputing, progressStartTime
     character (len = 50) :: netcdf_outfile, output_type
     logical :: wantProf
+    ! SPIKE (a), not for merge: -eq_profile, wall time per section of a step.
+    ! Lap timer, no barrier: every instant of the loop is charged to one
+    ! section, and a rank that waits for a slower one is charged where it
+    ! waits (the next collective call).
+    integer (kind = 4), parameter :: nProf = 11
+    PetscBool                  :: useProf
+    real (kind = 8)            :: tprof(nProf), tprofMin(nProf), tprofMax(nProf), &
+        tprofSum(nProf), tmark, tlap
+    character (len = 12), parameter :: profName(nProf) = (/ character (len = 12) :: &
+        'pore', 'rhs_local', 'rhs_vecasm', 'kspsolve', 'scatter', 'ftku', 'faulting', &
+        'flt_ghost', 'allreduce', 'output', 'other' /)
 
     call PetscInitialize(PETSC_NULL_CHARACTER, perr)
     CHKERRA(perr)
@@ -479,6 +490,8 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_spike_log', useLog, perr)
     CHKERRA(perr)
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_profile', useProf, perr)
+    CHKERRA(perr)
     wallSolve = 0.0d0
     if (useIS) then
         call MatSetType(Amat, MATIS, perr)
@@ -681,6 +694,8 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
     wallSetup = MPI_Wtime() - wall0
     wallLoop = MPI_Wtime()
+    tprof = 0.0d0
+    tmark = wallLoop
     call cpu_time(endTime)
     timeUsedInFactorization = endTime - startTime
 
@@ -709,7 +724,9 @@ subroutine solveTimeLoopPETScDD
 
         ! bp8: every rank advances the pore pressure of its own fault nodes
         ! to t+dtev1 before faulting consumes it through fric(FR_PORE_DP,:,:).
+        call profLap(11)
         if (bp == 8) call pore_pressure_update(dtev1)
+        call profLap(1)
 
         if (mod(it,nhplt) == 1 .and. me == 0) then
             write(*,*) '=                                                                   ='
@@ -747,9 +764,11 @@ subroutine solveTimeLoopPETScDD
             enddo
         endif
 
+        call profLap(10)
         do iiTag = 0, 1
             itag = iiTag
             call ddBoundLoad
+            call profLap(2)
             call VecZeroEntries(bvec, perr)
             CHKERRA(perr)
             call VecSetValuesLocal(bvec, pnLoc, allLoc, rloc, ADD_VALUES, perr)
@@ -759,9 +778,11 @@ subroutine solveTimeLoopPETScDD
             call VecAssemblyEnd(bvec, perr)
             CHKERRA(perr)
 
+            call profLap(3)
             wall0 = MPI_Wtime()
             call KSPSolve(ksp, bvec, xvec, perr)
             CHKERRA(perr)
+            call profLap(4)
             wall1 = MPI_Wtime() - wall0
             wallSolve = wallSolve + wall1
             call KSPGetConvergedReason(ksp, kspReason, perr)
@@ -796,6 +817,7 @@ subroutine solveTimeLoopPETScDD
                     kspIts, kspReason%v, wall1, nrmB, nrmX, nrmR
             endif
 
+            call profLap(11)
             ! Displacements of own elements' nodes: owned + ghost values.
             call VecGhostUpdateBegin(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
             CHKERRA(perr)
@@ -835,12 +857,16 @@ subroutine solveTimeLoopPETScDD
                 enddo
             endif
 
+            call profLap(5)
             call ddBoundFtKu
+            call profLap(6)
             call faulting
+            call profLap(7)
             ! Owner -> ghost copies of the split-node velocities the next
             ! RHS needs.
             call ddFltForward(consv)
             call ddFltForward(consvtmp)
+            call profLap(8)
 
             call MPI_Allreduce(dtev, dtevG, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
                 MPI_COMM_WORLD, IERR)
@@ -863,6 +889,7 @@ subroutine solveTimeLoopPETScDD
                 totTaoRuptArea = rsumG(4)
                 totSlipRuptArea = rsumG(5)
             endif
+            call profLap(9)
         enddo
 
         if (bp == 8) call bp8_profile_record
@@ -871,6 +898,7 @@ subroutine solveTimeLoopPETScDD
         wantProf = (bp == 5 .or. bp == 7) .and. ((status1 == 0 .and. mod(it,20) == 1) .or. &
             (status1 == 1 .and. mod(it,10) == 0))
         if (wantProf) call ddWriteProf
+        call profLap(10)
 
         status0 = status1
         dtev1 = max(dt,int8(dtev/dt)*dt)
@@ -890,6 +918,7 @@ subroutine solveTimeLoopPETScDD
         globaldat(6,it) = totRuptArea
         globaldat(7,it) = totMomRateVW
 
+        call profLap(11)
         if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1) .or. (it==nstep)) then
             ! Every rank sends its own nodes' and fault nodes' values; rank 0
             ! writes them as they arrive.
@@ -907,6 +936,7 @@ subroutine solveTimeLoopPETScDD
             endif
         endif
 
+        call profLap(10)
         if (mod(it, 100) == 0 .and. me == 0) then
             call cpu_time(endTime)
             write(*,'(A,I8,A,E12.5,A,E12.5,A,E12.5,A,F10.2,A,F10.4,A,F8.2)') &
@@ -922,7 +952,26 @@ subroutine solveTimeLoopPETScDD
     enddo
     call cpu_time(endTime)
     timeUsedInComputing = endTime-startTime
+    call profLap(11)
     wallLoop = MPI_Wtime() - wallLoop
+    if (useProf) then
+        call MPI_Reduce(tprof, tprofMin, nProf, MPI_DOUBLE_PRECISION, MPI_MIN, 0, MPI_COMM_WORLD, IERR)
+        call MPI_Reduce(tprof, tprofMax, nProf, MPI_DOUBLE_PRECISION, MPI_MAX, 0, MPI_COMM_WORLD, IERR)
+        call MPI_Reduce(tprof, tprofSum, nProf, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, IERR)
+        if (me == 0) then
+            tprofSum = tprofSum/dble(nprocs)
+            write(*,'(A,I6,A,I8,A,ES13.5,A,ES13.5)') 'EQ_PROF ranks ', nprocs, ' steps ', it-1, &
+                ' loop_wall_rank0 ', wallLoop, ' kspsolve_wall_rank0 ', wallSolve
+            write(*,'(A)') 'EQ_PROF section             min_s       mean_s        max_s' // &
+                '  share_mean   share_max  max/mean   max_s/step'
+            do i = 1, nProf
+                write(*,'(A,A12,3ES13.5,2F12.4,F10.3,ES13.5)') 'EQ_PROF ', profName(i), tprofMin(i), &
+                    tprofSum(i), tprofMax(i), tprofSum(i)/wallLoop, tprofMax(i)/wallLoop, &
+                    tprofMax(i)/max(tprofSum(i), tiny(1.0d0)), tprofMax(i)/dble(max(1,it-1))
+            enddo
+            write(*,'(A,ES13.5)') 'EQ_PROF sum_of_section_means ', sum(tprofSum)
+        endif
+    endif
     if (useLog .and. me == 0) write(*,'(A,3ES13.5,I8)') 'EQ_WALL setup loop kspsolve steps ', &
         wallSetup, wallLoop, wallSolve, it-1
 
@@ -998,6 +1047,15 @@ subroutine solveTimeLoopPETScDD
     CHKERRA(perr)
 
 contains
+
+    subroutine profLap(k)
+        ! SPIKE (a): charge the time since the last lap to section k.
+        integer (kind = 4), intent(in) :: k
+        if (.not. useProf) return
+        tlap = MPI_Wtime()
+        tprof(k) = tprof(k) + tlap - tmark
+        tmark = tlap
+    end subroutine profLap
 
     integer (kind = 4) function blockRank(cx, cy, cz)
         ! Rank of the block that holds cell (cx, cy, cz), 1-based cell indices.

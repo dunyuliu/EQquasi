@@ -1,6 +1,6 @@
 # EQquasi Project Rules
 
-Twenty-two rules, each earned by an incident in this repository. Rule numbers are
+Twenty-three rules, each earned by an incident in this repository. Rule numbers are
 cited from `tests/`, `scripts/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
@@ -13,7 +13,7 @@ below it is the record of why.
 |---|---|
 | 1 | New file, name, or parameter? Say so and get agreement **first**. |
 | 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. |
-| 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. |
+| 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. A skip in the gate is a failure (3a); the audit runs before the PR lands (3b). |
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
@@ -25,7 +25,7 @@ below it is the record of why.
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
 | 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). |
-| 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. `flock <lock> timeout N cmd`, never `timeout` around `flock`; shared-lock holders are bounded (15a). |
+| 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. `flock <lock> timeout N cmd`, never `timeout` around `flock`; shared-lock holders are bounded (15a); lock waiters are not FIFO (15b); `< /dev/null` on launching loops, `tail --pid` to wait (15c). |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. Before escalating: re-derive against file:line, a dimensional check, and against already-passing gates (16a). |
 | 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. A `src/` change must also link without PETSc (17a); workflows pin `python-version` (17b); land with `gh api` + `gh run watch`, not `gh pr edit` or auto-merge (17c). |
 | 18 | Every compset must create, run, **and** post-process. |
@@ -33,6 +33,7 @@ below it is the record of why.
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
 | 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
 | 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 5 MB. |
+| 23 | A quoted figure names its source file and counting rule: resource = maximum over all rank files; float32 parity states its floor. |
 
 Two habits that would have caught most violations of the above: read the file
 list a commit prints before pushing it, and re-read this card before staging.
@@ -61,6 +62,7 @@ list a commit prints before pushing it, and re-read this card before staging.
 20. [“Plot” means a fixed set of five figures](#20-plot-means-a-fixed-set-of-five-figures)
 21. [A release is a tag plus its Release page, and the unattended grant](#21-a-release-is-a-tag-plus-its-release-page-and-the-unattended-grant)
 22. [The root is a whitelist, not a preference](#22-the-root-is-a-whitelist-not-a-preference)
+23. [A quoted figure names its source and its counting rule](#23-a-quoted-figure-names-its-source-and-its-counting-rule)
 
 ## How these rules overlap
 
@@ -146,6 +148,28 @@ the per-PR gate even though the full tier moved to a schedule.
 
 A gate only counts if it **stops** the commit. Chaining the test run with `;`
 instead of `&&` let a red suite through on 2026-08-14.
+
+**3a. In the gate, a skip is a failure.** A gate worktree with no built binary
+skips the contract test that needs it, and the summary line reads as a pass
+(2026-11-14, a gate worktree without `bin/eqquasi-<version>`). Provisioning is
+the gate-runner's job, not an excuse: build the binary in the gate worktree
+(rule 9) before the run, then read the summary's skip count and the reason of
+every skip. Evidence posted to a PR lists each skip reason; a skip whose reason
+is "no binary" or any missing tool of the runner's own makes the run void, not
+green. Skips caused by absent reference files (data absence, named in the
+reason) are reported as such and are not covered by this sub-rule. Check:
+`python3 -m pytest -q -rs -m "not e2e" tests | grep -ci 'binary'` reads 0.
+Tier: judgment on the reasons; the grep is the mechanical proxy.
+
+**3b. The audit runs before a board PR lands, not after.** Board rows quoting
+figures (row 1, 2026-11-14) were merged and then audited; the audits found
+wrong figures corrected afterwards (#94 and #96: "3-4x" was 2.6-3.1x, "3 steps"
+was 11; the later table: bp5 RSS read from rank 7, a mixed counter, wrong file
+counts, fixed in #99). A PR that adds or changes a quantitative
+board claim is audited (rule 3's `victor-reyes`, or the quantitative-claim
+auditor) on its final diff before the squash-merge, and the PR body names the
+audit and its verdict. Check: `gh pr view <N> --json comments,body` shows the
+verdict dated before `mergedAt`. Tier: mechanical per PR, by reading dates.
 
 ---
 
@@ -430,6 +454,30 @@ single-core run of about an hour held it for 60 minutes and starved a parallel
 job (2026-11-13). Runs of at most 8 ranks and under a minute take
 `scratch/locks/light.lock`; anything long or single-core runs outside the heavy
 lock, or last. The holder states its expected duration when it takes the lock.
+
+**15b. Lock waiters are not FIFO; schedule around it.** `flock` wakes an
+arbitrary waiter, so on one lock a queued batch can be starved by later
+arrivals, and a long job can starve a queued batch of short ones (2026-11-14:
+a queue of long and short jobs on `heavy.lock` starved the short ones, and the
+bp1002 scaling block was moved to the light lock). Do not rely on arrival
+order. Put short jobs (rule 15a's light-lock class) on `light.lock`, run a long
+job outside the heavy lock or last, and never queue a batch of unrelated lengths
+on one lock. A batch that must run in order is one script that takes the lock
+once per item in that order, not several waiters. Tier: judgment; the record is
+the run's start times in its own log against the order submitted.
+
+**15c. Launching loops and waiting on a PID.** Every `while read` loop that
+launches a job ends `done < file` and gives each launched command
+`< /dev/null`: a command that reads stdin (`create.newcase`, `ssh`, `mpirun`)
+swallows the rest of the loop's input and the loop stops after the first item
+while the script goes on to write `DONE` (2026-11-14: one case ran, `DONE` was
+written). The harness moves a foreground command over 180 s to the background,
+so wait on a recorded PID with
+`timeout 170 tail --pid=<pid> -f /dev/null`, repeated, never a `sleep` poll or
+a `ps` loop. Check: `grep -nE 'while +read' scripts scratch/bench` lines each
+show `< /dev/null` on the launching command (judgment on the match; the
+mechanical part is the grep listing). A `DONE` marker is written only after the
+item count is compared with the input's line count.
 
 ---
 
@@ -723,7 +771,37 @@ file prints -- and does not fail on -- worktrees under `.claude/worktrees/` (or
 left under `scratch/`), merged local branches, and `runs/` and `scratch/`
 entries nothing in `PATHWAY_FORWARD.md` cites.
 
----
+## 23. A quoted figure names its source and its counting rule
+
+Owner-visible figures on the board and in PRs were wrong or mixed in five
+separate ways on 2026-11-14, each found by audit after landing (rule 3b). Each
+way is now a requirement:
+
+- **Resources are the maximum over all ranks.** A per-run memory or time figure
+  is the maximum over every `rss.*` rank file of that run, never one file: the
+  bp5 RSS of 491,348 / 1,091,204 kB was rank 7's, the maximum is 520,616 /
+  1,236,568 kB (2.4x, not 2.2x). Say "maximum over N rank files", or "sum" if
+  summed.
+- **Float32 parity states its floor.** netCDF output is float32, so any
+  solver whose true error exceeds about 1e-9 shows 6e-8 to 1.2e-7 per file
+  (one to two ulps). A parity figure over float32 files states that floor and
+  the comparator's own pass/fail beside the number; a value at the floor says
+  nothing about the solver. Dip components below 1e-16 (symmetry noise) are
+  excluded or named.
+- **Two counters: name the one.** When a figure exists in two counters (the
+  in-code MB line against the `rss.*` file, `EQ_WALL` against `runInfo.json`),
+  the quote names which it read, and the two are never mixed in one row
+  (gs10: 63.33 GB `rss.*` against 61.9 in-code).
+- **A denominator states the rule that counts it.** "N of M files" gives the
+  rule: compared files are `result/cycle0` minus `eqquasi.mesh.*` and
+  `runInfo.json` (25 bp1002, 120 bp5, 33 gs10 and wide); "779 items" had no
+  rule and "32 of 32" was 33 of 33.
+
+Rule 16 applies to every inherited figure of this kind.
+
+**Check**: judgment, a reader recomputes the figure from the cited run
+directory with a script that reads every rank file. Mechanical proxy: the board
+row cites the run directory (`runs/<date>_<slug>/`), which must exist.
 
 ---
 

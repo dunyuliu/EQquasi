@@ -584,17 +584,22 @@ build, run and traps are in `CLAUDE.md`.
      rank: the point is contaminated, not a scaling result). Earlier unmatched SOR 32-rank figure was 50.7 s at
      load 18-28; this run 40.5 s: run-to-run spread on this node is of order 25 %. Crossing re-derived from the
      matched 16/32 pair, an extrapolation: with exact flat at 16.2 s it is near 32 x (40.5/16.2)^(1/0.576) = 157
-     ranks (the unmatched estimate was 139); if exact keeps falling at its measured -0.27 exponent the
-     ratio shrinks only as ranks^-0.31 and the crossing is near 630 ranks. Either way it is beyond this 64-core
+     ranks (the unmatched estimate was 139); if exact keeps falling at its measured -0.26 exponent the
+     ratio shrinks only as ranks^-0.31 and the crossing is near 600 ranks. Either way it is beyond this 64-core
      node. A test would need a cluster run at 256 to 512 ranks (4 to 8 nodes of 64 cores, low-latency
-     interconnect, exclusive nodes): GAMG needs about 0.1-0.2 GB per rank at those counts (0.78 GB at 64
-     ranks, scaled as 1/ranks), exact MUMPS about 7 GB per rank or more at 32 and needs its 190 s-plus
-     setup repeated; and the exact 64-rank reference itself failed here. Accuracy of the SOR variant against
+     interconnect, exclusive nodes): GAMG needs about 0.15-0.26 GB per rank at those counts (measured per-rank RSS fell 1.87x 16 to 32 and
+     1.74x 32 to 64 ranks; 1.74x per doubling extrapolated), exact MUMPS 6.8 GB per rank at 32 and 3.8 GB
+     at 64 (e64b) with a setup of 178-330 s repeated; and the first exact 64-rank run failed here. Accuracy of the SOR variant against
      exact at these runs was not compared (comparator not run on `runs/20261114_matched/`).
-     **Exact MUMPS at 64 ranks aborted**: `MPI_ABORT` on rank 59 (reported by prterun as rank 27) after
-     129 s, during setup, no error text in `run.log` or `log/cycle0.log`
-     (`runs/20261114_matched/bp8.qdc.gs.10.wide_s3_np64_e64`); a rerun with MUMPS ICNTL(4)=2 to print the
-     cause is queued (`..._e64b`).
+     **`KSPConvergedReason = -11` reproduced, exact MUMPS, 64 ranks, wide**: the first exact 64-rank run
+     (`runs/20261114_matched/bp8.qdc.gs.10.wide_s3_np64_e64`, load 50.6 right after the 64-rank GAMG run,
+     MUMPS ICNTL(4) default) stopped at the first solve: `log/cycle0.log` reads `par.solver=3: KSPSolve
+     did NOT converge (KSPConvergedReason = -11) at step 1 iiTag 0`, then `MPI_ABORT` on rank 59 (prterun
+     names rank 27), `rc=1`, 129 s wall, no `runInfo.json`; the MUMPS INFOG(1)/(2) at the failure were not
+     printed. The identical case rerun with ICNTL(4)=2 (`..._e64b`, load 18.8) passed: rc 0, setup 177.9 s,
+     loop 25.1 s, RSS 3.77 GB. This is the second sighting of the `-11` of the open observation below
+     (1 of 11, 0 of 40, 0 of 60 at 8 ranks on gs10; now 1 of 2 at 64 ranks on wide); it is intermittent and
+     the cause is still not read from MUMPS. Repeats with ICNTL(4)=2 are queued.
      **Why wide needs 63 iterations and bp1002 10:** not wide-specific. The control `bp8.qdc.gs.10`
      (1.96 M equations, no enlarged box) at 16 ranks takes 64.0 iterations per solve (62-67), the same
      as wide's 63.0; GAMG CG on it: setup 5.6 s against 80.8 s exact, loop 49.3 s against 8.1 s (6.1x),
@@ -603,7 +608,7 @@ build, run and traps are in `CLAUDE.md`.
      cost; what separates bp1002 (163 k equations, 10 iterations) from the BP8 meshes is size or the
      BP8 fault geometry, which these two points cannot separate (a mesh-refinement series of one geometry
      would; not run). Not examined: the near-null space quality on fault split nodes.
-   - Open (2026-11-14 12:15): `-11` 60-run batch FINISHED 2026-11-14 12:34, 60 of 60 clean (`runs/20261114_ksp-stress2/results.txt`: `rc=0`, zero DIVERGED/`KSPConvergedReason` lines, zero negative `INFOG(1)` lines per run log; `ALLDONE` in `rc`; binary 1.24.4, 8 ranks, `test.bp8.qdc.gs.10`, 3 steps, solver 3, MUMPS ICNTL(4)=3): the row's second closing condition (60 clean runs) is met; with the 0 of 40 earlier and 1 of 11 reported, the `-11` stays an unreproduced single observation (closing the row is the board owner's); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
+   - Open (2026-11-14 12:15): `-11` 60-run batch FINISHED 2026-11-14 12:34, 60 of 60 clean (`runs/20261114_ksp-stress2/results.txt`: `rc=0`, `rc=0` in all 60 (an abort returns rc 1, as the 64-rank sighting did; the `-11` text goes to `log/cycle0.log`, which the batch's grep on the run log did not read), 60 of 60 logs read `INFOG(1) = 0` and none negative (re-checked 2026-11-14 with the pattern `INFOG\(1\) *= *-`; the batch script's own INFOG pattern had no space before `=` and could not match); `ALLDONE` in `rc`; binary 1.24.4, 8 ranks, `test.bp8.qdc.gs.10`, 3 steps, solver 3, MUMPS ICNTL(4)=3): the row's second closing condition (60 clean runs) is met; with the 0 of 40 earlier and 1 of 11 reported, the `-11` stays an unreproduced single observation (closing the row is the board owner's); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
    converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);

@@ -108,6 +108,13 @@ subroutine solveTimeLoopPETScDD
     Mat                        :: Atr
     PetscReal                  :: nrmDiff, nrmA
     PetscScalar                :: mone2
+    ! SPIKE (exact substructuring): -eq_all_primal makes every interface dof a BDDC primal vertex.
+    PetscBool                  :: useAP
+    Vec                        :: svec, slvec
+    IS                         :: primIS
+    PetscInt, allocatable      :: primIdx(:)
+    PetscScalar, pointer       :: sarr(:)
+    PetscInt                   :: nPrim, ip
     real (kind = 8)            :: wmm
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -650,6 +657,46 @@ subroutine solveTimeLoopPETScDD
         CHKERRA(perr)
         call PCSetType(pc, PCBDDC, perr)
         CHKERRA(perr)
+        call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_all_primal', useAP, perr)
+        if (useAP) then
+            ! Interface = every ghost dof, plus every owned dof some other rank ghosts
+            ! (reverse ADD of ones put on the ghost entries).
+            call VecDuplicate(xvec, svec, perr)
+            call VecZeroEntries(svec, perr)
+            call VecGhostGetLocalForm(svec, slvec, perr)
+            call VecGetArray(slvec, sarr, perr)
+            do ip = nOwnEq + 1, nLocDof
+                sarr(ip) = 1.0d0
+            enddo
+            call VecRestoreArray(slvec, sarr, perr)
+            call VecGhostRestoreLocalForm(svec, slvec, perr)
+            call VecGhostUpdateBegin(svec, ADD_VALUES, SCATTER_REVERSE, perr)
+            call VecGhostUpdateEnd(svec, ADD_VALUES, SCATTER_REVERSE, perr)
+            call VecGhostGetLocalForm(svec, slvec, perr)
+            call VecGetArray(slvec, sarr, perr)
+            allocate(primIdx(max(1,nLocDof)))
+            nPrim = 0
+            do ip = 1, nOwnEq
+                if (sarr(ip) > 0.5d0) then
+                    primIdx(nPrim+1) = ip - 1
+                    nPrim = nPrim + 1
+                endif
+            enddo
+            do ip = nOwnEq + 1, nLocDof
+                primIdx(nPrim+1) = ip - 1
+                nPrim = nPrim + 1
+            enddo
+            call VecRestoreArray(slvec, sarr, perr)
+            call VecGhostRestoreLocalForm(svec, slvec, perr)
+            call ISCreateGeneral(PETSC_COMM_SELF, nPrim, primIdx, PETSC_COPY_VALUES, primIS, perr)
+            call PCBDDCSetPrimalVerticesLocalIS(pc, primIS, perr)
+            CHKERRA(perr)
+            if (useLog) write(*,'(A,I6,A,I8,A,I8)') 'EQ_PRIMAL rank ', me, ' interface dofs ', nPrim, &
+                ' of local ', nLocDof
+            deallocate(primIdx)
+            call ISDestroy(primIS, perr)
+            call VecDestroy(svec, perr)
+        endif
     else
     call KSPSetType(ksp, KSPPREONLY, perr)
     CHKERRA(perr)

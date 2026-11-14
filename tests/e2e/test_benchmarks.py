@@ -78,7 +78,7 @@ def _run(runs, case):
         ref_dir = C.reference_dir(name, ref)
         if not os.path.isdir(ref_dir):
             pytest.skip(f"no reference at {ref_dir}")
-        runs[cid] = (C.run_case(compset, over,
+        runs[cid] = (C.run_case(compset, dict(over, solver=3),
                                 os.path.join(WORK_ROOT, f"e2e.{cid}")), ref_dir)
     return runs[cid]
 

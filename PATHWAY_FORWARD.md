@@ -287,6 +287,16 @@ build, run and traps are in `CLAUDE.md`.
    Per step: one matvec streaming the matrix, ~0.6 s at an assumed 160 GB/s
    against 7.18 s now, i.e. ~10x if the build is paid. bp1002 gains ~5x at
    most (0.03 s matvec against 0.15 s). Feasible in memory, open in build time;
+   **Correction, 2026-11-14 (independent audit; `src/meshgen.f90:637`)**: "Fault
+   elements (et=2)" are the volume hexes within 2*dy of the fault, not fault
+   quads, so 7,440 and 53,868 are not fault sizes. Slip unknowns are two per
+   fault node: wide has 10,201 split nodes (6,561 "fault nodes in Omega_f"),
+   i.e. ~20.4 k (13.1 k) unknowns, bp1002 594 nodes, ~1.2 k. Re-derived (arithmetic,
+   not measured): dense operator 3.3 GB on wide (not 93 GB), build at 0.231 s per
+   right-hand side ~4,700 s (not 6.9 h), break-even ~650 steps (not 3,800). The
+   15 k / 108 k / 93 GB / 6.9 h / 3,800-step figures in this paragraph and the
+   next rest on the element count and are void. The 7.18 s/step baseline has no
+   run behind it (measured wide MUMPS at 16 ranks: 6.9-7.0 s/step).
    **Measured 2026-11-14** (`runs/20261114_matmat/`, spike branch `spike-mm`, not
    merge-bound, binary 1.24.4 plus a timer; PETSc `MatMatSolve` on the MUMPS
    Cholesky factor, dense random right-hand sides, `-eq_spike_log -eq_matmat 32`,
@@ -308,19 +318,25 @@ build, run and traps are in `CLAUDE.md`.
    solves per subdomain under an outer iteration; factorize once. MEASURED
    (same-script re-run), not VERIFIED. K is symmetric to round-off (`-eq_check_sym`).
    - bp1002, 8 ranks: CG+GAMG with rigid-body near-null space is the best plain
-     Krylov, ~3-4x slower than MUMPS, 0.32 GB against 0.50 GB peak, setup 0.97 s
+     Krylov, 2.6-3.1x slower than MUMPS (loop 4.4-5.2 s against 1.7 s), 0.32 GB against 0.50 GB peak, setup 0.97 s
      against 3.23 s. Jacobi and block-Jacobi+ICC are slower still. CG breaks
      down only in the BDDC inexact variants (KSP -8), where GMRES with right
      preconditioning was used instead.
-   - GAMG+near-null+previous-step guess, bp1002 3 steps: 10.2 iterations per
+   - GAMG+near-null+previous-step guess, bp1002 11 steps (22 solves; "3 steps" was wrong): 10.2 iterations per
      solve (max 11), relative residual 9e-9, at 16 ranks (loop 2.46 s, setup
-     0.54 s, peak RSS 200 MB per rank by unit inference) and 32 ranks (loop 1.33
-     s, setup 0.34 s, 140 MB). Worst parity against exact at 32 ranks 5e-11.
+     0.54 s, peak RSS 200 MB per rank; unit confirmed: `rss.*` is GNU `time -f %M`, kB, and agrees with the in-code line, 478,760 kB against 470.5 MB, 2026-11-14) and 32 ranks (loop 1.33
+     s, setup 0.34 s, 140 MB). Worst parity against exact at 16 and 32 ranks 1.9e-8
+     (netCDF `disp` and `fault` fields, relative to the field maximum; 5e-11 was
+     wrong), 2.5e-10 over the text files (`srfst_*`).
    - **Wide, 16 ranks, 3 steps:** exact MUMPS setup 337 s, loop 20.8 s (6.9
      s/step), peak RSS 12.1 GB per rank; GAMG CG setup 10.6 s, loop 97.4 s
      (32 s/step, 4.7x slower), 63 iterations per solve (max 67), 2.5 GB per rank
-     (4.8x less), relative residual 9e-9; per-file parity against exact printed
-     as <=4e-15 on the files listed last (full worst-case table not computed).
+     (4.8x less), relative residual 9e-9; worst-case parity against exact over all 76 files of
+     `result/cycle0` (per file max|a-b| / max|a|; log10 slip-rate column of the `fltst`
+     files excluded, floor sentinel; 3 aseismic steps): text and `.dat` files
+     <= 4.1e-15, `fltst` <= 6.7e-19, netCDF fields 1.7e-8 to 1.1e-7 (`fault.00001.nc`
+     `slipd`, `disp.00001.nc` `disp`), i.e. 1e-7 against the gold gate's 1e-9, so
+     GAMG CG at rtol 1e-8 would not pass the comparator either.
      Conclusion: the iterative route trades 4.7x time for 4.8x memory and a
      30x shorter setup; it does not beat MUMPS on time at 3.5 M equations.
    - Subdomain-direct (CG, block Jacobi / additive Schwarz, exact MUMPS blocks,
@@ -332,12 +348,38 @@ build, run and traps are in `CLAUDE.md`.
    - Inexact BDDC local solves (GMRES, BLR 1e-4, ICC, ILU, GAMG): none beats
      exact local solves; BLR 1e-4 15 iterations in 22 s, ICC/ILU 69 iterations in
      16-18 s; np32 fails (-8) and adaptive threshold errors at `bddc.c:1528`.
-   - **Exact substructuring: ARITHMETIC ONLY, not measured, not built.** Wide:
-     16 blocks ~170 k interface equations, ~231 GB dense Schur; 32 blocks ~240 k,
-     ~460 GB; ~2.9 s per step marginal. Spike not started; runtime route to try
-     first (unverified): BDDC with all interface dofs primal, then code.
-   - Open: `-11` 60-run batch (not started); the unmeasured wide subdomain-direct
-     and slip-change cases above.
+   - **Exact 3-step substructuring, MEASURED 2026-11-14** (spike branch
+     `spike-sub` 7d469dc, one flag, not merge-bound; host load 6-14, indicative).
+     Runtime route: `-eq_mat_is -eq_all_primal` makes every interface dof a BDDC
+     primal vertex (`PCBDDCSetPrimalVerticesLocalIS`), so the coarse problem is the
+     whole interface Schur complement, factorized once by MUMPS, with exact local
+     solves (MUMPS) and CG: 1 iteration per solve, relative residual 1.2-1.3e-15
+     in all 8 runs. bp1002, 11 steps, exact solver 3 beside it (same binary 1.24.4,
+     `runs/20261114_substruct/`); setup s / time loop s / peak RSS GB per rank:
+     | ranks | interface dofs | exact | substructuring | worst diff from exact |
+     |---|---|---|---|---|
+     | 4 | 6,600 | 5.40 / 2.51 / 0.73 | 19.9 / 7.19 / 2.29 | 1.3e-15 |
+     | 8 | not logged (<= 3,492 per rank) | 3.07 / 1.43 / 0.48 | 10.9 / 2.89 / 1.98 | 1.3e-15 |
+     | 16 | 17,793 | 2.22 / 0.97 / 0.33 | 6.20 / 2.12 / 1.09 | 2.0e-19 |
+     | 32 | 26,433 | 1.84 / 1.02 / 0.20 | 3.87 / 1.76 / 0.76 | 7.5e-16 |
+     (worst diff: per-file max|a-b| / max|a| over `result/cycle0`; identical digits at 4 and 8
+     ranks are the same last-printed-digit flip of `global.dat`, the two files differ.)
+     So it costs 2-3.7x setup, 1.7-2.9x time loop and 3.3-4.1x memory against exact
+     MUMPS on bp1002, and it is exact. **Gold gate** (`e2e_fast` reference tests,
+     comparator unchanged, `par.solver = 3` forced in throwaway branch `gate-sub`
+     b57a6a1, `runs/20261114_gate-sub/`, `runInfo.json` shows the spike path ran): 39
+     passed, 21 skipped (data absence, six reasons: no summary.json, section 4.3
+     profiles, offfault, perfault, profile, restart files), rc 0, 894 s: it passes at
+     1e-9, where BLR failed 21 and 32 and exact solver 3 has 0 failures. Only 4-rank
+     compsets. Wide not run: interface ~183-192 k dofs (audit estimates, not the 170 k
+     above), dense Schur 270-295 GB plus its factor, and the build needs one local
+     solve per interface dof (~170 k x 0.23 s ~ 11 h at 16 ranks); not an
+     unattended run. Mid-size feasibility (`bp8.qdc.gs.10`, 16 ranks) is queued: see
+     the session log.
+   - Open: `-11` 60-run batch running (`runs/20261114_ksp-stress2/`, binary 1.24.4,
+     `rc` file); wide subdomain-direct, several blocks per rank and the bp5
+     event-crossing runs of the iterative variants queued (`runs/20261114_subdirect/`,
+     `runs/20261114_substruct-bp5/`); results go to the session log.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs
    converges to Kim within ~2 % at 25 m (`docs/dev/fenicsx_feasibility_2026-10-09.md`);

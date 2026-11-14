@@ -18,6 +18,12 @@ subroutine solveTimeLoopPETScDD
 !     the block of its grid point; elements of other ranks that touch it send
 !     their part of the nodal force to the owner (reverse ghost update), and
 !     the owner returns the new split-node velocities (forward ghost update).
+! bp 8: a rank advances the pore pressure of the fault nodes it owns
+! (pore_pressure_update); the line of nodes its stencil reaches in each
+! neighbouring block is exchanged rank to rank every sub-step (ddPfHalo in
+! porepressure.f90). The nodes of the two section 4.3 profile lines are
+! recorded by their owners and summed over ranks once, after the loop
+! (ddProfLines), for rank 0 to write.
 ! Scalars that steer the step (dtev, max slip rate, moment rate) are
 ! MPI_Allreduce'd, so every rank advances time itself; nothing is broadcast
 ! from rank 0.
@@ -55,8 +61,7 @@ subroutine solveTimeLoopPETScDD
 !     range on every rank; a rank fills only its own block's entries;
 !   - the netCDF files pass through rank 0 (above): no whole field in
 !     memory, but one writer;
-!   - mesh4num still counts the whole grid on every rank (a loop, no arrays);
-!   - pore pressure (bp == 8) is refused here, not distributed.
+!   - mesh4num still counts the whole grid on every rank (a loop, no arrays).
 
 #include <petsc/finclude/petscksp.h>
     use petscksp
@@ -104,12 +109,6 @@ subroutine solveTimeLoopPETScDD
     call PetscInitialize(PETSC_NULL_CHARACTER, perr)
     CHKERRA(perr)
 
-    if (bp == 8) then
-        if (me == 0) write(*,*) 'par.solver=3 (distributed PETSc) does not ', &
-            'distribute pore pressure yet (bp == 8). Use par.solver = 1 or 2.'
-        flush(6)
-        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
-    endif
     if (.not. ddActive) then
         if (me == 0) write(*,*) 'par.solver=3: the per-rank mesh was not set up ', &
             '(ddMeshBox did not run).'
@@ -444,6 +443,9 @@ subroutine solveTimeLoopPETScDD
     ! the owner.
     call ddFltArea
 
+    if (bp == 8) call pore_pressure_init
+    if (bp == 8) call bp8_profile_init
+
     ! Mesh files, whole-mesh numbering; which lines of p1/p2output are this
     ! rank's.
     call ddWriteMeshFiles
@@ -590,6 +592,10 @@ subroutine solveTimeLoopPETScDD
         if (dtmax > 0.0d0) dtev1 = min(dtev1, dtmax)
         time = time + dtev1
 
+        ! bp8: every rank advances the pore pressure of its own fault nodes
+        ! to t+dtev1 before faulting consumes it through fric(FR_PORE_DP,:,:).
+        if (bp == 8) call pore_pressure_update(dtev1)
+
         if (mod(it,nhplt) == 1 .and. me == 0) then
             write(*,*) '=                                                                   ='
             write(*,*) '=     Current time =                                                ='
@@ -724,6 +730,8 @@ subroutine solveTimeLoopPETScDD
             endif
         enddo
 
+        if (bp == 8) call bp8_profile_record
+
         ! bp5/bp7 profile files (output_prof, same schedule as inside faulting).
         wantProf = (bp == 5 .or. bp == 7) .and. ((status1 == 0 .and. mod(it,20) == 1) .or. &
             (status1 == 1 .and. mod(it,10) == 0))
@@ -783,6 +791,7 @@ subroutine solveTimeLoopPETScDD
     ! The whole-fault text files, each rank its own nodes' lines. ddActive
     ! stays set: writeResults then has every rank write the stations it owns.
     call ddWriteCplot
+    if (bp == 8) call ddProfLines
 
     hwm(1) = dble(ddPeakRSSkB())/1024.0d0
     hwm(2) = hwm(1)
@@ -1401,41 +1410,28 @@ contains
         enddo
     end subroutine ddWriteCplot
 
+    subroutine ddProfLines
+        ! bp 8, the section 4.3 files: each rank recorded the profile-line
+        ! nodes it owns (bp8_profile_record) and holds zero for the others,
+        ! so the sum over ranks is the line. Ten line histories, once; rank 0
+        ! writes them (output_bp8_profiles).
+        integer (kind = 4) :: ns, nd
+        if (nProfRec == 0) return
+        ns = nProfMax*nProfStrike
+        nd = nProfMax*nProfDepth
+        call MPI_Allreduce(MPI_IN_PLACE, profS2s, ns, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profS3s, ns, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profT2s, ns, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profT3s, ns, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profPs,  ns, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profS2d, nd, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profS3d, nd, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profT2d, nd, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profT3d, nd, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, profPd,  nd, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+    end subroutine ddProfLines
+
 end subroutine solveTimeLoopPETScDD
-
-subroutine ddBlocks(pdim, ncell)
-! par.solver = 3: the regular block decomposition of the analytic grid. Cells
-! per direction are (nxt-1, nyt-1, nzt-1). MPI_Dims_create factors nprocs into
-! three non-increasing factors; the largest goes to the direction with the
-! most cells. Rank r holds block (bx, by, bz), r = bx + pdim(1)*(by + pdim(2)*bz).
-    use globalvar
-    implicit none
-    include 'mpif.h'
-    integer (kind = 4), intent(out) :: pdim(3), ncell(3)
-    integer (kind = 4) :: dimsS(3), ord(3), i, j, itmp
-
-    ncell = (/ nxt-1, nyt-1, nzt-1 /)
-    dimsS = 0
-    call MPI_Dims_create(nprocs, 3, dimsS, IERR)
-    ord = (/ 1, 2, 3 /)
-    do i = 1, 2
-        do j = i+1, 3
-            if (ncell(ord(j)) > ncell(ord(i))) then
-                itmp = ord(i); ord(i) = ord(j); ord(j) = itmp
-            endif
-        enddo
-    enddo
-    do i = 1, 3
-        pdim(ord(i)) = dimsS(i)
-    enddo
-    if (any(pdim > ncell)) then
-        if (me == 0) write(*,*) 'par.solver=3: more blocks than cells in a ', &
-            'direction. blocks (x,y,z) =', pdim, ' cells (x,y,z) =', ncell, &
-            '. Use fewer MPI ranks.'
-        flush(6)
-        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
-    endif
-end subroutine ddBlocks
 
 subroutine ddMeshBox
 ! par.solver = 3, after mesh4num and before allocAndInit: sets this rank's

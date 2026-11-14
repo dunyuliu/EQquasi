@@ -51,8 +51,6 @@ codes. The launcher normally passes the code through as the exit status.
 * `par.solver=2 (PETSc) needs MACHINE=conda-linux` (or the same for
   `par.solver=3`): this binary was built without PETSc. Use `solver = 1`
   (MUMPS) or the conda build.
-* `par.solver=3 ... does not distribute pore pressure yet`: the distributed
-  loop does not run `bp = 8`. Use `solver = 1` or `2`.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.
 * `par.solver=3: fault N is not one rectangle of nodes on a single interior
@@ -68,6 +66,12 @@ codes. The launcher normally passes the code through as the exit status.
   write one of the text files every rank writes its own lines of (`cplot_*`,
   `p1output.txt`, `p2output.txt`). Check that the output directory is
   writable and on a file system all ranks see.
+* `par.solver=3: rank N owns M nodes of fault F, not one rectangle` or
+  `par.solver=3: rank N cannot tell which rank owns each fault node for the
+  pore-pressure exchange`: a rank's part of a fault is not the rectangle of
+  nodes the fault snapshot (`fault.*.nc`) and the BP8 pore-pressure exchange
+  between ranks assume. This is a fault in the block bookkeeping, not in the
+  case: report it and use `solver = 1` or `2`.
 * `ON-FAULT STATIONS REQUESTED BUT NOT FOUND`: a warning, not a stop. Some
   requested stations do not lie on a fault node; see [Output
   files](outputs.md).

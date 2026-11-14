@@ -310,8 +310,16 @@ subroutine output_globaldat
     use globalvar
     implicit none
     integer (kind = 4) :: i
-    real (kind = dp)   :: dtGlbMin, dtGlbMax
+    real (kind = dp)   :: dtGlbMin, dtGlbMax, vinit0(ntotft)
     
+    ! par.solver = 3: every rank comes here. bp 8's row at t = 0 needs each
+    ! fault's largest initial slip rate, which is on the ranks that own the
+    ! nodes; rank 0 then writes the file.
+    if (ddActive) then
+        if (bp == 8) call ddInitialPeak(vinit0)
+        if (me /= 0) return
+    endif
+
     if (bp == 8) then
         ! SEAS BP8 source parameter time series, see section 4.2.
         open(1113,file=trim(outDir)//'global.dat',form='formatted',status='unknown')
@@ -335,6 +343,8 @@ subroutine output_globaldat
             write(1113,'(A)') 't max_slip_rate moment_rate'
             write(1113,'(A)') '# Here is the time-series data.'
             ! Initial condition at t = 0, as for the station files.
+            if (ddActive) write(1113,'(E22.14,2E15.7)') 0.0d0, dlog10(max(vinit0(1), 1.0d-30)), 0.0d0
+            if (.not. ddActive) &
             write(1113,'(E22.14,2E15.7)') 0.0d0, &
                 dlog10(max(maxval(fric(FR_VINIT,1:nftnd(1),1)), 1.0d-30)), 0.0d0
             do i = 1, it-1
@@ -376,9 +386,20 @@ subroutine output_peak_sliprate_per_fault
     use globalvar
     implicit none
     integer (kind = 4) :: i, ift
+    real (kind = dp)   :: vinit0(ntotft)
+
+    ! par.solver = 3: every rank comes here. bp 8's row at t = 0 needs each
+    ! fault's largest initial slip rate, which is on the ranks that own the
+    ! nodes; rank 0 then writes the file.
+    if (ddActive) then
+        if (bp == 8) call ddInitialPeak(vinit0)
+        if (me /= 0) return
+    endif
 
     open(1115,file=trim(outDir)//'peak_sliprate_per_fault.dat',form='formatted',status='unknown')
         if (bp == 8) then
+            if (ddActive) write(1115,'(*(e32.21e4))') 0.0d0, vinit0
+            if (.not. ddActive) &
             write(1115,'(*(e32.21e4))') 0.0d0, (merge(maxval(fric(FR_VINIT,1:nftnd(ift),ift)), &
                 0.0d0, nftnd(ift) > 0), ift = 1, ntotft)
         endif
@@ -389,6 +410,25 @@ subroutine output_peak_sliprate_per_fault
 
 end subroutine output_peak_sliprate_per_fault
 
+
+! ddInitialPeak, par.solver = 3 only: the largest initial slip rate of each
+! fault, over every rank's own nodes -- the t = 0 row of bp 8's global.dat and
+! peak_sliprate_per_fault.dat. Called by every rank.
+subroutine ddInitialPeak(vpk)
+    use globalvar
+    implicit none
+    include 'mpif.h'
+    real (kind = dp), intent(out) :: vpk(ntotft)
+    integer (kind = 4) :: ift
+
+    do ift = 1, ntotft
+        vpk(ift) = maxval(fric(FR_VINIT,1:nftnd(ift),ift), mask = fltMine(1:nftnd(ift),ift))
+    enddo
+    call MPI_Allreduce(MPI_IN_PLACE, vpk, ntotft, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+    do ift = 1, ntotft
+        if (nftnd(ift) <= 0) vpk(ift) = 0.0d0
+    enddo
+end subroutine ddInitialPeak
 
 subroutine output_prof
 

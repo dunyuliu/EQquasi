@@ -17,7 +17,13 @@
 ! Fault nodes are ordered n = (ix-1)*nz1 + iz (nz1: fault 1's z lines), the same convention used by
 ! netcdf_read_on_fault in netcdf_io.f90.
 !
-! Everything here runs on the master rank only, like faulting.
+! Everything here runs on the master rank only, like faulting. Under
+! par.solver = 3 (ddActive) every rank runs it on the fault nodes it owns:
+! the loops skip the other ranks' nodes, the sums and the well cell are
+! reduced over ranks, and the one line of nodes the 5-point stencil reaches
+! across a block boundary comes from the rank that owns it (ddPfHalo, below).
+! pf, pfActive and the rest keep the whole fault's index range on every rank,
+! like fric; a rank fills its own nodes and that line.
 
 ! Subroutine #1.
 ! pore_pressure_init allocates the pore pressure field, builds the Omega_f
@@ -25,10 +31,12 @@
 subroutine pore_pressure_init
 
     use globalvar
+    use mpi
     implicit none
 
-    integer (kind = 4) :: i, isn, jm, jp
+    integer (kind = 4) :: i, isn, jm, jp, nact
     real (kind = dp)   :: xtmp, ztmp, wsum, re
+    real (kind = dp), allocatable :: halo(:)
 
     ! pf_neighbor walks n = (ix-1)*nz1 + iz; that needs whole columns.
     if (mod(nftnd(1), int((fltxyz(2,3,1) - fltxyz(1,3,1))/dx + 0.5d0) + 1) /= 0) then
@@ -57,6 +65,9 @@ subroutine pore_pressure_init
     endif
 
     do i = 1, nftnd(1)
+        if (ddActive) then
+            if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+        endif
         isn  = nsmp(1,i,1)
         xtmp = x(1,isn)
         ztmp = x(3,isn)
@@ -69,6 +80,17 @@ subroutine pore_pressure_init
         endif
     enddo
 
+    ! par.solver = 3: pfActive of the neighbours' nodes this rank's stencil
+    ! reaches, and the well cell from the rank that found it.
+    if (ddActive) then
+        allocate(halo(nftnd(1)))
+        halo = dble(pfActive)
+        call ddPfHalo(halo)
+        pfActive = int(halo + 0.5d0)
+        deallocate(halo)
+        call MPI_Allreduce(MPI_IN_PLACE, pfWell, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, IERR)
+    endif
+
     ! Mark the boundary of Omega_f and give those nodes half a cell in the
     ! direction normal to it, a quarter at a corner. Omega_f is the closed
     ! square [-l_f, l_f]^2, so with N nodes per side the storage area must be
@@ -77,6 +99,9 @@ subroutine pore_pressure_init
     ! dx = 50 m, which traps the injected fluid in 12.9 % too much rock and
     ! leaves the late-time uniform pressure 11.4 % low.
     do i = 1, nftnd(1)
+        if (ddActive) then
+            if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+        endif
         if (pfActive(i) == 0) cycle
         ! neighbour along dip (z) missing or outside Omega_f -> z boundary
         call pf_neighbor(i, 1, jm); call pf_neighbor(i, 2, jp)
@@ -90,6 +115,8 @@ subroutine pore_pressure_init
     ! This removes both the analytic normalization ambiguity in SEAS_BP8 eq (20)
     ! and the discretization error of the smeared source.
     wsum = sum(pfWt)
+    if (ddActive) call MPI_Allreduce(MPI_IN_PLACE, wsum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_WORLD, IERR)
     if (wsum > 0.0d0) pfWt = pfWt / wsum
 
     ! Peaceman well index, m^3/(Pa s). The equivalent radius is
@@ -118,9 +145,21 @@ subroutine pore_pressure_init
         endif
     endif
 
+    if (ddActive) then
+        ! From here on the well cell is known only to the rank that owns it,
+        ! which alone advances the well pressure.
+        if (pfWell > 0) then
+            if (.not. fltMine(pfWell,1)) pfWell = 0
+        endif
+        nact = count(pfActive(1:nftnd(1)) == 1 .and. fltMine(1:nftnd(1),1))
+        call MPI_Allreduce(MPI_IN_PLACE, nact, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+    endif
+
     if (me == 0) then
         write(*,*) '=     BP8 pore fluid diffusion enabled                              ='
         write(*,'(X,A,40X,E15.7,4X,A)') '=', fluid_alpha, 'm^2/s hydraulic diffusivity'
+        if (ddActive) write(*,'(X,A,40X,i7,4X,A)') '=', nact, 'fault nodes in Omega_f'
+        if (.not. ddActive) &
         write(*,'(X,A,40X,i7,4X,A)')    '=', sum(pfActive), 'fault nodes in Omega_f'
         if (fluid_src == 2) write(*,'(X,A,40X,E15.7,4X,A)') '=', fluid_WI, 'm^3/(Pa s) well index'
     endif
@@ -161,6 +200,9 @@ subroutine pore_pressure_update(dtstep)
 
         do i = 1, nftnd(1)
             if (pfActive(i) == 0) cycle
+            if (ddActive) then
+                if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+            endif
 
             ! Finite-volume 5-point Laplacian on cells of area
             ! dx^2 * pfFx(i) * pfFz(i). A face on the boundary of Omega_f
@@ -204,6 +246,9 @@ subroutine pore_pressure_update(dtstep)
         endif
 
         pf = pnew
+        ! par.solver = 3: the neighbours' new values for the next sub-step and
+        ! for the Darcy velocity below.
+        if (ddActive) call ddPfHalo(pf)
     enddo
 
     deallocate(pnew)
@@ -211,6 +256,9 @@ subroutine pore_pressure_update(dtstep)
     ! Hand the pore pressure to faulting through the existing fric(FR_PORE_DP,:,:) slot
     ! and record the Darcy velocity q = -(k/eta) grad(p) for benchmark output.
     do i = 1, nftnd(1)
+        if (ddActive) then
+            if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+        endif
         fric(FR_PORE_DP,i,1) = pf(i)
 
         fric(FR_DARCY_S,i,1) = 0.0d0
@@ -239,9 +287,10 @@ end subroutine pore_pressure_update
 subroutine bp8_profile_init
 
     use globalvar
+    use mpi
     implicit none
 
-    integer (kind = 4) :: i, isn, is, idp
+    integer (kind = 4) :: i, isn, is, idp, loc(2), tot(2), off(2)
     real (kind = dp)   :: xtmp, ztmp, tol
 
     tol = 0.01d0 * dx
@@ -249,6 +298,9 @@ subroutine bp8_profile_init
     nProfStrike = 0
     nProfDepth  = 0
     do i = 1, nftnd(1)
+        if (ddActive) then
+            if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+        endif
         if (pfActive(i) == 0) cycle
         isn  = nsmp(1,i,1)
         xtmp = x(1,isn)
@@ -256,6 +308,20 @@ subroutine bp8_profile_init
         if (abs(ztmp) < tol) nProfStrike = nProfStrike + 1
         if (abs(xtmp) < tol) nProfDepth  = nProfDepth  + 1
     enddo
+
+    ! par.solver = 3: the counts above are this rank's own nodes. A line runs
+    ! along x or along z through blocks whose rank number grows with it
+    ! (rank = bx + pdim(1)*(by + pdim(2)*bz)), so the nodes of the lower ranks
+    ! are the ones before this rank's on the line.
+    if (ddActive) then
+        loc = (/ nProfStrike, nProfDepth /)
+        off = 0
+        call MPI_Exscan(loc, off, 2, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+        if (me == 0) off = 0
+        call MPI_Allreduce(loc, tot, 2, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+        nProfStrike = tot(1)
+        nProfDepth  = tot(2)
+    endif
 
     if (nProfStrike == 0 .or. nProfDepth == 0) return
 
@@ -280,7 +346,17 @@ subroutine bp8_profile_init
     ! Fault nodes are ordered n = (ix-1)*nz1 + iz, so walking i in order gives
     ! increasing x3 along the dip line and increasing x2 along the strike line.
     is = 0; idp = 0
+    ! par.solver = 3: a rank fills its own nodes' slots of the two lines; the
+    ! other slots stay 0 (bp8_profile_record skips them).
+    if (ddActive) then
+        idProfStrike = 0; idProfDepth = 0
+        xProfStrike = 0.0d0; xProfDepth = 0.0d0
+        is = off(1); idp = off(2)
+    endif
     do i = 1, nftnd(1)
+        if (ddActive) then
+            if (.not. fltMine(i,1)) cycle ! par.solver = 3: another rank owns it.
+        endif
         if (pfActive(i) == 0) cycle
         isn  = nsmp(1,i,1)
         xtmp = x(1,isn)
@@ -302,6 +378,14 @@ subroutine bp8_profile_init
     ! DECREASING x3. The benchmark expects the coordinate row to ascend, like
     ! the strike line. Reverse it.
     call reverse_profile_line(idProfDepth, xProfDepth, nProfDepth)
+
+    ! par.solver = 3: the coordinate row of each line, from the owners.
+    if (ddActive) then
+        call MPI_Allreduce(MPI_IN_PLACE, xProfStrike, nProfStrike, MPI_DOUBLE_PRECISION, MPI_SUM, &
+            MPI_COMM_WORLD, IERR)
+        call MPI_Allreduce(MPI_IN_PLACE, xProfDepth, nProfDepth, MPI_DOUBLE_PRECISION, MPI_SUM, &
+            MPI_COMM_WORLD, IERR)
+    endif
 
     if (me == 0) then
         write(*,'(X,A,40X,i7,4X,A)') '= BP8 profile nodes along strike = ', nProfStrike, '='
@@ -329,6 +413,9 @@ subroutine bp8_profile_record
     profVmax(k) = maxSlipRate
 
     do i = 1, nProfStrike
+        if (ddActive) then
+            if (idProfStrike(i) == 0) cycle ! par.solver = 3: another rank owns it.
+        endif
         profS2s(k,i) =  fric(FR_SLIP_S, idProfStrike(i), 1)          ! slip along strike, m
         profS3s(k,i) = -fric(FR_SLIP_D, idProfStrike(i), 1)          ! slip, positive down
         profT2s(k,i) =  fric(FR_TSTK, idProfStrike(i), 1)/1.0d6    ! shear stress, MPa
@@ -336,6 +423,9 @@ subroutine bp8_profile_record
         profPs (k,i) =  fric(FR_PORE_DP,  idProfStrike(i), 1)/1.0d6    ! pore pressure, MPa
     enddo
     do i = 1, nProfDepth
+        if (ddActive) then
+            if (idProfDepth(i) == 0) cycle ! par.solver = 3: another rank owns it.
+        endif
         profS2d(k,i) =  fric(FR_SLIP_S, idProfDepth(i), 1)
         profS3d(k,i) = -fric(FR_SLIP_D, idProfDepth(i), 1)
         profT2d(k,i) =  fric(FR_TSTK, idProfDepth(i), 1)/1.0d6
@@ -408,3 +498,154 @@ subroutine pf_neighbor(i, dir, j)
     endif
 
 end subroutine pf_neighbor
+
+! ddPfHalo, par.solver = 3 only. a is a fault-1 nodal field of which this rank
+! holds its own nodes' values; on return it also holds the values of the other
+! ranks' nodes that pf_neighbor reaches from this rank's nodes -- one line of
+! nodes across each block boundary on the fault. Rank to rank (MPI_Isend /
+! MPI_Irecv between blocks that share a boundary); nothing passes through
+! rank 0. The lists are built on the first call: rank A sends rank B, in
+! increasing node number, its nodes that have a stencil neighbour owned by B,
+! which is the list B builds of what it needs from A.
+subroutine ddPfHalo(a)
+
+    use globalvar
+    use mpi
+    implicit none
+
+    real (kind = dp), intent(inout) :: a(nftnd(1))
+
+    integer (kind = 4), save :: nnb = -1
+    integer (kind = 4), allocatable, save :: nbr(:), sOff(:), rOff(:), sIdx(:), rIdx(:)
+    integer (kind = 4), allocatable :: cnt(:,:), last(:,:), keep(:), req(:)
+    real (kind = dp), allocatable :: sbuf(:), rbuf(:)
+    integer (kind = 4) :: pdim(3), ncell(3), nzf, j, k, dir, r, q, pass
+
+    if (nnb < 0) then
+        call ddBlocks(pdim, ncell)
+        nzf = ddFlt(2,3,1) - ddFlt(1,3,1) + 1
+        ! The owner of a node in closed form must be the owner fltMine says,
+        ! and pf_neighbor's z columns the fault rectangle's.
+        k = 0
+        if (nzf /= int((fltxyz(2,3,1) - fltxyz(1,3,1))/dx + 0.5d0) + 1) k = 1
+        do j = 1, nftnd(1)
+            if ((pfOwner(j) == me) .neqv. fltMine(j,1)) k = 1
+        enddo
+        if (k /= 0) then
+            write(*,*) 'par.solver=3: rank', me, 'cannot tell which rank owns each fault node ', &
+                'for the pore-pressure exchange (bp == 8).'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        ! pf_neighbor drops a neighbour outside Omega_f; the lists need every
+        ! grid neighbour (pfActive itself is exchanged through them).
+        allocate(cnt(2,0:nprocs-1), last(2,0:nprocs-1), keep(nftnd(1)))
+        keep = pfActive
+        pfActive = 1
+        cnt = 0
+        do pass = 1, 2
+            if (pass == 2) then
+                nnb = count(cnt(1,:) + cnt(2,:) > 0)
+                allocate(nbr(nnb), sOff(nnb+1), rOff(nnb+1), sIdx(sum(cnt(1,:))), rIdx(sum(cnt(2,:))))
+                q = 0
+                sOff(1) = 0
+                rOff(1) = 0
+                do r = 0, nprocs-1
+                    if (cnt(1,r) + cnt(2,r) == 0) cycle
+                    q = q + 1
+                    nbr(q) = r
+                    sOff(q+1) = sOff(q) + cnt(1,r)
+                    rOff(q+1) = rOff(q) + cnt(2,r)
+                    cnt(1,r) = sOff(q)
+                    cnt(2,r) = rOff(q)
+                enddo
+            endif
+            last = 0
+            do j = 1, nftnd(1)
+                do dir = 1, 4
+                    call pf_neighbor(j, dir, k)
+                    if (k == 0) cycle
+                    if (fltMine(j,1) .eqv. fltMine(k,1)) cycle
+                    if (fltMine(j,1)) then
+                        q = 1          ! mine, next to a node of rank r: send
+                        r = pfOwner(k)
+                    else
+                        q = 2          ! rank r's, next to a node of mine: receive
+                        r = pfOwner(j)
+                    endif
+                    if (last(q,r) == j) cycle
+                    last(q,r) = j
+                    cnt(q,r) = cnt(q,r) + 1
+                    if (pass == 2 .and. q == 1) sIdx(cnt(1,r)) = j
+                    if (pass == 2 .and. q == 2) rIdx(cnt(2,r)) = j
+                enddo
+            enddo
+        enddo
+        pfActive = keep
+        deallocate(cnt, last, keep)
+    endif
+
+    allocate(sbuf(size(sIdx)), rbuf(size(rIdx)), req(2*nnb))
+    req = MPI_REQUEST_NULL
+    do q = 1, nnb
+        if (rOff(q+1) > rOff(q)) call MPI_Irecv(rbuf(rOff(q)+1), rOff(q+1)-rOff(q), &
+            MPI_DOUBLE_PRECISION, nbr(q), 81, MPI_COMM_WORLD, req(q), IERR)
+    enddo
+    sbuf = a(sIdx)
+    do q = 1, nnb
+        if (sOff(q+1) > sOff(q)) call MPI_Isend(sbuf(sOff(q)+1), sOff(q+1)-sOff(q), &
+            MPI_DOUBLE_PRECISION, nbr(q), 81, MPI_COMM_WORLD, req(nnb+q), IERR)
+    enddo
+    call MPI_Waitall(2*nnb, req, MPI_STATUSES_IGNORE, IERR)
+    a(rIdx) = rbuf
+    deallocate(sbuf, rbuf, req)
+
+contains
+
+    integer (kind = 4) function pfOwner(n)
+        ! Rank that owns fault-1 node n: the block of the cell its grid point
+        ! is the lower corner of (solveTimeLoopPETScDD's blockRank).
+        integer (kind = 4), intent(in) :: n
+        integer (kind = 4) :: cx, cy, cz
+        cx = min(ddFlt(1,1,1) + (n-1)/nzf, ncell(1))
+        cy = min(ddFlt(1,2,1), ncell(2))
+        cz = min(ddFlt(1,3,1) + mod(n-1, nzf), ncell(3))
+        pfOwner = ((cx-1)*pdim(1))/ncell(1) + pdim(1)*(((cy-1)*pdim(2))/ncell(2) &
+            + pdim(2)*(((cz-1)*pdim(3))/ncell(3)))
+    end function pfOwner
+
+end subroutine ddPfHalo
+
+subroutine ddBlocks(pdim, ncell)
+! par.solver = 3: the regular block decomposition of the analytic grid. Cells
+! per direction are (nxt-1, nyt-1, nzt-1). MPI_Dims_create factors nprocs into
+! three non-increasing factors; the largest goes to the direction with the
+! most cells. Rank r holds block (bx, by, bz), r = bx + pdim(1)*(by + pdim(2)*bz).
+    use globalvar
+    implicit none
+    include 'mpif.h'
+    integer (kind = 4), intent(out) :: pdim(3), ncell(3)
+    integer (kind = 4) :: dimsS(3), ord(3), i, j, itmp
+
+    ncell = (/ nxt-1, nyt-1, nzt-1 /)
+    dimsS = 0
+    call MPI_Dims_create(nprocs, 3, dimsS, IERR)
+    ord = (/ 1, 2, 3 /)
+    do i = 1, 2
+        do j = i+1, 3
+            if (ncell(ord(j)) > ncell(ord(i))) then
+                itmp = ord(i); ord(i) = ord(j); ord(j) = itmp
+            endif
+        enddo
+    enddo
+    do i = 1, 3
+        pdim(ord(i)) = dimsS(i)
+    enddo
+    if (any(pdim > ncell)) then
+        if (me == 0) write(*,*) 'par.solver=3: more blocks than cells in a ', &
+            'direction. blocks (x,y,z) =', pdim, ' cells (x,y,z) =', ncell, &
+            '. Use fewer MPI ranks.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+end subroutine ddBlocks

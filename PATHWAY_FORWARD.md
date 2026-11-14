@@ -507,9 +507,9 @@ build, run and traps are in `CLAUDE.md`.
 
      Reading: only the tolerance and the smoother change the iteration count; the threshold, a second
      smoothing step and the coarse limit leave it at 10.2. Even rtol 1e-10 (13.2 iterations) leaves
-     3 of 25 files above the gold comparator's 1e-9, so GAMG CG needs rtol of about 1e-11 to pass it,
-     where each decade costs ~3 iterations: the cost of exactness is small in iterations, not
-     yet shown in wall time. The two 1.1e-7 rows are float32-floor `slip_rate` differences, not a
+     3 of 25 files above the gold comparator's 1e-9, so passing it needs a tighter rtol than any run here
+     (an extrapolation of ~3 iterations per decade suggests 1e-11 to 1e-12; not run): the cost of
+     exactness looks small in iterations, and is not shown in wall time. The two 1.1e-7 rows are float32-floor `slip_rate` differences, not a
      convergence figure (the residual tolerance is the same as the reference). Exact 0.94 s loop
      against GAMG 1.4-3.4 s: GAMG is slower at this size in every variant. Wide tuning and the
      scaling curve are running (`runs/20261114_scaling/`).

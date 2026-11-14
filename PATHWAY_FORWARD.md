@@ -146,12 +146,51 @@ build, run and traps are in `CLAUDE.md`.
    slower), setup 60 s against 362 s, peak RSS of the largest rank 6.9 against
    11.9 GB; parity on wide not checked. Host not exclusive (load 7-22). So
    BDDC with these options does not beat MUMPS at either size: its gain is
-   setup time and memory, its cost is ~0.06 s (bp1002) to ~4.6 s (wide) per CG
-   iteration; untested: tuned BDDC options (coarse space, local solvers,
+   setup time and memory, its cost is ~0.06 s (bp1002) to ~2.3 s (wide, corrected
+   2026-11-14: 149 iterations per step, two solves) per CG iteration; untested: tuned BDDC options (coarse space, local solvers,
    vertex/edge primal sets), more ranks.
    Mesh-only memory (stage 2 per-rank mesh), solver 3 on wide at 16 ranks:
    peak RSS after mesh setup 90.8 MB for the largest rank, 1.44 GB summed,
    against 11.9 GB per rank at the end: factors are >99 % of the footprint.
+   **2026-11-14, fourth conductor** (MEASURED, indicative: host load 18-43 on
+   every wide run; binary 1.24.4 of `dd-3g-spike2`, solver 3, no code change,
+   runtime PETSc options only; no `par.` parameter).
+   Where a step goes (`-eq_profile`, branch `dd-prof` eabe30a, spike, not for
+   merge; `runs/20261114_prof/`): KSPSolve (the MUMPS forward/back solve) is
+   87-95 % of the loop on bp1002 and on wide at 8/16/32 ranks; output 2-9 %,
+   RHS vector assembly 1-2 %, friction + fault ghost exchange <= 2 % (imbalance
+   up to 10x, still small), pore pressure ~0. Solve speed-up 8 -> 32 ranks is
+   only 1.85x (wide MatSolve 6.06 / 4.34 / 3.27 s). BDDC, wide, 16 ranks: 2.29 s
+   per CG iteration, of which local Neumann solve 1.07 s, local Dirichlet 0.88 s
+   (MUMPS triangular solves), coarse solve 0.001 s, MatMult 0.08 s.
+   MUMPS block-low-rank compression inside the PETSc direct solve
+   (`-mat_mumps_icntl_35 1 -mat_mumps_cntl_7 <eps>`; `runs/20261114_blr-wide*`,
+   wide, 3 steps, s/step / factorization s / peak RSS largest rank GB):
+   | ranks | variant | s/step | factor s | GB |
+   |---|---|---|---|---|
+   | 16 | none | 8.32 | 344 | 12.2 |
+   | 16 | BLR 1e-8 | 3.59 | 156 | 9.5 |
+   | 16 | BLR 1e-6 | 2.69 | 129 | 9.7 |
+   | 16 | BLR 1e-4 | 2.58 | 120 | 8.5 |
+   | 32 | none | 7.55 | 242 | 6.9 |
+   | 32 | BLR 1e-6 | 3.25 | 151 | 5.2 |
+   | 32 | BLR 1e-4 | 2.47 | 135 | 5.0 |
+   Ordering and threads do not help: METIS 8.11 s/step (= none), PORD 13.0 and
+   26.5 GB, 8 ranks x 2 threads 12.8 s/step. Parity against the uncompressed
+   run on the same binary: wide, 3 steps, worst relative difference over the
+   result files 1.4e-13 (1e-8), 4.6e-11 (1e-6), but 3 aseismic steps barely
+   test it. `test.bp5.qdc.2000`, 8 ranks, 4483 steps to the stop tag (an event
+   is included; `runs/20261114_blr-small/`): 1e-8 worst 4.5e-8, step count and
+   time column identical; 1e-6 worst 5.7e-6 (`global.dat`), same step count and
+   time column; 1e-4 worst 3.4e-3 and 4486 steps against 4483: REJECTED. bp1002
+   101 steps: 1e-8 3e-11, 1e-6 4.6e-8, 1e-4 5.7e-6. So at the 5 s target: wide
+   at 16 and at 32 ranks is below 5 s with BLR 1e-8 or 1e-6 (indicative, loaded
+   host), the loop is still ~flat from 16 to 32 ranks. Not done: parity of BLR
+   against the gold compsets through `-m e2e_fast` (needs a solver 3 gate case
+   with these options), a wide run long enough to include slip-rate change, a
+   host-exclusive repeat. Reaching the options in production needs the owner's
+   answer on `par.solver = 3` (the options act on the PETSc loops only; native
+   `par.solver = 1` has its own MUMPS controls).
 
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt
    the bug". An independent FEniCSx linear-hex model with EQquasi's box and BCs

@@ -577,11 +577,14 @@ build, run and traps are in `CLAUDE.md`.
      | 16 | 9.7 / 60.4 | 35.2 (34-37) | 2.54 | 14.96 | 330.1 / 19.5 | 12.28 | 18.76 | 3.1x |
      | 32 | 5.4 / 40.5 | 35.3 (34-38) | 1.36 | 25.66 | 194.0 / 16.2 | 6.81 | 29.56 | 2.5x |
      | 64 | 8.3 / 52.2 (4.60); repeat `..._g64b` 8.3 / 47.1 (load 4.81; foreign jobs on the host not checked) | 37.2 (36-39) | 0.78 | 4.60 | first run aborted (-11, see below); rerun `e64b` 177.9 / 25.1 | 3.77 | 18.84 | 1.9x vs the repeat (47.1 / 25.1) |
+     | 64, clean pair 2026-11-14 14:51-14:57 (`runs/20261114_clean64/`, `g64c`, `e64c`; load 4.77 before GAMG) | 8.1 / 50.7 | 37.2 (36-39) | 0.78 | 4.77 | 182.1 / 24.3 (ICNTL(14)=100, INFOG(1)=0) | 5.06 | 44.1 (contains the GAMG run) | 2.1x |
 
      Reading: 16 to 32 ranks GAMG's loop falls 1.49x (ranks^-0.58) against exact's 1.20x; at 64 ranks GAMG's
-     loop does not fall (52.2 s, 1.3x slower than at 32; the 64-rank run had no spare core, so the host owner's
-     4 cores of other jobs ran on shared cores and a 64-rank bulk-synchronous run waits for the slowest
-     rank: the point is contaminated, not a scaling result). Earlier unmatched SOR 32-rank figure was 50.7 s at
+     loop does not fall: 52.2, 47.1 and 50.7 s in three runs (the last two started at load 4.8; all three above the
+     32-rank 40.5 s, 1.2-1.3x). The 64-rank run has no spare core on this 64-core node (the host owner's other jobs, about 4
+     cores, share cores with it, and a bulk-synchronous run waits for its slowest rank), so the 64-rank point is
+     a node-saturated result, reproduced in three runs, not a clean scaling point; whether foreign cores were
+     busy during `g64c` was not recorded. Exact's loop, same node: 19.5 s (16 ranks), 16.2 s (32), 24.3-25.3 s (64: e64c, e64b, w1-w3), so exact also slows from 32 to 64 ranks, by 1.5x; the GAMG to exact loop ratio at 64 ranks is 2.1x against 2.5x at 32. Earlier unmatched SOR 32-rank figure was 50.7 s at
      load 18-28; this run 40.5 s: run-to-run spread on this node is of order 25 %. Crossing re-derived from the
      matched 16/32 pair, an extrapolation: with exact flat at 16.2 s it is near 32 x (40.5/16.2)^(1/0.576) = 157
      ranks (the unmatched estimate was 139); if exact keeps falling at its measured -0.26 exponent the

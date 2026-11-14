@@ -532,34 +532,6 @@ subroutine meshgen
         plane1 = plane2
     enddo!ix    
 
-    ! par.solver = 3, rank 0 only, until output is written per rank: the
-    ! on-fault output routines read the coordinates of every fault node
-    ! through nsmp, so the fault nodes outside this block get a coordinate-only
-    ! entry after the block's own nodes. No element refers to them.
-    if (ddActive .and. me == 0) then
-        do ift = 1, ntotft
-            iy = ddFlt(1,2,ift)
-            do ix = ddFlt(1,1,ift), ddFlt(2,1,ift)
-                do iz = ddFlt(1,3,ift), ddFlt(2,3,ift)
-                    if (ix >= ix0 .and. ix <= ix1 .and. iy >= iy0 .and. iy <= iy1 .and. &
-                        iz >= iz0 .and. iz <= iz1) cycle
-                    nnode = nnode + 1
-                    x(1,nnode) = xlinet(ix)
-                    x(2,nnode) = ylinet(iy)
-                    x(3,nnode) = zlinet(iz)
-                    if (rough_fault == 1) then
-                        call insert_rough_fault(xlinet(ix), ylinet(iy), zlinet(iz), ycoort, pfx, pfz, ymax1, ymin1)
-                        x(2,nnode) = ycoort
-                    endif
-                    id(:,nnode) = -5
-                    i = (ix-ddFlt(1,1,ift))*(ddFlt(2,3,ift)-ddFlt(1,3,ift)+1) + iz-ddFlt(1,3,ift)+1
-                    nsmp(1,i,ift) = nnode
-                    nsmp(2,i,ift) = nnode
-                enddo
-            enddo
-        enddo
-    endif
-
     !Checking phase
     !write(*,*) 'C2'
     call report_element_types

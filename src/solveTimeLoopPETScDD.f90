@@ -22,6 +22,19 @@ subroutine solveTimeLoopPETScDD
 ! MPI_Allreduce'd, so every rank advances time itself; nothing is broadcast
 ! from rank 0.
 !
+! Output, the same files as solvers 1 and 2:
+!   - a station file (fltst_, srfst_) is written by the rank that owns the
+!     station (writeResults);
+!   - the whole-fault text files (cplot_*, p1output, p2output) have lines of
+!     one fixed length, so every rank writes its own nodes' lines at their
+!     byte offsets (MPI-IO, ddTextRecords);
+!   - the netCDF files (mesh, disp, fault) are netCDF classic and written by
+!     rank 0, serially: every rank sends only its own nodes', elements' or
+!     fault nodes' values, and rank 0 writes one rank's part at a time
+!     (ddColsToFile, netcdf_write_on_fault), so it never holds a whole field;
+!   - global.dat and the other step series are scalars every rank already
+!     holds (MPI_Allreduce above); rank 0 writes them.
+!
 ! Numbering. A grid point is owned by the block of the cell it is the lower
 ! corner of. Equations are contiguous per rank, in the rank's own node order;
 ! a rank asks the owners for the equation numbers of its ghost nodes, once.
@@ -40,10 +53,8 @@ subroutine solveTimeLoopPETScDD
 ! What is NOT distributed yet:
 !   - the fault arrays (fric, nsmp, un, ...) keep the whole fault's index
 !     range on every rank; a rank fills only its own block's entries;
-!   - file output: owners' values are gathered to rank 0, which writes the
-!     mesh, disp and fault netCDF and the station/global text files. For that
-!     rank 0 alone holds the coordinates of every fault node, and a
-!     whole-mesh nodal (or element) buffer for the duration of each write;
+!   - the netCDF files pass through rank 0 (above): no whole field in
+!     memory, but one writer;
 !   - mesh4num still counts the whole grid on every rank (a loop, no arrays);
 !   - pore pressure (bp == 8) is refused here, not distributed.
 
@@ -70,18 +81,18 @@ subroutine solveTimeLoopPETScDD
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     character (len = 16)       :: kspTypeStr, pcTypeStr
 
-    integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3)
+    integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
         pidn(:), beEl(:), beIdx(:,:), locFlt(:,:), fpid(:,:), cntR(:), offR(:), &
         cntF(:), offF(:), scnt(:), sdsp(:), rcnt(:), rdsp(:), sbuf(:), rbuf(:), &
-        reqNode(:), stnNode(:), stnOwn(:), stnOwnG(:)
+        reqNode(:), stnNode(:), stnOwn(:), stnOwnG(:), profI(:,:), profP(:,:)
     logical, allocatable :: fltLocal(:,:)
-    real (kind = dp), allocatable :: beEs(:,:,:), uloc(:), uprev(:), rloc(:), gbuf(:,:), hold(:,:)
+    real (kind = dp), allocatable :: beEs(:,:,:), uloc(:), uprev(:), rloc(:)
     integer (kind = 4) :: nBE, nOwnEq, nGhostNodes, nLocDof, nOwnF, nGhostF, nLocF, &
         nOwnNodes, nOwnFree
 
     integer (kind = 4) :: i, j, k, l, n, r, ix, iy, iz, ift, ib, nel, &
-        node_num, ntag, iiTag, itmp
+        node_num, ntag, iiTag
     real (kind = dp) :: elemmat(5), elemx(ndof,nen), es(nee,nee), em(nee), ef(nee), &
         elemu(nee), Vol, rmax(2+ntotft), rmaxG(2+ntotft), rsum(5), rsumG(5), dtevG, &
         hwm(2), hwmG(2)
@@ -122,7 +133,7 @@ subroutine solveTimeLoopPETScDD
     endif
     allocate(nodeAt(ddBox(1,1):ddBox(2,1), ddBox(1,2):ddBox(2,2), ddBox(1,3):ddBox(2,3)), &
         nodeOwner(numnp), gnode(numnp))
-    nodeOwner = -1   ! stays -1 on rank 0's coordinate-only fault entries
+    nodeOwner = -1
     gnode = 0
     n = 0
     nOwnNodes = 0
@@ -142,7 +153,7 @@ subroutine solveTimeLoopPETScDD
             enddo
         enddo
     enddo
-    if (n > numnp .or. (me /= 0 .and. n /= numnp)) then
+    if (n /= numnp) then
         write(*,*) 'par.solver=3: rank', me, 'numbering replay disagrees with meshgen', n, numnp
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
@@ -393,6 +404,8 @@ subroutine solveTimeLoopPETScDD
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
         deallocate(stnOwn, stnOwnG)
+        ! output_offfault_st writes a station on the rank that owns it.
+        an4nds(2,1:n4out) = stnNode
     endif
 
     ! ---- 4. PETSc objects -------------------------------------------------
@@ -431,8 +444,10 @@ subroutine solveTimeLoopPETScDD
     ! the owner.
     call ddFltArea
 
-    ! Mesh files, whole-mesh numbering, written by rank 0.
+    ! Mesh files, whole-mesh numbering; which lines of p1/p2output are this
+    ! rank's.
     call ddWriteMeshFiles
+    if (bp == 5 .or. bp == 7) call ddProfSetup
     deallocate(nodeAt)
 
     call MatCreate(PETSC_COMM_WORLD, Amat, perr)
@@ -591,10 +606,10 @@ subroutine solveTimeLoopPETScDD
 
         call exitCriteria
 
-        ! Off-fault stations: recorded by the rank that owns the node; the
-        ! rest stay zero and are summed onto rank 0 after the loop.
+        ! Off-fault stations: recorded, and written after the loop, by the
+        ! rank that owns the node.
         if (allocated(dout)) then
-            if (me == 0) dout(1,it) = time
+            dout(1,it) = time
             do i = 1, ndout
                 j = stnNode((i-1)/(ndof*noid) + 1)
                 if (j > 0) then
@@ -712,10 +727,7 @@ subroutine solveTimeLoopPETScDD
         ! bp5/bp7 profile files (output_prof, same schedule as inside faulting).
         wantProf = (bp == 5 .or. bp == 7) .and. ((status1 == 0 .and. mod(it,20) == 1) .or. &
             (status1 == 1 .and. mod(it,10) == 0))
-        if (wantProf) then
-            call ddGatherFault
-            if (me == 0) call output_prof
-        endif
+        if (wantProf) call ddWriteProf
 
         status0 = status1
         dtev1 = max(dt,int8(dtev/dt)*dt)
@@ -736,33 +748,19 @@ subroutine solveTimeLoopPETScDD
         globaldat(7,it) = totMomRateVW
 
         if (mod(it,nt_output_stress) == 1 .or. (stoptag == 1) .or. (it==nstep)) then
-            call ddGatherFault
-            call ddNodalToRoot(cons, gbuf)
-            if (me == 0) then
-                write(proc_str,'(I5.5)') it
-                ! netcdf_write writes cons(ndof,numnp): lend it the gathered
-                ! whole-mesh field for the write.
-                call move_alloc(cons, hold)
-                call move_alloc(gbuf, cons)
-                itmp = numnp
-                numnp = ddGlobal(1)
-                netcdf_outfile = trim(outDir)//'disp.'//trim(proc_str)//'.nc'
-                output_type = 'disp'
-                call netcdf_write(netcdf_outfile, output_type)
-                if ((stoptag == 1) .or. (it==nstep)) then
-                    netcdf_outfile = trim(outDir)//'disp.r.nc'
-                    output_type = 'disp'
-                    call netcdf_write(netcdf_outfile, output_type)
-                endif
-                numnp = itmp
-                deallocate(cons)
-                call move_alloc(hold, cons)
-                netcdf_outfile = trim(outDir)//'fault.'//trim(proc_str)//'.nc'
+            ! Every rank sends its own nodes' and fault nodes' values; rank 0
+            ! writes them as they arrive.
+            write(proc_str,'(I5.5)') it
+            output_type = 'disp'
+            netcdf_outfile = trim(outDir)//'disp.'//trim(proc_str)//'.nc'
+            call ddWriteNodal(netcdf_outfile, output_type, 'disp', cons)
+            netcdf_outfile = trim(outDir)//'fault.'//trim(proc_str)//'.nc'
+            call netcdf_write_on_fault(netcdf_outfile)
+            if ((stoptag == 1) .or. (it==nstep)) then
+                netcdf_outfile = trim(outDir)//'disp.r.nc'
+                call ddWriteNodal(netcdf_outfile, output_type, 'disp', cons)
+                netcdf_outfile = trim(outDir)//'fault.r.nc'
                 call netcdf_write_on_fault(netcdf_outfile)
-                if ((stoptag == 1) .or. (it==nstep)) then
-                    netcdf_outfile = trim(outDir)//'fault.r.nc'
-                    call netcdf_write_on_fault(netcdf_outfile)
-                endif
             endif
         endif
 
@@ -782,11 +780,9 @@ subroutine solveTimeLoopPETScDD
     call cpu_time(endTime)
     timeUsedInComputing = endTime-startTime
 
-    ! Everything writeResults (rank 0) reads: owners' values onto rank 0.
-    call ddGatherFault
-    if (allocated(fltsta)) call ddReduceFlat(fltsta, size(fltsta))
-    if (allocated(dout)) call ddReduceFlat(dout, size(dout))
-    ddActive = .false.
+    ! The whole-fault text files, each rank its own nodes' lines. ddActive
+    ! stays set: writeResults then has every rank write the stations it owns.
+    call ddWriteCplot
 
     hwm(1) = dble(ddPeakRSSkB())/1024.0d0
     hwm(2) = hwm(1)
@@ -1100,171 +1096,310 @@ contains
         CHKERRA(perr)
     end subroutine ddFltArea
 
-    subroutine ddReduceFlat(a, nn)
-        ! Sum a over ranks onto rank 0 (entries are zero off their owner).
-        integer (kind = 4), intent(in) :: nn
-        real (kind = dp), intent(inout) :: a(nn)
-        real (kind = dp), allocatable :: g(:)
-        allocate(g(nn))
-        call MPI_Reduce(a, g, nn, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, IERR)
-        if (me == 0) a = g
-        deallocate(g)
-    end subroutine ddReduceFlat
-
-    subroutine ddGatherFault
-        ! Owners' on-fault state onto rank 0, for output. A rank never reads
-        ! the pairs it does not own, so its copies of them are zeroed here.
-        integer (kind = 4) :: ii, jft
-        do jft = 1, ntotft
-            do ii = 1, nftmx
-                if (ii > nftnd(jft) .or. .not. fltMine(ii,jft)) then
-                    fric(:,ii,jft) = 0.0d0
-                    fnft(ii,jft) = 0.0d0
-                    slp4fri(ii,jft) = 0.0d0
-                endif
+    subroutine ddColsToFile(fname, vname, idname, m, n, gi, gv)
+        ! Columns gi(1:n) of the m-row variable vname of the netCDF file fname,
+        ! and the same entries of its index variable idname, from every rank.
+        ! gi are whole-mesh numbers, increasing. Rank 0 has written the file's
+        ! header (netcdf_write); it takes one rank's columns at a time and
+        ! writes each run of consecutive numbers, so it never holds more than
+        ! one rank's part. Integers travel as doubles, which is exact.
+        use netcdf
+        character (len = *), intent(in) :: fname, vname, idname
+        integer (kind = 4), intent(in) :: m, n, gi(n)
+        real (kind = dp), intent(in) :: gv(m,n)
+        integer (kind = 4), allocatable :: ri(:)
+        real (kind = dp), allocatable :: rv(:,:)
+        integer (kind = 4) :: ncid, vid, iid, rr, q1, q2, cnt(1)
+        cnt(1) = n
+        if (me /= 0) then
+            call MPI_Send(cnt, 1, MPI_INTEGER, 0, 71, MPI_COMM_WORLD, IERR)
+            call MPI_Send(gi, n, MPI_INTEGER, 0, 72, MPI_COMM_WORLD, IERR)
+            call MPI_Send(gv, m*n, MPI_DOUBLE_PRECISION, 0, 73, MPI_COMM_WORLD, IERR)
+            return
+        endif
+        lastNcPath = fname
+        call check(nf90_open(trim(fname), NF90_WRITE, ncid))
+        call check(nf90_inq_varid(ncid, vname, vid))
+        call check(nf90_inq_varid(ncid, idname, iid))
+        do rr = 0, nprocs-1
+            if (rr == 0) then
+                allocate(ri(n), rv(m,n))
+                ri = gi
+                rv = gv
+            else
+                call MPI_Recv(cnt, 1, MPI_INTEGER, rr, 71, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
+                allocate(ri(cnt(1)), rv(m,cnt(1)))
+                call MPI_Recv(ri, cnt(1), MPI_INTEGER, rr, 72, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
+                call MPI_Recv(rv, m*cnt(1), MPI_DOUBLE_PRECISION, rr, 73, MPI_COMM_WORLD, &
+                    MPI_STATUS_IGNORE, IERR)
+            endif
+            q1 = 1
+            do while (q1 <= cnt(1))
+                q2 = q1
+                do while (q2 < cnt(1))
+                    if (ri(q2+1) /= ri(q2) + 1) exit
+                    q2 = q2 + 1
+                enddo
+                call check(nf90_put_var(ncid, vid, rv(:,q1:q2), start = (/ 1, ri(q1) /), &
+                    count = (/ m, q2-q1+1 /)))
+                call check(nf90_put_var(ncid, iid, ri(q1:q2), start = (/ ri(q1) /), &
+                    count = (/ q2-q1+1 /)))
+                q1 = q2 + 1
             enddo
+            deallocate(ri, rv)
         enddo
-        call ddReduceFlat(fric, size(fric))
-        call ddReduceFlat(fnft, size(fnft))
-        call ddReduceFlat(slp4fri, size(slp4fri))
-    end subroutine ddGatherFault
+        call check(nf90_close(ncid))
+    end subroutine ddColsToFile
 
-    subroutine ddNodalToRoot(a, g)
-        ! Owners' nodal values into g(ndof, whole-mesh nodes) on rank 0, one
-        ! rank at a time. g exists on rank 0 only.
-        real (kind = dp), intent(in) :: a(ndof,numnp)
-        real (kind = dp), allocatable, intent(inout) :: g(:,:)
+    subroutine ddWriteNodal(fname, ftype, vname, a)
+        ! A whole-mesh nodal file, netcdf_write's 'coor' or 'disp': the header
+        ! from rank 0, then every rank's own nodes.
+        character (len = 50) :: fname, ftype
+        character (len = *), intent(in) :: vname
+        real (kind = dp), intent(in) :: a(:,:)
         integer (kind = 4), allocatable :: gi(:)
         real (kind = dp), allocatable :: gv(:,:)
-        integer (kind = 4) :: nn, q, rr, cnt(1)
+        integer (kind = 4) :: nn, q, keep
         if (me == 0) then
-            if (.not. allocated(g)) allocate(g(ndof,ddGlobal(1)))
-            do nn = 1, numnp
-                if (nodeOwner(nn) == 0) g(:,gnode(nn)) = a(:,nn)
-            enddo
-            do rr = 1, nprocs-1
-                call MPI_Recv(cnt, 1, MPI_INTEGER, rr, 71, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
-                allocate(gi(cnt(1)), gv(ndof,cnt(1)))
-                call MPI_Recv(gi, cnt(1), MPI_INTEGER, rr, 72, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
-                call MPI_Recv(gv, ndof*cnt(1), MPI_DOUBLE_PRECISION, rr, 73, MPI_COMM_WORLD, &
-                    MPI_STATUS_IGNORE, IERR)
-                do q = 1, cnt(1)
-                    g(:,gi(q)) = gv(:,q)
-                enddo
-                deallocate(gi, gv)
-            enddo
-        else
-            cnt(1) = nOwnNodes
-            allocate(gi(cnt(1)), gv(ndof,cnt(1)))
-            q = 0
-            do nn = 1, numnp
-                if (nodeOwner(nn) == me) then
-                    q = q + 1
-                    gi(q) = gnode(nn)
-                    gv(:,q) = a(:,nn)
-                endif
-            enddo
-            call MPI_Send(cnt, 1, MPI_INTEGER, 0, 71, MPI_COMM_WORLD, IERR)
-            call MPI_Send(gi, cnt(1), MPI_INTEGER, 0, 72, MPI_COMM_WORLD, IERR)
-            call MPI_Send(gv, ndof*cnt(1), MPI_DOUBLE_PRECISION, 0, 73, MPI_COMM_WORLD, IERR)
-            deallocate(gi, gv)
+            keep = numnp
+            numnp = ddGlobal(1)
+            call netcdf_write(fname, ftype)
+            numnp = keep
         endif
-    end subroutine ddNodalToRoot
+        allocate(gi(nOwnNodes), gv(ndof,nOwnNodes))
+        q = 0
+        do nn = 1, numnp
+            if (nodeOwner(nn) == me) then
+                q = q + 1
+                gi(q) = gnode(nn)
+                gv(:,q) = a(:,nn)
+            endif
+        enddo
+        call ddColsToFile(fname, vname, 'node_id', ndof, nOwnNodes, gi, gv)
+        deallocate(gi, gv)
+    end subroutine ddWriteNodal
 
     subroutine ddWriteMeshFiles
         ! eqquasi.mesh.{coor,ien,nsmp}.nc in whole-mesh numbering, as solvers
         ! 1 and 2 write them from checkAndReport. Each rank sends its own
-        ! nodes and elements; rank 0 holds one whole-mesh buffer per write.
-        real (kind = dp), allocatable :: g(:,:), xHold(:,:)
-        integer (kind = 4), allocatable :: eb(:,:), er(:,:), gien(:,:), ienHold(:,:), &
-            ns(:), nsG(:), nsmpHold(:,:,:)
-        integer (kind = 4) :: jx, jy, jz, ee, kk, rr, q, jft, ii, cnt(1), keep
+        ! nodes, elements and fault-1 pairs.
+        integer (kind = 4), allocatable :: gi(:)
+        real (kind = dp), allocatable :: gv(:,:)
+        integer (kind = 4) :: jx, jy, jz, ee, kk, ii, q, keep
         character (len = 50) :: fname, ftype
 
-        call ddNodalToRoot(x, g)
-        if (me == 0) then
-            call move_alloc(x, xHold)
-            call move_alloc(g, x)
-            keep = numnp
-            numnp = ddGlobal(1)
-            fname = trim(outDir)//'eqquasi.mesh.coor.nc'
-            ftype = 'coor'
-            call netcdf_write(fname, ftype)
-            numnp = keep
-            deallocate(x)
-            call move_alloc(xHold, x)
-        endif
+        fname = trim(outDir)//'eqquasi.mesh.coor.nc'
+        ftype = 'coor'
+        call ddWriteNodal(fname, ftype, 'coordinates', x)
 
-        ! Elements: whole-mesh element number, then its eight whole-mesh nodes.
-        allocate(eb(nen+1,max(1,numel)))
+        ! Elements: whole-mesh element number, and its eight whole-mesh nodes.
+        fname = trim(outDir)//'eqquasi.mesh.ien.nc'
+        ftype = 'ien'
+        if (me == 0) then
+            keep = numel
+            numel = ddGlobal(2)
+            call netcdf_write(fname, ftype)
+            numel = keep
+        endif
+        allocate(gi(numel), gv(nen,numel))
         ee = 0
         do jx = ddBox(1,1)+1, ddBox(2,1)
             do jz = ddBox(1,3)+1, ddBox(2,3)
                 do jy = ddBox(1,2)+1, ddBox(2,2)
                     ee = ee + 1
-                    eb(1,ee) = ((jx-2)*(nzt-1) + (jz-2))*(nyt-1) + jy - 1
+                    gi(ee) = ((jx-2)*(nzt-1) + (jz-2))*(nyt-1) + jy - 1
                     do kk = 1, nen
-                        eb(kk+1,ee) = gnode(ien(kk,ee))
+                        gv(kk,ee) = gnode(ien(kk,ee))
                     enddo
                 enddo
             enddo
         enddo
-        if (me == 0) then
-            allocate(gien(nen,ddGlobal(2)))
-            do q = 1, numel
-                gien(:,eb(1,q)) = eb(2:nen+1,q)
-            enddo
-            do rr = 1, nprocs-1
-                call MPI_Recv(cnt, 1, MPI_INTEGER, rr, 74, MPI_COMM_WORLD, MPI_STATUS_IGNORE, IERR)
-                allocate(er((nen+1),cnt(1)))
-                call MPI_Recv(er, (nen+1)*cnt(1), MPI_INTEGER, rr, 75, MPI_COMM_WORLD, &
-                    MPI_STATUS_IGNORE, IERR)
-                do q = 1, cnt(1)
-                    gien(:,er(1,q)) = er(2:nen+1,q)
-                enddo
-                deallocate(er)
-            enddo
-            call move_alloc(ien, ienHold)
-            call move_alloc(gien, ien)
-            keep = numel
-            numel = ddGlobal(2)
-            fname = trim(outDir)//'eqquasi.mesh.ien.nc'
-            ftype = 'ien'
-            call netcdf_write(fname, ftype)
-            numel = keep
-            deallocate(ien)
-            call move_alloc(ienHold, ien)
-        else
-            cnt(1) = numel
-            call MPI_Send(cnt, 1, MPI_INTEGER, 0, 74, MPI_COMM_WORLD, IERR)
-            call MPI_Send(eb, (nen+1)*cnt(1), MPI_INTEGER, 0, 75, MPI_COMM_WORLD, IERR)
-        endif
-        deallocate(eb)
+        call ddColsToFile(fname, 'node_id', 'element_id', nen, numel, gi, gv)
+        deallocate(gi, gv)
 
-        ! Split-node pairs: whole-mesh node numbers from each pair's owner.
-        allocate(ns(2*nftmx*ntotft), nsG(2*nftmx*ntotft))
-        ns = 0
-        do jft = 1, ntotft
-            do ii = 1, nftnd(jft)
-                if (fltMine(ii,jft)) then
-                    ns(2*(ii-1+nftmx*(jft-1))+1) = gnode(nsmp(1,ii,jft))
-                    ns(2*(ii-1+nftmx*(jft-1))+2) = gnode(nsmp(2,ii,jft))
+        ! Split-node pairs of fault 1 (all netcdf_write stores): whole-mesh
+        ! node numbers from each pair's owner. The file has nftmx columns;
+        ! rank 0 writes zero past the fault's last node.
+        fname = trim(outDir)//'eqquasi.mesh.nsmp.nc'
+        ftype = 'nsmp'
+        if (me == 0) call netcdf_write(fname, ftype)
+        q = count(fltMine(1:nftnd(1),1))
+        if (me == 0) q = q + nftmx - nftnd(1)
+        allocate(gi(q), gv(2,q))
+        gv = 0.0d0
+        q = 0
+        do ii = 1, nftnd(1)
+            if (fltMine(ii,1)) then
+                q = q + 1
+                gi(q) = ii
+                gv(1,q) = gnode(nsmp(1,ii,1))
+                gv(2,q) = gnode(nsmp(2,ii,1))
+            endif
+        enddo
+        if (me == 0) then
+            do ii = nftnd(1)+1, nftmx
+                q = q + 1
+                gi(q) = ii
+            enddo
+        endif
+        call ddColsToFile(fname, 'node_id', 'fault_node_id', 2, q, gi, gv)
+        deallocate(gi, gv)
+    end subroutine ddWriteMeshFiles
+
+    subroutine ddIOCheck(fname)
+        ! MPI-IO returns its errors; none is survivable here.
+        character (len = *), intent(in) :: fname
+        if (IERR == MPI_SUCCESS) return
+        write(*,*) 'par.solver=3: rank', me, 'MPI-IO failed on ', trim(fname)
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    end subroutine ddIOCheck
+
+    subroutine ddTextRecords(fname, reclen, n, pos, buf, append)
+        ! This rank's n lines of a text file whose lines all have reclen bytes
+        ! (newline included): line q goes to record pos(q), 0-based and
+        ! increasing, counted from the start of the file, or from its present
+        ! end when append is set. Called by every rank; no rank sees another
+        ! rank's lines.
+        character (len = *), intent(in) :: fname
+        integer (kind = 4), intent(in) :: reclen, n, pos(n)
+        character (len = reclen), intent(in) :: buf(n)
+        logical, intent(in) :: append
+        integer (kind = 4) :: fh, q1, q2
+        integer (kind = MPI_OFFSET_KIND) :: base, off
+        call MPI_File_open(MPI_COMM_WORLD, trim(fname), ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+            MPI_INFO_NULL, fh, IERR)
+        call ddIOCheck(fname)
+        base = 0
+        if (append) then
+            if (me == 0) then
+                call MPI_File_get_size(fh, base, IERR)
+                call ddIOCheck(fname)
+            endif
+            call MPI_Bcast(base, 1, MPI_OFFSET, 0, MPI_COMM_WORLD, IERR)
+        else
+            call MPI_File_set_size(fh, base, IERR)
+            call ddIOCheck(fname)
+        endif
+        q1 = 1
+        do while (q1 <= n)
+            q2 = q1
+            do while (q2 < n)
+                if (pos(q2+1) /= pos(q2) + 1) exit
+                q2 = q2 + 1
+            enddo
+            off = base + int(pos(q1), MPI_OFFSET_KIND)*reclen
+            call MPI_File_write_at(fh, off, buf(q1:q2), reclen*(q2-q1+1), MPI_CHARACTER, &
+                MPI_STATUS_IGNORE, IERR)
+            call ddIOCheck(fname)
+            q1 = q2 + 1
+        enddo
+        call MPI_File_close(fh, IERR)
+        call ddIOCheck(fname)
+    end subroutine ddTextRecords
+
+    subroutine ddProfSetup
+        ! Which fault-1 nodes go to p1output.txt (k = 1) and p2output.txt
+        ! (k = 2) -- output_prof's own coordinate tests, bp 5 and 7 -- and for
+        ! the ones this rank owns, profI(q,k), the line profP(q,k) they take
+        ! in each block of lines: the number of profile nodes before them on
+        ! the fault. One integer per fault node and file, summed over ranks,
+        ! once.
+        integer (kind = 4), allocatable :: flag(:)
+        integer (kind = 4) :: ii, kk, nf, cnt
+        real (kind = dp) :: xx, zz
+        logical :: s1, s2
+        nf = nftnd(1)
+        cnt = count(fltMine(1:nf,1))
+        allocate(flag(2*max(1,nf)), profI(max(1,cnt),2), profP(max(1,cnt),2))
+        flag = 0
+        do ii = 1, nf
+            if (.not. fltMine(ii,1)) cycle
+            xx = x(1,nsmp(1,ii,1))
+            zz = x(3,nsmp(1,ii,1))
+            if (bp == 5) then
+                s1 = abs(xx)<=38.0d3.and.abs(zz-(-10.0d3))<0.01d0
+                s2 = abs(xx)<=0.01d0.and.abs(zz)<=40.0d3
+            else
+                s1 = abs(zz-0.0d3)<0.01d0
+                s2 = abs(xx)<=0.01d0
+            endif
+            if (s1) flag(ii) = 1
+            if (s2) flag(nf+ii) = 1
+        enddo
+        call MPI_Allreduce(MPI_IN_PLACE, flag, 2*nf, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, IERR)
+        profN = 0
+        do kk = 1, 2
+            cnt = 0
+            do ii = 1, nf
+                if (flag((kk-1)*nf+ii) == 0) cycle
+                if (fltMine(ii,1)) then
+                    profN(kk) = profN(kk) + 1
+                    profI(profN(kk),kk) = ii
+                    profP(profN(kk),kk) = cnt
                 endif
+                cnt = cnt + 1
             enddo
         enddo
-        call MPI_Reduce(ns, nsG, 2*nftmx*ntotft, MPI_INTEGER, MPI_MAX, 0, MPI_COMM_WORLD, IERR)
-        if (me == 0) then
-            allocate(nsmpHold(2,nftmx,ntotft))
-            nsmpHold = nsmp
-            nsmp = reshape(nsG, (/ 2, nftmx, ntotft /))
-            fname = trim(outDir)//'eqquasi.mesh.nsmp.nc'
-            ftype = 'nsmp'
-            call netcdf_write(fname, ftype)
-            nsmp = nsmpHold
-            deallocate(nsmpHold)
-        endif
-        deallocate(ns, nsG)
-    end subroutine ddWriteMeshFiles
+        deallocate(flag)
+    end subroutine ddProfSetup
+
+    subroutine ddWriteProf
+        ! One block of lines appended to p1output.txt and p2output.txt, as
+        ! output_prof writes it: each rank its own profile nodes' lines.
+        character (len = 162), allocatable :: buf(:)
+        character (len = 12) :: pname(2)
+        integer (kind = 4) :: kk, q, ii
+        pname = (/ 'p1output.txt', 'p2output.txt' /)
+        do kk = 1, 2
+            allocate(buf(profN(kk)))
+            do q = 1, profN(kk)
+                ii = profI(q,kk)
+                write(buf(q)(1:161),'(1x,5e32.21e4)') time,fric(FR_SLIP_S,ii,1),fric(FR_SLIP_D,ii,1),fric(FR_TSTK,ii,1),fric(FR_TDIP,ii,1)
+                buf(q)(162:162) = achar(10)
+            enddo
+            call ddTextRecords(trim(outDir)//pname(kk), 162, profN(kk), profP(1:profN(kk),kk), buf, .true.)
+            deallocate(buf)
+        enddo
+    end subroutine ddWriteProf
+
+    subroutine ddWriteCplot
+        ! cplot_<fault>EQquasi.txt and cplot_<fault>ruptarea_trac_slip.txt, one
+        ! line per fault node in the fault's node order, as
+        ! output_onfault_transfer and output_ruptarea_trac_slip write them:
+        ! each rank its own nodes' lines.
+        character (len = 514), allocatable :: b1(:)
+        character (len = 130), allocatable :: b2(:)
+        integer (kind = 4), allocatable :: pos(:)
+        integer (kind = 4) :: ii, jft, q
+        character (len = 8) :: fttmp, faultTag
+        do jft = 1, ntotft
+            if (nftnd(jft) <= 0) cycle
+            fttmp = faultTag(jft)
+            q = count(fltMine(1:nftnd(jft),jft))
+            allocate(pos(q), b1(q), b2(q))
+            q = 0
+            do ii = 1, nftnd(jft)
+                if (.not. fltMine(ii,jft)) cycle
+                q = q + 1
+                pos(q) = ii - 1
+                write(b1(q)(1:513),'(1x,16e32.21e4)') x(1,nsmp(1,ii,jft)), -x(3,nsmp(1,ii,jft)), &
+                    fric(FR_V_TRIAL,ii,jft), fric(FR_STATE,ii,jft), fric(FR_TSTK,ii,jft), &
+                    fric(FR_TDIP,ii,jft), fric(FR_TNRM,ii,jft), &
+                    fric(FR_VXM,ii,jft), fric(FR_VYM,ii,jft), fric(FR_VZM,ii,jft), &
+                    fric(FR_VXS,ii,jft), fric(FR_VYS,ii,jft), fric(FR_VZS,ii,jft), &
+                    fric(FR_SPARE44,ii,jft), fric(FR_SPARE45,ii,jft), fnft(ii,jft)
+                b1(q)(514:514) = achar(10)
+                write(b2(q)(1:129),'(1x,4e32.21e4)') fric(FR_RUPT_AREA,ii,jft), fric(FR_RUPT_SLIP,ii,jft), &
+                    fric(FR_TRACT_START,ii,jft), fric(FR_TRACT_END,ii,jft)
+                b2(q)(130:130) = achar(10)
+            enddo
+            call ddTextRecords(trim(outDir)//'cplot_'//trim(fttmp)//'EQquasi.txt', 514, q, pos, b1, .false.)
+            call ddTextRecords(trim(outDir)//'cplot_'//trim(fttmp)//'ruptarea_trac_slip.txt', 130, q, pos, &
+                b2, .false.)
+            deallocate(pos, b1, b2)
+        enddo
+    end subroutine ddWriteCplot
 
 end subroutine solveTimeLoopPETScDD
 
@@ -1311,8 +1446,7 @@ subroutine ddMeshBox
 !
 ! The block's grid lines along a direction are its cells' lower lines plus
 ! the one line above (the ghost layer); a grid point is owned by the block of
-! the cell it is the lower corner of. Rank 0 also keeps a coordinate-only
-! entry for every fault node outside its block (see meshgen).
+! the cell it is the lower corner of.
     use globalvar
     implicit none
     include 'mpif.h'
@@ -1422,7 +1556,6 @@ subroutine ddMeshBox
     enddo
     ddGlobal = (/ numnp, numel, neq /)
     numnp = nb + nfb
-    if (me == 0) numnp = numnp + sum(nftnd(1:ntotft)) - nfb
     numel = product(ddBox(2,:) - ddBox(1,:))
     neq = 3*(nb - nbnd - nfb)
     ddActive = .true.

@@ -542,8 +542,8 @@ build, run and traps are in `CLAUDE.md`.
      advantage (5.5 s against 255.6 s) is already 47x at 32 ranks and memory 5x, but the solve is
      inexact (9 of 33 files fail at 8 and 32 ranks, worst 1.1e-7, float32 floor) and over a 200-step
      run the loop, not setup, dominates (exact wide at 16 ranks: loop 1103 s for 200 steps), so the
-     verdict at this size and rank count is unchanged. The 64-rank point is the one that would test the
-     extrapolation; it is queued for a quiet window.
+     verdict at this size and rank count is unchanged. The 64-rank point, measured twice (matched-load block below),
+     does not test the extrapolation: GAMG's loop does not fall past 32 ranks on this node.
    - **GAMG CG tuning on wide, 16 ranks, 3 steps, and the iteration-count control, MEASURED
      2026-11-14 13:05** (`runs/20261114_scaling/`, rtol 1e-8 unless stated, comparator = the table's,
      33 files; exact at 16 ranks: loop 20.6 s; load before each run 16-29 (13.7 for the gs10 control), so iterations carry the
@@ -576,7 +576,7 @@ build, run and traps are in `CLAUDE.md`.
      |---|---|---|---|---|---|---|---|---|
      | 16 | 9.7 / 60.4 | 35.2 (34-37) | 2.54 | 14.96 | 330.1 / 19.5 | 12.28 | 18.76 | 3.1x |
      | 32 | 5.4 / 40.5 | 35.3 (34-38) | 1.36 | 25.66 | 194.0 / 16.2 | 6.81 | 29.56 | 2.5x |
-     | 64 | 8.3 / 52.2 | 37.2 (36-39) | 0.78 | 4.60 | aborted (see below) | | | n/a |
+     | 64 | 8.3 / 52.2 (4.60); repeat `..._g64b` 8.3 / 47.1 (load 4.81; foreign jobs on the host not checked) | 37.2 (36-39) | 0.78 | 4.60 | first run aborted (-11, see below); rerun `e64b` 177.9 / 25.1 | 3.77 | 18.84 | 1.9x vs the repeat (47.1 / 25.1) |
 
      Reading: 16 to 32 ranks GAMG's loop falls 1.49x (ranks^-0.58) against exact's 1.20x; at 64 ranks GAMG's
      loop does not fall (52.2 s, 1.3x slower than at 32; the 64-rank run had no spare core, so the host owner's
@@ -589,17 +589,65 @@ build, run and traps are in `CLAUDE.md`.
      node. A test would need a cluster run at 256 to 512 ranks (4 to 8 nodes of 64 cores, low-latency
      interconnect, exclusive nodes): GAMG needs about 0.15-0.26 GB per rank at those counts (measured per-rank RSS fell 1.87x 16 to 32 and
      1.74x 32 to 64 ranks; 1.74x per doubling extrapolated), exact MUMPS 6.8 GB per rank at 32 and 3.8 GB
-     at 64 (e64b) with a setup of 178-330 s repeated; and the first exact 64-rank run failed here. Accuracy of the SOR variant against
-     exact at these runs was not compared (comparator not run on `runs/20261114_matched/`).
-     **`KSPConvergedReason = -11` reproduced, exact MUMPS, 64 ranks, wide**: the first exact 64-rank run
-     (`runs/20261114_matched/bp8.qdc.gs.10.wide_s3_np64_e64`, load 50.6 right after the 64-rank GAMG run,
-     MUMPS ICNTL(4) default) stopped at the first solve: `log/cycle0.log` reads `par.solver=3: KSPSolve
-     did NOT converge (KSPConvergedReason = -11) at step 1 iiTag 0`, then `MPI_ABORT` on rank 59 (prterun
-     names rank 27), `rc=1`, 129 s wall, no `runInfo.json`; the MUMPS INFOG(1)/(2) at the failure were not
-     printed. The identical case rerun with ICNTL(4)=2 (`..._e64b`, load 18.8) passed: rc 0, setup 177.9 s,
-     loop 25.1 s, RSS 3.77 GB. This is the second sighting of the `-11` of the open observation below
-     (1 of 11, 0 of 40, 0 of 60 at 8 ranks on gs10; now 1 of 2 at 64 ranks on wide); it is intermittent and
-     the cause is still not read from MUMPS. Repeats with ICNTL(4)=2 are queued.
+     at 64 (e64b) with a setup of 178-330 s repeated; and the exact 64-rank runs at the default ICNTL(14) abort with `-11` in five of six tries (MUMPS -9 read in four of them; below). SOR accuracy against exact:
+     see the 200-step block below.
+     **`KSPConvergedReason = -11` reproduced at 64 ranks, exact MUMPS, wide; cause read: MUMPS INFOG(1) = -9**
+     (2026-11-14; `runs/20261114_matched/..np64_e64` and `runs/20261114_minus11/..np64_r1` to `r4`; MUMPS
+     ICNTL(4)=2 in r1-r4, default in e64). `log/cycle0.log` reads `par.solver=3: KSPSolve did NOT converge
+     (KSPConvergedReason = -11) at step 1 iiTag 0`, then `MPI_ABORT`, rc 1, 117-147 s wall, no `runInfo.json`.
+     Five `-11` aborts in six exact 64-rank runs at the default ICNTL(14) (the sixth, `..._e64b`, load 18.8, passed: setup 177.9 s,
+     loop 25.1 s, RSS 3.77 GB). The MUMPS code was read in four of the five, r1-r4 only (ICNTL(4)=2): `run.log` prints, once
+     per run, `** ERROR RETURN ** FROM DMUMPS INFO(1)= -9` with `On return from DMUMPS, INFOG(2)=` 4,799,232 / 8,804,430 /
+     5,913,752 / 6,650,676 (and `INFO(2)` equal to that value on the failing rank), and on the other 63 ranks
+     `INFO(1)= -1` with `INFO(2)` = 48 (r1, r3, r4) or 0 (r2). On those 63 ranks -1 means "an error occurred on another
+     process" and `INFO(2)` is that process's rank (48, 0, 48, 48), not a quantity: it is constant over 63 ranks and
+     small, which fits a rank id and cannot be a size. The MUMPS user guide could not be opened here (the conda env ships
+     headers only; the guide URLs tried returned 404), so the meaning of -1 and of -9 (main internal work array too small,
+     INFOG(2) the size short, cure a larger ICNTL(14)) is from the guide as recalled, not re-read; the log pattern above
+     is the only local evidence. `..._e64` ran at the default print level: its logs hold no `INFO(1)` line, only the `-11`,
+     so it is a fifth `-11` with its MUMPS code unread, not a fifth -9.
+     So the failure is factorization workspace (ICNTL(14), default 20 % over the symbolic estimate) at 64-way
+     parallelism, not a PETSc setup defect; whether the earlier single 8-rank sighting (1 of 11, then 0 of 100)
+     had the same cause is unknown, its codes were never printed. Load before the failing runs was 35-68
+     (their own predecessor included) and 18.8 before the one that passed: a reading, not a controlled
+     comparison. Test of the cure, `-mat_mumps_icntl_14 100` (with ICNTL(4)=2) at 64 ranks, `runs/20261114_minus11/..np64_w1` to `w3`: all three passed (rc 0 in `rc.txt`; MEASURED 2026-11-14 14:46-14:55 CST, `DONE_w` present): loop 24.5 / 23.3 / 22.8 s (`runInfo.json`; `EQ_WALL` setup 191.9 / 179.9 / 183.5 s, e64b by the same field 189.6 s: the 177.9 and 179.6 s figures above came from another timer not re-identified), max-rank RSS 4.50 / 4.99 / 4.49 GB against e64b 3.77 GB (+19 to +32 %), MUMPS INFOG(1) = 0 in each. Against the default ICNTL(14): 0 of 3 failed with 100, 5 of 6 failed at default (4 of 4 with the same ICNTL(4)=2); Fisher exact one-sided p about 0.05, and load was 44-68 before the ICNTL(14)=100 runs against 35-68 before the failing ones, so it is a strong indication, not a controlled proof. Cause (with the guide caveat above) and runtime cure: factorization workspace at 64-way parallelism, `-mat_mumps_icntl_14 100`; cost about +20-30 % rank memory. The earlier 8-rank sighting is not shown to be the same cause: its code was never printed, and 0 of 100 later 8-rank runs failed at the default. The
+     board's first closing condition (KSPSetUp reading INFOG(1)/(2) on failure, code in
+     `solveTimeLoopMUMPS.f90`-style) is not done: the codes above came from ICNTL(4)=2 printing, not from code.
+     **Slip-rate change, GAMG CG (SOR, rtol 1e-8, previous-step initial guess), wide, 32 ranks, 200 steps,
+     MEASURED 2026-11-14** (`runs/20261114_event/bp8.qdc.gs.10.wide_s3_np32_ev32`, `-ksp_monitor`; rc 0,
+     load 62.9 before (my own preceding runs) and 35.6 after, loop 2035.7 s = 10.2 s/step, setup 5.5 s).
+     Iterations per solve counted from the monitor's iteration-0 resets: 400 solves = 2 per step x 200,
+     mean 27.28 (agrees with `runInfo.json` `ksp_iterations_mean` 27.275), range 25-38. By 20-step block:
+     32.15, 29.35, 28.3, 27.4, 27.0, 26.25, 26.0, 26.0, 25.3, 25.0 (re-counted from `run.log` 2026-11-14: 400 solves, mean 27.275, range 25-38; first block holds the maximum). The max
+     slip rate of this case rises from 1e-12 to 1.479e-7 m/s in these 200 steps (final value identical to
+     0.1479348E-06 in the exact 200-step run of `runs/20261114_blr-widelong/..np16_base`: different run
+     directories, ranks (32 against 16) and solvers, so not a wrong-file read; the comparator below is the
+     second statistic), so the 200 steps do cross five orders of magnitude of slip rate, and iterations per
+     solve fall with the warm start rather than rising: there is no iteration growth through the change at
+     this sampling (a per-step slip-rate trajectory was not recorded; `log/cycle0.log` prints it at
+     output steps only; the run is aseismic-to-accelerating, not an event with rupture). Output against the
+     exact baseline (repo comparator, `compare_series` / `compare_netcdf`, rtol 1e-9, 33 compared files):
+     13 of 33 fail; worst per-file max|a-b|/max|a| 1.1e-4 (`fltst_strk+000dp+000.dat`, and 1.0e-7 to 3e-8
+     for netCDF `disp`/`fault` fields: float32 floor). The station-file failures are columns near zero
+     (the comparator message names row 200 column 7, `2.466e-10` against the reference), not diagnosed
+     further. So the SOR variant is inexact over 200 steps as it is over 3, and not by a margin that the
+     tolerance of the gold gate covers.
+     Slip-rate-change summary (200 steps, wide, MEASURED; the matched-load pair at one rank count, `runs/20261114_event2/`
+     `ev32b` GAMG CG against `ex32` exact, both 32 ranks, is queued as `scratch/bench/sub13.sh`, PID 2705259, 14:51; until it
+     lands the two columns below differ in ranks and host load, so the s/step ratio is not a result):
+
+     | solver | ranks | its/solve through the change | s/step (loop / 200) | host load before | accuracy against the 200-step exact baseline |
+     |---|---|---|---|---|---|
+     | GAMG CG (SOR), `..._ev32` | 32 | 27.3 mean, 32.15 to 25.0 by 20-step block, 25-38 | 10.18 (2035.7 s) | 62.9 | 13 of 33 files fail 1e-9; worst per-file 1.1e-4 |
+     | exact MUMPS, `..np16_base` | 16 | 1 (preonly) | 5.52 (1103.4 s) | 4.2 | reference |
+
+     Spike-run reporting defect, 2026-11-14 (audit): `runInfo.json` of the GAMG runs reads `ksp_type` preonly, `pc_type`
+     cholesky (g64b checked), not the solver used; the real iteration counts (`ksp_iterations_*`) are right. Merge-bound
+     solver 3 path: `solveTimeLoopPETSc.f90:496-509` sets the names from the whitelist booleans (`isPreonly`,
+     `isCholesky`) and the guard at `:472` rejects other combinations, so it names what it ran by construction; read from
+     source only, the merge-bound binary was not run on a GAMG option. Not changed (source change, owner). Owner
+     questions, not decided here: a test pinning the INFO(2) meaning (new test); `KSPSetUp` reading INFOG(1)/(2) on
+     failure and any default ICNTL(14) (changes merge-bound solver behaviour).
      **Why wide needs 63 iterations and bp1002 10:** not wide-specific. The control `bp8.qdc.gs.10`
      (1.96 M equations, no enlarged box) at 16 ranks takes 64.0 iterations per solve (62-67), the same
      as wide's 63.0; GAMG CG on it: setup 5.6 s against 80.8 s exact, loop 49.3 s against 8.1 s (6.1x),

@@ -376,6 +376,7 @@ build, run and traps are in `CLAUDE.md`.
      solve per interface dof (~170 k x 0.23 s ~ 11 h at 16 ranks); not an
      unattended run. Mid-size feasibility (`bp8.qdc.gs.10`, 16 ranks) is queued: see
      the session log.
+   - **Substructuring on an event-resolving run (bp5, 4483 steps, 8 ranks), MEASURED 2026-11-14** (`runs/20261114_substruct-bp5/`, spike binary, same script): exact MUMPS setup 3.4 s, loop 577 s, kspsolve 516 s; `-eq_mat_is -eq_all_primal` setup 8.0 s, loop 1202 s (2.1x slower), kspsolve 1139 s. Per-file worst max|a-b|/max|a| over 779 txt/dat/nc items: 3.9e-11 (`fault.*.nc:slipn`), so the iterative-in-name solve still carries ~1e-11 drift over 4483 steps, far below the 1e-9 comparator. Peak RSS (GNU time, whole-run per rank, kB): exact 491,348, all-primal 1,091,204. GAMG CG run on bp5 and the subdomain-direct and gs10 runs still queued (see session log entry 9). MEASURED (same-script re-run), not VERIFIED.
    - Open: `-11` 60-run batch running (`runs/20261114_ksp-stress2/`, binary 1.24.4,
      `rc` file); wide subdomain-direct, several blocks per rank and the bp5
      event-crossing runs of the iterative variants queued (`runs/20261114_subdirect/`,

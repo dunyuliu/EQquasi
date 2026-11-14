@@ -93,6 +93,10 @@ Stack, all draft or open, none merged (owner decision on `par.solver = 3` and `s
 - Housekeeping: worktrees `board-c5`, `board-c5b` reaped (clean, `status --ignored` empty, PRs #94 #96 merged), branches deleted. Spike and gate commits carry `Agent: conductor` (the agent-name trailer was removed from them by rewriting my own two spike commits; names are barred in commit messages).
 - Lesson for the rules agent: a `while read` loop feeding `create.newcase` needs `< /dev/null`; a foreground command over 180 s is moved to the background by the harness, so waits on a PID are `timeout 170 tail --pid=<pid> -f /dev/null`; flock waiters are not FIFO, so a queue of long and short jobs on one lock starves the short ones (bp1002 scaling was moved to the light lock).
 
+## Entry 9, 2026-11-14 (conductor 6, tool calls 67-85 of 100, times CST)
+- bp5 4483-step all-primal vs exact harvested (board row 1): 3.9e-11 worst over 779 items, loop 2.1x slower, RSS 2.2x. Checked: exact and all-primal `rss.*` and EQ_WALL lines read from their own run dirs (different values, not a wrong-file read).
+- Still running at call 76 (`ps`): PIDs 2370074 (sub3, GAMG bp5 queued next), 2370771 (sub4, bj16 done, bj64 / bj16r / bj_wide pending), 2372625 (sub5 gs10), 2377489 (`-11` batch, 1 of 60 done at last read). Results not harvested; a fresh conductor reads each `DONE` / `rc` file.
+
 ### Still owns (all conductor-6 jobs; none is an agent; verified by `ps` at tool call 63)
 | PID | job | outputs | closes on |
 |---|---|---|---|

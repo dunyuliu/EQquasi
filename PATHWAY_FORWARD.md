@@ -513,6 +513,36 @@ build, run and traps are in `CLAUDE.md`.
      convergence figure (the residual tolerance is the same as the reference). Exact 0.94 s loop
      against GAMG 1.4-3.4 s: GAMG is slower at this size in every variant. Wide tuning and the
      scaling curve are running (`runs/20261114_scaling/`).
+   - **Strong scaling of GAMG CG against exact MUMPS on wide, 3 steps, MEASURED 2026-11-14 12:50**
+     (`runs/20261114_scaling/`, spike binary, rtol 1e-8, same options at every rank count; exact
+     from existing runs of the same case: 8 and 32 ranks `prof/`, 16 ranks `krylov4/`; host load
+     shown, it was 10-20 and other sessions' jobs ran beside every run, so absolute times are
+     indicative and the curve shape is the finding). s/step = loop / 3; s per iteration =
+     kspsolve / (3 x iterations per solve), assuming one CG solve per step (not checked against the
+     solve count).
+
+     | ranks | option | setup s | loop s | s/step | its/solve (min-max) | s per iteration | peak RSS GB per rank | load before |
+     |---|---|---|---|---|---|---|---|---|
+     | 8 | GAMG CG | 18.5 | 138.7 | 46.2 | 63.0 (60-67) | 0.72 | 4.80 | 10.11 |
+     | 8 | exact MUMPS | 640.4 | 38.2 | 12.7 | 1 | n/a | 20.91 | n/a |
+     | 16 | GAMG CG | 10.6 | 98.4 | 32.8 | 63.0 (60-67) | 0.51 | 2.54 | 16.49 |
+     | 16 | exact MUMPS | 331.3 | 20.6 | 6.9 | 1 | n/a | 12.07 | 13.27 |
+     | 32 | GAMG CG | 5.5 | 55.4 | 18.5 | 63.2 (61-67) | 0.28 | 1.35 | 19.89 |
+     | 32 | exact MUMPS | 255.6 | 21.2 | 7.1 | 1 | n/a | 6.79 | n/a |
+     | 64 | both | not run: load1 was 30.8 at 12:47 (other sessions), 64 ranks would oversubscribe the 64 cores | | | | | | |
+
+     Reading: GAMG CG scales and MUMPS does not. From 8 to 32 ranks GAMG's loop falls 2.5x (63 %
+     parallel efficiency, ranks^-0.66; s per iteration halves per doubling, the iteration count stays
+     at 63 so the cost is the work per iteration, not convergence), setup 3.4x, memory per rank 3.6x;
+     exact's loop falls 38.2 to 20.6 s and then stays flat (21.2 s at 32), its setup
+     falls 2.5x. The GAMG/exact loop ratio is 3.6x, 4.8x, 2.6x at 8, 16, 32 ranks. Extrapolating
+     GAMG's ranks^-0.66 against exact's flat ~21 s puts the crossing near 140 ranks (an
+     extrapolation from three noisy points, not a measurement), beyond this node; GAMG's setup
+     advantage (5.5 s against 255.6 s) is already 46x at 32 ranks and memory 5x, but the solve is
+     inexact (9 of 33 files fail at 8 and 32 ranks, worst 1.1e-7, float32 floor) and over a 200-step
+     run the loop, not setup, dominates (exact wide at 16 ranks: loop 1103 s for 200 steps), so the
+     verdict at this size and rank count is unchanged. The 64-rank point is the one that would test the
+     extrapolation; it is queued for a quiet window.
    - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,
      ~8-10 min per run behind the heavy lock; `rc` file, closes on `ALLDONE`); sub4 and the bp5 GAMG CG run are harvested (table rows; 12:35). Wide subdomain-direct, 1 block per rank (`runs/20261114_subdirect/`, MEASURED, host load 13.5, indicative): setup ~0, loop 1000.6 s against 20.6 s exact (48x slower), 229 CG iterations per solve (max 247), peak RSS 3.36 against 12.07 GB per rank (3.6x less), worst difference 1.1e-7 (`disp.00001.nc`, float32 floor), 9 of 33 files fail: it loses on time by a wider margin than GAMG CG (97 s) and is inexact. bp1002 at 16 ranks: loop 15.7 s against 0.94 s exact (16.7x), 66 iterations, 14 of 25 fail.
 3. [ ] **P1 -- EQquasi BP8 discrepancy (bug hunt).** Owner, 2026-10-09: "hunt

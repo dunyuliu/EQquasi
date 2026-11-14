@@ -331,11 +331,11 @@ build, run and traps are in `CLAUDE.md`.
    - **Wide, 16 ranks, 3 steps:** exact MUMPS setup 337 s, loop 20.8 s (6.9
      s/step), peak RSS 12.1 GB per rank; GAMG CG setup 10.6 s, loop 97.4 s
      (32 s/step, 4.7x slower), 63 iterations per solve (max 67), 2.5 GB per rank
-     (4.8x less), relative residual 9e-9; worst-case parity against exact over all 76 files of
+     (4.8x less), relative residual 9e-9; worst-case parity against exact over the 33 compared files of
      `result/cycle0` (per file max|a-b| / max|a|; log10 slip-rate column of the `fltst`
      files excluded, floor sentinel; 3 aseismic steps): text and `.dat` files
-     <= 4.1e-15, `fltst` <= 6.7e-19, netCDF fields 1.7e-8 to 1.1e-7 (`fault.00001.nc`
-     `slipd`, `disp.00001.nc` `disp`), i.e. 1e-7 against the gold gate's 1e-9, so
+     <= 4.1e-15, `fltst` <= 6.7e-19, netCDF fields 6.6e-9 to 1.1e-7 (`fault.00001.nc`
+     `shear_dip`, `disp.00001.nc` `disp`; the worst `fault` file is 1.75e-8, `fault.00003.nc` and `fault.r.nc`), i.e. 1e-7 against the gold gate's 1e-9, so
      GAMG CG at rtol 1e-8 would not pass the comparator either.
      Conclusion: the iterative route trades 4.7x time for 4.8x memory and a
      30x shorter setup; it does not beat MUMPS on time at 3.5 M equations.
@@ -364,7 +364,7 @@ build, run and traps are in `CLAUDE.md`.
      | 32 | 26,433 | 1.84 / 1.02 / 0.20 | 3.87 / 1.76 / 0.76 | 7.5e-16 |
      (worst diff: per-file max|a-b| / max|a| over `result/cycle0`; identical digits at 4 and 8
      ranks are the same last-printed-digit flip of `global.dat`, the two files differ.)
-     So it costs 2-3.7x setup, 1.7-2.9x time loop and 3.3-4.1x memory against exact
+     So it costs 2-3.7x setup, 1.7-2.9x time loop and 3.1-4.1x memory against exact
      MUMPS on bp1002, and it is exact. **Gold gate** (`e2e_fast` reference tests,
      comparator unchanged, `par.solver = 3` forced in throwaway branch `gate-sub`
      b57a6a1, `runs/20261114_gate-sub/`, `runInfo.json` shows the spike path ran): 39
@@ -376,28 +376,28 @@ build, run and traps are in `CLAUDE.md`.
      solve per interface dof (~170 k x 0.23 s ~ 11 h at 16 ranks); not an
      unattended run. Mid-size feasibility (`bp8.qdc.gs.10`, 16 ranks) is queued: see
      the session log.
-   - **Substructuring on an event-resolving run (bp5, 4483 steps, 8 ranks), MEASURED 2026-11-14** (`runs/20261114_substruct-bp5/`, spike binary, same script): exact MUMPS setup 3.4 s, loop 577 s, kspsolve 516 s; `-eq_mat_is -eq_all_primal` setup 8.0 s, loop 1202 s (2.1x slower), kspsolve 1139 s. Per-file worst max|a-b|/max|a| over 779 txt/dat/nc items: 3.9e-11 (`fault.*.nc:slipn`), so the iterative-in-name solve still carries ~1e-11 drift over 4483 steps, far below the 1e-9 comparator. Peak RSS (GNU time, largest of the 8 ranks, kB): exact 520,616, all-primal 1,236,568 (2.4x; corrected 2026-11-14: the first-posted 491,348 and 1,091,204, ratio 2.2x, were rank 7's, not the maximum). GAMG CG run on bp5 and the subdomain-direct and gs10 runs still queued (see session log entry 9). MEASURED (same-script re-run), not VERIFIED.
+   - **Substructuring on an event-resolving run (bp5, 4483 steps, 8 ranks), MEASURED 2026-11-14** (`runs/20261114_substruct-bp5/`, spike binary, same script): exact MUMPS setup 3.4 s, loop 577 s, kspsolve 516 s; `-eq_mat_is -eq_all_primal` setup 8.0 s, loop 1202 s (2.1x slower), kspsolve 1139 s. Per-file worst max|a-b|/max|a| over the 120 compared files, no variable excluded: 3.9e-11 (`fault.03001.nc` `slipn`; 4.6e-14 under the consolidated table's metric, which drops variables with max < 1e-16), so the iterative-in-name solve still carries ~1e-11 drift over 4483 steps, far below the 1e-9 comparator. Peak RSS (GNU time, largest of the 8 ranks, kB): exact 520,616, all-primal 1,236,568 (2.4x; corrected 2026-11-14: the first-posted 491,348 and 1,091,204, ratio 2.2x, were rank 7's, not the maximum). GAMG CG run on bp5 and the subdomain-direct and gs10 runs still queued (see session log entry 9). MEASURED (same-script re-run), not VERIFIED.
    - **gs10 (`bp8.qdc.gs.10`, 1.96 M equations), 16 ranks, 3 steps, exact vs
      all-primal substructuring, MEASURED 2026-11-14 12:00** (`runs/20261114_substruct-gs10/`,
      spike binary, load 11-12 before each run, both rc 0, `DONE` present): setup 80.8 s
      against 268.4 s (3.3x), loop 8.1 s against 13.3 s (2.71 against 4.45 s/step, 1.6x), peak RSS
-     of the largest rank 4.47 against 20.68 GB (4.6x), summed over ranks 61.9 against
-     255.0 GB (4.1x); 1 CG iteration per solve; interface N_Gamma = 76,992 dofs (sum of
+     of the largest rank 4.47 against 20.68 GB (4.6x), summed over ranks (`rss.*`) 63.3 against
+     261.2 GB (4.1x); 1 CG iteration per solve; interface N_Gamma = 76,992 dofs (sum of
      `EQ_PRIMAL` owned-shared over ranks), so a dense N_Gamma x N_Gamma matrix is 47 GB.
-     The same-comparator check below passes 32 of 32 files (worst per-file difference
+     The same-comparator check below passes 33 of 33 files (worst per-file difference
      4.3e-10). Substructuring is feasible at 2 M equations and loses on every column.
    - **Why all-primal substructuring costs more memory than global MUMPS** (diagnostic,
      `runs/20261114_substruct-mem/`, bp1002, 8 ranks, 3 steps, MUMPS `ICNTL(4)=2` on the
      BDDC solvers; host load 13-14, memory is not load-sensitive; MEASURED, partial
-     attribution). Exact: one global factor, 2,914 MB in total (INFOG(17)) of 3,377 MB summed
-     peak RSS. All-primal, same case: 16 local factorizations, two per rank (read as the Neumann and
-     Dirichlet solvers, each of local order 18.1-19.0 k, 89-100 MB each, 1.55 GB in total),
+     attribution). Exact: one global factor, 2,914 MB in total (INFOG(17)) of 3,432 MB summed
+     peak RSS (`rss.*`; the in-code `Peak RSS` line reads 3,377, 13,314, 1,931 and 489.5 MB, a different counter). All-primal, same case: 16 local factorizations, two per rank (read as the Neumann and
+     Dirichlet solvers, each of local order 18.1-19.0 k (MUMPS `JOB, N, NNZ` lines of `run.log`: 18,135 to 18,972), 89-100 MB each, 1.55 GB in total),
      plus one coarse factorization of the whole interface Schur complement, order 12,924,
      3,412 MB in total (645 MB estimated on the largest rank): the coarse factor alone is
      larger than the entire global factor, and the local factors come on top of it. Dense
      local Schur blocks (sum of n_loc^2 x 8 B) add 0.7 GB here and 12.8 GB on gs10. Summed
-     peak RSS is 13,314 MB (largest rank 1,931 MB against 490 MB); the factors above are
-     about 5.0 GB, the dense local Schur 0.7 GB, and ~7.6 GB (57 %) is not attributed (MUMPS
+     peak RSS is 13,634 MB (largest rank 1,977 MB against 498 MB); the factors above are
+     about 5.0 GB, the dense local Schur 0.7 GB, and ~8.0 GB (58 %) is not attributed (MUMPS
      work arrays above the factor size, coarse-matrix assembly copies; not measured). Why it
      is structural (a reading; the control that would test it, wide-box Schur order against global fill, was not run): MUMPS' elimination tree already is a multilevel substructuring, with
      the interfaces eliminated sparsely as separators; the all-primal route flattens it
@@ -425,7 +425,7 @@ build, run and traps are in `CLAUDE.md`.
      parse-checked; each row cites its run directory, "not run" means no run exists;
      the rows tagged running fill in when their `DONE` lands). Definitions: setup =
      `factorization_seconds`, loop = `time_loop_seconds` of `runInfo.json` (rows
-     elsewhere in this row quote the in-code `EQ_WALL` line, up to 2 % different); peak
+     elsewhere in this row quote the in-code `EQ_WALL` line, up to 5 % different, 3.5-4.6 % on the 32-rank bp1002 loops); peak
      RSS = largest `rss.*` over ranks (GNU time `%M`, kB / 1e6); worst diff = per-file
      max|a-b| / max|a| against the exact run of the same family over text, `.dat` and
      netCDF files, log10 slip-rate columns of `fltst` and netCDF variables with max
@@ -446,40 +446,40 @@ build, run and traps are in `CLAUDE.md`.
      |---|---|---|---|---|---|---|---|---|---|---|
      | bp1002, 8 ranks, 11 steps | exact MUMPS | krylov/test.bp1002.qdc.zone.2500_s3_np8_exact | 3.23 | 1.7 (0.153/step, 11 st) | 0.50 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 12.02 |
      | bp1002, 8 ranks, 11 steps | BLR 1e-8, 1e-6 | not run: at 11 steps; see the 101-step case | not run | not run | not run | not run | not run | not run | not run | not run |
-     | bp1002, 8 ranks, 11 steps | all-primal substructuring | substruct/test.bp1002.qdc.zone.2500_s3_np8_allprimal | 10.90 | 2.9 (0.261/step, 11 st) | 1.98 | 1.0 | 1.5e-19 | 24/24 files pass | yes: 39 passed, gate-sub | 6.88 |
-     | bp1002, 8 ranks, 11 steps | GAMG CG | krylov/test.bp1002.qdc.zone.2500_s3_np8_gamgg | 0.97 | 4.4 (0.401/step, 11 st) | 0.32 | 10.5 | 1.9e-08 | 12 of 24 files fail | not run | 13.27 |
-     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks | krylov2/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.00 | 26.8 (2.435/step, 11 st) | 0.14 | 144.4 | 3.7e-08 | 15 of 24 files fail | not run | 13.45 |
-     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks (rerun) | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.01 | 31.3 (2.843/step, 11 st) | 0.23 | 66.5 | 1.9e-08 | 14 of 24 files fail | not run | 13.07 |
-     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 64 blocks | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj64 | 0.01 | 27.5 (2.500/step, 11 st) | 0.17 | 107.7 | 7.5e-08 | 14 of 24 files fail | not run | 11.61 |
-     | bp1002, 8 ranks, 11 steps | BDDC default | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_base | 1.03 | 29.4 (2.675/step, 11 st) | 0.40 | 27.0 | 1.5e-08 | 13 of 24 files fail | not run | 2.82 |
-     | bp1002, 8 ranks, 11 steps | BDDC near-null + faces/edges/vertices | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_nn_fev | 1.09 | 15.7 (1.428/step, 11 st) | 0.41 | 15.0 | 9.3e-09 | 12 of 24 files fail | not run | 10.83 |
+     | bp1002, 8 ranks, 11 steps | all-primal substructuring | substruct/test.bp1002.qdc.zone.2500_s3_np8_allprimal | 10.90 | 2.9 (0.261/step, 11 st) | 1.98 | 1.0 | 1.5e-19 | 25/25 files pass | yes: 39 passed, gate-sub | 6.88 |
+     | bp1002, 8 ranks, 11 steps | GAMG CG | krylov/test.bp1002.qdc.zone.2500_s3_np8_gamgg | 0.97 | 4.4 (0.401/step, 11 st) | 0.32 | 10.5 | 1.9e-08 | 12 of 25 files fail | not run | 13.27 |
+     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks | krylov2/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.00 | 26.8 (2.435/step, 11 st) | 0.14 | 144.4 | 3.7e-08 | 15 of 25 files fail | not run | 13.45 |
+     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 16 blocks (rerun) | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj16 | 0.01 | 31.3 (2.843/step, 11 st) | 0.23 | 66.5 | 1.9e-08 | 14 of 25 files fail | not run | 13.07 |
+     | bp1002, 8 ranks, 11 steps | subdomain-direct CG, 64 blocks | subdirect/test.bp1002.qdc.zone.2500_s3_np8_bj64 | 0.01 | 27.5 (2.500/step, 11 st) | 0.17 | 107.7 | 7.5e-08 | 14 of 25 files fail | not run | 11.61 |
+     | bp1002, 8 ranks, 11 steps | BDDC default | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_base | 1.03 | 29.4 (2.675/step, 11 st) | 0.40 | 27.0 | 1.5e-08 | 13 of 25 files fail | not run | 2.82 |
+     | bp1002, 8 ranks, 11 steps | BDDC near-null + faces/edges/vertices | bddc-tune/test.bp1002.qdc.zone.2500_s3_np8_nn_fev | 1.09 | 15.7 (1.428/step, 11 st) | 0.41 | 15.0 | 9.3e-09 | 12 of 25 files fail | not run | 10.83 |
      | bp1002, 8 ranks, 101 steps | exact MUMPS | blr-small/test.bp1002.qdc.zone.2500_s3_np8_base | 3.43 | 19.2 (0.191/step, 101 st) | 0.50 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 20.05 |
-     | bp1002, 8 ranks, 101 steps | BLR 1e-8 | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr8 | 3.76 | 20.5 (0.203/step, 101 st) | 0.48 | 1.0 | 1.5e-08 | 13 of 24 files fail | no: 21 failed, gate-blr | 22.42 |
-     | bp1002, 8 ranks, 101 steps | BLR 1e-6 | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr6 | 3.06 | 13.7 (0.136/step, 101 st) | 0.47 | 1.0 | 1.0e-06 | 21 of 24 files fail | no: 32 failed, gate-blr | 24.29 |
-     | bp1002, 8 ranks, 101 steps | BLR 1e-4 (rejected) | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr4 | 2.69 | 9.4 (0.093/step, 101 st) | 0.43 | 1.0 | 2.0e-04 | 23 of 24 files fail | not run | 25.13 |
+     | bp1002, 8 ranks, 101 steps | BLR 1e-8 | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr8 | 3.76 | 20.5 (0.203/step, 101 st) | 0.48 | 1.0 | 1.5e-08 | 13 of 25 files fail | no: 21 failed, gate-blr | 22.42 |
+     | bp1002, 8 ranks, 101 steps | BLR 1e-6 | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr6 | 3.06 | 13.7 (0.136/step, 101 st) | 0.47 | 1.0 | 1.0e-06 | 21 of 25 files fail | no: 32 failed, gate-blr | 24.29 |
+     | bp1002, 8 ranks, 101 steps | BLR 1e-4 (rejected) | blr-small/test.bp1002.qdc.zone.2500_s3_np8_blr4 | 2.69 | 9.4 (0.093/step, 101 st) | 0.43 | 1.0 | 2.0e-04 | 23 of 25 files fail | not run | 25.13 |
      | bp1002, 8 ranks, 101 steps | all-primal, GAMG CG, subdomain-direct, BDDC | not run: not run at 101 steps | not run | not run | not run | not run | not run | not run | not run | not run |
      | bp5 event run, 8 ranks, 4483 steps | exact MUMPS (BLR family, load 25.7) | blr-small/test.bp5.qdc.2000_s3_np8_base | 3.72 | 799.4 (0.178/step, 4483 st) | 0.55 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 25.69 |
-     | bp5 event run, 8 ranks, 4483 steps | BLR 1e-8 | blr-small/test.bp5.qdc.2000_s3_np8_blr8 | 3.69 | 850.9 (0.190/step, 4483 st) | 0.55 | 1.0 | 1.2e-07 | 115 of 119 files fail | no: 21 failed, gate-blr | 22.20 |
-     | bp5 event run, 8 ranks, 4483 steps | BLR 1e-6 | blr-small/test.bp5.qdc.2000_s3_np8_blr6 | 4.10 | 786.3 (0.175/step, 4483 st) | 0.54 | 1.0 | 4.6e-05 | 118 of 119 files fail | no: 32 failed, gate-blr | 25.49 |
+     | bp5 event run, 8 ranks, 4483 steps | BLR 1e-8 | blr-small/test.bp5.qdc.2000_s3_np8_blr8 | 3.69 | 850.9 (0.190/step, 4483 st) | 0.55 | 1.0 | 1.2e-07 | 115 of 120 files fail | no: 21 failed, gate-blr | 22.20 |
+     | bp5 event run, 8 ranks, 4483 steps | BLR 1e-6 | blr-small/test.bp5.qdc.2000_s3_np8_blr6 | 4.10 | 786.3 (0.175/step, 4483 st) | 0.54 | 1.0 | 4.6e-05 | 118 of 120 files fail | no: 32 failed, gate-blr | 25.49 |
      | bp5 event run, 8 ranks, 4483 steps | BLR 1e-4 (rejected: 4486 steps) | blr-small/test.bp5.qdc.2000_s3_np8_blr4 | 2.91 | 380.8 (0.085/step, 4486 st) | 0.52 | 1.0 | n/a (MISSING disp.04483.nc) | not comparable (4486 steps vs reference) | not run | 13.37 |
      | bp5 event run, 8 ranks, 4483 steps | exact MUMPS (substructuring family, load 5.8) | substruct-bp5/test.bp5.qdc.2000_s3_np8_exact | 3.44 | 573.0 (0.128/step, 4483 st) | 0.52 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 5.82 |
-     | bp5 event run, 8 ranks, 4483 steps | all-primal substructuring | substruct-bp5/test.bp5.qdc.2000_s3_np8_allprimal | 8.02 | 1198.2 (0.267/step, 4483 st) | 1.24 | 1.0 | 4.6e-14 | 119/119 files pass | yes: 39 passed, gate-sub | 17.43 |
+     | bp5 event run, 8 ranks, 4483 steps | all-primal substructuring | substruct-bp5/test.bp5.qdc.2000_s3_np8_allprimal | 8.02 | 1198.2 (0.267/step, 4483 st) | 1.24 | 1.0 | 4.6e-14 | 120/120 files pass | yes: 39 passed, gate-sub | 17.43 |
      | bp5 event run, 8 ranks, 4483 steps | GAMG CG | substruct-bp5/test.bp5.qdc.2000_s3_np8_gamgg (running, no result yet) | running | running | running | running | running | running | running |  |
      | bp5 event run, 8 ranks, 4483 steps | subdomain-direct, BDDC | not run: not run on bp5 | not run | not run | not run | not run | not run | not run | not run | not run |
      | gs10 (bp8.qdc.gs.10), 16 ranks, 3 steps | exact MUMPS | substruct-gs10/bp8.qdc.gs.10_s3_np16_exact | 80.78 | 8.1 (2.708/step, 3 st) | 4.47 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 12.32 |
-     | gs10 (bp8.qdc.gs.10), 16 ranks, 3 steps | all-primal substructuring | substruct-gs10/bp8.qdc.gs.10_s3_np16_allprimal | 268.41 | 13.3 (4.450/step, 3 st) | 20.68 | 1.0 | 4.3e-10 | 32/32 files pass | yes: 39 passed, gate-sub | 11.35 |
+     | gs10 (bp8.qdc.gs.10), 16 ranks, 3 steps | all-primal substructuring | substruct-gs10/bp8.qdc.gs.10_s3_np16_allprimal | 268.41 | 13.3 (4.450/step, 3 st) | 20.68 | 1.0 | 4.3e-10 | 33/33 files pass | yes: 39 passed, gate-sub | 11.35 |
      | gs10 (bp8.qdc.gs.10), 16 ranks, 3 steps | BLR, GAMG CG, subdomain-direct, BDDC | not run: not run on gs10 | not run | not run | not run | not run | not run | not run | not run | not run |
      | wide (10 m BP8), 16 ranks, 3 steps | exact MUMPS | krylov4/bp8.qdc.gs.10.wide_s3_np16_exact | 331.26 | 20.6 (6.881/step, 3 st) | 12.07 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 13.27 |
-     | wide (10 m BP8), 16 ranks, 3 steps | BLR 1e-8 | blr-wide/bp8.qdc.gs.10.wide_s3_np16_blr8 | 156.38 | 10.8 (3.585/step, 3 st) | 9.52 | 1.0 | 4.4e-07 | 13 of 32 files fail | no: 21 failed, gate-blr | 16.74 |
-     | wide (10 m BP8), 16 ranks, 3 steps | BLR 1e-6 | blr-wide/bp8.qdc.gs.10.wide_s3_np16_blr6 | 128.59 | 8.1 (2.690/step, 3 st) | 9.66 | 1.0 | 1.6e-04 | 15 of 32 files fail | no: 32 failed, gate-blr | 17.02 |
+     | wide (10 m BP8), 16 ranks, 3 steps | BLR 1e-8 | blr-wide/bp8.qdc.gs.10.wide_s3_np16_blr8 | 156.38 | 10.8 (3.585/step, 3 st) | 9.52 | 1.0 | 4.4e-07 | 13 of 33 files fail | no: 21 failed, gate-blr | 16.74 |
+     | wide (10 m BP8), 16 ranks, 3 steps | BLR 1e-6 | blr-wide/bp8.qdc.gs.10.wide_s3_np16_blr6 | 128.59 | 8.1 (2.690/step, 3 st) | 9.66 | 1.0 | 1.6e-04 | 15 of 33 files fail | no: 32 failed, gate-blr | 17.02 |
      | wide (10 m BP8), 16 ranks, 3 steps | all-primal substructuring | not run: not run: dense Schur 270-295 GB, ~11 h build (sizing) | not run | not run | not run | not run | not run | not run | not run | not run |
-     | wide (10 m BP8), 16 ranks, 3 steps | GAMG CG | krylov4/bp8.qdc.gs.10.wide_s3_np16_gamgg | 10.61 | 97.2 (32.416/step, 3 st) | 2.54 | 63.0 | 1.1e-07 | 9 of 32 files fail | not run | 21.47 |
+     | wide (10 m BP8), 16 ranks, 3 steps | GAMG CG | krylov4/bp8.qdc.gs.10.wide_s3_np16_gamgg | 10.61 | 97.2 (32.416/step, 3 st) | 2.54 | 63.0 | 1.1e-07 | 9 of 33 files fail | not run | 21.47 |
      | wide (10 m BP8), 16 ranks, 3 steps | subdomain-direct CG | not run: not run (queued, sub4 bj_wide) | not run | not run | not run | not run | not run | not run | not run | not run |
-     | wide (10 m BP8), 16 ranks, 3 steps | BDDC default | bddc-wide/bp8.qdc.gs.10.wide_s3_np16_bddc | 60.19 | 1019.2 (339.720/step, 3 st) | 6.95 | 74.2 | 1.1e-07 | 9 of 32 files fail | not run | 20.86 |
-     | wide (10 m BP8), 16 ranks, 3 steps | BDDC near-null + faces/edges/vertices | bddc-tune/bp8.qdc.gs.10.wide_s3_np16_nnfev | 61.91 | 377.6 (125.883/step, 3 st) | 6.97 | 31.0 | 1.1e-07 | 9 of 32 files fail | not run | 9.82 |
+     | wide (10 m BP8), 16 ranks, 3 steps | BDDC default | bddc-wide/bp8.qdc.gs.10.wide_s3_np16_bddc | 60.19 | 1019.2 (339.720/step, 3 st) | 6.95 | 74.2 | 1.1e-07 | 9 of 33 files fail | not run | 20.86 |
+     | wide (10 m BP8), 16 ranks, 3 steps | BDDC near-null + faces/edges/vertices | bddc-tune/bp8.qdc.gs.10.wide_s3_np16_nnfev | 61.91 | 377.6 (125.883/step, 3 st) | 6.97 | 31.0 | 1.1e-07 | 9 of 33 files fail | not run | 9.82 |
      | wide (10 m BP8), 16 ranks, 200 steps | exact MUMPS | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_base | 335.57 | 1103.4 (5.517/step, 200 st) | 11.66 | 1.0 | reference | reference | yes: 39 passed, gate-blr | 4.17 |
-     | wide (10 m BP8), 16 ranks, 200 steps | BLR 1e-8 | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_blr8 | 140.30 | 573.9 (2.869/step, 200 st) | 9.53 | 1.0 | 5.4e-07 | 15 of 32 files fail | no: 21 failed, gate-blr | 3.70 |
-     | wide (10 m BP8), 16 ranks, 200 steps | BLR 1e-6 | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_blr6 | 132.91 | 495.6 (2.478/step, 200 st) | 9.25 | 1.0 | 2.0e-04 | 19 of 32 files fail | no: 32 failed, gate-blr | 5.10 |
+     | wide (10 m BP8), 16 ranks, 200 steps | BLR 1e-8 | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_blr8 | 140.30 | 573.9 (2.869/step, 200 st) | 9.53 | 1.0 | 5.4e-07 | 15 of 33 files fail | no: 21 failed, gate-blr | 3.70 |
+     | wide (10 m BP8), 16 ranks, 200 steps | BLR 1e-6 | blr-widelong/bp8.qdc.gs.10.wide_s3_np16_blr6 | 132.91 | 495.6 (2.478/step, 200 st) | 9.25 | 1.0 | 2.0e-04 | 19 of 33 files fail | no: 32 failed, gate-blr | 5.10 |
      | wide (10 m BP8), 16 ranks, 200 steps | all-primal, GAMG CG, subdomain-direct, BDDC | not run: not run at 200 steps | not run | not run | not run | not run | not run | not run | not run | not run |
 
    - Open (2026-11-14 12:15): `-11` 60-run batch running, 2 of 60 clean (`runs/20261114_ksp-stress2/`, binary 1.24.4,

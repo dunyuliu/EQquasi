@@ -468,6 +468,12 @@ def _dd_profile_series(gpath, rpath):
     g, r = np.atleast_2d(np.array(g, float)), np.atleast_2d(np.array(r, float))
     if g.shape[1] != 5:
         return False, f"{g.shape[1]} columns, not time, slip_s, slip_d, tstk, tdip"
+    # A non-finite reference entry makes its column's scale, hence its
+    # tolerance, infinite: the column would pass whatever the run holds (rule 2).
+    if not np.isfinite(g).all():
+        i, j = (int(k[0]) for k in np.nonzero(~np.isfinite(g)))
+        return False, (f"{os.path.basename(gpath)}: reference column {j+1} holds {g[i, j]} at row {i}; "
+                       f"a non-finite reference disables the column's check")
     scale = np.abs(g).max(axis=0)
     scale[4] = max(scale[4], scale[3])
     ok, nbad, idx, worst = C.compare_arrays(g, r, DD_RTOL, DD_RTOL, scale=scale)
@@ -871,3 +877,17 @@ def test_kill_group_and_collect_fails_when_a_member_escaped_the_group():
     finally:
         os.kill(escaped, signal.SIGKILL)
         p.communicate(timeout=10)
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("ref_value", [float("inf"), float("-inf"), float("nan")])
+def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_column(tmp_path, ref_value):
+    """Same hole as the station comparison: an inf in a reference column made
+    its scale inf and the column passed whatever the run held (rule 2)."""
+    import numpy as np
+    g, r = str(tmp_path / "ref" / "p1output.txt"), str(tmp_path / "run" / "p1output.txt")
+    for p, tdip in ((g, ref_value), (r, 1.0)):
+        os.makedirs(os.path.dirname(p))
+        np.savetxt(p, np.array([[1.0, 0.1, 0.0, 5.0, 0.0], [2.0, 0.2, 0.0, 6.0, tdip]]))
+    ok, msg = _dd_profile_series(g, r)
+    assert not ok and "p1output.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"

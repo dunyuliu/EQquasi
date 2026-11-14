@@ -62,6 +62,27 @@ build, run and traps are in `CLAUDE.md`.
    (79 GB at 10 m BP8 wide, 141 GB in-core estimate at Case 3);
    (g) subdomain matrices kept unassembled (`MATIS`) and solved with
    `PCBDDC`, the setup built once and reused every step (K is constant).
+   Owner, 2026-11-14, on the solver under (g): "This is a really simple system.
+   It's symmetric. You can use maybe just a regular CG or GRMS." (verbatim;
+   read as: try plain Krylov, CG or GMRES, on the distributed matrix, not
+   only BDDC with direct local solves.)
+   Owner, 2026-11-14: "If you cut the domain into subdomains, and each
+   subdomain you can use mumps with much less memory cost, then it also
+   sounds a good strategy." (verbatim; read as: a subdomain-wise direct
+   solve under an outer Krylov iteration is also a candidate.)
+   Owner, 2026-11-14: "you can just factorize once and just solve for each
+   subdomain and then piece them together. But you just factorize once."
+   (verbatim.)
+   Owner, 2026-11-14: "was a really good strategy and put it on board as
+   well. So in the end, we may have several solver options. And I think the
+   last that you proposed, this 3-step one, is pretty good. Give it a try."
+   (verbatim.) The 3-step strategy, exact substructuring with no outer
+   iteration: (1) factorize each subdomain interior once; (2) build and
+   factorize once the Schur complement that couples only the interface
+   unknowns; (3) each step is one solve per subdomain, one interface solve,
+   one more solve per subdomain. Known cost: the interface matrix is dense,
+   its size not yet computed. Status: TO TRY as a spike, beside plain CG and
+   subdomain-direct solves under CG; none measured yet.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

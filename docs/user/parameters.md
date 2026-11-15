@@ -128,7 +128,7 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
 * **`solver`** -- default `1`
 
-  solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; no bp 8).
+  solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; runs bp 8 as well).
 
 * **`nstep`** -- default `10000`
 

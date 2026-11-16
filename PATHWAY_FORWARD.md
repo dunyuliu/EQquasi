@@ -104,6 +104,14 @@ build, run and traps are in `CLAUDE.md`.
    now" (verbatim.) Read as (a reading, not the owner's words): the 1e-9
    comparator stays the bar for every solver option for now, and iterative
    solves are run as tight as it takes to pass it, down to machine precision.
+   Owner, 2026-11-16, after the survey of the other solver lines (GAMG CG
+   best on memory and scaling; its untested lever, rigid-body modes per side
+   of the fault's split nodes in the near-null space, offered as a second
+   line): "so the winner is gamg cg. what's the near null space on the split
+   node?" and then "keep proposing, keep exploring. 3 days budget. go"
+   (verbatim.) Budget read as 2026-11-16 16:20 CST to 2026-11-19 16:20 CST;
+   scope read as (a reading): the solver lines on this row, the 3-step solve
+   and GAMG CG first, new proposals recorded here before they are run.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

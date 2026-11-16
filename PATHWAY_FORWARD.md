@@ -98,6 +98,11 @@ build, run and traps are in `CLAUDE.md`.
    larger subdomains): "keep pursuing that line" (verbatim.) Owner, 2026-11-16:
    "keep pursuing that line, optimize it with memory and speed." (verbatim.)
    Status: TO TRY on the spike, BLR on the interface first.
+   Owner, 2026-11-16, on the parity tolerance for approximate solves (the
+   question further down this row): "let's use 1e-9 to machine precesion for
+   now" (verbatim.) Read as (a reading, not the owner's words): the 1e-9
+   comparator stays the bar for every solver option for now, and iterative
+   solves are run as tight as it takes to pass it, down to machine precision.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

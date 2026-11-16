@@ -95,8 +95,9 @@ build, run and traps are in `CLAUDE.md`.
    grow that crazy" and, on the untried ways to cut the dense interface cost
    (BLR compression of the Schur complement offered as the cheapest test on
    the existing spike; a sparse hierarchical interface factorization; fewer,
-   larger subdomains): "keep pursuing that line" (verbatim.) Status: TO TRY
-   on the spike, BLR on the interface first.
+   larger subdomains): "keep pursuing that line" (verbatim.) Owner, 2026-11-16:
+   "keep pursuing that line, optimize it with memory and speed." (verbatim.)
+   Status: TO TRY on the spike, BLR on the interface first.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

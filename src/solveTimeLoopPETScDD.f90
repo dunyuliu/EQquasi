@@ -116,6 +116,13 @@ subroutine solveTimeLoopPETScDD
     PetscScalar, pointer       :: sarr(:)
     PetscInt                   :: nPrim, ip, nOwnShared
     real (kind = 8)            :: wmm
+    ! SPIKE (slip-to-traction operator), not for merge: -eq_s2t_build.
+    PetscBool                  :: useS2t
+    real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
+    integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
+    logical, allocatable       :: s2tPair(:)
+    integer (kind = 4)         :: s2tNcol
+    real (kind = 8)            :: s2tBuildSec
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
@@ -793,6 +800,19 @@ subroutine solveTimeLoopPETScDD
         enddo
     endif
 
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_build', useS2t, perr)
+    CHKERRA(perr)
+    if (useS2t .and. useIS) then
+        if (me == 0) write(*,*) '-eq_s2t_build needs the direct factor (no -eq_mat_is)'
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+    if (useS2t) then
+        call PCFactorGetMatrix(pc, Fmm, perr)
+        CHKERRA(perr)
+        call ddS2tBuild
+        wallLoop = MPI_Wtime()
+    endif
+
     stoptag = 0
     totalKSPIts = 0
     nKSPSolves = 0
@@ -859,6 +879,7 @@ subroutine solveTimeLoopPETScDD
         do iiTag = 0, 1
             itag = iiTag
             call ddBoundLoad
+            if (.not. useS2t) then
             call VecZeroEntries(bvec, perr)
             CHKERRA(perr)
             call VecSetValuesLocal(bvec, pnLoc, allLoc, rloc, ADD_VALUES, perr)
@@ -946,7 +967,19 @@ subroutine solveTimeLoopPETScDD
                 enddo
             endif
 
-            call ddBoundFtKu
+            endif
+            if (useS2t) then
+                if (iiTag == 1) then
+                    do n = 1, numnp
+                        if (id(1,n) <= 0) cons(:,n) = constmp(:,n)
+                    enddo
+                endif
+                wall0 = MPI_Wtime()
+                call ddS2tApply
+                wallSolve = wallSolve + (MPI_Wtime() - wall0)
+            else
+                call ddBoundFtKu
+            endif
             call faulting
             ! Owner -> ghost copies of the split-node velocities the next
             ! RHS needs.
@@ -1259,6 +1292,264 @@ contains
         enddo
         call ddFltReverse(consf)
     end subroutine ddBoundFtKu
+
+    real (kind = dp) function ddS2tW(code)
+        ! Prescribed far-field velocity of a constrained dof, the same
+        ! code table as ddBoundLoad.
+        integer (kind = 4), intent(in) :: code
+        if (code == -2) then
+            ddS2tW = -far_load_rate
+        elseif (code == -3) then
+            ddS2tW = far_load_rate
+        elseif (code == -21) then
+            ddS2tW = -far_norm_load_vel
+        elseif (code == -31) then
+            ddS2tW = far_norm_load_vel
+        else
+            ddS2tW = 0.0d0
+        endif
+    end function ddS2tW
+
+    subroutine ddS2tRhs
+        ! The right-hand side of ddBoundLoad from the current constmp
+        ! (second half of ddBoundLoad, unchanged).
+        integer (kind = 4) :: ii, jj, nn, b
+        rloc = 0.0d0
+        do b = 1, nBE
+            ntag = 0
+            do ii = 1, nen
+                nn = ien(ii,beEl(b))
+                do jj = 1, ndof
+                    ntag = ntag + 1
+                    elemu(ntag) = constmp(jj,nn)
+                enddo
+            enddo
+            do jj = 1, nee
+                if (beIdx(jj,b) == 0) then
+                    do ii = 1, nee
+                        if (beIdx(ii,b) > 0) then
+                            rloc(beIdx(ii,b)) = rloc(beIdx(ii,b)) - beEs(ii,jj,b)*elemu(jj)
+                        endif
+                    enddo
+                endif
+            enddo
+        enddo
+    end subroutine ddS2tRhs
+
+    subroutine ddS2tSetState(gc)
+        ! constmp = unit fault-pair dof gc (0-based, global pair order),
+        ! or the far-field velocity pattern when gc == s2tNcol, or zero.
+        integer (kind = 4), intent(in) :: gc
+        integer (kind = 4) :: nn, jj
+        constmp = 0.0d0
+        if (gc == s2tNcol) then
+            do nn = 1, numnp
+                if (id(1,nn) > 0) cycle
+                do jj = 1, ndof
+                    constmp(jj,nn) = ddS2tW(id(jj,nn))
+                enddo
+            enddo
+        endif
+        call VecGhostGetLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGetArray(floc, parr, perr)
+        CHKERRA(perr)
+        parr = 0.0d0
+        if (gc >= s2tDsp(me) .and. gc < s2tDsp(me) + 6*nOwnF) parr(gc - s2tDsp(me) + 1) = 1.0d0
+        call VecRestoreArray(floc, parr, perr)
+        CHKERRA(perr)
+        call VecGhostRestoreLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGhostUpdateBegin(fvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+        CHKERRA(perr)
+        call VecGhostUpdateEnd(fvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+        CHKERRA(perr)
+        call ddFltUnpack(constmp, 1, nLocF)
+    end subroutine ddS2tSetState
+
+    subroutine ddS2tBuild
+        ! Dense S (6*nOwnF local rows per rank, s2tNcol columns, every rank
+        ! holds its own rows) and the far-field column s2tC, by MatMatSolve
+        ! on the factor, 32 columns per batch.
+        integer (kind = 4), parameter :: nbat0 = 32
+        integer (kind = 4) :: ibat, kk, gc, nbat, nn, ll, jj, nr
+        PetscInt :: pk, pnb
+        Vec :: vcol
+        real (kind = 8) :: t0
+        t0 = MPI_Wtime()
+        allocate(s2tCnt(0:nprocs-1), s2tDsp(0:nprocs-1))
+        nr = 6*nOwnF
+        call MPI_Allgather(nr, 1, MPI_INTEGER, s2tCnt, 1, MPI_INTEGER, MPI_COMM_WORLD, IERR)
+        s2tDsp(0) = 0
+        do r = 1, nprocs-1
+            s2tDsp(r) = s2tDsp(r-1) + s2tCnt(r-1)
+        enddo
+        s2tNcol = s2tDsp(nprocs-1) + s2tCnt(nprocs-1)
+        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)))
+        s2tS = 0.0d0
+        allocate(s2tPair(numnp))
+        s2tPair = .false.
+        do ll = 1, nLocF
+            s2tPair(nsmp(1,locFlt(1,ll),locFlt(2,ll))) = .true.
+            s2tPair(nsmp(2,locFlt(1,ll),locFlt(2,ll))) = .true.
+        enddo
+        pnb = nbat0
+        call MatCreateDense(PETSC_COMM_WORLD, pnOwn, PETSC_DECIDE, pneq, pnb, &
+            PETSC_NULL_SCALAR_ARRAY, Bmm, perr)
+        CHKERRA(perr)
+        call MatDuplicate(Bmm, MAT_DO_NOT_COPY_VALUES, Xmm, perr)
+        CHKERRA(perr)
+        nbat = (s2tNcol + 1 + nbat0 - 1)/nbat0
+        do ibat = 1, nbat
+            do kk = 1, nbat0
+                gc = (ibat-1)*nbat0 + kk - 1
+                call ddS2tSetState(gc)
+                call ddS2tRhs
+                call VecZeroEntries(bvec, perr)
+                CHKERRA(perr)
+                call VecSetValuesLocal(bvec, pnLoc, allLoc, rloc, ADD_VALUES, perr)
+                CHKERRA(perr)
+                call VecAssemblyBegin(bvec, perr)
+                CHKERRA(perr)
+                call VecAssemblyEnd(bvec, perr)
+                CHKERRA(perr)
+                pk = kk - 1
+                call MatDenseGetColumnVecWrite(Bmm, pk, vcol, perr)
+                CHKERRA(perr)
+                call VecCopy(bvec, vcol, perr)
+                CHKERRA(perr)
+                call MatDenseRestoreColumnVecWrite(Bmm, pk, vcol, perr)
+                CHKERRA(perr)
+            enddo
+            call MatMatSolve(Fmm, Bmm, Xmm, perr)
+            CHKERRA(perr)
+            do kk = 1, nbat0
+                gc = (ibat-1)*nbat0 + kk - 1
+                if (gc > s2tNcol) cycle
+                pk = kk - 1
+                call MatDenseGetColumnVecRead(Xmm, pk, vcol, perr)
+                CHKERRA(perr)
+                call VecCopy(vcol, xvec, perr)
+                CHKERRA(perr)
+                call MatDenseRestoreColumnVecRead(Xmm, pk, vcol, perr)
+                CHKERRA(perr)
+                call VecGhostUpdateBegin(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+                CHKERRA(perr)
+                call VecGhostUpdateEnd(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+                CHKERRA(perr)
+                call VecGhostGetLocalForm(xvec, xloc, perr)
+                CHKERRA(perr)
+                call VecGetArray(xloc, parr, perr)
+                CHKERRA(perr)
+                do i = 1, nLocDof
+                    uloc(i) = parr(i)
+                enddo
+                call VecRestoreArray(xloc, parr, perr)
+                CHKERRA(perr)
+                call VecGhostRestoreLocalForm(xvec, xloc, perr)
+                CHKERRA(perr)
+                call ddS2tSetState(gc)
+                do nn = 1, numnp
+                    if (id(1,nn) > 0) then
+                        do jj = 1, ndof
+                            constmp(jj,nn) = uloc(lbase(nn)+jj)
+                        enddo
+                    endif
+                enddo
+                itag = 0
+                call ddBoundFtKu
+                call ddFltPack(consf)
+                call VecGhostGetLocalForm(fvec, floc, perr)
+                CHKERRA(perr)
+                call VecGetArray(floc, parr, perr)
+                CHKERRA(perr)
+                if (gc < s2tNcol) then
+                    s2tS(1:nr, gc+1) = parr(1:nr)
+                else
+                    s2tC(1:nr) = parr(1:nr)
+                endif
+                call VecRestoreArray(floc, parr, perr)
+                CHKERRA(perr)
+                call VecGhostRestoreLocalForm(fvec, floc, perr)
+                CHKERRA(perr)
+            enddo
+        enddo
+        call MatDestroy(Bmm, perr)
+        call MatDestroy(Xmm, perr)
+        s2tBuildSec = MPI_Wtime() - t0
+        if (me == 0) write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
+        flush(6)
+    end subroutine ddS2tBuild
+
+    subroutine ddS2tApply
+        ! consf at the owned fault pairs = S g + alpha c, g the constmp
+        ! of the fault pairs, alpha the far-field amplitude (checked).
+        integer (kind = 4) :: nn, jj, nr
+        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi
+        nr = 6*nOwnF
+        amin = huge(1.0d0)
+        amax = -huge(1.0d0)
+        zmax = 0.0d0
+        wmx = max(abs(far_load_rate), abs(far_norm_load_vel))
+        do nn = 1, numnp
+            if (id(1,nn) > 0) cycle
+            if (s2tPair(nn)) cycle
+            do jj = 1, ndof
+                wv = ddS2tW(id(jj,nn))
+                if (wv /= 0.0d0) then
+                    a = constmp(jj,nn)/wv
+                    amin = min(amin, a)
+                    amax = max(amax, a)
+                else
+                    zmax = max(zmax, abs(constmp(jj,nn)))
+                endif
+            enddo
+        enddo
+        lo = amin
+        call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, IERR)
+        amin = hi
+        lo = amax
+        call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+        amax = hi
+        lo = zmax
+        call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+        zmax = hi
+        scale = max(abs(amin), abs(amax))*wmx
+        if (amin > amax) then
+            if (me == 0) write(*,*) 'EQ_S2T: no far-field constrained dof with a prescribed velocity'
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        if (amax - amin > 1.0d-12*max(abs(amin), abs(amax)) .or. zmax > 1.0d-12*scale) then
+            if (me == 0) write(*,*) 'EQ_S2T: far-field part of the prescribed displacement is not ', &
+                'proportional to the velocity pattern: amin amax zmax', amin, amax, zmax
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        call ddFltPack(constmp)
+        call VecGhostGetLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGetArray(floc, parr, perr)
+        CHKERRA(perr)
+        s2tOwn(1:nr) = parr(1:nr)
+        call VecRestoreArray(floc, parr, perr)
+        CHKERRA(perr)
+        call VecGhostRestoreLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call MPI_Allgatherv(s2tOwn, nr, MPI_DOUBLE_PRECISION, s2tGall, s2tCnt, s2tDsp, &
+            MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        consf = 0.0d0
+        call VecGhostGetLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call VecGetArray(floc, parr, perr)
+        CHKERRA(perr)
+        if (nr > 0) then
+            parr(1:nr) = matmul(s2tS(1:nr,:), s2tGall) + amax*s2tC(1:nr)
+        endif
+        call VecRestoreArray(floc, parr, perr)
+        CHKERRA(perr)
+        call VecGhostRestoreLocalForm(fvec, floc, perr)
+        CHKERRA(perr)
+        call ddFltUnpack(consf, 1, nOwnF)
+    end subroutine ddS2tApply
 
     subroutine ddFltPack(a)
         real (kind = dp), intent(in) :: a(ndof,numnp)

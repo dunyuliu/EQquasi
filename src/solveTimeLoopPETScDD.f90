@@ -124,7 +124,12 @@ subroutine solveTimeLoopPETScDD
     real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
     integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
     external :: dgemv
-    real (kind = dp), allocatable :: s2tY(:)
+    ! step 2: the dense rows are redistributed evenly over all ranks after build/load;
+    ! s2tS/s2tC then hold rows s2tDspB(me)+1 .. s2tDspB(me)+s2tNrB of the global row
+    ! order (the order of s2tDsp); the on-disk dump keeps the owner layout.
+    integer (kind = 4), allocatable :: s2tCntB(:), s2tDspB(:)
+    integer (kind = 4)         :: s2tNrB = 0
+    real (kind = dp), allocatable :: s2tY(:), s2tYall(:)
     logical, allocatable       :: s2tPair(:)
     integer (kind = 4)         :: s2tNcol, s2tNst = 0
     real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
@@ -1113,6 +1118,7 @@ subroutine solveTimeLoopPETScDD
             write(*,'(A,I8,6ES13.5)') 'EQ_S2T_APPLY ', s2tNcall, s2tRmax(1), s2tRsum(1), &
                 s2tRmax(2), s2tRsum(2), s2tRmax(3), s2tRsum(3)
             write(*,'(A,3I10)') 'EQ_S2T_APPLY_ROWS ', s2tNrMin, s2tNrMax, s2tNrCnt
+            write(*,'(A,2I10)') 'EQ_S2T_APPLY_ROWS_EVEN ', s2tCntB(0), s2tCntB(nprocs-1)
         endif
     endif
     if (useLog .and. me == 0) write(*,'(A,3ES13.5,I8)') 'EQ_WALL setup loop kspsolve steps ', &
@@ -1446,7 +1452,7 @@ contains
             s2tDsp(r) = s2tDsp(r-1) + s2tCnt(r-1)
         enddo
         s2tNcol = s2tDsp(nprocs-1) + s2tCnt(nprocs-1)
-        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)), s2tY(max(1,nr)))
+        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)))
         s2tS = 0.0d0
         s2tNst = 0
         if (allocated(stnNode)) s2tNst = ndof*n4out
@@ -1493,6 +1499,7 @@ contains
                 write(*,'(A,A)') 'EQ_S2T load read ', trim(s2tLoadPre)
                 write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
             endif
+            call ddS2tRedistribute
             flush(6)
             return
         endif
@@ -1618,10 +1625,89 @@ contains
             call MPI_Barrier(MPI_COMM_WORLD, IERR)
             if (me == 0) write(*,'(A,A)') 'EQ_S2T dump written ', trim(s2tDumpPre)
         endif
+        call ddS2tRedistribute
         s2tBuildSec = MPI_Wtime() - t0
         if (me == 0) write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
         flush(6)
     end subroutine ddS2tBuild
+
+    subroutine ddS2tRedistribute
+        ! Owner layout (rows s2tDsp(me)+1.. of count s2tCnt(me)) to the even layout
+        ! (rank r: rows ncol*r/nprocs+1 .. ncol*(r+1)/nprocs). Both are contiguous
+        ! partitions of the same global row order, so every rank sends a contiguous
+        ! row block to each overlapping rank; columns go in chunks of cb.
+        integer (kind = 4), parameter :: cb = 64
+        integer (kind = 4) :: r, c0, nc, k, nrOld, o, lo, hi
+        integer (kind = 4), allocatable :: sc(:), sd(:), rc(:), rd(:)
+        real (kind = dp), allocatable :: sb(:), rb(:), Sn(:,:), Cn(:)
+        real (kind = dp), allocatable :: cfull(:)
+        nrOld = s2tCnt(me)
+        allocate(s2tCntB(0:nprocs-1), s2tDspB(0:nprocs-1))
+        do r = 0, nprocs-1
+            s2tDspB(r) = int((int(s2tNcol,8)*r)/nprocs, 4)
+            s2tCntB(r) = int((int(s2tNcol,8)*(r+1))/nprocs, 4) - s2tDspB(r)
+        enddo
+        s2tNrB = s2tCntB(me)
+        allocate(sc(0:nprocs-1), sd(0:nprocs-1), rc(0:nprocs-1), rd(0:nprocs-1))
+        ! rows I send to r: overlap of my old block with r's new block; rows I
+        ! receive from r: overlap of r's old block with my new block
+        do r = 0, nprocs-1
+            lo = max(s2tDsp(me), s2tDspB(r))
+            hi = min(s2tDsp(me)+s2tCnt(me), s2tDspB(r)+s2tCntB(r))
+            sc(r) = max(0, hi-lo)
+            lo = max(s2tDsp(r), s2tDspB(me))
+            hi = min(s2tDsp(r)+s2tCnt(r), s2tDspB(me)+s2tCntB(me))
+            rc(r) = max(0, hi-lo)
+        enddo
+        allocate(Sn(max(1,s2tNrB), s2tNcol), Cn(max(1,s2tNrB)))
+        allocate(sb(max(1,sum(sc))*cb), rb(max(1,sum(rc))*cb))
+        do c0 = 1, s2tNcol, cb
+            nc = min(cb, s2tNcol-c0+1)
+            o = 0
+            do r = 0, nprocs-1
+                sd(r) = o
+                lo = max(s2tDsp(me), s2tDspB(r))
+                if (sc(r) > 0) then
+                    do k = 1, nc
+                        sb(o+1:o+sc(r)) = s2tS(lo-s2tDsp(me)+1:lo-s2tDsp(me)+sc(r), c0+k-1)
+                        o = o + sc(r)
+                    enddo
+                endif
+            enddo
+            o = 0
+            do r = 0, nprocs-1
+                rd(r) = o
+                o = o + rc(r)*nc
+            enddo
+            call ddS2tA2A(sb, sc*nc, sd, rb, rc*nc, rd)
+            do r = 0, nprocs-1
+                if (rc(r) > 0) then
+                    lo = max(s2tDsp(r), s2tDspB(me))
+                    o = rd(r)
+                    do k = 1, nc
+                        Sn(lo-s2tDspB(me)+1:lo-s2tDspB(me)+rc(r), c0+k-1) = rb(o+1:o+rc(r))
+                        o = o + rc(r)
+                    enddo
+                endif
+            enddo
+        enddo
+        ! the far-field column: gather whole, slice (s2tNcol doubles)
+        allocate(cfull(s2tNcol))
+        call MPI_Allgatherv(s2tC, nrOld, MPI_DOUBLE_PRECISION, cfull, s2tCnt, s2tDsp, &
+            MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        if (s2tNrB > 0) Cn(1:s2tNrB) = cfull(s2tDspB(me)+1:s2tDspB(me)+s2tNrB)
+        call move_alloc(Sn, s2tS)
+        call move_alloc(Cn, s2tC)
+        allocate(s2tY(max(1,s2tNrB)), s2tYall(s2tNcol))
+        s2tY = 0.0d0
+    end subroutine ddS2tRedistribute
+
+    subroutine ddS2tA2A(sb, sc, sd, rb, rc, rd)
+        real (kind = dp), intent(in) :: sb(*)
+        real (kind = dp), intent(inout) :: rb(*)
+        integer (kind = 4), intent(in) :: sc(0:nprocs-1), sd(0:nprocs-1), rc(0:nprocs-1), rd(0:nprocs-1)
+        call MPI_Alltoallv(sb, sc, sd, MPI_DOUBLE_PRECISION, rb, rc, rd, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+    end subroutine ddS2tA2A
 
     subroutine ddS2tApply
         ! consf at the owned fault pairs = S g + alpha c, g the constmp
@@ -1688,16 +1774,21 @@ contains
             MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
         s2tTagv = s2tTagv + (MPI_Wtime() - tB)
         consf = 0.0d0
+        tC0 = MPI_Wtime()
+        if (s2tNrB > 0) then
+            call dgemv('N', s2tNrB, s2tNcol, 1.0d0, s2tS, s2tNrB, s2tGall, 1, 0.0d0, s2tY, 1)
+            s2tY(1:s2tNrB) = s2tY(1:s2tNrB) + amax*s2tC(1:s2tNrB)
+        endif
+        s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
+        tB = MPI_Wtime()
+        call MPI_Allgatherv(s2tY, s2tNrB, MPI_DOUBLE_PRECISION, s2tYall, s2tCntB, s2tDspB, &
+            MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        s2tTagv = s2tTagv + (MPI_Wtime() - tB)
         call VecGhostGetLocalForm(fvec, floc, perr)
         CHKERRA(perr)
         call VecGetArray(floc, parr, perr)
         CHKERRA(perr)
-        tC0 = MPI_Wtime()
-        if (nr > 0) then
-            call dgemv('N', nr, s2tNcol, 1.0d0, s2tS, nr, s2tGall, 1, 0.0d0, s2tY, 1)
-            parr(1:nr) = s2tY(1:nr) + amax*s2tC(1:nr)
-        endif
-        s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
+        if (nr > 0) parr(1:nr) = s2tYall(s2tDsp(me)+1:s2tDsp(me)+nr)
         call VecRestoreArray(floc, parr, perr)
         CHKERRA(perr)
         call VecGhostRestoreLocalForm(fvec, floc, perr)

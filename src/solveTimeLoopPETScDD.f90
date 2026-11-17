@@ -117,7 +117,7 @@ subroutine solveTimeLoopPETScDD
     PetscInt                   :: nPrim, ip, nOwnShared
     real (kind = 8)            :: wmm
     ! SPIKE (slip-to-traction operator), not for merge: -eq_s2t_build.
-    PetscBool                  :: useS2t
+    PetscBool                  :: useS2t, s2tFull
     real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
     integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
     logical, allocatable       :: s2tPair(:)
@@ -879,7 +879,12 @@ subroutine solveTimeLoopPETScDD
         do iiTag = 0, 1
             itag = iiTag
             call ddBoundLoad
-            if (.not. useS2t) then
+            ! s2t: the displacement of the free nodes is solved (exact path, same
+            ! factor) in the last solve of a step when it is read: stations record
+            ! cons and consv every step, disp files at output steps.
+            s2tFull = useS2t .and. iiTag == 1 .and. (allocated(dout) .or. &
+                mod(it,nt_output_stress) == 1 .or. it == nstep)
+            if (.not. useS2t .or. s2tFull) then
             call VecZeroEntries(bvec, perr)
             CHKERRA(perr)
             call VecSetValuesLocal(bvec, pnLoc, allLoc, rloc, ADD_VALUES, perr)
@@ -1476,6 +1481,9 @@ contains
         enddo
         call MatDestroy(Bmm, perr)
         call MatDestroy(Xmm, perr)
+        ! The build solves leave the last column in uloc; step 1 takes its
+        ! velocity from uloc - uprev, which must start from zero as in the exact path.
+        uloc = 0.0d0
         s2tBuildSec = MPI_Wtime() - t0
         if (me == 0) write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
         flush(6)

@@ -885,7 +885,7 @@ subroutine solveTimeLoopPETScDD
             ! factor) in the last solve of a step when it is read: stations record
             ! cons and consv every step, disp files at output steps.
             s2tFull = useS2t .and. iiTag == 1 .and. &
-                (mod(it,nt_output_stress) == 1 .or. it == nstep)
+                (mod(it,nt_output_stress) == 1 .or. it == nstep .or. stoptag == 1)
             if (.not. useS2t .or. s2tFull) then
             call VecZeroEntries(bvec, perr)
             CHKERRA(perr)

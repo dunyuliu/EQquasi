@@ -1516,6 +1516,8 @@ contains
                 call VecGhostRestoreLocalForm(fvec, floc, perr)
                 CHKERRA(perr)
             enddo
+            if (me == 0) write(*,'(A,2I8,ES13.5,2I10)') 'EQ_S2T_PROG ibat nbat sec ncol nr ', ibat, nbat, MPI_Wtime() - t0, s2tNcol, nr
+            flush(6)
         enddo
         call MatDestroy(Bmm, perr)
         call MatDestroy(Xmm, perr)

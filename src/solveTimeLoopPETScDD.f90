@@ -127,6 +127,9 @@ subroutine solveTimeLoopPETScDD
     integer (kind = 4)         :: s2tNcol, s2tNst = 0
     real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
     real (kind = 8)            :: s2tBuildSec
+    real (kind = dp)           :: s2tTagv = 0.0d0, s2tTmm = 0.0d0, s2tTall = 0.0d0, s2tTother = 0.0d0
+    integer (kind = 4)         :: s2tNcall = 0, s2tNr, s2tNrOn, s2tNrMin, s2tNrMax, s2tNrCnt
+    real (kind = dp)           :: s2tRt(3), s2tRmax(3), s2tRsum(3)
     character (len = 1024)     :: s2tDumpPre, s2tLoadPre
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -1091,6 +1094,25 @@ subroutine solveTimeLoopPETScDD
     call cpu_time(endTime)
     timeUsedInComputing = endTime-startTime
     wallLoop = MPI_Wtime() - wallLoop
+    if (useS2t) then
+        s2tTother = s2tTall - s2tTagv - s2tTmm
+        s2tRt(1) = s2tTagv
+        s2tRt(2) = s2tTmm
+        s2tRt(3) = s2tTother
+        call MPI_Reduce(s2tRt, s2tRmax, 3, MPI_DOUBLE_PRECISION, MPI_MAX, 0, MPI_COMM_WORLD, IERR)
+        call MPI_Reduce(s2tRt, s2tRsum, 3, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, IERR)
+        s2tNr = 6*nOwnF
+        s2tNrOn = 0
+        if (s2tNr > 0) s2tNrOn = 1
+        call MPI_Reduce(s2tNr, s2tNrMin, 1, MPI_INTEGER, MPI_MIN, 0, MPI_COMM_WORLD, IERR)
+        call MPI_Reduce(s2tNr, s2tNrMax, 1, MPI_INTEGER, MPI_MAX, 0, MPI_COMM_WORLD, IERR)
+        call MPI_Reduce(s2tNrOn, s2tNrCnt, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, IERR)
+        if (me == 0) then
+            write(*,'(A,I8,6ES13.5)') 'EQ_S2T_APPLY ', s2tNcall, s2tRmax(1), s2tRsum(1), &
+                s2tRmax(2), s2tRsum(2), s2tRmax(3), s2tRsum(3)
+            write(*,'(A,3I10)') 'EQ_S2T_APPLY_ROWS ', s2tNrMin, s2tNrMax, s2tNrCnt
+        endif
+    endif
     if (useLog .and. me == 0) write(*,'(A,3ES13.5,I8)') 'EQ_WALL setup loop kspsolve steps ', &
         wallSetup, wallLoop, wallSolve, it-1
 
@@ -1603,7 +1625,9 @@ contains
         ! consf at the owned fault pairs = S g + alpha c, g the constmp
         ! of the fault pairs, alpha the far-field amplitude (checked).
         integer (kind = 4) :: nn, jj, nr
-        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi
+        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi, tA, tB, tC0
+        tA = MPI_Wtime()
+        s2tNcall = s2tNcall + 1
         nr = 6*nOwnF
         amin = huge(1.0d0)
         amax = -huge(1.0d0)
@@ -1657,22 +1681,29 @@ contains
         CHKERRA(perr)
         call VecGhostRestoreLocalForm(fvec, floc, perr)
         CHKERRA(perr)
+        tB = MPI_Wtime()
         call MPI_Allgatherv(s2tOwn, nr, MPI_DOUBLE_PRECISION, s2tGall, s2tCnt, s2tDsp, &
             MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        s2tTagv = s2tTagv + (MPI_Wtime() - tB)
         consf = 0.0d0
         call VecGhostGetLocalForm(fvec, floc, perr)
         CHKERRA(perr)
         call VecGetArray(floc, parr, perr)
         CHKERRA(perr)
+        tC0 = MPI_Wtime()
         if (nr > 0) then
             parr(1:nr) = matmul(s2tS(1:nr,:), s2tGall) + amax*s2tC(1:nr)
         endif
+        s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
         call VecRestoreArray(floc, parr, perr)
         CHKERRA(perr)
         call VecGhostRestoreLocalForm(fvec, floc, perr)
         CHKERRA(perr)
         call ddFltUnpack(consf, 1, nOwnF)
+        tC0 = MPI_Wtime()
         if (itag == 1 .and. s2tNst > 0) s2tU = matmul(s2tSu, s2tGall) + amax*s2tCu
+        s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
+        s2tTall = s2tTall + (MPI_Wtime() - tA)
     end subroutine ddS2tApply
 
     subroutine ddS2tStations(full)

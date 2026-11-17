@@ -123,6 +123,8 @@ subroutine solveTimeLoopPETScDD
     PetscBool                  :: useS2t, s2tFull
     real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
     integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
+    external :: dgemv
+    real (kind = dp), allocatable :: s2tY(:)
     logical, allocatable       :: s2tPair(:)
     integer (kind = 4)         :: s2tNcol, s2tNst = 0
     real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
@@ -1444,7 +1446,7 @@ contains
             s2tDsp(r) = s2tDsp(r-1) + s2tCnt(r-1)
         enddo
         s2tNcol = s2tDsp(nprocs-1) + s2tCnt(nprocs-1)
-        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)))
+        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)), s2tY(max(1,nr)))
         s2tS = 0.0d0
         s2tNst = 0
         if (allocated(stnNode)) s2tNst = ndof*n4out
@@ -1692,7 +1694,8 @@ contains
         CHKERRA(perr)
         tC0 = MPI_Wtime()
         if (nr > 0) then
-            parr(1:nr) = matmul(s2tS(1:nr,:), s2tGall) + amax*s2tC(1:nr)
+            call dgemv('N', nr, s2tNcol, 1.0d0, s2tS, nr, s2tGall, 1, 0.0d0, s2tY, 1)
+            parr(1:nr) = s2tY(1:nr) + amax*s2tC(1:nr)
         endif
         s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
         call VecRestoreArray(floc, parr, perr)
@@ -1701,7 +1704,10 @@ contains
         CHKERRA(perr)
         call ddFltUnpack(consf, 1, nOwnF)
         tC0 = MPI_Wtime()
-        if (itag == 1 .and. s2tNst > 0) s2tU = matmul(s2tSu, s2tGall) + amax*s2tCu
+        if (itag == 1 .and. s2tNst > 0) then
+            call dgemv('N', s2tNst, s2tNcol, 1.0d0, s2tSu, s2tNst, s2tGall, 1, 0.0d0, s2tU, 1)
+            s2tU = s2tU + amax*s2tCu
+        endif
         s2tTmm = s2tTmm + (MPI_Wtime() - tC0)
         s2tTall = s2tTall + (MPI_Wtime() - tA)
     end subroutine ddS2tApply

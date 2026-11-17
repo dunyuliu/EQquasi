@@ -1429,7 +1429,7 @@ contains
         ! EQ_S2T_BATCHTIME, finalize and exit (no dump, no time loop).
         integer (kind = 4) :: nbat0, maxbat, tbat
         PetscBool :: hasNb, hasMb
-        real (kind = 8) :: tloop
+        real (kind = 8) :: tloop, tRl, tRlSum
         integer (kind = 4) :: ibat, kk, gc, nbat, nn, ll, jj, nr
         PetscInt :: pk, pnb
         Vec :: vcol
@@ -1541,6 +1541,7 @@ contains
         CHKERRA(perr)
         nbat = (s2tNcol + 1 + nbat0 - 1)/nbat0
         tloop = MPI_Wtime()
+        tRlSum = 0.0d0
         cap = 4096
         allocate(lrow(cap), lcol(cap), lval(cap))
         do ibat = 1, nbat
@@ -1581,6 +1582,7 @@ contains
                     call VecRestoreArray(bvec, parr, perr)
                     CHKERRA(perr)
                 else
+                    tRl = MPI_Wtime()
                     pk = kk - 1
                     call MatDenseGetColumnVecWrite(Bmm, pk, vcol, perr)
                     CHKERRA(perr)
@@ -1588,6 +1590,7 @@ contains
                     CHKERRA(perr)
                     call MatDenseRestoreColumnVecWrite(Bmm, pk, vcol, perr)
                     CHKERRA(perr)
+                    tRlSum = tRlSum + (MPI_Wtime() - tRl)
                 endif
             enddo
             if (sparseRhs) then
@@ -1607,6 +1610,7 @@ contains
                 call MPI_Gatherv(lrow, nlz, MPI_INTEGER, grow, rcnt, rdsp, MPI_INTEGER, 0, MPI_COMM_WORLD, IERR)
                 call MPI_Gatherv(lcol, nlz, MPI_INTEGER, gcol, rcnt, rdsp, MPI_INTEGER, 0, MPI_COMM_WORLD, IERR)
                 call MPI_Gatherv(lval, nlz, MPI_DOUBLE_PRECISION, gval, rcnt, rdsp, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, IERR)
+                tRl = MPI_Wtime()
                 allocate(dnzA(max(1,nbat0)), onzA(max(1,nbat0)))
                 dnzA = 0
                 onzA = 0
@@ -1628,6 +1632,7 @@ contains
                         CHKERRA(perr)
                     enddo
                 endif
+                tRlSum = tRlSum + (MPI_Wtime() - tRl)
                 call MatAssemblyBegin(Btm, MAT_FINAL_ASSEMBLY, perr)
                 CHKERRA(perr)
                 call MatAssemblyEnd(Btm, MAT_FINAL_ASSEMBLY, perr)
@@ -1715,6 +1720,8 @@ contains
                 tloop = MPI_Wtime() - tloop
                 if (me == 0) write(*,'(A,2I8,2ES13.5)') 'EQ_S2T_BATCHTIME nbat0 nbatDone sec sec_per_col ', &
                     nbat0, tbat, tloop, tloop/(dble(tbat)*dble(nbat0))
+                if (me == 0) write(*,'(A,ES13.5,2I8,I6)') 'EQ_S2T_RHSLOAD sec_sum ncols_total nbatches nranks ', &
+                    tRlSum, tbat*nbat0, tbat, nprocs
                 flush(6)
                 call PetscFinalize(perr)
                 call MPI_FINALIZE(IERR)

@@ -1424,8 +1424,12 @@ contains
     subroutine ddS2tBuild
         ! Dense S (6*nOwnF local rows per rank, s2tNcol columns, every rank
         ! holds its own rows) and the far-field column s2tC, by MatMatSolve
-        ! on the factor, 32 columns per batch.
-        integer (kind = 4), parameter :: nbat0 = 32
+        ! on the factor, -eq_s2t_nbat columns per batch (default 32).
+        ! -eq_s2t_maxbat N is timing-only: stop after N batches, print
+        ! EQ_S2T_BATCHTIME, finalize and exit (no dump, no time loop).
+        integer (kind = 4) :: nbat0, maxbat, tbat
+        PetscBool :: hasNb, hasMb
+        real (kind = 8) :: tloop
         integer (kind = 4) :: ibat, kk, gc, nbat, nn, ll, jj, nr
         PetscInt :: pk, pnb
         Vec :: vcol
@@ -1441,6 +1445,20 @@ contains
         CHKERRA(perr)
         if (doDump .and. doLoad) then
             if (me == 0) write(*,*) 'EQ_S2T: -eq_s2t_dump and -eq_s2t_load are mutually exclusive'
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        nbat0 = 32
+        call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_nbat', nbat0, hasNb, perr)
+        CHKERRA(perr)
+        if (nbat0 < 1) then
+            if (me == 0) write(*,*) 'EQ_S2T: -eq_s2t_nbat must be >= 1'
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        maxbat = 0
+        call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_maxbat', maxbat, hasMb, perr)
+        CHKERRA(perr)
+        if (hasMb .and. (maxbat < 1 .or. doLoad .or. doDump)) then
+            if (me == 0) write(*,*) 'EQ_S2T: -eq_s2t_maxbat needs N >= 1 and no dump/load'
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
         nbat = 0
@@ -1510,6 +1528,7 @@ contains
         call MatDuplicate(Bmm, MAT_DO_NOT_COPY_VALUES, Xmm, perr)
         CHKERRA(perr)
         nbat = (s2tNcol + 1 + nbat0 - 1)/nbat0
+        tloop = MPI_Wtime()
         do ibat = 1, nbat
             do kk = 1, nbat0
                 gc = (ibat-1)*nbat0 + kk - 1
@@ -1601,6 +1620,17 @@ contains
             enddo
             if (me == 0) write(*,'(A,2I8,ES13.5,2I10)') 'EQ_S2T_PROG ibat nbat sec ncol nr ', ibat, nbat, MPI_Wtime() - t0, s2tNcol, nr
             flush(6)
+            if (hasMb .and. ibat == maxbat) then
+                tbat = ibat
+                call MPI_Barrier(MPI_COMM_WORLD, IERR)
+                tloop = MPI_Wtime() - tloop
+                if (me == 0) write(*,'(A,2I8,2ES13.5)') 'EQ_S2T_BATCHTIME nbat0 nbatDone sec sec_per_col ', &
+                    nbat0, tbat, tloop, tloop/(dble(tbat)*dble(nbat0))
+                flush(6)
+                call PetscFinalize(perr)
+                call MPI_FINALIZE(IERR)
+                stop
+            endif
         enddo
         call MatDestroy(Bmm, perr)
         call MatDestroy(Xmm, perr)

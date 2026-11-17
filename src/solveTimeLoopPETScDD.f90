@@ -117,6 +117,9 @@ subroutine solveTimeLoopPETScDD
     PetscInt                   :: nPrim, ip, nOwnShared
     real (kind = 8)            :: wmm
     ! SPIKE (slip-to-traction operator), not for merge: -eq_s2t_build.
+    ! -eq_s2t_dump <prefix> writes the built operator, one stream file per rank
+    ! <prefix>.NNNNNN; -eq_s2t_load <prefix> reads it instead of building (header
+    ! mismatch or short read aborts, no rebuild). Not both together.
     PetscBool                  :: useS2t, s2tFull
     real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
     integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
@@ -124,6 +127,7 @@ subroutine solveTimeLoopPETScDD
     integer (kind = 4)         :: s2tNcol, s2tNst = 0
     real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
     real (kind = 8)            :: s2tBuildSec
+    character (len = 1024)     :: s2tDumpPre, s2tLoadPre
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
     integer (kind = 4), allocatable :: nodeAt(:,:,:), nodeOwner(:), gnode(:), lbase(:), &
@@ -1396,7 +1400,20 @@ contains
         PetscInt :: pk, pnb
         Vec :: vcol
         real (kind = 8) :: t0
+        PetscBool :: doDump, doLoad
+        character (len = 1100) :: fn
+        integer (kind = 4) :: hdr(6), hdr0(6), iu, ios
+        character (len = 8) :: hname(6) = (/ 'nprocs  ', 'rank    ', 'nr      ', 's2tNcol ', 's2tNst  ', 'numnp   ' /)
         t0 = MPI_Wtime()
+        call PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_dump', s2tDumpPre, doDump, perr)
+        CHKERRA(perr)
+        call PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_load', s2tLoadPre, doLoad, perr)
+        CHKERRA(perr)
+        if (doDump .and. doLoad) then
+            if (me == 0) write(*,*) 'EQ_S2T: -eq_s2t_dump and -eq_s2t_load are mutually exclusive'
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        nbat = 0
         allocate(s2tCnt(0:nprocs-1), s2tDsp(0:nprocs-1))
         nr = 6*nOwnF
         call MPI_Allgather(nr, 1, MPI_INTEGER, s2tCnt, 1, MPI_INTEGER, MPI_COMM_WORLD, IERR)
@@ -1420,6 +1437,41 @@ contains
             s2tPair(nsmp(1,locFlt(1,ll),locFlt(2,ll))) = .true.
             s2tPair(nsmp(2,locFlt(1,ll),locFlt(2,ll))) = .true.
         enddo
+        if (doLoad) then
+            write(fn,'(A,A,I6.6)') trim(s2tLoadPre), '.', me
+            hdr0 = (/ nprocs, me, nr, s2tNcol, s2tNst, numnp /)
+            open(newunit=iu, file=trim(fn), access='stream', form='unformatted', status='old', action='read', iostat=ios)
+            if (ios /= 0) then
+                write(*,*) 'EQ_S2T load: cannot open ', trim(fn), ' iostat ', ios
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            read(iu, iostat=ios) hdr
+            if (ios /= 0) then
+                write(*,*) 'EQ_S2T load: short read in header of ', trim(fn)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            do ll = 1, 6
+                if (hdr(ll) /= hdr0(ll)) then
+                    write(*,*) 'EQ_S2T load: header mismatch field ', trim(hname(ll)), ' file ', hdr(ll), ' run ', hdr0(ll), ' rank ', me
+                    call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+                endif
+            enddo
+            read(iu, iostat=ios) s2tS(1:nr,1:s2tNcol), s2tC(1:nr), s2tSu(1:s2tNst,1:s2tNcol), s2tCu(1:s2tNst)
+            if (ios /= 0) then
+                write(*,*) 'EQ_S2T load: short read in data of ', trim(fn), ' iostat ', ios
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            close(iu)
+            uloc = 0.0d0
+            call MPI_Barrier(MPI_COMM_WORLD, IERR)
+            s2tBuildSec = MPI_Wtime() - t0
+            if (me == 0) then
+                write(*,'(A,A)') 'EQ_S2T load read ', trim(s2tLoadPre)
+                write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
+            endif
+            flush(6)
+            return
+        endif
         pnb = nbat0
         call MatCreateDense(PETSC_COMM_WORLD, pnOwn, PETSC_DECIDE, pneq, pnb, &
             PETSC_NULL_SCALAR_ARRAY, Bmm, perr)
@@ -1524,6 +1576,24 @@ contains
         ! The build solves leave the last column in uloc; step 1 takes its
         ! velocity from uloc - uprev, which must start from zero as in the exact path.
         uloc = 0.0d0
+        if (doDump) then
+            write(fn,'(A,A,I6.6)') trim(s2tDumpPre), '.', me
+            hdr = (/ nprocs, me, nr, s2tNcol, s2tNst, numnp /)
+            open(newunit=iu, file=trim(fn), access='stream', form='unformatted', status='replace', action='write', iostat=ios)
+            if (ios /= 0) then
+                write(*,*) 'EQ_S2T dump: cannot open ', trim(fn), ' iostat ', ios
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            write(iu, iostat=ios) hdr
+            if (ios == 0) write(iu, iostat=ios) s2tS(1:nr,1:s2tNcol), s2tC(1:nr), s2tSu(1:s2tNst,1:s2tNcol), s2tCu(1:s2tNst)
+            if (ios /= 0) then
+                write(*,*) 'EQ_S2T dump: write failed ', trim(fn), ' iostat ', ios
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            close(iu)
+            call MPI_Barrier(MPI_COMM_WORLD, IERR)
+            if (me == 0) write(*,'(A,A)') 'EQ_S2T dump written ', trim(s2tDumpPre)
+        endif
         s2tBuildSec = MPI_Wtime() - t0
         if (me == 0) write(*,'(A,ES13.5,2I8)') 'EQ_S2T built sec ncol nbat ', s2tBuildSec, s2tNcol, nbat
         flush(6)
@@ -1563,6 +1633,11 @@ contains
         call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
         zmax = hi
         scale = max(abs(amin), abs(amax))*wmx
+        if (amin > amax .and. wmx == 0.0d0) then
+            ! no far-field load at all: alpha = 0, the amax*s2tC term vanishes
+            amin = 0.0d0
+            amax = 0.0d0
+        endif
         if (amin > amax) then
             if (me == 0) write(*,*) 'EQ_S2T: no far-field constrained dof with a prescribed velocity'
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)

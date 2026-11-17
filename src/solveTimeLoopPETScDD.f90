@@ -121,7 +121,8 @@ subroutine solveTimeLoopPETScDD
     real (kind = dp), allocatable :: s2tS(:,:), s2tC(:), s2tGall(:), s2tOwn(:)
     integer (kind = 4), allocatable :: s2tCnt(:), s2tDsp(:)
     logical, allocatable       :: s2tPair(:)
-    integer (kind = 4)         :: s2tNcol
+    integer (kind = 4)         :: s2tNcol, s2tNst = 0
+    real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
     real (kind = 8)            :: s2tBuildSec
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -827,6 +828,7 @@ subroutine solveTimeLoopPETScDD
         if (stoptag == 1) exit
 
         uprev = uloc
+        if (s2tNst > 0) s2tUprev = s2tU
 
         if (bp == 7 .and. icstart == 1) then
             if (it < (nuct/dt)) then
@@ -882,8 +884,8 @@ subroutine solveTimeLoopPETScDD
             ! s2t: the displacement of the free nodes is solved (exact path, same
             ! factor) in the last solve of a step when it is read: stations record
             ! cons and consv every step, disp files at output steps.
-            s2tFull = useS2t .and. iiTag == 1 .and. (allocated(dout) .or. &
-                mod(it,nt_output_stress) == 1 .or. it == nstep)
+            s2tFull = useS2t .and. iiTag == 1 .and. &
+                (mod(it,nt_output_stress) == 1 .or. it == nstep)
             if (.not. useS2t .or. s2tFull) then
             call VecZeroEntries(bvec, perr)
             CHKERRA(perr)
@@ -982,6 +984,7 @@ subroutine solveTimeLoopPETScDD
                 wall0 = MPI_Wtime()
                 call ddS2tApply
                 wallSolve = wallSolve + (MPI_Wtime() - wall0)
+                if (iiTag == 1) call ddS2tStations(s2tFull)
             else
                 call ddBoundFtKu
             endif
@@ -1031,6 +1034,18 @@ subroutine solveTimeLoopPETScDD
                 enddo
             endif
         enddo
+        if (s2tNst > 0) then
+            do i = 1, n4out
+                j = stnNode(i)
+                if (j > 0) then
+                    if (id(1,j) > 0) then
+                        do k = 1, ndof
+                            consv(k,j) = (s2tU(ndof*(i-1)+k) - s2tUprev(ndof*(i-1)+k))/dtev1
+                        enddo
+                    endif
+                endif
+            enddo
+        endif
         globaldat(1,it) = time
         globaldat(2,it) = maxSlipRate
         globaldat(3,it) = totMomRate
@@ -1392,6 +1407,13 @@ contains
         s2tNcol = s2tDsp(nprocs-1) + s2tCnt(nprocs-1)
         allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)))
         s2tS = 0.0d0
+        s2tNst = 0
+        if (allocated(stnNode)) s2tNst = ndof*n4out
+        allocate(s2tSu(max(1,s2tNst), s2tNcol), s2tCu(max(1,s2tNst)), s2tU(max(1,s2tNst)), s2tUprev(max(1,s2tNst)))
+        s2tSu = 0.0d0
+        s2tCu = 0.0d0
+        s2tU = 0.0d0
+        s2tUprev = 0.0d0
         allocate(s2tPair(numnp))
         s2tPair = .false.
         do ll = 1, nLocF
@@ -1453,6 +1475,22 @@ contains
                 CHKERRA(perr)
                 call VecGhostRestoreLocalForm(xvec, xloc, perr)
                 CHKERRA(perr)
+                if (s2tNst > 0) then
+                    do ll = 1, n4out
+                        jj = stnNode(ll)
+                        if (jj > 0) then
+                            if (id(1,jj) > 0) then
+                                do nn = 1, ndof
+                                    if (gc < s2tNcol) then
+                                        s2tSu(ndof*(ll-1)+nn, gc+1) = uloc(lbase(jj)+nn)
+                                    else
+                                        s2tCu(ndof*(ll-1)+nn) = uloc(lbase(jj)+nn)
+                                    endif
+                                enddo
+                            endif
+                        endif
+                    enddo
+                endif
                 call ddS2tSetState(gc)
                 do nn = 1, numnp
                     if (id(1,nn) > 0) then
@@ -1557,7 +1595,59 @@ contains
         call VecGhostRestoreLocalForm(fvec, floc, perr)
         CHKERRA(perr)
         call ddFltUnpack(consf, 1, nOwnF)
+        if (itag == 1 .and. s2tNst > 0) s2tU = matmul(s2tSu, s2tGall) + amax*s2tCu
     end subroutine ddS2tApply
+
+    subroutine ddS2tStations(full)
+        ! Station cons from the operator (last apply of the step). On a step
+        ! with the full solve, operator vs solve: traction at the owned fault
+        ! pairs against ddBoundFtKu, station displacement against uloc.
+        PetscBool, intent(in) :: full
+        integer (kind = 4) :: ll, ss, jj, kk, w, nn
+        real (kind = dp) :: v(4), vg(4)
+        real (kind = dp), allocatable :: fop(:,:)
+        if (full) then
+            allocate(fop(ndof,numnp))
+            fop = consf
+            call ddBoundFtKu
+            v = 0.0d0
+            do ll = 1, nOwnF
+                do w = 1, 2
+                    nn = nsmp(w,locFlt(1,ll),locFlt(2,ll))
+                    v(1) = max(v(1), maxval(abs(fop(:,nn) - consf(:,nn))))
+                    v(2) = max(v(2), maxval(abs(consf(:,nn))))
+                enddo
+            enddo
+            consf = fop
+            if (s2tNst > 0) then
+                do ss = 1, n4out
+                    jj = stnNode(ss)
+                    if (jj > 0) then
+                        if (id(1,jj) > 0) then
+                            do kk = 1, ndof
+                                v(3) = max(v(3), abs(s2tU(ndof*(ss-1)+kk) - uloc(lbase(jj)+kk)))
+                                v(4) = max(v(4), abs(uloc(lbase(jj)+kk)))
+                            enddo
+                        endif
+                    endif
+                enddo
+            endif
+            call MPI_Allreduce(v, vg, 4, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
+        endif
+        if (s2tNst > 0) then
+            do ss = 1, n4out
+                jj = stnNode(ss)
+                if (jj > 0) then
+                    if (id(1,jj) > 0) then
+                        do kk = 1, ndof
+                            cons(kk,jj) = s2tU(ndof*(ss-1)+kk)
+                        enddo
+                    endif
+                endif
+            enddo
+        endif
+    end subroutine ddS2tStations
 
     subroutine ddFltPack(a)
         real (kind = dp), intent(in) :: a(ndof,numnp)

@@ -1,6 +1,6 @@
 # EQquasi Project Rules
 
-Twenty-three rules, each earned by an incident in this repository. Rule numbers are
+Twenty-five rules, each earned by an incident in this repository. Rule numbers are
 cited from `tests/`, `scripts/defaultParameters.py`, `src/read_input.f90` and
 commit messages, so they are never reused or renumbered.
 
@@ -21,7 +21,7 @@ below it is the record of why.
 | 8 | `data/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
 | 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
 | 10 | Docs move with the code, in the same commit. |
-| 11 | Comparing two runs? Check both `runInfo.json` versions first. Rows agreeing to 3+ digits while a controlled variable changed: investigate, not a result (11a). Relaxed comparator column: audit the others (11b). |
+| 11 | Comparing two runs? Check both `runInfo.json` versions first. Rows agreeing to 3+ digits while a controlled variable changed: investigate, not a result (11a). Relaxed comparator column: audit the others (11b). Audit every noise or comparator claim before the owner relies on it (11c). |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
 | 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). |
@@ -33,7 +33,9 @@ below it is the record of why.
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
 | 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
 | 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 5 MB. |
-| 23 | A quoted figure names its source file and counting rule: resource = maximum over all rank files; float32 parity states its floor. |
+| 23 | A quoted figure names its source file and counting rule: resource = maximum over all rank files; float32 parity states its floor. An empty `rss.*` is absent, not zero (23a); parse `EQ_S2T_PROG` with its inline header handled (23b). |
+| 24 | Long launch: grep the driver chain for `timeout` first, one wall cap recorded on the board row (24a); kill by recorded process group, check the lock (24b); `export` what children read, log it (24c); a batch over ~2 h declares itself (24d). |
+| 25 | "Running" on the board quotes a live `ps` line and an advancing log mtime, this turn (25a). A gate that could not run is NOT RUN, never green (25b). |
 
 Two habits that would have caught most violations of the above: read the file
 list a commit prints before pushing it, and re-read this card before staging.
@@ -63,6 +65,8 @@ list a commit prints before pushing it, and re-read this card before staging.
 21. [A release is a tag plus its Release page, and the unattended grant](#21-a-release-is-a-tag-plus-its-release-page-and-the-unattended-grant)
 22. [The root is a whitelist, not a preference](#22-the-root-is-a-whitelist-not-a-preference)
 23. [A quoted figure names its source and its counting rule](#23-a-quoted-figure-names-its-source-and-its-counting-rule)
+24. [A long launch has one wall cap, a killable process group, and exported inputs](#24-a-long-launch-has-one-wall-cap-a-killable-process-group-and-exported-inputs)
+25. [A status claim is a fresh observation, and a gate that did not run says so](#25-a-status-claim-is-a-fresh-observation-and-a-gate-that-did-not-run-says-so)
 
 ## How these rules overlap
 
@@ -325,6 +329,19 @@ change to the pass definition for that column only; before it merges, a
 check (test or script, named in the PR) must show every other column still
 fails on its exact tolerance, e.g. by perturbing each by one tolerance unit
 and seeing it fail. Without that, the relaxation is a widened gate.
+
+**11c. An audit of every noise or comparator claim precedes an owner decision
+that relies on it.** A board claim that the exact-vs-exact comparator misses
+were "column 5 only" was overturned by an independent audit; the failing
+entries were the out-of-plane columns (conductor 19 hand-off, board row 1,
+2026-11-17; the audit and the physical-terms re-measurement are the paragraphs
+above that hand-off). The owner moves a comparator bar on the strength of such
+claims, so an unaudited one is a hypothesis (rule 16). Before a PR or hand-off
+asks the owner to move a comparator bar, the claim is audited per column and
+per file by the quantitative-claim auditor or `victor-reyes` (rule 3b's form),
+and the ask names the audit and its verdict. Check:
+`gh pr view <N> --json comments,body` shows the verdict dated before the ask.
+Tier: judgment (advisory); the mechanical part is the dated verdict.
 
 ---
 
@@ -799,9 +816,97 @@ way is now a requirement:
 
 Rule 16 applies to every inherited figure of this kind.
 
+**23a. An empty rank file is absent, not zero.** `MPI_ABORT` kills
+`/usr/bin/time` before it writes, so every `rss.*` of an aborted run is 0 bytes
+(wide slip-to-traction run, board row 1, 2026-11-17: no RSS figure exists for
+it). A harvest checks every rank file is non-empty before quoting a memory
+figure and prints "absent (aborted)" otherwise. Check:
+`find <run> -name 'rss.*' -size 0` prints nothing for a run whose figure is quoted.
+
+**23b. `EQ_S2T_PROG` prints its header inline with the first data row.** The
+audit of batch C found the hazard (board row 1, 2026-11-17: "parse with care");
+a parser that treats line 1 as a pure header or pure data drops or corrupts a
+batch. Safe form: split the header token off line 1 and keep its data, then
+assert parsed rows equal `grep -c EQ_S2T_PROG log/cycle0.log`. The exact header
+text is not quoted on the board; verify the form against a log before relying
+on this check. Tier: mechanical once the harvest asserts the count.
+
 **Check**: judgment, a reader recomputes the figure from the cited run
 directory with a script that reads every rank file. Mechanical proxy: the board
 row cites the run directory (`runs/<date>_<slug>/`), which must exist.
+
+---
+
+## 24. A long launch has one wall cap, a killable process group, and exported inputs
+
+Four mechanisms have each cost a long run or a lock. Each is written for the
+mechanism that failed, not for launches in general.
+
+**24a. A wall cap is set in one place and recorded.** A driver that wraps its
+job in its own `timeout N` makes the outer cap a lie. Board row 1 records two
+wide builds lost to it (2026-11-16 and 17): `rc=124` at "the 7000 s runcase
+timeout", and "an inner timeout in the run script". Conductor 19's
+copy-of-`runcase_blr.sh` case is the same mechanism, but that script is not
+named on the board (not found). Before any launch over 30 minutes:
+`grep -nE '\btimeout\b' <driver> <every script it calls>`; each hit is either
+the single cap, equal to what the board row records, or removed. The row
+records the cap and its source `file:line`. Rule 15a still holds: the cap sits
+inside `flock`. Tier: mechanical (the grep); that the row records it is judgment.
+
+**24b. Kill a job by its recorded process group, then confirm.** A shell-only
+kill leaves `mpirun` and the solver ranks alive, still holding the
+`heavy.lock` file descriptor they inherited, so the next launch waits on a
+dead batch. Board row 1 records batch A killed when its conductor stopped (it
+was a child of her session), and the conductor 19 hand-off lists "orphaned MPI
+jobs holding the heavy lock after a shell-only kill"; the PIDs and times are
+not on the board (not found). Launch detached in its own group (`setsid`),
+record the PID, kill with `kill -- -<pgid>`; then `ps -o pid,pgid,args -g
+<pgid>` lists nothing and `flock -n <lock> true` exits 0 before any relaunch.
+Never `pkill -f` (rule 15). Tier: mechanical.
+
+**24c. Export what children read, and log the effective value.** Variables not
+`export`ed are invisible inside `bash -c` and `flock ... bash -c` children, so a
+driver ran its defaults: the stop-step bisect requeue "ran nothing (variables
+not exported into the `bash -c`)" and its marker was renamed
+`BIS_DONE.empty_unexported_vars_20261117` (board row 1, 2026-11-17). A driver
+`export`s every variable a child reads, and the child's first log line prints
+the values it received. Check: each `grep -n 'bash -c' <driver>` hit is paired
+with an `export` of every variable in its quoted command. Tier: judgment on
+the pairing, mechanical for the listing.
+
+**24d. A batch over ~2 h declares itself.** Rules 15a and 15b already bound
+lock holders and forbid relying on arrival order; this adds the declaration. A
+batch expected over 2 h on `heavy.lock` writes a board row with start, expected
+end and the window it leaves, or small gates take `light.lock` meanwhile.
+Evidence: `docs/dev/SESSION_LOG_20261113_dd_ownership.md` entry 4 (a one-core
+hour-long run starved the spike); the 2026-11-17 starvation of spike agents'
+small gates is in the conductor 19 hand-off only, without detail (not found).
+Tier: norm (advisory); proxy: the row's declared window against the `flock`
+start times in the run's own log.
+
+---
+
+## 25. A status claim is a fresh observation, and a gate that did not run says so
+
+**25a. "Running" is quoted from a live process, this turn.** Conductor 15's
+board row said batch A was running; conductor 16 corrected it, because the
+batch had been killed with its parent session at 20:40 CST (board row 1,
+"CORRECTION by conductor 16", 2026-11-16). A "running", "queued" or "in
+progress" claim on the board or in a hand-off quotes, from the same turn,
+`ps -o pid,lstart,args -p <pid>` and the `ls -l --time-style=full-iso` of a
+log whose mtime is later than the claim's own start. No such lines: write "not
+verified running". Rule 12's command-per-claim applies. Tier: mechanical per
+claim at the time it is written; not checkable afterwards.
+
+**25b. A gate that could not run is reported NOT RUN.** A specialist whose gate
+scripts were all refused by the permission guard must not report green or omit
+the gate. The brief states the allowed form for scripts up front (an inline
+command, or a script path the guard permits); the gate is runnable inside the
+sandbox rules; a refused or unrunnable gate is reported as `NOT RUN: <reason>`
+and counts as a failure under rule 3a. The refusal incident itself is not on
+the board or in the session log (not found); this sub-rule is written from the
+dispatching brief. Tier: norm (advisory); proxy: rule 3a's grep on posted
+evidence for "refused" and "NOT RUN".
 
 ---
 

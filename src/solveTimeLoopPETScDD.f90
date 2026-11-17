@@ -1435,6 +1435,15 @@ contains
         Vec :: vcol
         real (kind = 8) :: t0
         PetscBool :: doDump, doLoad
+        ! -eq_s2t_sparse: RHS block as a sparse AIJ (transposed, all on rank 0) for MatMatTransposeSolve
+        PetscBool :: hasSp, sparseRhs
+        Mat :: Btm
+        PetscInt :: rs, re, ri(1), ci(1), pz0 = 0, pone = 1
+        PetscInt, allocatable :: dnzA(:), onzA(:)
+        PetscScalar :: vv(1)
+        integer (kind = 4), allocatable :: lrow(:), lcol(:), grow(:), gcol(:), rcnt(:), rdsp(:), tmpi(:)
+        real (kind = 8), allocatable :: lval(:), gval(:), tmpr(:)
+        integer (kind = 4) :: nlz, cap, ntot, ie, r0
         character (len = 1100) :: fn
         integer (kind = 4) :: hdr(6), hdr0(6), iu, ios
         character (len = 8) :: hname(6) = (/ 'nprocs  ', 'rank    ', 'nr      ', 's2tNcol ', 's2tNst  ', 'numnp   ' /)
@@ -1461,6 +1470,9 @@ contains
             if (me == 0) write(*,*) 'EQ_S2T: -eq_s2t_maxbat needs N >= 1 and no dump/load'
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
+        call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_sparse', hasSp, perr)
+        CHKERRA(perr)
+        sparseRhs = hasSp
         nbat = 0
         allocate(s2tCnt(0:nprocs-1), s2tDsp(0:nprocs-1))
         nr = 6*nOwnF
@@ -1529,7 +1541,10 @@ contains
         CHKERRA(perr)
         nbat = (s2tNcol + 1 + nbat0 - 1)/nbat0
         tloop = MPI_Wtime()
+        cap = 4096
+        allocate(lrow(cap), lcol(cap), lval(cap))
         do ibat = 1, nbat
+            nlz = 0
             do kk = 1, nbat0
                 gc = (ibat-1)*nbat0 + kk - 1
                 call ddS2tSetState(gc)
@@ -1542,16 +1557,90 @@ contains
                 CHKERRA(perr)
                 call VecAssemblyEnd(bvec, perr)
                 CHKERRA(perr)
-                pk = kk - 1
-                call MatDenseGetColumnVecWrite(Bmm, pk, vcol, perr)
-                CHKERRA(perr)
-                call VecCopy(bvec, vcol, perr)
-                CHKERRA(perr)
-                call MatDenseRestoreColumnVecWrite(Bmm, pk, vcol, perr)
-                CHKERRA(perr)
+                if (sparseRhs) then
+                    call VecGetOwnershipRange(bvec, rs, re, perr)
+                    CHKERRA(perr)
+                    call VecGetArray(bvec, parr, perr)
+                    CHKERRA(perr)
+                    do ie = 1, int(re - rs)
+                        if (parr(ie) /= 0.0d0) then
+                            if (nlz == cap) then
+                                allocate(tmpi(2*cap), tmpr(2*cap))
+                                tmpi(1:cap) = lrow(1:cap); call move_alloc(tmpi, lrow)
+                                allocate(tmpi(2*cap))
+                                tmpi(1:cap) = lcol(1:cap); call move_alloc(tmpi, lcol)
+                                tmpr(1:cap) = lval(1:cap); call move_alloc(tmpr, lval)
+                                cap = 2*cap
+                            endif
+                            nlz = nlz + 1
+                            lrow(nlz) = int(rs) + ie - 1
+                            lcol(nlz) = kk - 1
+                            lval(nlz) = parr(ie)
+                        endif
+                    enddo
+                    call VecRestoreArray(bvec, parr, perr)
+                    CHKERRA(perr)
+                else
+                    pk = kk - 1
+                    call MatDenseGetColumnVecWrite(Bmm, pk, vcol, perr)
+                    CHKERRA(perr)
+                    call VecCopy(bvec, vcol, perr)
+                    CHKERRA(perr)
+                    call MatDenseRestoreColumnVecWrite(Bmm, pk, vcol, perr)
+                    CHKERRA(perr)
+                endif
             enddo
-            call MatMatSolve(Fmm, Bmm, Xmm, perr)
-            CHKERRA(perr)
+            if (sparseRhs) then
+                ! Bt = RHS^T: nbat0 x pneq, all rows and columns owned by rank 0 (the
+                ! PETSc/MUMPS interface reads only rank 0's diagonal block, imumps.c MatMatSolve_MUMPS).
+                allocate(rcnt(0:nprocs-1), rdsp(0:nprocs-1))
+                call MPI_Gather(nlz, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, IERR)
+                ntot = 0
+                if (me == 0) then
+                    rdsp(0) = 0
+                    do r0 = 1, nprocs-1
+                        rdsp(r0) = rdsp(r0-1) + rcnt(r0-1)
+                    enddo
+                    ntot = rdsp(nprocs-1) + rcnt(nprocs-1)
+                endif
+                allocate(grow(max(1,ntot)), gcol(max(1,ntot)), gval(max(1,ntot)))
+                call MPI_Gatherv(lrow, nlz, MPI_INTEGER, grow, rcnt, rdsp, MPI_INTEGER, 0, MPI_COMM_WORLD, IERR)
+                call MPI_Gatherv(lcol, nlz, MPI_INTEGER, gcol, rcnt, rdsp, MPI_INTEGER, 0, MPI_COMM_WORLD, IERR)
+                call MPI_Gatherv(lval, nlz, MPI_DOUBLE_PRECISION, gval, rcnt, rdsp, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, IERR)
+                allocate(dnzA(max(1,nbat0)), onzA(max(1,nbat0)))
+                dnzA = 0
+                onzA = 0
+                if (me == 0) then
+                    do ie = 1, ntot
+                        dnzA(gcol(ie)+1) = dnzA(gcol(ie)+1) + 1
+                    enddo
+                    call MatCreateAIJ(PETSC_COMM_WORLD, pnb, pneq, pnb, pneq, pz0, dnzA, pz0, onzA, Btm, perr)
+                else
+                    call MatCreateAIJ(PETSC_COMM_WORLD, pz0, pz0, pnb, pneq, pz0, dnzA, pz0, onzA, Btm, perr)
+                endif
+                CHKERRA(perr)
+                if (me == 0) then
+                    do ie = 1, ntot
+                        ri(1) = gcol(ie)
+                        ci(1) = grow(ie)
+                        vv(1) = gval(ie)
+                        call MatSetValues(Btm, pone, ri, pone, ci, vv, INSERT_VALUES, perr)
+                        CHKERRA(perr)
+                    enddo
+                endif
+                call MatAssemblyBegin(Btm, MAT_FINAL_ASSEMBLY, perr)
+                CHKERRA(perr)
+                call MatAssemblyEnd(Btm, MAT_FINAL_ASSEMBLY, perr)
+                CHKERRA(perr)
+                call MatMatTransposeSolve(Fmm, Btm, Xmm, perr)
+                CHKERRA(perr)
+                call MatDestroy(Btm, perr)
+                CHKERRA(perr)
+                deallocate(rcnt, rdsp, grow, gcol, gval, dnzA, onzA)
+            else
+                call MatMatSolve(Fmm, Bmm, Xmm, perr)
+                CHKERRA(perr)
+            endif
             do kk = 1, nbat0
                 gc = (ibat-1)*nbat0 + kk - 1
                 if (gc > s2tNcol) cycle

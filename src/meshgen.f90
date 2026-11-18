@@ -621,7 +621,7 @@ end subroutine meshgen
 !
 ! et == 1 regular interior, et == 2 fault-adjacent, et == 3 far-field boundary.
 ! Only et == 2 elements contribute nodal mass to fault nodes (see
-! bound_ft_ku in solveTimeLoopMUMPS.f90), so a mesh with no et == 2 elements
+! bound_ft_ku in onFaultHelpers.f90), so a mesh with no et == 2 elements
 ! leaves every fault node massless and aborts later in faulting with a
 ! ZERO MASS message that says nothing about the cause.
 !

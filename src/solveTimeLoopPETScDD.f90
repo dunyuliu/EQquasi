@@ -66,6 +66,7 @@ subroutine solveTimeLoopPETScDD
 #include <petsc/finclude/petscksp.h>
     use petscksp
     use globalvar, gv_mat => mat
+    use onFaultHelpers
     implicit none
 
     Mat                        :: Amat

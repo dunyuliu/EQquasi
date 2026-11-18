@@ -959,3 +959,37 @@ Hand-off, for a fresh conductor:
 - Proposal 6 (single precision + BLR + Fischer on Vista) not started; waits on the ladder harvest and an SU tally.
 - Ask the rules specialist to draft rules from lessons 3 and 4 and the launcher crash.
 - Worktrees to keep: c23-read, c23-board, c24-board, owner-relays-2, spike-blr, gate-full, lapusta-xi and the agent-* worktrees listed in the session log; agent-a07d3a48124b0f9b0 is locked.
+
+### Row 1, conductor 25: Vista ladder harvest, comparator verdicts, two open questions (2026-11-18 04:10 CST; MEASURED once each, not closed)
+
+Machine: Vista (TACC), GH nodes used CPU-only (72 Neoverse-V2 cores, 117 GB, 9 NUMA domains), gcc 14.2.0, Open MPI 5.0.5, PETSc 3.25.5 with MUMPS, netcdf 4.9.2, binary 1.24.5 solver 3, `--map-by ppr:<ppn>:node:PE=1 --bind-to core`, no `--host`. Job 1151045 (8 nodes, 6 min 16 s) finished: np64, np288, np576 all rc=0 with `-mat_mumps_icntl_4 1 -mat_mumps_icntl_14 100`; the ICNTL(14)=250 retry never ran (not needed). Evidence: `runs/20261118_vista/vista_rungs/` (tarball `c25_all.tgz`, md5 3933cace99cb8c8debe008a84db4ff83, copied over the control socket and the md5 matched on both ends; per-rung `run*.log`, `rc*.txt`, `result/cycle0`, mesh files excluded).
+
+Rungs, wide (BP8 GS wide, 1,231,276 nodes, 40 steps, exact distributed direct), one run each, not repeated. Factorization s / time loop s / s per step (loop over 40) / largest-rank peak RSS MB / summed MB / layout; ICNTL(14) is 35 (default) at 32 and 144, 100 at 64, 288, 576, so memory is not like for like:
+
+| ranks | nodes x ppn | factorization | loop | s/step | peak rank | summed | ICNTL(14) |
+|---|---|---|---|---|---|---|---|
+| 32 | 4 x 8 | 354.8 | 45.45 | 1.136 | 7113 | 190275 | 35 |
+| 64 | 4 x 16 | 153.9 | 31.91 | 0.798 | 4638 | 260228 | 100 |
+| 144 | 4 x 36 | 87.2 | 23.46 | 0.586 | 2294 | 253362 | 35 |
+| 288 | 8 x 36 | 59.3 | 21.42 | 0.535 | 2235 | 374793 | 100 |
+| 576 | 8 x 72 | 50.0 | 21.83 | 0.546 | 2279 | 513511 | 100 |
+
+Efficiency against the 32-rank rung (speedup / ranks ratio): factorization 64: 1.15, 144: 0.90, 288: 0.66, 576: 0.39; loop 64: 0.71, 144: 0.43, 288: 0.24, 576: 0.12. This is NOT a clean strong-scaling curve: ranks per node change 8, 16, 36, 36, 72, nodes change 4 to 8 at 288, and ICNTL(14) differs. Read it as: factorization keeps improving to 576 ranks (7.1x for 18x ranks), the per-step loop stops improving past 288 (0.535 against 0.546 s). Assembly and solve are not timed separately by this binary (it logs factorization, time loop, per step only); the split needs a `-log_view` rerun. bp1002, 8 ranks, 1 node: factorization 2.56 s, 0.0427 s/step.
+
+Comparator (`scratch/bench/cmp_c11.py`, 1e-9, 25 or 33 files):
+- bp1002 8 ranks Vista against the local solver-3 8-rank result `runs/20261118_c22-metrics/bp1002.qdc.2500_s3_np8`: `compared 25 fail 0` (cross-architecture, aarch64 against x86). This one passes.
+- wide, every rung against the local 32-rank reference `runs/20261118_vista/local/wide40_np32`: FAIL at the 1e-9 bar (4 to 6 of 33 files; also against the Vista 32-rank rung). Causes read from the files, each rung:
+  1. `cplot_EQquasi.txt` and `cplot_ruptarea_trac_slip.txt` have NUL-byte holes (same file size, NUL runs; NULs 43690 to 1322522 per file, none in bp1002) on every multi-node rung, persisting on disk when counted on the Vista login node. `$SCRATCH` on Vista is NFSv3 with `nconnect=8`. Only rank 0 writes these (`writeResults`, `src/eqquasi.f90:301`). Cause of the holes not established (an NFS write artifact is the hypothesis; no control run on node-local disk). The intact rows (7544 to 10113 of 10201) match the reference to at most 1.1e-13 of column scale, all 16 columns, every row key found.
+  2. `disp.00001.nc` (float32): worst 2.4e-8 of the component scale, 1.4e-8 to 2.4e-8 in all rungs, identical across ranks (np32 and np144 give the same worst entries), so architecture, not scaling; `disp.00040.nc`: 1.0e-9 to 3.7e-9.
+  3. `fltst_strk+000dp+000.dat`: in-plane columns 0.0 difference at every row; only the out-of-plane columns differ: slip_3 (1e-27 scale), shear_stress_3 (1e-19) and slip_rate_3 in log10 (reference exactly -30, i.e. floor, Vista -29.0 to -29.9 from step 30: roundoff 1e-29 m/s displayed in log space). This is the owner's open out-of-plane comparator-bar item.
+  So the wide rungs are timings that completed, with in-plane output matching to roundoff, not passes at the 1e-9 bar. They are not called VERIFIED or passing here.
+
+Open questions:
+- cplot 9.8e-4 in the step-0 rerun: `runs/20261118_step0/rerun`, `test.bp8.qdc.gs.10_s3_np4_rerun` and `_np8_rerun` against their first runs, column 4 (index 3), entry 277770180767.1491 against 277770180767.1501, 2.4e-15 relative to the column maximum (about 16 ulp); no other file pair exceeds 5e-7 absolute, all at most 3.3e-15 of column scale; np1 reruns identical (bp1002, bp5, bp7, bp8 np1: 0 difference). Roundoff from reduction order at np greater than 1, not noise of another kind.
+- local wide reference 5.45 s/step (218.1 s loop, 40 steps, 32 ranks, `runs/20261118_vista/local/wide40_np32`): host load 5.8 at start, 38.3 at end (`load_before.txt`, `load_after.txt`), so the second half ran loaded; one run, no repeat at stable load. I could not find a 3.3 to 3.5 s/step exact-solver figure for wide at 32 ranks on this board; the 3.3 to 3.65 figures there are slip-to-traction (s32a 3.58 s/step) or a build rate of 3.3 s per batch, a different solver. Premise not confirmed; load as the cause is plausible, untested. UNEXPLAINED.
+
+SU: jobs 1150984, 1151010, 1151018, 1151045 held 8 nodes for 2:01, 7:56, 5:46, 6:16 = 2.9 node-hours plus about 0.02 for builds; at 1 SU per node-hour (rate not read from the allocation, assumption) about 3 SU against the 150 ceiling.
+
+Proposal 8 (written before it runs, needs no owner action; amended from my first draft of 36 ranks per node on 1, 2, 4, 8 nodes, because the 32-rank rung already holds 190 GB summed and one 117 GB node cannot hold np36): comparable layouts on 4 and 8 nodes, all at ICNTL(4)=1, ICNTL(14)=100, one attempt each under a 1500 s timeout, no `--host`. 4 nodes: np32 (8 per node), np144 (36), np288 (72), with the existing np64 (16) r3 rung gives ranks 32, 64, 144, 288 on fixed 4 nodes at one ICNTL(14); 8 nodes: np144 (18 per node) new, np288 (36) and np576 (72) existing r3. Plus np144 4 x 36 on `$WORK` (Lustre) as the control for the NUL-hole hypothesis (the `$SCRATCH` filesystem is NFS), and np144 4 x 36 with `-log_view` for the assembly and solve split. Script `runs/20261118_vista/ladder4/ladder4_job.sh`, about 20 min on 8 nodes, about 3 SU of the 150 ceiling (rate assumption as above). Proposal 6 (single precision, BLR, Fischer) stays queued behind it.
+
+Owner items added: (1) wide cplot files lose rows on Vista NFS (the output path writes through rank 0; whether to write elsewhere or sync is the owner's); (2) cross-architecture bar for float32 `disp` files (1e-9 fails at 2.4e-8 of scale); (3) the comparator bar for out-of-plane columns, now with Vista evidence; (4) default ICNTL(14): default 35 failed at np64, 288, 576 on Vista and 100 passed, and passed at np32 and np144 at 35.

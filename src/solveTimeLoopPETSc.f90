@@ -113,6 +113,7 @@ subroutine solveTimeLoopPETSc
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     PetscInt                   :: kspMaxIts
     PetscBool                  :: isPreonly, isCholesky, isCG, isGAMG
+    PetscBool                  :: icntl14Set
     KSPConvergedReason         :: kspReason
     PetscInt                   :: maxRowNnz
     PetscInt                   :: matLocalRows, matLocalCols
@@ -422,6 +423,15 @@ subroutine solveTimeLoopPETSc
     CHKERRA(perr)
     call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
     CHKERRA(perr)
+    ! Owner decision 2A: MUMPS workspace ICNTL(14) defaults to 100 (MUMPS
+    ! itself: 20, as measured on 1.24.5); Vista fails at the MUMPS default from 64 ranks. A user
+    ! -mat_mumps_icntl_14 (command line or PETSC_OPTIONS) wins.
+    call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-mat_mumps_icntl_14', icntl14Set, perr)
+    CHKERRA(perr)
+    if (.not. icntl14Set) then
+        call PetscOptionsSetValue(PETSC_NULL_OPTIONS, '-mat_mumps_icntl_14', '100', perr)
+        CHKERRA(perr)
+    end if
     ! Runtime overrides (e.g. -ksp_view, or a different -pc_type for row
     ! 8b) are applied on top of the hardcoded defaults above, never
     ! instead of them.

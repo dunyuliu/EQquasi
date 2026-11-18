@@ -169,6 +169,74 @@ build, run and traps are in `CLAUDE.md`.
    reproducible; look at how EQdyna records its runs and borrow that
    layout rather than invent one. A new file or script for it is still a
    rule 1 proposal on this row first.
+   Owner, 2026-11-18 13:55 CST, answering three numbered questions put by
+   the invoking session: "3A. 2A" (verbatim.) The options as they were put:
+   question 2, MUMPS workspace setting ICNTL(14), "A) default it to 100,
+   since Vista fails at the default from 64 ranks (recommended), B) leave
+   at 35"; question 3, solver-layer refactor design on this row, "A) go,
+   gated at 1e-9 (recommended, since byte-identical only holds at 1 rank),
+   B) hold". Read as (a reading): (2A) ICNTL(14) defaults to 100 in source
+   on the MUMPS-through-PETSc paths, a user option still overriding it; a
+   `src/` change, so a version bump and a gated PR, with setup time, time
+   per step and memory recorded before and after; whether the native MUMPS
+   loop (solver 1) gets the same default, and `KSPSetUp` reading
+   INFOG(1)/(2), are NOT decided. (3A) the refactor design on this row
+   (#166) may start; its gate is the 1e-9 comparator against gold and
+   against the pre-refactor binary, not byte identity; it stays
+   behaviour-preserving, with no new user-facing parameter, file rename or
+   default change without the owner's word. Question 1 (an absolute floor
+   for the out-of-plane columns in the comparator) was NOT answered and
+   stays open: strict 1e-9 holds until it is.
+   Owner, 2026-11-18 13:57 CST, answering question 1: "1A" (verbatim.) The
+   option as it was put: "Comparator bar for out-of-plane columns: A) add
+   an absolute floor so roundoff passes (recommended), B) keep strict
+   1e-9". Read as (a reading): the comparator keeps rtol 1e-9 on every
+   column that carries signal and gains an absolute floor on the
+   out-of-plane columns (`Slip_3`, `Slip_rate_3`, `Shear_stress_3` and
+   their log10 forms in the `fltst` files), so values at roundoff level
+   pass. The floor value was NOT given: it is proposed on this row with
+   the measured exact-against-exact differences behind it before any
+   result is re-read as a pass; the cross-architecture float32 `disp`
+   files are NOT covered by this answer.
+   Owner, 2026-11-18 13:59 CST, after being told what stands between the
+   slip-to-traction option and regular use (and, one message earlier, the
+   Vista limits of distributed direct): "fix those vista issue, and run
+   full cycles, a few, and verify. if we can pass that and the CI, let's
+   promote it" (verbatim.) Read as (a reading, the owner may correct it):
+   "it" is the slip-to-traction option; promotion is CONDITIONAL on
+   (i) the Vista issues fixed: ICNTL(14) (2A above), the NUL holes in
+   output written to NFS scratch (run from Lustre, or a fix if the cause
+   is in the code), and for slip-to-traction a clean dedicated-node run;
+   (ii) a few full earthquake cycles run with slip-to-traction and
+   verified against exact at the comparator bar (1e-9 with the 1A floor);
+   which cases and how many is proposed on this row first, with cost;
+   (iii) the full test tier and CI green on the exact commit. Promotion
+   then follows the same route as distributed direct: gated merges, a
+   version bump, the code audit before any tag. NOT decided by this
+   message: the option's name and parameter value (rule 1: proposed on
+   this row and agreed before the merge-bound branch), a `vista` machine
+   target, a compset for wide, the re-layout reader for the saved
+   operator, any default change.
+   Owner, 2026-11-18 14:00 CST: "then, let's promote slip to traction"
+   (verbatim.) Read as (a reading): confirms that "it" above is
+   slip-to-traction and that promotion comes after the conditions (i) to
+   (iii) pass ("then"), not before them.
+   Owner, 2026-11-18 14:00 CST: "and then optimize the slip to traction"
+   (verbatim.) Read as (a reading): after the promotion lands, the
+   slip-to-traction option is optimized; the measured costs on this row
+   are the candidates (operator build time, 1.9 h at 32 ranks and 3 h at
+   16 on wide; memory, about 1.3x summed and 1.5x peak rank against
+   exact; the saved operator being readable only at its own rank count).
+   Each optimization is proposed on this row with its before and after
+   measurement and stays behaviour-preserving at the comparator bar; it
+   comes after the promotion, not inside it.
+   Owner, 2026-11-18 14:00 CST: "/autopilot go" (verbatim.) Read as (a
+   reading): the unattended run continues on the scope above (Vista
+   fixes, full cycles and verification, promotion of slip-to-traction if
+   the conditions and CI pass, then its optimization, with 2A, 3A and 1A);
+   "go" names no time budget, so it is read as until this row's items are
+   done or blocked on the owner, replacing the 2026-11-19 16:20 CST end.
+   The Vista ceiling of 150 SU and every "NOT decided" item above stand.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

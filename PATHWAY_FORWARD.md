@@ -155,6 +155,10 @@ build, run and traps are in `CLAUDE.md`.
    two ways and both are done unless the owner narrows it: the full
    milestone cycle (rules audit, code audit, fixes, release), and a run
    through a complete earthquake cycle compared against the gold result.
+   Owner, same exchange: "also, always measure perfs" (verbatim.) Read
+   as (a reading): every gate, release and refactor step on this row
+   records performance beside correctness (setup, time per step, peak
+   memory, rank count, host load), before and after the change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

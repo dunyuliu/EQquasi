@@ -100,7 +100,10 @@ by step number. `fault.NNNNN.nc` holds the fault-plane fields on a
 `effective_normal` (Pa), `slip_rate` (m/s), `state_variable`,
 `state_normal`, the nodal velocities `vxm vym vzm vxs vys vzs`, and
 accumulated slip `slips`, `slipd`, `slipn` (m). `disp.NNNNN.nc` holds the
-displacement of every node in the model. `plotOnFaultVars` maps every
+displacement of every node in the model. Every real variable in these files,
+in the restart files, in the roughness file and in `eqquasi.mesh.coor.nc` is
+stored as an 8-byte real (float64, the solver's `dp`) since 1.24.8; earlier
+files hold 4-byte reals. `plotOnFaultVars` maps every
 `fault.NNNNN.nc`.
 
 ## Restart files: `fault.r.nc` and `disp.r.nc`

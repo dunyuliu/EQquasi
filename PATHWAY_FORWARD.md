@@ -169,7 +169,7 @@ build, run and traps are in `CLAUDE.md`.
    reproducible; look at how EQdyna records its runs and borrow that
    layout rather than invent one. A new file or script for it is still a
    rule 1 proposal on this row first.
-   Owner, 2026-11-18 14:00 CST, answering three numbered questions put by
+   Owner, 2026-11-18 13:55 CST, answering three numbered questions put by
    the invoking session: "3A. 2A" (verbatim.) The options as they were put:
    question 2, MUMPS workspace setting ICNTL(14), "A) default it to 100,
    since Vista fails at the default from 64 ranks (recommended), B) leave

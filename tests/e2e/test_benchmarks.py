@@ -399,6 +399,20 @@ def _binary_has_petsc():
 # peak_sliprate_per_fault, and fltst_ and global.dat otherwise).
 DD_TEXT_OUTPUTS = ("fltst_", "srfst_", "cplot_", "p1output", "p2output", "global",
                    "peak_sliprate_per_fault")
+# bp 8, the section 4.3 line files (slip_2_, slip_3_, shear_stress_2_,
+# shear_stress_3_ and pore_pressure_, each along strike and along depth):
+# every rank records the line nodes it owns, rank 0 writes the sum.
+DD_BP8_LINES = ("slip_", "shear_stress_", "pore_pressure_")
+# The kinds of text output solver 2 writes for each compset of
+# test_distributed_loop_matches_petsc_loop, listed from its 31-step run. A
+# kind listed here that solver 2 did not write fails the test: a comparison
+# over no files passes whatever solver 3 does (rule 2).
+DD_EXPECTED_KINDS = {
+    "test.bp5.qdc.2000": ("fltst_", "srfst_", "cplot_", "p1output", "p2output", "global", "peak_sliprate_per_fault"),
+    "test.bp1002.qdc.zone.2500": ("fltst_", "srfst_", "cplot_", "p1output", "p2output", "global", "peak_sliprate_per_fault"),
+    "test.bp7.qdc.a.10": ("fltst_", "srfst_", "cplot_", "p1output", "p2output", "global", "peak_sliprate_per_fault"),
+    "test.bp8.qdc.gs.10": ("fltst_", "srfst_", "cplot_", "global", "peak_sliprate_per_fault", "slip_", "shear_stress_", "pore_pressure_"),
+}
 # The whole-mesh numbering solver 3 computes in closed form, each rank sending
 # its own part: integers and grid coordinates, so equal arrays and no tolerance.
 DD_MESH_FILES = ("eqquasi.mesh.coor.nc", "eqquasi.mesh.ien.nc", "eqquasi.mesh.nsmp.nc")
@@ -438,11 +452,38 @@ def _assert_distributed_mesh(stdout, nranks):
         f"a rank holds {largest_el} of the mesh's {whole_el} elements"
 
 
-def _dd_differences(s2, s3):
+def _dd_profile_series(gpath, rpath):
+    """compare_series for p1output and p2output (time, slip_s, slip_d, tstk,
+    tdip; no header, so compare_series scales each column by its own largest
+    value). On a fault where the dip traction vanishes by symmetry (bp 7) that
+    column is round-off of either solver, about 2e-9 Pa beside 1.6e7 Pa of
+    strike traction, and its own maximum is no scale: tdip is judged against
+    the vector it is a component of, the larger of its own and tstk's maximum.
+    The other columns keep their own scale; every column keeps DD_RTOL."""
+    import numpy as np
+    g, r = C.read_any(gpath), C.read_any(rpath)
+    if g.shape != r.shape:
+        return False, f"shape {r.shape} vs reference {g.shape}"
+    g, r = np.atleast_2d(np.array(g, float)), np.atleast_2d(np.array(r, float))
+    if g.shape[1] != 5:
+        return False, f"{g.shape[1]} columns, not time, slip_s, slip_d, tstk, tdip"
+    scale = np.abs(g).max(axis=0)
+    scale[4] = max(scale[4], scale[3])
+    ok, nbad, idx, worst = C.compare_arrays(g, r, DD_RTOL, DD_RTOL, scale=scale)
+    if not ok:
+        i, j = idx
+        return False, (f"{nbad} of {g.size} entries outside rtol={DD_RTOL:g}; worst at row {i}, "
+                       f"column {j+1}: {r[i, j]:.8g} vs {g[i, j]:.8g}")
+    return True, f"{g.shape[0]} rows x {g.shape[1]} cols, worst diff = {worst:.1e} of the column scales"
+
+
+def _dd_differences(s2, s3, expected):
     """Every way solver 3's cycle directory `s3` differs from solver 2's `s2`,
     one line each: the text series, the mesh files and the disp and fault
     snapshots.
-    A kind of output solver 2 did not write is itself a line (rule 2)."""
+    A kind of output in `expected` that solver 2 did not write is itself a
+    line (rule 2), and so is a file of a compared kind that only solver 3
+    wrote."""
     import numpy as np
     netCDF4 = pytest.importorskip("netCDF4")
     bad = []
@@ -453,16 +494,27 @@ def _dd_differences(s2, s3):
             return None
         return os.path.join(s2, f), os.path.join(s3, f)
 
-    for p in DD_TEXT_OUTPUTS:
+    text_kinds = DD_TEXT_OUTPUTS + DD_BP8_LINES
+    unknown = [p for p in expected if p not in text_kinds]
+    assert not unknown, f"expected kinds {unknown} are not compared kinds {text_kinds}"
+    for p in text_kinds:
         files = C.station_files(s2, p)
-        if not files and p in ("fltst_", "srfst_", "global"):
+        if not files and p in expected:
             bad.append(f"{p}*: solver 2 wrote none, nothing to compare")
+        if files and p not in expected:
+            bad.append(f"{p}*: solver 2 wrote {len(files)}, not a kind expected of this compset")
         for f in files:
             ab = pair(f)
             if ab:
-                ok, msg = C.compare_series(*ab, rtol=DD_RTOL, floor_rtol=DD_RTOL)
+                if p in ("p1output", "p2output"):
+                    ok, msg = _dd_profile_series(*ab)
+                else:
+                    ok, msg = C.compare_series(*ab, rtol=DD_RTOL, floor_rtol=DD_RTOL)
                 if not ok:
                     bad.append(f"{f}: {msg}")
+        for f in C.station_files(s3, p):
+            if f not in files:
+                bad.append(f"{f}: written by solver 3 only")
 
     for f in DD_MESH_FILES:
         if not os.path.exists(os.path.join(s2, f)):
@@ -486,6 +538,9 @@ def _dd_differences(s2, s3):
         snaps = sorted(f for f in os.listdir(s2) if f.startswith(kind) and f.endswith(".nc"))
         if not snaps:
             bad.append(f"{kind}*.nc: solver 2 wrote none, nothing to compare")
+        for f in sorted(os.listdir(s3)):
+            if f.startswith(kind) and f.endswith(".nc") and f not in snaps:
+                bad.append(f"{f}: written by solver 3 only")
         for f in snaps:
             ab = pair(f)
             if ab:
@@ -496,14 +551,16 @@ def _dd_differences(s2, s3):
 
 
 @pytest.mark.e2e_fast
-@pytest.mark.parametrize("compset", ["test.bp5.qdc.2000", "test.bp1002.qdc.zone.2500"])
+@pytest.mark.parametrize("compset", sorted(DD_EXPECTED_KINDS))
 def test_distributed_loop_matches_petsc_loop(compset):
     """par.solver = 3 (each rank owns a block of the mesh, src/
     solveTimeLoopPETScDD.f90) solves the same system with the same MUMPS
     Cholesky as par.solver = 2, so the two must agree to round-off. Run at 4
     ranks -- blocks (2, 2, 1), which cut every fault along strike and put the
     block boundary on the fault plane -- against solver 2 at the compset's own
-    rank count, 31 steps each. The two-fault compset is here for rule 12.
+    rank count, 31 steps each. The two-fault compset is here for rule 12, bp 7
+    for a fault whose dip components vanish by symmetry, bp 8 for the pore
+    pressure every rank advances on its own fault nodes.
     Compared (_dd_differences): the text series, the mesh files in whole-mesh
     numbering, and the disp and fault snapshots -- every file solver 3 writes
     rank by rank.
@@ -531,5 +588,5 @@ def test_distributed_loop_matches_petsc_loop(compset):
         if name == "s3":
             _assert_distributed_mesh(r.stdout, nranks=4)
 
-    bad = _dd_differences(cyc["s2"], cyc["s3"])
+    bad = _dd_differences(cyc["s2"], cyc["s3"], DD_EXPECTED_KINDS[compset])
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)

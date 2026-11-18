@@ -202,6 +202,16 @@ subroutine netcdf_write_on_fault(outfile)
                 own(3,ift) = min(own(3,ift), j)
                 own(4,ift) = max(own(4,ift), j)
             enddo
+            ! What goes to rank 0 below is that rectangle, whole.
+            ni = max(0, own(2,ift) - own(1,ift) + 1)
+            nj = max(0, own(4,ift) - own(3,ift) + 1)
+            if (count(fltMine(1:nftnd(ift),ift)) /= ni*nj) then
+                write(*,*) 'par.solver=3: rank', me, 'owns', count(fltMine(1:nftnd(ift),ift)), &
+                    'nodes of fault', ift, ', not one rectangle of', ni, 'by', nj, &
+                    '; fault.*.nc cannot be written.'
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
         enddo
     endif
     allocate(var_name(nvar), var_unit(nvar), on_fault_vars(minval(own(1,:)):maxval(own(2,:)), &

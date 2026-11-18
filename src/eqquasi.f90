@@ -331,6 +331,9 @@ subroutine writeResults(currentProcID)
     if (ddActive .and. currentProcID /= 0) then
         call output_onfault_st
         call output_offfault_st
+        ! No file from these two here: this rank's part of the bp 8 row at t = 0.
+        call output_globaldat
+        call output_peak_sliprate_per_fault
     endif
     if (currentProcID == 0) then
         call output_onfault_st

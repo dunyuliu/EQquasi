@@ -956,5 +956,5 @@ Hand-off, for a fresh conductor:
 - Local full wide slip-to-traction run, PID 2368801, `runs/20261118_c24-s2tfull/`, via `scratch/bench/c24_s2tfull.sh`; build was at batch 598 of 1913 at 2201 s (3.7 s/batch), expected build end about 05:10 on 2026-11-18 then 40 steps; `DONE` and `cmp_vs_exact.txt` appear on finish. Proposal 7 falsifiers: any file over 1e-9, build over 3 h, summed peak RSS over 1.5x the exact reference.
 - 1e-9 comparisons owed: every wide Vista rung against the local reference with `cmp_c11.py`; bp1002 (8 ranks, Vista) against the c22 solver-3 result.
 - Proposal 6 (single precision + BLR + Fischer on Vista) not started; waits on the ladder harvest and an SU tally.
-- Ask `zofia-kaminska` to draft rules from lessons 3 and 4 and the launcher crash.
+- Ask the rules specialist to draft rules from lessons 3 and 4 and the launcher crash.
 - Worktrees to keep: c23-read, c23-board, c24-board, owner-relays-2, spike-blr, gate-full, lapusta-xi and the agent-* worktrees listed in the session log; agent-a07d3a48124b0f9b0 is locked.

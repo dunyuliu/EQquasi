@@ -330,6 +330,17 @@ build, run and traps are in `CLAUDE.md`.
    file, name, parameter or compset, no major version bump unattended,
    and that opening, closing and re-scoping rows stays with the rules
    owner.
+   Owner, 2026-11-18 16:39 CST, answering one numbered question on the
+   tolerance left open by the 16:36 paragraph: "1A" (verbatim.) The
+   options as put were: "Bar for the double-precision NetCDF files in the
+   test tier: A) 1e-10, same as the text columns (recommended), B) keep
+   1e-6". Read as (a reading): once `disp.*.nc` and `fault.*.nc` are
+   stored as 8-byte reals, the test tier compares them at a relative
+   1e-10, the bar the double-precision text columns already use
+   (`DD_RTOL`), in place of the 1e-6 kept for 4-byte storage
+   (`DD_DISP_RTOL`). NOT decided: any change to the 1e-9 campaign
+   comparator; what to do if a measured difference exceeds 1e-10 (it
+   comes back to this row, the bar is not loosened unattended).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -1,0 +1,12 @@
+# Skips CI tolerates (rule 3a). Each line: <path><TAB><reason substring>.
+# Only a missing HOST tool belongs here. A missing binary, tag, data file or
+# python module is a failure, never an entry.
+# Every entry lists why the tool may be absent on a legitimate runner.
+
+# gfortran absent on the host (Lapusta xi reference compiled at test time)
+tests/unit/test_lapusta_xi.py	no gfortran
+# no MPI Fortran wrapper on the host (meshing regression, build-script probe)
+tests/regression/test_fault_normal_offset_meshing.py	no MPI Fortran wrapper on this host
+tests/contract/test_build_scripts.py	no MPI Fortran wrapper on this host
+# binary truly built without PETSc (CI's non-PETSc build; e2e tier only)
+tests/e2e/test_benchmarks.py	this binary was built without PETSc

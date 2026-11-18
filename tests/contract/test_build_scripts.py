@@ -133,7 +133,11 @@ def test_binary_on_disk_is_built_from_the_current_source():
     assert declared, "EQQUASI_VERSION not found in src/globalvar.f90"
     found = installed_binary()
     if found is None:
-        pytest.skip(f"no bin/eqquasi-{declared}; nothing built yet")
+        # Rule 3a: a skip here makes a gate run void. The tier that needs the
+        # binary builds it first (CI builds before the fast tier).
+        pytest.fail(f"no bin/eqquasi-{declared}: build it first "
+                    f"(bash install.eqquasi.sh -m <machine>); a gate run "
+                    f"without the binary is void, not green")
     binary = Path(found)
 
     # Share the e2e tier's implementation rather than paraphrasing it. The two

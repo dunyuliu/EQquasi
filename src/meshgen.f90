@@ -22,7 +22,7 @@ subroutine meshgen
 
     integer(kind=4)::nnode,nelement,neq0,ix,iy,iz,&
         edgex1,edgey1,edgez1,edgezn,&
-        i,j,k,i1,j1,ift
+        i,j,k,i1,j1,ift,ix0,ix1,iy0,iy1,iz0,iz1
     real(kind=dp)::dy,dz
     logical::on_fault_plane
     real(kind=dp)::tmp1,tmp2
@@ -84,7 +84,17 @@ subroutine meshgen
     !Z: built above by build_xzlines.
     zmin1=zlinet(1)
     !...prepare for digitizing    
-    allocate(plane1(nyt+ntotft,nzt),plane2(nyt+ntotft,nzt),fltrc(2,nxt,nzt,ntotft))
+    ! Grid lines this pass covers: the whole mesh, or with par.solver = 3 this
+    ! rank's block (ddBox). Node and element numbers are then the block's own,
+    ! in the same ix, iz, iy order.
+    ix0 = 1; ix1 = nxt; iy0 = 1; iy1 = nyt; iz0 = 1; iz1 = nzt
+    if (ddActive) then
+        ix0 = ddBox(1,1); ix1 = ddBox(2,1)
+        iy0 = ddBox(1,2); iy1 = ddBox(2,2)
+        iz0 = ddBox(1,3); iz1 = ddBox(2,3)
+        nsmp = 0 ! a fault node outside the block has no node here
+    endif
+    allocate(plane1(iy0:nyt+ntotft,iz0:iz1),plane2(iy0:nyt+ntotft,iz0:iz1),fltrc(2,ix1-ix0+1,iz1-iz0+1,ntotft))
     nnode = 0
     nelement = 0
     neq0 = 0
@@ -97,9 +107,9 @@ subroutine meshgen
     !1. Create a node. If the node is on the boundaries, do not allocate equation number. 
     !2. Loop over fault nodes. Split the node, b
     !write(*,*) xlinet(1),xlinet(2),xlinet(3)
-    do ix = 1, nxt
-        do iz = 1, nzt
-            do iy = 1, nyt
+    do ix = ix0, ix1
+        do iz = iz0, iz1
+            do iy = iy0, iy1
                 xcoor = xlinet(ix)
                 ycoor = ylinet(iy)
                 zcoor = zlinet(iz)
@@ -206,7 +216,13 @@ subroutine meshgen
                             ! write(*,*) 'SLAVE:-18,-21,nnode',nnode,nftnd0(ift),ifs(ift),ifd(ift) 
                             ! write(*,*) '-18,-21,id',id(1,nnode),id(2,nnode),id(3,nnode)
                         ! endif                    
-                        nftnd0(ift) = nftnd0(ift) + 1
+                        if (ddActive) then
+                            ! The node's index on the whole fault (strike
+                            ! outer, dip inner), not a count within the block.
+                            nftnd0(ift) = (ix-ddFlt(1,1,ift))*(ddFlt(2,3,ift)-ddFlt(1,3,ift)+1) + iz-ddFlt(1,3,ift)+1
+                        else
+                            nftnd0(ift) = nftnd0(ift) + 1
+                        endif
 
                         nsmp(1,nftnd0(ift),ift) = nnode !slave node                        
                         nnode = nnode + 1
@@ -416,7 +432,7 @@ subroutine meshgen
                         exit !can only be on 1 fault, thus if ynft(ift), exit do loop       
                     endif  !if flt range
                 enddo  !do ift
-                if(ix>=2 .and. iy>=2 .and. iz>=2) then
+                if(ix>ix0 .and. iy>iy0 .and. iz>iz0) then
                     ! if (xcoor==0.and.ycoor==100.and.zcoor==-100)then 
                         ! write(*,*) 'nele',nelement
                     ! endif
@@ -516,16 +532,55 @@ subroutine meshgen
         plane1 = plane2
     enddo!ix    
 
+    ! par.solver = 3, rank 0 only, until output is written per rank: the
+    ! on-fault output routines read the coordinates of every fault node
+    ! through nsmp, so the fault nodes outside this block get a coordinate-only
+    ! entry after the block's own nodes. No element refers to them.
+    if (ddActive .and. me == 0) then
+        do ift = 1, ntotft
+            iy = ddFlt(1,2,ift)
+            do ix = ddFlt(1,1,ift), ddFlt(2,1,ift)
+                do iz = ddFlt(1,3,ift), ddFlt(2,3,ift)
+                    if (ix >= ix0 .and. ix <= ix1 .and. iy >= iy0 .and. iy <= iy1 .and. &
+                        iz >= iz0 .and. iz <= iz1) cycle
+                    nnode = nnode + 1
+                    x(1,nnode) = xlinet(ix)
+                    x(2,nnode) = ylinet(iy)
+                    x(3,nnode) = zlinet(iz)
+                    if (rough_fault == 1) then
+                        call insert_rough_fault(xlinet(ix), ylinet(iy), zlinet(iz), ycoort, pfx, pfz, ymax1, ymin1)
+                        x(2,nnode) = ycoort
+                    endif
+                    id(:,nnode) = -5
+                    i = (ix-ddFlt(1,1,ift))*(ddFlt(2,3,ift)-ddFlt(1,3,ift)+1) + iz-ddFlt(1,3,ift)+1
+                    nsmp(1,i,ift) = nnode
+                    nsmp(2,i,ift) = nnode
+                enddo
+            enddo
+        enddo
+    endif
+
     !Checking phase
     !write(*,*) 'C2'
     call report_element_types
 
-    if (nnode/=numnp.or.nelement/=numel.or.any(nftnd0(1:ntotft)/=nftnd(1:ntotft)).or.neq0/=neq) then
+    if (nnode/=numnp.or.nelement/=numel.or.(.not.ddActive.and.any(nftnd0(1:ntotft)/=nftnd(1:ntotft))).or.neq0/=neq) then
         write(*,*) 'Consistancy check'
         write(*,*) 'mesh4:meshgen(nnode)',numnp,nnode
         write(*,*) 'mesh4:meshgen(nelem)',numel,nelement
-        write(*,*) 'mesh4:meshgen(nftnd)',nftnd0(1:ntotft),nftnd(1:ntotft)
+        if (ddActive) then
+            ! par.solver = 3: the counts above are this rank's block; nftnd0 is
+            ! the index of the last fault node met, not a count, and nftnd is
+            ! the whole fault, so the two are not compared.
+            write(*,*) 'mesh4:meshgen(rank, block ix, iy, iz)',me,ix0,ix1,iy0,iy1,iz0,iz1
+            write(*,*) 'mesh4:meshgen(nftnd) not checked per block; whole faults hold',nftnd(1:ntotft)
+        else
+            write(*,*) 'mesh4:meshgen(nftnd)',nftnd0(1:ntotft),nftnd(1:ntotft)
+        endif
         write(*,*) 'mesh4:meshgen(neq)',neq0,neq
+        ! par.solver = 3: one rank's block can fail alone, the others go on.
+        flush(6)
+        if (ddActive) call MPI_ABORT(MPI_COMM_WORLD, 2, IERR)
         stop 2
     endif
     !for multiple faults. B.D. 1/7/12
@@ -540,6 +595,13 @@ subroutine meshgen
                 + (x(3,i1)-zsource)**2)
             enddo
         enddo
+        ! par.solver = 3: every fault quad once. Along strike and dip the
+        ! block's own cells do that; across the fault, only the block that
+        ! owns the fault's grid line. The parts are summed at each node's
+        ! owner in solveTimeLoopPETScDD.
+        if (ddActive) then
+            if (ddFlt(1,2,ift) == iy1 .and. iy1 < nyt) cycle
+        endif
         !...element areas and distribute evenly to its four nodes
         do i=2,ifd(ift)
             do j=2,ifs(ift)
@@ -602,6 +664,10 @@ subroutine report_element_types
 
     integer (kind = 4) :: i, n1, n2, n3
     real (kind = dp)   :: yhalf
+
+    ! par.solver = 3 sees one block here; it sums the counts over ranks and
+    ! makes the same report and refusal itself (solveTimeLoopPETScDD).
+    if (ddActive) return
 
     n1 = count(et(1:numel) == 1)
     n2 = count(et(1:numel) == 2)

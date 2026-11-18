@@ -55,6 +55,15 @@ codes. The launcher normally passes the code through as the exit status.
   loop does not run `bp = 8`. Use `solver = 1` or `2`.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.
+* `par.solver=3: fault N is not one rectangle of nodes on a single interior
+  y line, or shares nodes with another fault`: the distributed loop numbers
+  each rank's part of the mesh in closed form, which needs every fault to be
+  a full rectangle of nodes on one y line inside the model, and no two faults
+  to touch. Use `solver = 1` or `2`.
+* `par.solver=3: an off-fault station without exactly one owning rank`: a
+  node matched to an off-fault station is owned by no rank, or by more than
+  one. This is a fault in the block bookkeeping, not in the case: report it
+  and use `solver = 1` or `2`.
 * `ON-FAULT STATIONS REQUESTED BUT NOT FOUND`: a warning, not a stop. Some
   requested stations do not lie on a fault node; see [Output
   files](outputs.md).

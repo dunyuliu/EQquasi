@@ -119,6 +119,56 @@ build, run and traps are in `CLAUDE.md`.
    scale?" (verbatim.) Read as (a reading): the cluster test under (g) is
    released on that one allocation; the build there is spike work until a
    machine target is agreed; the question is answered with measurements.
+   Owner, 2026-11-17, on which solver options move from spike to a
+   merge-bound branch: "let me decide promotion" (verbatim.) Read as (a
+   reading): no agent promotes, proposes a merge-bound rewrite of, or
+   retires a solver option; rankings are offered, the owner picks.
+   Owner, 2026-11-17, shown a ranking whose item 1 was the distributed
+   PETSc loop with exact MUMPS (`par.solver = 3`, the stack #76, #77, #82,
+   #83, #85): "cool. promote 1" (verbatim.) Read as (a reading):
+   `par.solver = 3` and the new file `src/solveTimeLoopPETScDD.f90` are
+   agreed, and the stack lands through gated merges in stack order. Not
+   read into it: a change of default solver, retiring solver 1 or 2,
+   anything under (h), or promotion of any other option.
+   Owner, 2026-11-17, asked for a better name for that option and offered
+   three: "distributed direct" (verbatim.) Read as (a reading): the
+   option is called distributed direct (distributed assembly, one global
+   direct factorization) in docs, the board and PR titles from here on;
+   renaming the source file or any parameter is not decided.
+   Owner, 2026-11-17: "and let's /refactor the code base to make eqquasi
+   naturally adopts more solver options on the line?" (verbatim.) Read as
+   (a reading): after the stack lands, a behaviour-preserving refactor of
+   the solver layer so a new solver option plugs into the distributed
+   direct loop without a new time loop; gold results identical; the
+   design goes on this row before code; no new user-facing parameter,
+   no default change and no retired solver without the owner's word.
+   Owner, 2026-11-17: "/release to lock this promotion. other lines still
+   pending my decision and test later" (verbatim.) Read as (a reading):
+   once the stack is on master, cut a release (audit first, tag gated on
+   green CI for that commit) so the distributed direct option is locked;
+   the release comes before the refactor; every other solver line stays
+   spike-only and undecided.
+   Owner, same exchange: "and this should go through full test" and
+   "with a full cycle?" (verbatim.) Read as (a reading): the release is
+   gated on the full `e2e` tier on the exact commit with the distributed
+   direct option exercised, not only the fast tier; "full cycle" is read
+   two ways and both are done unless the owner narrows it: the full
+   milestone cycle (rules audit, code audit, fixes, release), and a run
+   through a complete earthquake cycle compared against the gold result.
+   Owner, same exchange: "also, always measure perfs" (verbatim.) Read
+   as (a reading): every gate, release and refactor step on this row
+   records performance beside correctness (setup, time per step, peak
+   memory, rank count, host load), before and after the change.
+   The owner then named the three: "memory cost, scaling with more cores,
+   and compute speed per step" (verbatim.)
+   Owner, 2026-11-17: "and whatever metrics you'd better collect, say
+   machine used, hardware used, i think eqdyna has some setups you can
+   borrow" (verbatim.) Read as (a reading): each performance record also
+   names the machine and its hardware (CPU model, cores, memory, compiler,
+   MPI and library versions), plus whatever else makes the number
+   reproducible; look at how EQdyna records its runs and borrow that
+   layout rather than invent one. A new file or script for it is still a
+   rule 1 proposal on this row first.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

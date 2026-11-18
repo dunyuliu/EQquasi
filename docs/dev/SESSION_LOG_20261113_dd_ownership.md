@@ -184,3 +184,7 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 - Roster: auditor agent finished (19 tool calls, no files written). Still owns: PID 2870084 (tier), watcher PID 2879960.
 - Entry 22 continued (tool calls 23-27): full `e2e` tier on `dd-2d` c0a3160 finished 18:22: 90 passed, 45 skipped (10 for the pending bp1002 zone gold, 35 for categories a gold does not hold), 0 failed, rc 0. Fix 1 pushed to `dd-2d` as 0bc146b (docs only). Items 7 and 8 left for the owner (reasons on the board). Gate PID 2870084 finished; watcher PID 2879960 exited with it.
 - Entry 22 continued (tool calls 28-31): #116 merged (9021bd9, run 43657949157 success). Correction to my own #115 paragraph: the board's exact wide figures (6.88 s/step, 331 s, 12.07 GB) are the `krylov4/..np16_exact` row, not unsourced; ratio now stated against both exact runs (6.0-6.4x and 7.3-7.8x). One-screen row 1 summary written at the head of the row from existing tables (nothing new run).
+
+## Conductor 23 (2026-11-18)
+
+- 01:40 CST [20/100]: #165 merged (f93da64) after a CI rerun (hosted runner hung in "Install dependencies" twice, cancelled and rerun). Vista build moved from `gg` (pending about 7 h, estimate 2026-11-20) to `gh-dev` (job 1150931). Refactor design written on board row 1 (conductor 23 block): seam, staged steps, owner-held list; no code. Worktrees of conductors 21 and 22 reaped.

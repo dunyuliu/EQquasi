@@ -929,3 +929,32 @@ build, run and traps are in `CLAUDE.md`.
    runs at creeping nodes, stop 13 exits without `MPI_Abort`.
    Done when: PR #72 is merged or closed with (c) resolved, and (a) and (b)
    are each decided and, if yes, landed with a test.
+
+### Row 1, conductor 24 interim harvest and hand-off (2026-11-18, interim, not closed)
+
+Vista (aarch64 Grace, 72 cores and 117 GB per node, gcc 14.2, Open MPI 5.0.5, PETSc 3.25.5 with MUMPS, binding `--map-by ppr:N:node:PE=1 --bind-to core`), wide case, solver 3. State: MEASURED, one run per rung, not yet compared at 1e-9.
+
+| ranks | result | factorization | s/step | peak RSS largest rank / summed |
+|---|---|---|---|---|
+| 32 (4 nodes, diag job) | passed | 354.8 s | 1.136 | 7113 MB / 190,275 MB |
+| 64 | MUMPS failure, KSP -11 | n/a | n/a | n/a |
+| 144 | passed, default ICNTL(14)=35 | 87.2 s | 0.5864 | 2294 MB / 253,362 MB |
+| 288, 576 | MUMPS failure, KSP -11 | n/a | n/a | n/a |
+
+Strong-scaling efficiency against 32 ranks, 144 ranks: 1.136/0.5864 = 1.94x speedup on 4.5x ranks, 43 %. Summed memory grows 190 to 253 GB. bp1002 at 8 ranks on Vista: 0.0427 s/step. Local reference for the wide case: `runs/20261118_vista/local/wide40_np32` (5.45 s/step on a contended host).
+
+Diagnoses, from logs only (no file:line yet):
+1. Ladder 1, wide at 32/64/144 ranks died with `free(): invalid next size`: Open MPI 5.0.5 `prterun` crashes when given `--host` with 4 hosts; works with 8 hosts or no `--host`. Fix: drop `--host`.
+2. Ladder 1 and 2, wide at 288/576 (and 64): KSP -11. With `-mat_mumps_icntl_4 2` the 288-rank diagnostic shows INFO(1) = -9 (workspace too small) on one rank at ICNTL(14)=35. Raising ICNTL(14) is the fix under test.
+3. Script lesson: ladder 2 retried on a grep for -9, but MUMPS prints nothing unless ICNTL(4) >= 1, so the retry never fired. Ladder 3 sets ICNTL(4)=1 and retries unconditionally at ICNTL(14)=100 then 250.
+4. Chain-script lessons: `grep -c BUILD_OK` counted the `set -x` trace line as well (2 instead of 1); a watcher ran `gh pr view` outside a git repo.
+
+Owner question: a default ICNTL(14) above 35 for solver 3 at high rank counts changes a solver default, so it is the owner's; not changed.
+
+Hand-off, for a fresh conductor:
+- Vista job 1151045 (`runs/20261118_vista/ladder3_job.sh`: np64, np288, np576, ICNTL(4)=1, ICNTL(14)=100 then 250). Results under `$SCRATCH/eqq_vista/ladder_diag/run/*_r3` (rc.a*.txt, run.log under case/). Harvest each rung, fill the table, compute efficiency, add hardware from `ladder_diag/run/hardware.txt`. SU spent so far about 8 of 150, ladder 3 about 2 more.
+- Local full wide slip-to-traction run, PID 2368801, `runs/20261118_c24-s2tfull/`, via `scratch/bench/c24_s2tfull.sh`; build was at batch 598 of 1913 at 2201 s (3.7 s/batch), expected build end about 05:10 on 2026-11-18 then 40 steps; `DONE` and `cmp_vs_exact.txt` appear on finish. Proposal 7 falsifiers: any file over 1e-9, build over 3 h, summed peak RSS over 1.5x the exact reference.
+- 1e-9 comparisons owed: every wide Vista rung against the local reference with `cmp_c11.py`; bp1002 (8 ranks, Vista) against the c22 solver-3 result.
+- Proposal 6 (single precision + BLR + Fischer on Vista) not started; waits on the ladder harvest and an SU tally.
+- Ask `zofia-kaminska` to draft rules from lessons 3 and 4 and the launcher crash.
+- Worktrees to keep: c23-read, c23-board, c24-board, owner-relays-2, spike-blr, gate-full, lapusta-xi and the agent-* worktrees listed in the session log; agent-a07d3a48124b0f9b0 is locked.

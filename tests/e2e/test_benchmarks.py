@@ -389,23 +389,31 @@ def _binary_has_petsc():
     return "libpetsc" in r.stdout
 
 
-# Double-precision text outputs. srfst_ is the off-fault stations, each
-# recorded by the rank that owns its node.
-DD_TEXT_OUTPUTS = ("fltst_", "srfst_", "p1output", "p2output", "global",
+# Text outputs. A station file (fltst_, srfst_) is written by the rank that
+# owns the station; cplot_, p1output and p2output by every rank, each its own
+# fault nodes' lines; the rest by rank 0 from scalars every rank holds.
+# compare_series takes each column's tolerance from its printed precision:
+# the 7-digit columns (E15.7: srfst_ always; fltst_ and global.dat in the
+# bp 8 layout) are compared at about 2e-6, not at DD_RTOL, which applies to
+# the columns printed in full double precision (cplot_, p1/p2output,
+# peak_sliprate_per_fault, and fltst_ and global.dat otherwise).
+DD_TEXT_OUTPUTS = ("fltst_", "srfst_", "cplot_", "p1output", "p2output", "global",
                    "peak_sliprate_per_fault")
-# The whole-mesh numbering solver 3 computes in closed form, gathered from the
-# ranks: integers and grid coordinates, so equal arrays and no tolerance.
+# The whole-mesh numbering solver 3 computes in closed form, each rank sending
+# its own part: integers and grid coordinates, so equal arrays and no tolerance.
 DD_MESH_FILES = ("eqquasi.mesh.coor.nc", "eqquasi.mesh.ien.nc", "eqquasi.mesh.nsmp.nc")
-# disp.*.nc is stored as float32 (eps 1.2e-7): a round-off difference can move
-# the last digit, a node written under another node's number moves the field.
+# disp.*.nc and fault.*.nc are stored as float32 (eps 1.2e-7): a round-off
+# difference can move the last digit, a node written under another node's
+# number moves the field.
 DD_DISP_RTOL = 1e-6
-# Measured 2026-11-13 over 101 steps at 1, 4 and 8 ranks: worst 1.6e-13 of a
-# column's scale. 1e-10 leaves room for a different MUMPS ordering.
+# The double-precision columns. Measured 2026-11-13 over 101 steps at 1, 4
+# and 8 ranks: worst 1.6e-13 of a column's scale. 1e-10 leaves room for a
+# different MUMPS ordering.
 DD_RTOL = 1e-10
 # The largest rank's share of the whole mesh's nodes at 4 ranks. A block is a
-# quarter of the cells plus one ghost line per cut direction (and, on rank 0,
-# the other blocks' fault nodes); a rank that held the whole mesh would be 1.
-# Measured 2026-11-13 at 4 ranks: 0.279 and 0.268 of the nodes, 0.25 of the
+# quarter of the cells plus one ghost line per cut direction; a rank that
+# held the whole mesh would be 1.
+# Measured 2026-11-13 at 4 ranks: 0.267 and 0.264 of the nodes, 0.25 of the
 # elements.
 DD_MAX_NODE_SHARE = 0.35
 
@@ -432,7 +440,8 @@ def _assert_distributed_mesh(stdout, nranks):
 
 def _dd_differences(s2, s3):
     """Every way solver 3's cycle directory `s3` differs from solver 2's `s2`,
-    one line each: the text series, the mesh files and the disp snapshots.
+    one line each: the text series, the mesh files and the disp and fault
+    snapshots.
     A kind of output solver 2 did not write is itself a line (rule 2)."""
     import numpy as np
     netCDF4 = pytest.importorskip("netCDF4")
@@ -473,15 +482,16 @@ def _dd_differences(s2, s3):
                 elif not np.array_equal(x, y):
                     bad.append(f"{f}: {v} differs in {int((x != y).sum())} of {x.size} entries")
 
-    disp = sorted(f for f in os.listdir(s2) if f.startswith("disp.") and f.endswith(".nc"))
-    if not disp:
-        bad.append("disp.*.nc: solver 2 wrote none, nothing to compare")
-    for f in disp:
-        ab = pair(f)
-        if ab:
-            ok, msg = C.compare_netcdf(*ab, rtol=DD_DISP_RTOL, floor_rtol=DD_DISP_RTOL)
-            if not ok:
-                bad.append(f"{f}: {msg}")
+    for kind in ("disp.", "fault."):
+        snaps = sorted(f for f in os.listdir(s2) if f.startswith(kind) and f.endswith(".nc"))
+        if not snaps:
+            bad.append(f"{kind}*.nc: solver 2 wrote none, nothing to compare")
+        for f in snaps:
+            ab = pair(f)
+            if ab:
+                ok, msg = C.compare_netcdf(*ab, rtol=DD_DISP_RTOL, floor_rtol=DD_DISP_RTOL)
+                if not ok:
+                    bad.append(f"{f}: {msg}")
     return bad
 
 
@@ -495,7 +505,8 @@ def test_distributed_loop_matches_petsc_loop(compset):
     block boundary on the fault plane -- against solver 2 at the compset's own
     rank count, 31 steps each. The two-fault compset is here for rule 12.
     Compared (_dd_differences): the text series, the mesh files in whole-mesh
-    numbering, and the disp snapshots.
+    numbering, and the disp and fault snapshots -- every file solver 3 writes
+    rank by rank.
 
     Not in e2e_ci: CI builds -m ubuntu, which has no PETSc.
     """

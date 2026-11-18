@@ -112,6 +112,13 @@ build, run and traps are in `CLAUDE.md`.
    (verbatim.) Budget read as 2026-11-16 16:20 CST to 2026-11-19 16:20 CST;
    scope read as (a reading): the solver lines on this row, the 3-step solve
    and GAMG CG first, new proposals recorded here before they are run.
+   Owner, 2026-11-17 (asked which clusters and allocations are reachable;
+   two TACC systems are): the scale test is to run on Vista under an
+   allocation the owner named (marked paraphrase; the allocation code is
+   left out of this public file), followed by "just need more cores to
+   scale?" (verbatim.) Read as (a reading): the cluster test under (g) is
+   released on that one allocation; the build there is spike work until a
+   machine target is agreed; the question is answered with measurements.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -142,6 +142,12 @@ build, run and traps are in `CLAUDE.md`.
    direct loop without a new time loop; gold results identical; the
    design goes on this row before code; no new user-facing parameter,
    no default change and no retired solver without the owner's word.
+   Owner, 2026-11-17: "/release to lock this promotion. other lines still
+   pending my decision and test later" (verbatim.) Read as (a reading):
+   once the stack is on master, cut a release (audit first, tag gated on
+   green CI for that commit) so the distributed direct option is locked;
+   the release comes before the refactor; every other solver line stays
+   spike-only and undecided.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -161,6 +161,14 @@ build, run and traps are in `CLAUDE.md`.
    memory, rank count, host load), before and after the change.
    The owner then named the three: "memory cost, scaling with more cores,
    and compute speed per step" (verbatim.)
+   Owner, 2026-11-17: "and whatever metrics you'd better collect, say
+   machine used, hardware used, i think eqdyna has some setups you can
+   borrow" (verbatim.) Read as (a reading): each performance record also
+   names the machine and its hardware (CPU model, cores, memory, compiler,
+   MPI and library versions), plus whatever else makes the number
+   reproducible; look at how EQdyna records its runs and borrow that
+   layout rather than invent one. A new file or script for it is still a
+   rule 1 proposal on this row first.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

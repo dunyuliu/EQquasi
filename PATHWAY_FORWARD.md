@@ -187,7 +187,7 @@ build, run and traps are in `CLAUDE.md`.
    default change without the owner's word. Question 1 (an absolute floor
    for the out-of-plane columns in the comparator) was NOT answered and
    stays open: strict 1e-9 holds until it is.
-   Owner, 2026-11-18 14:00 CST, answering question 1: "1A" (verbatim.) The
+   Owner, 2026-11-18 13:57 CST, answering question 1: "1A" (verbatim.) The
    option as it was put: "Comparator bar for out-of-plane columns: A) add
    an absolute floor so roundoff passes (recommended), B) keep strict
    1e-9". Read as (a reading): the comparator keeps rtol 1e-9 on every

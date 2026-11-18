@@ -217,6 +217,10 @@ build, run and traps are in `CLAUDE.md`.
    this row and agreed before the merge-bound branch), a `vista` machine
    target, a compset for wide, the re-layout reader for the saved
    operator, any default change.
+   Owner, 2026-11-18 14:01 CST: "then, let's promote slip to traction"
+   (verbatim.) Read as (a reading): confirms that "it" above is
+   slip-to-traction and that promotion comes after the conditions (i) to
+   (iii) pass ("then"), not before them.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

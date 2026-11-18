@@ -148,6 +148,13 @@ build, run and traps are in `CLAUDE.md`.
    green CI for that commit) so the distributed direct option is locked;
    the release comes before the refactor; every other solver line stays
    spike-only and undecided.
+   Owner, same exchange: "and this should go through full test" and
+   "with a full cycle?" (verbatim.) Read as (a reading): the release is
+   gated on the full `e2e` tier on the exact commit with the distributed
+   direct option exercised, not only the fast tier; "full cycle" is read
+   two ways and both are done unless the owner narrows it: the full
+   milestone cycle (rules audit, code audit, fixes, release), and a run
+   through a complete earthquake cycle compared against the gold result.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

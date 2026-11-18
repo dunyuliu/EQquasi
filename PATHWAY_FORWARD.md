@@ -317,6 +317,19 @@ build, run and traps are in `CLAUDE.md`.
    item just above. NOT decided: any other file absent from a reference
    set (`p1output.txt`, `p2output.txt`, `peak_sliprate_per_fault.dat` on
    bp1002); the tolerance the tier applies to the new files.
+   Owner, 2026-11-18 16:41 CST: "/autopilot clear the board. a week
+   budget. go" (verbatim.) Read as (a reading): the unattended run now
+   covers every open row of this board, worked in `prio` order with
+   state as the tiebreak, not only row 1; the budget is one week from
+   this message, to 2026-11-25 16:41 CST, replacing the "until this
+   row's items are done or blocked on the owner" end; the order already
+   set on this row (refactor step 1, NetCDF output follows `dp`, gold
+   regeneration, slip-to-traction promotion, then its optimization)
+   keeps its place at the head of the queue. Unchanged: the Vista
+   ceiling of 150 SU, every "NOT decided" item above, rule 1 for any new
+   file, name, parameter or compset, no major version bump unattended,
+   and that opening, closing and re-scoping rows stays with the rules
+   owner.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -237,6 +237,70 @@ build, run and traps are in `CLAUDE.md`.
    "go" names no time budget, so it is read as until this row's items are
    done or blocked on the owner, replacing the 2026-11-19 16:20 CST end.
    The Vista ceiling of 150 SU and every "NOT decided" item above stand.
+   Owner, 2026-11-18 16:18 CST, answering three numbered questions put by
+   the invoking session: "1A. 2A. 3A" (verbatim.) The options as put were:
+   question 1, refactor file name, "A) accept `src/onFaultHelpers.f90`
+   (recommended), B) fold the helpers into an existing module"; question
+   2, slip-to-traction option, "A) `par.solver = 4`, "slip to traction"
+   (recommended), B) another value or name"; question 3, out-of-plane
+   floor value, "A) 1e-12 m/s on `Slip_rate_3` and 1e-9 MPa on
+   `Shear_stress_3`, with `Slip_3` measured first (recommended), B) other
+   values". Read as (a reading): the new file `src/onFaultHelpers.f90`
+   with module `onFaultHelpers` is agreed for refactor step 1 (rule 1);
+   the slip-to-traction option is `par.solver = 4`, named "slip to
+   traction", so its promotion stack may go on merge-bound branches; the
+   comparator's absolute floors are 1e-12 m/s for `Slip_rate_3` and
+   1e-9 MPa for `Shear_stress_3`, and the `Slip_3` floor is measured and
+   put on this row before any value is used. NOT decided by these
+   answers: the `Slip_3` floor value; how the floor applies to the log10
+   columns; any new source file name the slip-to-traction stack may need;
+   ICNTL(14) for native solver 1; a `vista` machine target; any default
+   change.
+   Owner, 2026-11-18 16:21 CST, after being told that the solver runs in
+   double precision but the `disp.*.nc` snapshots are stored as 4-byte
+   reals (`NF90_REAL` in `src/netcdf_io.f90`), which is why they fail the
+   1e-9 comparator across machines: "weird. fix that. should be double
+   precision" (verbatim.) Read as (a reading): `netcdf_write` stores the
+   displacement snapshots as 8-byte reals, as a gated `src/` change with a
+   version bump, performance and file size recorded before and after.
+   NOT decided by this message: the same change for the other two
+   single-precision writers in that file (`netcdf_write_on_fault`, whose
+   `fault.*.nc` files are in the committed gold and are read back on
+   restart, and `netcdf_write_roughness`); any regeneration of gold under
+   `data/`; what readers outside this repo expect.
+   Owner, 2026-11-18 16:22 to 16:24 CST, on the same subject: "there
+   should be a setup of precision in globalvar.f90?" and "all f90 should
+   follow that right?" (verbatim.) Told that `dp =
+   selected_real_kind(15,307)` in `src/globalvar.f90` is followed
+   everywhere except three `NF90_REAL` definitions in `src/netcdf_io.f90`
+   and a few hard-coded but equivalent declarations, and asked two
+   numbered questions, the owner answered: "for 1 and 2, yes, both should
+   follow dp" (verbatim.) The options as put were: question 1, on-fault
+   and roughness NetCDF writers, "A) switch them to double as well and
+   regenerate the affected gold in a separate gated PR (recommended,
+   since it matches your rule that everything follows `dp`), B)
+   displacement only, leave those two in single"; question 2, the
+   hard-coded `real(8)` and `double precision` lines, "A) change them to
+   `kind=dp` in the same PR, behaviour-preserving (recommended), B) leave
+   them". Read as (a reading): all three NetCDF writers store reals at
+   the kind `dp` names, and the hard-coded `real(8)` and `double
+   precision` declarations become `kind=dp`; the gold under `data/` that
+   the on-fault change invalidates is regenerated in its own gated PR,
+   with the old-against-new difference shown to be storage truncation
+   only before any gold file is replaced. This supersedes the "NOT
+   decided" items of the 16:21 paragraph for the two other writers and
+   for that gold regeneration. NOT decided: the MPI calls that name
+   `MPI_DOUBLE_PRECISION` (not asked); gold for anything other than the
+   files this change invalidates; what readers outside this repo expect.
+   Owner, 2026-11-18 16:25 CST, two messages in a row: "and rebless the
+   affected disp" then "in ref" (verbatim.) Read as (a reading): the
+   reference data that holds displacement snapshots affected by the
+   change to 8-byte storage is regenerated ("reblessed") with the new
+   binary, in the gated gold PR above, each replaced file shown to
+   differ from the old one by storage truncation only. "ref" is read as
+   the reference (gold) sets under `data/`; which sets hold `disp.*.nc`
+   is listed on this row before any is replaced. NOT decided: adding
+   displacement snapshots to a reference set that holds none today.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -135,6 +135,13 @@ build, run and traps are in `CLAUDE.md`.
    option is called distributed direct (distributed assembly, one global
    direct factorization) in docs, the board and PR titles from here on;
    renaming the source file or any parameter is not decided.
+   Owner, 2026-11-17: "and let's /refactor the code base to make eqquasi
+   naturally adopts more solver options on the line?" (verbatim.) Read as
+   (a reading): after the stack lands, a behaviour-preserving refactor of
+   the solver layer so a new solver option plugs into the distributed
+   direct loop without a new time loop; gold results identical; the
+   design goes on this row before code; no new user-facing parameter,
+   no default change and no retired solver without the owner's word.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

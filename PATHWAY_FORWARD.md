@@ -237,6 +237,25 @@ build, run and traps are in `CLAUDE.md`.
    "go" names no time budget, so it is read as until this row's items are
    done or blocked on the owner, replacing the 2026-11-19 16:20 CST end.
    The Vista ceiling of 150 SU and every "NOT decided" item above stand.
+   Owner, 2026-11-18 16:18 CST, answering three numbered questions put by
+   the invoking session: "1A. 2A. 3A" (verbatim.) The options as put were:
+   question 1, refactor file name, "A) accept `src/onFaultHelpers.f90`
+   (recommended), B) fold the helpers into an existing module"; question
+   2, slip-to-traction option, "A) `par.solver = 4`, "slip to traction"
+   (recommended), B) another value or name"; question 3, out-of-plane
+   floor value, "A) 1e-12 m/s on `Slip_rate_3` and 1e-9 MPa on
+   `Shear_stress_3`, with `Slip_3` measured first (recommended), B) other
+   values". Read as (a reading): the new file `src/onFaultHelpers.f90`
+   with module `onFaultHelpers` is agreed for refactor step 1 (rule 1);
+   the slip-to-traction option is `par.solver = 4`, named "slip to
+   traction", so its promotion stack may go on merge-bound branches; the
+   comparator's absolute floors are 1e-12 m/s for `Slip_rate_3` and
+   1e-9 MPa for `Shear_stress_3`, and the `Slip_3` floor is measured and
+   put on this row before any value is used. NOT decided by these
+   answers: the `Slip_3` floor value; how the floor applies to the log10
+   columns; any new source file name the slip-to-traction stack may need;
+   ICNTL(14) for native solver 1; a `vista` machine target; any default
+   change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

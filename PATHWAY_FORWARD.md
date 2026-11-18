@@ -130,6 +130,11 @@ build, run and traps are in `CLAUDE.md`.
    agreed, and the stack lands through gated merges in stack order. Not
    read into it: a change of default solver, retiring solver 1 or 2,
    anything under (h), or promotion of any other option.
+   Owner, 2026-11-17, asked for a better name for that option and offered
+   three: "distributed direct" (verbatim.) Read as (a reading): the
+   option is called distributed direct (distributed assembly, one global
+   direct factorization) in docs, the board and PR titles from here on;
+   renaming the source file or any parameter is not decided.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -49,6 +49,9 @@ EQQUASIROOT=<checkout> python3 -m pytest -q -m "not e2e" tests   # fast tier
 EQQUASIROOT=<checkout> python3 -m pytest -q -m e2e_fast tests    # local sweep, ~20-40 min
 ```
 
+The fast tier needs a built `bin/eqquasi-<version>` (rule 3a: no binary fails
+the contract test, it does not skip).
+
 CI runs the fast tier, the build and two smokes (`-m e2e_ci`). The full
 `-m e2e` tier is periodic, not per-PR.
 

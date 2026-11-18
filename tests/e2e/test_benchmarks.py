@@ -384,7 +384,8 @@ def test_xi_gamma_per_node_step_runs_and_matches_eq15():
 def _binary_has_petsc():
     exe = C.installed_binary()
     if exe is None:
-        return False
+        pytest.fail("no built bin/eqquasi-<version>: build it (rule 3a); "
+                    "a missing binary is a failure, not a skip")
     r = subprocess.run(["ldd", str(exe)], capture_output=True, text=True)
     return "libpetsc" in r.stdout
 

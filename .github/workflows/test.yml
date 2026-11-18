@@ -40,9 +40,6 @@ jobs:
         sudo apt-get install libnetcdf-dev libnetcdff-dev
         pip install xarray imageio pdf2image numpy==1.26.4 netCDF4 pytest matplotlib
 
-    - name: Fast tiers (unit, contract, regression)
-      run: python3 -m pytest tests/ -v
-
     - name: Build
       run: |
         bash make.scripts.executable.sh
@@ -55,6 +52,14 @@ jobs:
         eqv=$(grep -oP "EQQUASI_VERSION = '\K[^']*" src/globalvar.f90)
         test -x "bin/eqquasi-$eqv"
 
+    # The fast tier follows the build: the contract test that checks the binary
+    # against src/globalvar.f90 fails (rule 3a) when no binary exists.
+    - name: Fast tiers (unit, contract, regression)
+      run: |
+        export EQQUASIROOT=$(pwd)
+        set -o pipefail
+        python3 -m pytest tests/ -v -rfEs -m "not e2e" 2>&1 | tee fastRunLog.txt
+
     - name: End-to-end (CI smokes only)
       # Owner decision 2026-09-23 (PATHWAY_FORWARD.md row 9): CI runs only the
       # two 101-step smokes -- test.bp5.qdc.2000 and test.stepover.qdc.1000,
@@ -65,11 +70,14 @@ jobs:
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
         set -o pipefail
-        python3 -m pytest tests/ -m e2e_ci -v 2>&1 | tee testRunLog.txt
+        python3 -m pytest tests/ -m e2e_ci -v -rfEs 2>&1 | tee testRunLog.txt
 
     - name: Print log
       if: always()   # otherwise a failing test step hides the very log needed to debug it
-      run: cat testRunLog.txt
+      run: |
+        for f in fastRunLog.txt testRunLog.txt; do
+          if [ -f "$f" ]; then echo "=== $f"; cat "$f"; fi
+        done
 
     # Step logs need authentication to download, but annotations do not. On
     # failure, re-emit the tail of the log as annotations so the cause is
@@ -101,3 +109,6 @@ jobs:
           echo "pytest produced no summary line - refusing to pass."
           exit 1
         }
+        # Rule 3a: a skip is a failure unless tests/skip_allowlist.txt names
+        # its file and reason (host tools only). The counts above never see skips.
+        python3 tests/skip_gate.py fastRunLog.txt testRunLog.txt

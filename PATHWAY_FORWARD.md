@@ -256,6 +256,18 @@ build, run and traps are in `CLAUDE.md`.
    columns; any new source file name the slip-to-traction stack may need;
    ICNTL(14) for native solver 1; a `vista` machine target; any default
    change.
+   Owner, 2026-11-18 16:21 CST, after being told that the solver runs in
+   double precision but the `disp.*.nc` snapshots are stored as 4-byte
+   reals (`NF90_REAL` in `src/netcdf_io.f90`), which is why they fail the
+   1e-9 comparator across machines: "weird. fix that. should be double
+   precision" (verbatim.) Read as (a reading): `netcdf_write` stores the
+   displacement snapshots as 8-byte reals, as a gated `src/` change with a
+   version bump, performance and file size recorded before and after.
+   NOT decided by this message: the same change for the other two
+   single-precision writers in that file (`netcdf_write_on_fault`, whose
+   `fault.*.nc` files are in the committed gold and are read back on
+   restart, and `netcdf_write_roughness`); any regeneration of gold under
+   `data/`; what readers outside this repo expect.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

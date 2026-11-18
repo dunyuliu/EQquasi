@@ -58,7 +58,7 @@ jobs:
       run: |
         export EQQUASIROOT=$(pwd)
         set -o pipefail
-        python3 -m pytest tests/ -v -rs -m "not e2e" 2>&1 | tee fastRunLog.txt
+        python3 -m pytest tests/ -v -rfEs -m "not e2e" 2>&1 | tee fastRunLog.txt
 
     - name: End-to-end (CI smokes only)
       # Owner decision 2026-09-23 (PATHWAY_FORWARD.md row 9): CI runs only the
@@ -70,7 +70,7 @@ jobs:
         export EQQUASIROOT=$(pwd)
         export PATH=$(pwd)/bin:$(pwd)/scripts:$PATH
         set -o pipefail
-        python3 -m pytest tests/ -m e2e_ci -v -rs 2>&1 | tee testRunLog.txt
+        python3 -m pytest tests/ -m e2e_ci -v -rfEs 2>&1 | tee testRunLog.txt
 
     - name: Print log
       if: always()   # otherwise a failing test step hides the very log needed to debug it

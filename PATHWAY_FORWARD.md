@@ -159,6 +159,8 @@ build, run and traps are in `CLAUDE.md`.
    as (a reading): every gate, release and refactor step on this row
    records performance beside correctness (setup, time per step, peak
    memory, rank count, host load), before and after the change.
+   The owner then named the three: "memory cost, scaling with more cores,
+   and compute speed per step" (verbatim.)
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

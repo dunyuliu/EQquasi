@@ -230,6 +230,13 @@ build, run and traps are in `CLAUDE.md`.
    Each optimization is proposed on this row with its before and after
    measurement and stays behaviour-preserving at the comparator bar; it
    comes after the promotion, not inside it.
+   Owner, 2026-11-18 14:00 CST: "/autopilot go" (verbatim.) Read as (a
+   reading): the unattended run continues on the scope above (Vista
+   fixes, full cycles and verification, promotion of slip-to-traction if
+   the conditions and CI pass, then its optimization, with 2A, 3A and 1A);
+   "go" names no time budget, so it is read as until this row's items are
+   done or blocked on the owner, replacing the 2026-11-19 16:20 CST end.
+   The Vista ceiling of 150 SU and every "NOT decided" item above stand.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -408,6 +408,9 @@ def load_summary(ref_dir):
 CATEGORIES = {
     "snapshot": (("fault.0*.nc",),                   "netcdf"),
     "restart":  (("fault.r.nc",),                    "netcdf"),
+    # The last-step whole-model displacement. Stored as float64 (the solver's
+    # dp) since 1.24.8; compared, like fault.*.nc, at compare_netcdf's 1e-10.
+    "disp":     (("disp.0*.nc",),                    "netcdf"),
     "onfault":  (("fltst_strk*",),                   "series"),
     "offfault": (("srfst_strk*",),                   "series"),
     "global":   (("global.dat", "global.csv"),       "series"),
@@ -417,7 +420,9 @@ CATEGORIES = {
     "perfault": (("peak_sliprate_per_fault.dat",),    "series"),
     "profile":  (("*_strike.dat", "*_strike.csv",
                   "*_depth.dat",  "*_depth.csv"),    "series"),
-    "cplot":    (("cplot_EQquasi.*",),               "series"),
+    "cplot":    (("cplot_EQquasi.*", "cplot_ft2_EQquasi.*",
+                  "cplot_ruptarea_trac_slip.*",
+                  "cplot_ft2_ruptarea_trac_slip.*"), "series"),
     "scalars":  (("summary.json",),                  "summary"),
 }
 
@@ -709,7 +714,7 @@ def variable_group(name):
     return name
 
 
-def compare_netcdf(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
+def compare_netcdf(gpath, rpath, rtol=1e-10, floor_rtol=1e-10):
     """(ok, message) per fault, so a missing or aliased fault is named.
 
     Same tolerance rule as compare_series, with each variable's vector as the

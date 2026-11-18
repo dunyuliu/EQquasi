@@ -31,7 +31,7 @@ SEARCH_ROOTS = [
 # is the point of it, so a new benchmark is a table row rather than a file --
 # and a text search cannot see filenames that are never written down. These
 # patterns record which families are covered that way.
-GLOB_READ = ("fault.", "fltst_strk", "srfst_strk", "global",
+GLOB_READ = ("fault.", "disp.", "fltst_strk", "srfst_strk", "global",
              "_strike.", "_depth.", "cplot_", "tdyna", "runInfo")
 
 

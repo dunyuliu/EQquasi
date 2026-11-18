@@ -378,3 +378,67 @@ def test_xi_gamma_per_node_step_runs_and_matches_eq15():
     w_bad, r_bad = run("abort", "par.xi_gamma = 1e-4\n", timeout=600)
     assert r_bad.returncode != 0, "xi_gamma = 1e-4 (cells larger than h*) did not fail"
     assert "lapusta_xi: no stable step" in r_bad.stdout + r_bad.stderr
+
+
+def _binary_has_petsc():
+    exe = C.installed_binary()
+    if exe is None:
+        return False
+    r = subprocess.run(["ldd", str(exe)], capture_output=True, text=True)
+    return "libpetsc" in r.stdout
+
+
+# Double-precision text outputs only: the fault/disp netCDF fields are stored
+# as float32 and cannot show a round-off difference.
+DD_TEXT_OUTPUTS = ("fltst_", "p1output", "p2output", "global", "peak_sliprate_per_fault")
+# Measured 2026-11-13 over 101 steps at 1, 4 and 8 ranks: worst 1.6e-13 of a
+# column's scale. 1e-10 leaves room for a different MUMPS ordering.
+DD_RTOL = 1e-10
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("compset", ["test.bp5.qdc.2000", "test.bp1002.qdc.zone.2500"])
+def test_distributed_loop_matches_petsc_loop(compset):
+    """par.solver = 3 (each rank owns a block of the mesh, src/
+    solveTimeLoopPETScDD.f90) solves the same system with the same MUMPS
+    Cholesky as par.solver = 2, so the two must agree to round-off. Run at 4
+    ranks -- blocks (2, 2, 1), which cut every fault along strike and put the
+    block boundary on the fault plane -- against solver 2 at the compset's own
+    rank count, 31 steps each. The two-fault compset is here for rule 12.
+
+    Not in e2e_ci: CI builds -m ubuntu, which has no PETSc.
+    """
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 3 unavailable)")
+    cyc = {}
+    for name, extra in {"s2": "par.solver = 2\npar.nstep = 31\n",
+                        "s3": "par.solver = 3\npar.nstep = 31\npar.HPC_ncpu = 4\n"}.items():
+        workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{compset}")
+        e = C.env()
+        shutil.rmtree(workdir, ignore_errors=True)
+        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                       cwd=str(ROOT), env=e, check=True, capture_output=True)
+        with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+            f.write(extra)
+        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
+                       capture_output=True)
+        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
+                           capture_output=True, text=True)
+        assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+        cyc[name] = os.path.join(workdir, "result", "cycle0")
+        if name == "s3":
+            assert "Blocks (x, y, z)" in r.stdout, "solver 3 did not run the distributed loop"
+
+    files = [f for p in DD_TEXT_OUTPUTS for f in C.station_files(cyc["s2"], p)]
+    assert files, f"solver 2 wrote none of {DD_TEXT_OUTPUTS}"
+    bad = []
+    for f in files:
+        run = os.path.join(cyc["s3"], f)
+        if not os.path.exists(run):
+            bad.append(f"{f}: not written by solver 3")
+            continue
+        ok, msg = C.compare_series(os.path.join(cyc["s2"], f), run,
+                                   rtol=DD_RTOL, floor_rtol=DD_RTOL)
+        if not ok:
+            bad.append(f"{f}: {msg}")
+    assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)

@@ -95,6 +95,14 @@ program eqquasi3d
             'another PETSc-enabled build); not available on this binary.'
         stop
 #endif
+    elseif (sol_op == 3) then
+#ifdef HAVE_PETSC
+        call solveTimeLoopPETScDD
+#else
+        write(*,*) 'par.solver=3 (PETSc, distributed) needs MACHINE=conda-linux (or ', &
+            'another PETSc-enabled build); not available on this binary.'
+        stop
+#endif
     endif
     
     call writeResults(me)

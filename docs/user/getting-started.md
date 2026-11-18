@@ -37,7 +37,8 @@ conda activate eqquasi-petsc
 bash install.eqquasi.sh -m conda-linux
 ```
 
-This is also the only build that includes the PETSc solver (`par.solver = 2`).
+This is also the only build that includes the PETSc solver (`par.solver = 2`,
+and the experimental distributed loop `par.solver = 3`).
 
 ### Ubuntu 22.04
 

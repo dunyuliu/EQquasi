@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.23.0'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.24.0'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -200,6 +200,10 @@ MODULE globalvar
     ! rather than (2*l_f)^2 -- 850 m instead of 800 m at dx = 50.
     real (kind=dp), allocatable :: pfFx(:), pfFz(:)
     integer (kind=4), allocatable :: pfActive(:)  ! 1 if the fault node is inside Omega_f.
+    ! par.solver = 3 only: while ddActive, faulting skips the fault nodes this
+    ! rank does not own (fltMine(i,ift) false). Never set by solver 1 or 2.
+    logical :: ddActive = .false.
+    logical, allocatable :: fltMine(:,:)
 
     ! Section 4.3 of SEAS BP8: slip, shear stress and pore pressure recorded
     ! along the two cross-section lines through the injection point, at a
@@ -236,7 +240,8 @@ contains
 
     ! Shear modulus, Pa, at (xc, yc, zc) in m (z negative down). Used for the
     ! element stiffness (meshgen) and for the fault's radiation damping and
-    ! moment rate (faulting), so both always see the same mu.
+    ! moment rate (faulting), so both use this one function. mu may vary in
+    ! space: each caller gets the value at the point it passes in.
     function shear_modulus_at(xc, yc, zc) result(mu)
         real (kind=dp), intent(in) :: xc, yc, zc
         real (kind=dp) :: mu

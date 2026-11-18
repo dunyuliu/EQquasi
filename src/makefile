@@ -134,7 +134,7 @@ else ifeq ($(SYSTEM), conda-linux)
     # PETSc via conda is not available on the utig/ubuntu/local/ls6 branches.
     PETSC_INC  = -I${INC}
     PETSC_LIB  = -L${LIB} -lpetsc ${RPATH}
-    OBJ_PETSC  = solveTimeLoopPETSc.o
+    OBJ_PETSC  = solveTimeLoopPETSc.o solveTimeLoopPETScDD.o
     PETSC_DEFINE = -DHAVE_PETSC
 
 else ifeq ($(SYSTEM), ls6)
@@ -193,6 +193,11 @@ solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o c8g2.o      shl
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETSc.f90 ${PETSC_INC}
+solveTimeLoopPETScDD.o:      solveTimeLoopPETScDD.f90    globalvar.o c8g2.o      shl.o       \
+             faulting.o  fric.o                \
+             library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
+             netcdf_io.o
+	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETScDD.f90 ${PETSC_INC}
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o

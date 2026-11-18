@@ -1041,3 +1041,26 @@ HAND-OFF, conductor 26 (06:25 CST, harness count 48 tool calls; state from git, 
 - Still owns: PID 2663360 (`scratch/_logs/c26_chain.sh`, ppid 1) running `scratch/bench/c26_s2t16.sh`: 9b build+dump at 16 ranks started 06:12:52 (1.24.14 PIDs live, 16 ranks, `EQ_S2T_PROG` batch 13 of 1913 at 77 s, about 5.6 s per batch at the start, so about 3 h, ETA about 09:30 CST, indicative), then the load-only run, then comparators; `runs/20261118_c26-s2t16/DONE` on finish; the load-only run is the quiet repeat of the loop. Harvest: `python3 -I scratch/bench/c26_harvest.py runs/20261118_c26-s2t16/bp8*_build runs/20261118_c26-s2t16/bp8*_load`, `cmp_build.txt`, `cmp_load.txt`, `op/` size (`order.txt`), `EQ_S2T built` and load-time lines in each `run.log`; falsifiers are in Proposal 9. Delete `op/` after harvest only if disk is wanted (about 19 GB estimate).
 - Ladder 4 (Vista job 1151093) untouched by me: still the invoking session's watch; harvest steps are conductor 25's hand-off above. Proposal 6 stays behind it.
 - Worktrees mine: `c23-read` (1.24.5 binary, used by 9a), `c26-board`. No wake armed by me; the invoking session wakes the next step.
+
+### Row 1, conductor 26: Vista ladder 4 harvest (Proposal 8), NUL-hole control, -log_view split (2026-11-18 07:10 CST; MEASURED once each, same script, not VERIFIED)
+
+Job 1151093 (`gh-dev`, 8 nodes, 16:34 elapsed, COMPLETED 0:0; six rungs, all rc=0, `runs/20261118_vista/ladder4/`, results tarball md5 37e67ffcce6e72408ae1ded7e0464473 matched on both ends, extracted under `results/{nfs_scratch,lustre_work}`; `harvest4.txt`, `cmp4.txt`). Machine: Vista (TACC) GH nodes used CPU-only (72 Neoverse-V2 cores, 117 GB per node), nodes c642-002..092, gcc 14.2.0, Open MPI 5.0.5, netcdf 4.9.2, PETSc 3.25.5 with MUMPS, binary 1.24.5 solver 3, `--map-by ppr:<ppn>:node:PE=1 --bind-to core`, `OMP_NUM_THREADS=1`; `$SCRATCH` is NFS (v3), `$WORK` is Lustre. Wide BP8 GS, 40 steps; every rung ICNTL(4)=1, ICNTL(14)=100, one attempt, no repeats (indicative).
+
+| rung | nodes x ppn | ranks | fs | factorization s | loop s | s/step | peak rank MB | summed MB |
+|---|---|---|---|---|---|---|---|---|
+| A | 4 x 8 | 32 | NFS | 353.2 | 44.03 | 1.101 | 8992 | 225326 |
+| B | 4 x 36 | 144 | NFS | 87.1 | 23.80 | 0.595 | 3044 | 305071 |
+| C | 4 x 72 | 288 | NFS | 63.9 | 23.51 | 0.588 | 2222 | 373807 |
+| D | 8 x 18 | 144 | NFS | 86.2 | 22.19 | 0.555 | 2787 | 302022 |
+| E | 4 x 36 | 144 | Lustre | 88.1 | 25.53 | 0.638 | 2721 | 304550 |
+| F | 4 x 36 | 144 | NFS, -log_view | 88.4 | 23.61 | 0.590 | 2774 | 307502 |
+
+Fixed 4 nodes, one ICNTL(14) (A, B, C): ranks x4.5 and x9 give factorization speedup 4.05x and 5.53x (efficiency 0.90, 0.61) and per-step speedup 1.85x and 1.87x (efficiency 0.41, 0.21): per-step time stops improving past 144 ranks (0.595 against 0.588 s) while factorization still gains; summed memory grows 1.35x and 1.66x over A. Layout at 144 ranks (B 4 x 36 against D 8 x 18): same factorization (87.1 against 86.2 s), 7 % faster steps on 8 nodes (0.555 against 0.595), single runs, B against F (identical configuration) differ 0.8 %.
+
+`-log_view` (rung F, 144 ranks, 116.6 s total): MatCholFctrNum 68.1 s (58 %) + MatCholFctrSym 20.4 s (17 %) = factorization 76 %; MatSolve 80 calls (2 per step) 20.15 s = 17 % of the run, 0.252 s per solve, 85 % of the 23.6 s loop; the rest of the loop (assembly, time-step bookkeeping, output) about 3.5 s, 0.09 s/step; MatAssembly under 0.1 s. The per-step cost at scale is the two distributed triangular solves, which is why more ranks stop helping.
+
+NUL-hole control: rung E (same case as B, on Lustre) has 0 NUL bytes in `cplot_EQquasi.txt` and `cplot_ruptarea_trac_slip.txt`, against B 277046 / 178750, A 95090 / 26130, C 612174 / 85800, D 980918 / 36660, F 1082948 / 103480 on NFS (files all of full size 5243314 / 1326130). So the holes occur on the NFS runs and not on Lustre, at every multi-node rank count including 32; the filesystem is the supported cause, still only one Lustre run and no single-node large-file control. Whether the output path should sync or write elsewhere stays the owner's (owner item 1 above).
+
+Comparator (`cmp_c11.py`, 1e-9, against the local 32-rank quiet-host-era reference `runs/20261118_vista/local/wide40_np32`, now itself confirmed by 9a): NFS rungs `compared 33 fail 6` (the 2 cplot files, `disp.00001.nc`, `disp.00040.nc` and `disp.r.nc`, `fltst_strk+000dp+000.dat`); Lustre rung E `compared 33 fail 4`: the cplot files pass, the other four remain: `disp.00001.nc` 1.39e-8 of scale, `disp.00040.nc` and `disp.r.nc` 1.0e-9, `fltst` out-of-plane 8 of 451 entries (NFS rungs 6-21 of 451). The 4 remaining failures are cross-architecture float32 and out-of-plane roundoff (owner items 2, 3), not scaling or filesystem. These rungs are therefore not passes at 1e-9.
+
+SU: job 1151093 elapsed 16:34 on 8 nodes = 2.2 node-hours (`sacct` CPUTimeRAW 572544 s over 72 x 8 cores). Reading (a), elapsed node-hours: about 3 + 2.2 = 5.2 spent of 150; reading (b), 0.25 h minimum per job: about 8.75 + 2.2 = about 11 of 150. Still unverified which reading TACC applies.

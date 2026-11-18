@@ -169,6 +169,24 @@ build, run and traps are in `CLAUDE.md`.
    reproducible; look at how EQdyna records its runs and borrow that
    layout rather than invent one. A new file or script for it is still a
    rule 1 proposal on this row first.
+   Owner, 2026-11-18 14:00 CST, answering three numbered questions put by
+   the invoking session: "3A. 2A" (verbatim.) The options as they were put:
+   question 2, MUMPS workspace setting ICNTL(14), "A) default it to 100,
+   since Vista fails at the default from 64 ranks (recommended), B) leave
+   at 35"; question 3, solver-layer refactor design on this row, "A) go,
+   gated at 1e-9 (recommended, since byte-identical only holds at 1 rank),
+   B) hold". Read as (a reading): (2A) ICNTL(14) defaults to 100 in source
+   on the MUMPS-through-PETSc paths, a user option still overriding it; a
+   `src/` change, so a version bump and a gated PR, with setup time, time
+   per step and memory recorded before and after; whether the native MUMPS
+   loop (solver 1) gets the same default, and `KSPSetUp` reading
+   INFOG(1)/(2), are NOT decided. (3A) the refactor design on this row
+   (#166) may start; its gate is the 1e-9 comparator against gold and
+   against the pre-refactor binary, not byte identity; it stays
+   behaviour-preserving, with no new user-facing parameter, file rename or
+   default change without the owner's word. Question 1 (an absolute floor
+   for the out-of-plane columns in the comparator) was NOT answered and
+   stays open: strict 1e-9 holds until it is.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

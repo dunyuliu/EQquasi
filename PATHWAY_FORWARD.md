@@ -187,6 +187,17 @@ build, run and traps are in `CLAUDE.md`.
    default change without the owner's word. Question 1 (an absolute floor
    for the out-of-plane columns in the comparator) was NOT answered and
    stays open: strict 1e-9 holds until it is.
+   Owner, 2026-11-18 14:00 CST, answering question 1: "1A" (verbatim.) The
+   option as it was put: "Comparator bar for out-of-plane columns: A) add
+   an absolute floor so roundoff passes (recommended), B) keep strict
+   1e-9". Read as (a reading): the comparator keeps rtol 1e-9 on every
+   column that carries signal and gains an absolute floor on the
+   out-of-plane columns (`Slip_3`, `Slip_rate_3`, `Shear_stress_3` and
+   their log10 forms in the `fltst` files), so values at roundoff level
+   pass. The floor value was NOT given: it is proposed on this row with
+   the measured exact-against-exact differences behind it before any
+   result is re-read as a pass; the cross-architecture float32 `disp`
+   files are NOT covered by this answer.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

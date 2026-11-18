@@ -159,7 +159,7 @@ OBJ  =  eqquasi.o   globalvar.o mesh4num.o  meshgen.o   \
         solveTimeLoopMUMPS.o      c8g2.o      shl.o       faulting.o  \
         fric.o               library_output.o \
         createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   read_input.o            \
-        func_lib.o  netcdf_io.o porepressure.o ${OBJ_PETSC}\
+        func_lib.o  netcdf_io.o porepressure.o onFaultHelpers.o ${OBJ_PETSC}\
 
 clean : eqquasi
 	rm -r *.o
@@ -183,17 +183,19 @@ mesh4num.o:  mesh4num.f90  globalvar.o
 	$(FC) $(OPT) mesh4num.f90
 meshgen.o:   meshgen.f90 globalvar.o func_lib.o
 	$(FC) $(OPT) meshgen.f90
-solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o c8g2.o      shl.o       \
+onFaultHelpers.o: onFaultHelpers.f90 globalvar.o
+	$(FC) $(OPT) onFaultHelpers.f90
+solveTimeLoopMUMPS.o:      solveTimeLoopMUMPS.f90    globalvar.o onFaultHelpers.o c8g2.o      shl.o       \
              faulting.o  fric.o                \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) solveTimeLoopMUMPS.f90 -I${MUMPS_INC}        
-solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o c8g2.o      shl.o       \
+solveTimeLoopPETSc.o:      solveTimeLoopPETSc.f90    globalvar.o onFaultHelpers.o c8g2.o     shl.o       \
              faulting.o  fric.o                \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
 	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETSc.f90 ${PETSC_INC}
-solveTimeLoopPETScDD.o:      solveTimeLoopPETScDD.f90    globalvar.o c8g2.o      shl.o       \
+solveTimeLoopPETScDD.o:      solveTimeLoopPETScDD.f90    globalvar.o onFaultHelpers.o c8g2.o     shl.o       \
              faulting.o  fric.o                \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o

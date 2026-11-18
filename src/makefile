@@ -197,7 +197,7 @@ solveTimeLoopPETScDD.o:      solveTimeLoopPETScDD.f90    globalvar.o c8g2.o     
              faulting.o  fric.o                \
              library_output.o        createMatrixHolderInCRSFormat.o       elemAssembleInCRS.o   \
              netcdf_io.o
-	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETScDD.f90 ${PETSC_INC}
+	$(FC) $(OPT) ${CPPFLAG} solveTimeLoopPETScDD.f90 ${PETSC_INC} ${NETCDF_INC}
 c8g2.o:      c8g2.f90    globalvar.o shl.o
 	$(FC) $(OPT) c8g2.f90    
 shl.o:       shl.f90     globalvar.o

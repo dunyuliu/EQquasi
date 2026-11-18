@@ -268,7 +268,7 @@ build, run and traps are in `CLAUDE.md`.
    `fault.*.nc` files are in the committed gold and are read back on
    restart, and `netcdf_write_roughness`); any regeneration of gold under
    `data/`; what readers outside this repo expect.
-   Owner, 2026-11-18 16:24 to 16:27 CST, on the same subject: "there
+   Owner, 2026-11-18 16:22 to 16:24 CST, on the same subject: "there
    should be a setup of precision in globalvar.f90?" and "all f90 should
    follow that right?" (verbatim.) Told that `dp =
    selected_real_kind(15,307)` in `src/globalvar.f90` is followed
@@ -292,6 +292,15 @@ build, run and traps are in `CLAUDE.md`.
    for that gold regeneration. NOT decided: the MPI calls that name
    `MPI_DOUBLE_PRECISION` (not asked); gold for anything other than the
    files this change invalidates; what readers outside this repo expect.
+   Owner, 2026-11-18 16:25 CST, two messages in a row: "and rebless the
+   affected disp" then "in ref" (verbatim.) Read as (a reading): the
+   reference data that holds displacement snapshots affected by the
+   change to 8-byte storage is regenerated ("reblessed") with the new
+   binary, in the gated gold PR above, each replaced file shown to
+   differ from the old one by storage truncation only. "ref" is read as
+   the reference (gold) sets under `data/`; which sets hold `disp.*.nc`
+   is listed on this row before any is replaced. NOT decided: adding
+   displacement snapshots to a reference set that holds none today.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

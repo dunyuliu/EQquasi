@@ -1018,3 +1018,21 @@ Proposal 9 (local, host cotopaxi, 2 x EPYC 7532, 64 cores, 1007 GB; load 5.8 at 
 - 9a, quiet-host exact wide reruns (`scratch/bench/c26_exact.sh`, runs in `runs/20261118_c26-exact/`): binary 1.24.5 (`c23-read`), wide BP8 GS, 40 steps, solver 3, no options: two back-to-back 32-rank runs (a, b) and one 16-rank run (c). Question: is the 5.45 s/step of the 2026-11-18 reference a load artifact (3.3-3.5 s/step in the 2026-11-17 batches)? Falsifier: a quiet-load run at or above 5 s/step means the 3.3-3.5 figure is the stale one and the s2t ratio needs restating. Also gives the exact 16 to 32 rank scaling point on one binary. About 25 min.
 - 9b, s2t scaling and operator reuse (`scratch/bench/c26_s2t16.sh`, `runs/20261118_c26-s2t16/`): spike binary 1.24.14 (d78d822, spike, not for merge), wide, 16 ranks, `-eq_s2t_build -eq_s2t_sparse -eq_s2t_nbat 32 -eq_s2t_dump <prefix>`; then a second run with `-eq_s2t_load <prefix>` at 16 ranks (the dump is per rank, so it is rank-count specific). Measures: build time at 16 against 6870 s at 32 ranks, loop s/step at 16 against 0.786 at 32, peak RSS per rank and summed, dump size on disk, load time against build time, comparator at 1e-9 against the 32-rank exact reference for both runs. Expected build 3.5-4 h (estimate from 6870 s at 32 ranks with linear scaling; unmeasured). Queued behind 9a on the heavy lock. Falsifiers: any file over 1e-9; load run slower than 10 min; summed RSS above 1.5x the exact reference. No 64-rank s2t run: free memory (235 GB at 05:38) is below its summed footprint plus margin on a shared host.
 - Nothing merge-bound; no source change; scripts are scratch helpers (rule 1 proposal is this paragraph).
+
+### Row 1, conductor 26: Proposal 9a harvest, quiet-host exact wide reruns (2026-11-18 06:15 CST; MEASURED, same script, not VERIFIED)
+
+Runs `runs/20261118_c26-exact/` (`scratch/bench/c26_exact.sh`, `harvest.txt` from `scratch/bench/c26_harvest.py`, `DONE`, all rc=0). Machine cotopaxi, 2 x AMD EPYC 7532 (64 cores), 1007 GB, gfortran 15.3.0, Open MPI 5.0.10, PETSc 3.25.5 (MUMPS), binary 1.24.5, solver 3 (preonly Cholesky, 1 KSP iteration), wide BP8 GS, 3,523,272 equations, 40 steps, `OMP_NUM_THREADS=1`, ranks unbound (OS places). Load1 before the run: a 5.24, b 10.72 (decaying tail of a: my own 32 ranks), c 11.36 (tail of b). MemAvailable 360 GB.
+
+| run | ranks | factorization s | loop s | s/step | peak rank MB | summed MB | wall s |
+|---|---|---|---|---|---|---|---|
+| a | 32 | 184.2 | 109.9 | 2.748 | 6677 | 181515 | 298 |
+| b | 32 | 193.1 | 113.6 | 2.841 | 6723 | 180662 | 311 |
+| c | 16 | 320.9 | 170.4 | 4.261 | 11549 | 168706 | 528 |
+
+Comparator `cmp_c11.py` 1e-9: a against the 2026-11-18 reference, b against it, and c against a: `compared 33 fail 0` each. Exact 16 to 32 ranks: factorization 1.74x, per step 1.55x (efficiency 0.87, 0.78); a against b differ 3.4 % (same binary, back to back).
+
+Reading, three statements the earlier text must not keep:
+1. The quiet-host exact figure for wide at 32 ranks is 2.75-2.84 s/step, not 5.45 (the 2026-11-18 reference, `runs/20261118_vista/local/wide40_np32`) and not 3.3-3.5 (the 2026-11-17 batches, which ran at load 40-100). The reference's 5.45 s/step is unexplained: its `load_after` of 38.3 is not evidence of foreign load, because the 1-minute load average at the end of a 32-rank run includes the run's own 32 runnable ranks (my runs: 5.24 to 37.31 and 10.72 to 37.83 with nothing else of ours running). A mid-run foreign job is the untested remaining cause.
+2. The slip-to-traction ratio against exact, with the matched quiet figure: 2.75-2.84 / 0.786 = 3.5-3.6x per step, not 6.9x; break-even 6870 / (2.80 - 0.786) = about 3400 steps, not about 1470 (the s2t loop's own load was 5.3 before, so it is the comparable condition). The 0.786 s/step is still one run.
+3. Comparator pass of a, b, c against the old reference means that reference's output is right at 1e-9 even though its timing was slow.
+Not done: 64-rank exact (summed footprint near 260 GB against 235 GB free at 05:38 on a shared host). The load gate in my scripts (load1 < 12) reads a figure that includes my own previous run; it only delayed starts, no run was contaminated that I can show.

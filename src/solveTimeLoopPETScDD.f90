@@ -548,7 +548,7 @@ subroutine solveTimeLoopPETScDD
     call PCFactorSetMatSolverType(pc, MATSOLVERMUMPS, perr)
     CHKERRA(perr)
     ! Owner decision 2A: MUMPS workspace ICNTL(14) defaults to 100 (MUMPS
-    ! itself: 35); Vista fails at the MUMPS default from 64 ranks. A user
+    ! itself: 20, as measured on 1.24.5); Vista fails at the MUMPS default from 64 ranks. A user
     ! -mat_mumps_icntl_14 (command line or PETSC_OPTIONS) wins.
     call PetscOptionsHasName(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-mat_mumps_icntl_14', icntl14Set, perr)
     CHKERRA(perr)

@@ -123,6 +123,13 @@ build, run and traps are in `CLAUDE.md`.
    merge-bound branch: "let me decide promotion" (verbatim.) Read as (a
    reading): no agent promotes, proposes a merge-bound rewrite of, or
    retires a solver option; rankings are offered, the owner picks.
+   Owner, 2026-11-17, shown a ranking whose item 1 was the distributed
+   PETSc loop with exact MUMPS (`par.solver = 3`, the stack #76, #77, #82,
+   #83, #85): "cool. promote 1" (verbatim.) Read as (a reading):
+   `par.solver = 3` and the new file `src/solveTimeLoopPETScDD.f90` are
+   agreed, and the stack lands through gated merges in stack order. Not
+   read into it: a change of default solver, retiring solver 1 or 2,
+   anything under (h), or promotion of any other option.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

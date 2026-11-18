@@ -268,6 +268,30 @@ build, run and traps are in `CLAUDE.md`.
    `fault.*.nc` files are in the committed gold and are read back on
    restart, and `netcdf_write_roughness`); any regeneration of gold under
    `data/`; what readers outside this repo expect.
+   Owner, 2026-11-18 16:24 to 16:27 CST, on the same subject: "there
+   should be a setup of precision in globalvar.f90?" and "all f90 should
+   follow that right?" (verbatim.) Told that `dp =
+   selected_real_kind(15,307)` in `src/globalvar.f90` is followed
+   everywhere except three `NF90_REAL` definitions in `src/netcdf_io.f90`
+   and a few hard-coded but equivalent declarations, and asked two
+   numbered questions, the owner answered: "for 1 and 2, yes, both should
+   follow dp" (verbatim.) The options as put were: question 1, on-fault
+   and roughness NetCDF writers, "A) switch them to double as well and
+   regenerate the affected gold in a separate gated PR (recommended,
+   since it matches your rule that everything follows `dp`), B)
+   displacement only, leave those two in single"; question 2, the
+   hard-coded `real(8)` and `double precision` lines, "A) change them to
+   `kind=dp` in the same PR, behaviour-preserving (recommended), B) leave
+   them". Read as (a reading): all three NetCDF writers store reals at
+   the kind `dp` names, and the hard-coded `real(8)` and `double
+   precision` declarations become `kind=dp`; the gold under `data/` that
+   the on-fault change invalidates is regenerated in its own gated PR,
+   with the old-against-new difference shown to be storage truncation
+   only before any gold file is replaced. This supersedes the "NOT
+   decided" items of the 16:21 paragraph for the two other writers and
+   for that gold regeneration. NOT decided: the MPI calls that name
+   `MPI_DOUBLE_PRECISION` (not asked); gold for anything other than the
+   files this change invalidates; what readers outside this repo expect.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

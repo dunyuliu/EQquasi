@@ -301,6 +301,46 @@ build, run and traps are in `CLAUDE.md`.
    the reference (gold) sets under `data/`; which sets hold `disp.*.nc`
    is listed on this row before any is replaced. NOT decided: adding
    displacement snapshots to a reference set that holds none today.
+   Owner, 2026-11-18 16:36 CST, answering two numbered questions put
+   after being told that no reference set holds `disp.*.nc` and that the
+   bp1002 reference lacks the second-fault summary files: "1A. 2A."
+   (verbatim.) The options as put were: question 1, displacement in the
+   reference, "A) add the last-step snapshot per reference set
+   (recommended), B) add every snapshot, C) keep none"; question 2,
+   bp1002 second-fault summaries, "A) add them in the same gold PR
+   (recommended), B) leave them out". Read as (a reading): when the gold
+   is regenerated for the 8-byte storage, each reference set gains its
+   last-step `disp.*.nc`, and the bp1002 set gains
+   `cplot_ft2_EQquasi.txt`, `cplot_ft2_ruptarea_trac_slip.txt` and
+   `cplot_ruptarea_trac_slip.txt`, all in that one gated gold PR, with
+   the size the tree grows by recorded. This settles the "NOT decided"
+   item just above. NOT decided: any other file absent from a reference
+   set (`p1output.txt`, `p2output.txt`, `peak_sliprate_per_fault.dat` on
+   bp1002); the tolerance the tier applies to the new files.
+   Owner, 2026-11-18 16:38 CST: "/autopilot clear the board. a week
+   budget. go" (verbatim.) Read as (a reading): the unattended run now
+   covers every open row of this board, worked in `prio` order with
+   state as the tiebreak, not only row 1; the budget is one week from
+   this message, to 2026-11-25 16:38 CST, replacing the "until this
+   row's items are done or blocked on the owner" end; the order already
+   set on this row (refactor step 1, NetCDF output follows `dp`, gold
+   regeneration, slip-to-traction promotion, then its optimization)
+   keeps its place at the head of the queue. Unchanged: the Vista
+   ceiling of 150 SU, every "NOT decided" item above, rule 1 for any new
+   file, name, parameter or compset, no major version bump unattended,
+   and that opening, closing and re-scoping rows stays with the rules
+   owner.
+   Owner, 2026-11-18 16:39 CST, answering one numbered question on the
+   tolerance left open by the 16:36 paragraph: "1A" (verbatim.) The
+   options as put were: "Bar for the double-precision NetCDF files in the
+   test tier: A) 1e-10, same as the text columns (recommended), B) keep
+   1e-6". Read as (a reading): once `disp.*.nc` and `fault.*.nc` are
+   stored as 8-byte reals, the test tier compares them at a relative
+   1e-10, the bar the double-precision text columns already use
+   (`DD_RTOL`), in place of the 1e-6 kept for 4-byte storage
+   (`DD_DISP_RTOL`). NOT decided: any change to the 1e-9 campaign
+   comparator; what to do if a measured difference exceeds 1e-10 (it
+   comes back to this row, the bar is not loosened unattended).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

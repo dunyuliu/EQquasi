@@ -959,7 +959,7 @@ Hand-off, for a fresh conductor:
 - Ask the rules specialist to draft rules from lessons 3 and 4 and the launcher crash.
 - Worktrees to keep: c23-read, c23-board, c24-board, owner-relays-2, spike-blr, gate-full, lapusta-xi and the agent-* worktrees listed in the session log; agent-a07d3a48124b0f9b0 is locked.
 
-### Row 1, conductor 25: Vista ladder harvest, comparator verdicts, two open questions (2026-11-18 04:50 CST; MEASURED once each, not closed)
+### Row 1, conductor 25: Vista ladder harvest, comparator verdicts, two open questions (2026-11-18 04:10 CST; MEASURED once each, not closed)
 
 Machine: Vista (TACC), GH nodes used CPU-only (72 Neoverse-V2 cores, 117 GB, 9 NUMA domains), gcc 14.2.0, Open MPI 5.0.5, PETSc 3.25.5 with MUMPS, netcdf 4.9.2, binary 1.24.5 solver 3, `--map-by ppr:<ppn>:node:PE=1 --bind-to core`, no `--host`. Job 1151045 (8 nodes, 6 min 16 s) finished: np64, np288, np576 all rc=0 with `-mat_mumps_icntl_4 1 -mat_mumps_icntl_14 100`; the ICNTL(14)=250 retry never ran (not needed). Evidence: `runs/20261118_vista/vista_rungs/` (tarball `c25_all.tgz`, md5 3933cace99cb8c8debe008a84db4ff83, copied over the control socket and the md5 matched on both ends; per-rung `run*.log`, `rc*.txt`, `result/cycle0`, mesh files excluded).
 

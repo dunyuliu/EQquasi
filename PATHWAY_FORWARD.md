@@ -198,6 +198,25 @@ build, run and traps are in `CLAUDE.md`.
    the measured exact-against-exact differences behind it before any
    result is re-read as a pass; the cross-architecture float32 `disp`
    files are NOT covered by this answer.
+   Owner, 2026-11-18 13:59 CST, after being told what stands between the
+   slip-to-traction option and regular use (and, one message earlier, the
+   Vista limits of distributed direct): "fix those vista issue, and run
+   full cycles, a few, and verify. if we can pass that and the CI, let's
+   promote it" (verbatim.) Read as (a reading, the owner may correct it):
+   "it" is the slip-to-traction option; promotion is CONDITIONAL on
+   (i) the Vista issues fixed: ICNTL(14) (2A above), the NUL holes in
+   output written to NFS scratch (run from Lustre, or a fix if the cause
+   is in the code), and for slip-to-traction a clean dedicated-node run;
+   (ii) a few full earthquake cycles run with slip-to-traction and
+   verified against exact at the comparator bar (1e-9 with the 1A floor);
+   which cases and how many is proposed on this row first, with cost;
+   (iii) the full test tier and CI green on the exact commit. Promotion
+   then follows the same route as distributed direct: gated merges, a
+   version bump, the code audit before any tag. NOT decided by this
+   message: the option's name and parameter value (rule 1: proposed on
+   this row and agreed before the merge-bound branch), a `vista` machine
+   target, a compset for wide, the re-layout reader for the saved
+   operator, any default change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

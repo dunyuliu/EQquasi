@@ -301,6 +301,22 @@ build, run and traps are in `CLAUDE.md`.
    the reference (gold) sets under `data/`; which sets hold `disp.*.nc`
    is listed on this row before any is replaced. NOT decided: adding
    displacement snapshots to a reference set that holds none today.
+   Owner, 2026-11-18 16:36 CST, answering two numbered questions put
+   after being told that no reference set holds `disp.*.nc` and that the
+   bp1002 reference lacks the second-fault summary files: "1A. 2A."
+   (verbatim.) The options as put were: question 1, displacement in the
+   reference, "A) add the last-step snapshot per reference set
+   (recommended), B) add every snapshot, C) keep none"; question 2,
+   bp1002 second-fault summaries, "A) add them in the same gold PR
+   (recommended), B) leave them out". Read as (a reading): when the gold
+   is regenerated for the 8-byte storage, each reference set gains its
+   last-step `disp.*.nc`, and the bp1002 set gains
+   `cplot_ft2_EQquasi.txt`, `cplot_ft2_ruptarea_trac_slip.txt` and
+   `cplot_ruptarea_trac_slip.txt`, all in that one gated gold PR, with
+   the size the tree grows by recorded. This settles the "NOT decided"
+   item just above. NOT decided: any other file absent from a reference
+   set (`p1output.txt`, `p2output.txt`, `peak_sliprate_per_fault.dat` on
+   bp1002); the tolerance the tier applies to the new files.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

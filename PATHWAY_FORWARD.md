@@ -1087,7 +1087,7 @@ Budget read: owner "3 days budget" of 2026-11-16 ends 2026-11-19 16:20 CST (abou
 | run wall s | 11031 | 419 | n/a | 528 (16) |
 | comparator `cmp_c11.py` 1e-9 against the 32-rank exact reference | `compared 33 fail 0` | `compared 33 fail 0` | | |
 
-Operator dump: `op/w16.00000x`, 16 files, 28 GB (`order.txt`), per-rank sizes 2.9 MB (4 ranks hold none) to 5.1 GB; gitignored. The load run's built-in check lines: step 1 `maxdiff_traction` 1.49e-12 of 1.10e2, step 40 4.77e-10 of 3.64e4 (1.3e-14 relative), displacement 2.5e-23 of 7.5e-9.
+Operator dump: `op/w16.00000x`, 16 files, 28 GB (`order.txt`), per-rank sizes 2.9 MB (8 of 16 ranks hold almost none) to 5.1 GB; gitignored. The load run's built-in check lines: step 1 `maxdiff_traction` 1.49e-12 of 1.10e2, step 40 4.77e-10 of 3.64e4 (1.3e-14 relative), displacement 2.5e-23 of 7.5e-9.
 
 Falsifiers of Proposal 9, answered:
 1. Any file over 1e-9: NO, both runs 33 of 33 pass against the exact 32-rank reference (cross rank count and cross method).

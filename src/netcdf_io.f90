@@ -100,7 +100,7 @@ subroutine netcdf_write(outfile, outtype)
     ! dimids of the dimensions of the netCDF variables.
     dimids = (/ lon_dimid, lat_dimid /)
     if (outtype == 'disp' .or. outtype == 'coor') then 
-        call check(nf90_def_var(ncid, var_1_name, NF90_REAL, dimids, var_1_id)) 
+        call check(nf90_def_var(ncid, var_1_name, NF90_DOUBLE, dimids, var_1_id)) 
     elseif (outtype == 'nsmp' .or. outtype == 'ien') then 
         call check(nf90_def_var(ncid, var_1_name, NF90_INT, dimids, var_1_id)) 
     endif 
@@ -327,7 +327,7 @@ subroutine netcdf_write_on_fault(outfile)
     dimids = (/ lon_dimid, lat_dimid, flt_dimid /)
 
     do i = 1, nvar
-        call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i)))
+        call check(nf90_def_var(ncid, var_name(i), NF90_DOUBLE, dimids, var_id(i)))
         ! Assign units attributes to the pressure and temperature netCDF
         ! variables.
         call check(nf90_put_att(ncid, var_id(i), UNITS, var_unit(i)))
@@ -456,7 +456,7 @@ subroutine netcdf_write_roughness(outfile)
     dimids = (/ lon_dimid, lat_dimid /)
     
     do i = 1, nvar
-        call check(nf90_def_var(ncid, var_name(i), NF90_REAL, dimids, var_id(i))) 
+        call check(nf90_def_var(ncid, var_name(i), NF90_DOUBLE, dimids, var_id(i))) 
         ! Assign units attributes to the pressure and temperature netCDF
         ! variables.
         call check(nf90_put_att(ncid, var_id(i), UNITS, var_unit(i)))

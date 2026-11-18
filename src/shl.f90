@@ -2,8 +2,8 @@ subroutine shlc8g2(shl,shl0,w)
 use globalvar
 implicit none 
 integer(kind=4)::i
-real(kind=8)::shl(3,8,8)!nrowsh*nen*nint
-real(kind=8)::shl0(8,8)!nrowsh*nen*nint
+real(kind=dp)::shl(3,8,8)!nrowsh*nen*nint
+real(kind=dp)::shl0(8,8)!nrowsh*nen*nint
 !1st-3rd:x,y,z derivatives of local shape function
 !4th:shape function itself
 !NO.1:-1,-1,-1; NO.5:-1,-1, 1;
@@ -11,8 +11,8 @@ real(kind=8)::shl0(8,8)!nrowsh*nen*nint
 !NO.3: 1, 1,-1; NO.7: 1, 1, 1; 
 !NO.4:-1, 1,-1; NO.8:-1, 1, 1;
 !-----------------------------
-real(kind=8)::w(8),cst
-real(kind=8)::gsloc(3,8)
+real(kind=dp)::w(8),cst
+real(kind=dp)::gsloc(3,8)
 !Gaussian points have the same order
 cst=1.0d0/8.0d0!
 gsloc(1,1)=-1.0d0/sqrt(3.0d0)!NO.1

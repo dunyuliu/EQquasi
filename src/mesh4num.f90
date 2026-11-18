@@ -31,14 +31,14 @@ subroutine mesh4num
 	logical::on_fault_plane
 
 	integer (kind=4),dimension(ntotft)::nftnd0
-	real(kind=8)::dy,dz
+	real(kind=dp)::dy,dz
 	integer (kind=4)::nxuni,nyuni,nzuni
 
-	real(kind=8)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
+	real(kind=dp)::tol,xcoor,ycoor,zcoor,xstep,ystep,zstep,&
 			xmin1,xmax1,ymin1,ymax1,zmin1
-	real(kind=8),allocatable,dimension(:)::xlinet,ylinet,zlinet,xline,yline,zline
+	real(kind=dp),allocatable,dimension(:)::xlinet,ylinet,zlinet,xline,yline,zline
 	integer(kind=4)::i1
-	real(kind=8)::fltx1,fltx2,fltz1,fltz2,yflt_lo,yflt_hi
+	real(kind=dp)::fltx1,fltx2,fltz1,fltz2,yflt_lo,yflt_hi
 
 
 	dy=dx

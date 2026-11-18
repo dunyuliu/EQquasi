@@ -119,6 +119,10 @@ build, run and traps are in `CLAUDE.md`.
    scale?" (verbatim.) Read as (a reading): the cluster test under (g) is
    released on that one allocation; the build there is spike work until a
    machine target is agreed; the question is answered with measurements.
+   Owner, 2026-11-17, on which solver options move from spike to a
+   merge-bound branch: "let me decide promotion" (verbatim.) Read as (a
+   reading): no agent promotes, proposes a merge-bound rewrite of, or
+   retires a solver option; rankings are offered, the owner picks.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

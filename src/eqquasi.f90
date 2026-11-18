@@ -297,6 +297,10 @@ subroutine allocAndInit
                 arn(nftmx,ntotft),r4nuc(nftmx,ntotft),anonfs(3,nonmx),&
                 slp4fri(nftmx,ntotft),fltslp(3,nftmx,ntotft), globaldat(10,nstep), peakSlipRatePerFault(ntotft,nstep), fltsta(14,nstep,nonmx))
 
+    ! meshgen fills nsmp(:,1:nftnd(ift),ift) only; netcdf_write stores fault
+    ! 1's nftmx columns in eqquasi.mesh.nsmp.nc, so with faults of unequal
+    ! size the columns past nftnd(1) were whatever the allocation held.
+    nsmp    = 0
     fnft    = -1000.d0!Should be initialized over 600.
     fric    = 0.0d0
     un      = 0.0d0

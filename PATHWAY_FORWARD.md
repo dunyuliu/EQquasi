@@ -341,6 +341,29 @@ build, run and traps are in `CLAUDE.md`.
    (`DD_DISP_RTOL`). NOT decided: any change to the 1e-9 campaign
    comparator; what to do if a measured difference exceeds 1e-10 (it
    comes back to this row, the bar is not loosened unattended).
+   Owner, 2026-11-18 16:45 CST, after being told that the 8-byte output
+   fails the CI comparison against the 4-byte reference files: "though
+   not bit identical, regenrated golds should match single precision with
+   a relatively larger bar" (verbatim.) Read as (a reading): an
+   acceptance condition on the gold regeneration, not a change of the
+   1e-10 tier bar: every regenerated reference file must agree with the
+   file it replaces at single-precision level (a looser bar, of the
+   order of the 1e-6 the tier used for 4-byte storage), and the measured
+   worst difference per file is recorded with the regeneration; a file
+   that does not agree at that level is not replaced and comes back to
+   this row. The stricter check already planned (new values cast to 4
+   bytes equal the old values) satisfies it. NOT decided: the exact
+   value of the looser bar (1e-6 is proposed here, as the bar already in
+   the tier).
+   Owner, 2026-11-18 16:45 CST, next message: "physics shouldn't change"
+   (verbatim.) Read as (a reading): the stated reason for the condition
+   above and a requirement on the whole change: storing the output at
+   8 bytes may alter only the stored precision of each value, never the
+   computed solution; the double-precision text output of the same case
+   (station series, summary files) must stay within the 1e-10 tier bar
+   between the binary before and the binary after, and any difference
+   beyond storage truncation stops the gold regeneration and comes back
+   to this row.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

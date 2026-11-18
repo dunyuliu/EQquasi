@@ -188,3 +188,4 @@ All take `scratch/locks/heavy.lock` per run (not FIFO). Worktrees: `spike-mm` (b
 ## Conductor 23 (2026-11-18)
 
 - 01:40 CST [20/100]: #165 merged (f93da64) after a CI rerun (hosted runner hung in "Install dependencies" twice, cancelled and rerun). Vista build moved from `gg` (pending about 7 h, estimate 2026-11-20) to `gh-dev` (job 1150931). Refactor design written on board row 1 (conductor 23 block): seam, staged steps, owner-held list; no code. Worktrees of conductors 21 and 22 reaped.
+- 02:10 CST [76/100]: Proposal 5 (Vista ladder on one gh-dev allocation) merged as #167. Local wide 40-step reference and the refactor step-0 baseline (12 solver-3 cases) measured and recorded on row 1; Vista build 1150956 pending, ladder auto-submit watcher armed (PID 2209123); first step-0 attempt voided (ran solver 1, sed spacing).

@@ -115,6 +115,12 @@ attribute (the writer's `dx`); a coupled restart whose dip-axis spacing
 doesn't match this run's `dx` stops loudly at read rather than silently
 misaligning the fault grid along dip.
 
+Since 1.24.8 the restart files hold the end state unrounded (8-byte reals), so
+cycle 2 and later start from the exact end state of the previous cycle. Under
+1.24.7 and earlier they started from the 4-byte rounded state, so a cycle after
+the first can differ from an older run at the level of that rounding; cycle 1 is
+unaffected. A 4-byte restart file written by an older version is still read.
+
 ## Mesh: `eqquasi.mesh.coor.nc`, `eqquasi.mesh.ien.nc`, `eqquasi.mesh.nsmp.nc`
 
 Node coordinates, element connectivity, and the fault's paired-node list,

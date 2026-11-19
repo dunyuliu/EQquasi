@@ -366,6 +366,31 @@ build, run and traps are in `CLAUDE.md`.
    between the binary before and the binary after, and any difference
    beyond storage truncation stops the gold regeneration and comes back
    to this row.
+   Owner, 2026-11-19 17:07 CST, replying to the daily brief of 09:37 CST:
+   "go" (verbatim.) The brief's three questions were: 1, slip-to-traction
+   self-check floor (1e-14 of the operator's largest entry): "A) adopt,
+   with a test option `-eq_s2t_plant_row` proving a wrong operator still
+   aborts (recommended), B) no floor, which aborts bp7"; 2, round-off
+   floors in the comparator: "A) `Slip_3` at 1e-15 m, the same floors
+   for surface-station files, applied to un-logged values (recommended),
+   B) no additions"; 3, already landed, confirm: "A) accept
+   (recommended): replaced on-fault gold judged at the tier's 1e-6 floor;
+   restart files unrounded, so cycle 2 differs by about 1e-6; B)
+   revisit". Read as (a reading): the recommended option of each, that
+   is owner-brief items 3 and 7 (floor adopted together with the
+   planted-operator option `-eq_s2t_plant_row` and its run-level test),
+   items 2 and 8 (`Slip_3` floor 1e-15 m; floors applied to the
+   un-logged values, a log10 entry below the floor skipped), items 1
+   and 6 (accepted). The surface-station part of question 2 is read as
+   superseded: after the brief the invoking session told the owner that
+   the bp7 8-rank failure did not reproduce in 7 repeats and no floor
+   is needed for surface-station files, so item 10 is read as option D
+   (no `srfst_` floor; re-run that test in the merge-head gate, and on a
+   second failure keep the case and send it to the code auditor first).
+   NOT decided by "go": item 11 (liu2020 reference, including any looser
+   text bar for that set) and item 5 that depends on it; item 9
+   (ICNTL(14) for native solver 1); step 2 of the operator-build plan (a
+   new option name); any default change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

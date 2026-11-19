@@ -38,18 +38,24 @@ program eqquasi3d
     call readmodel
     call readstations1
 
+    if (sol_op < 1 .or. sol_op > 4) then
+        if (me == 0) write(*,*) 'par.solver must be 1, 2, 3 or 4; got ', sol_op
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+    endif
+
     allocate(an4nds(2,n4nds), xonfs(2,maxval(nonfs),ntotft), x4nds(3,n4nds))
     call readstations2
 
     call mesh4num
 #ifdef HAVE_PETSC
-    ! par.solver = 3: from here on a rank holds its own block of the mesh only.
-    if (sol_op == 3) call ddMeshBox
+    ! par.solver = 3 and 4: from here on a rank holds its own block of the mesh only.
+    if (sol_op >= 3) call ddMeshBox
 #endif
     call allocAndInit
     call meshgen
 #ifdef HAVE_PETSC
-    if (sol_op == 3) call ddMeshFinish
+    if (sol_op >= 3) call ddMeshFinish
 #endif
 
     ! A requested station that matches no fault node used to vanish without a
@@ -103,11 +109,11 @@ program eqquasi3d
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
 #endif
-    elseif (sol_op == 3) then
+    elseif (sol_op == 3 .or. sol_op == 4) then
 #ifdef HAVE_PETSC
         call solveTimeLoopPETScDD
 #else
-        write(*,*) 'par.solver=3 (PETSc, distributed) needs MACHINE=conda-linux (or ', &
+        write(*,*) 'par.solver=3 or 4 (PETSc, distributed; 4 is slip to traction) needs MACHINE=conda-linux (or ', &
             'another PETSc-enabled build); not available on this binary.'
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)

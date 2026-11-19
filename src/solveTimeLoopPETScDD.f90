@@ -1575,7 +1575,7 @@ contains
             ! round-off and still far below any wrong operator column. Every rank holds
             ! the same vg, so every rank stops. .not. (<=) also stops on NaN.
             if (.not. (vg(1) <= s2tCheckRtol*vg(2) .and. vg(3) <= s2tCheckRtol*vg(4))) then
-                if (me == 0) write(*,'(A,I8,4ES14.6)') &
+                if (me == 0) write(*,'(A,A,I8,4ES14.6)') &
                     'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
                     'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
                 flush(6)

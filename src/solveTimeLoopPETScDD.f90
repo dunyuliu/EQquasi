@@ -101,7 +101,7 @@ subroutine solveTimeLoopPETScDD
     logical, allocatable       :: s2tPair(:)
     integer (kind = 4)         :: s2tNcol, s2tNst = 0
     real (kind = dp), allocatable :: s2tSu(:,:), s2tCu(:), s2tU(:), s2tUprev(:)
-    real (kind = 8)            :: s2tBuildSec
+    real (kind = dp)            :: s2tBuildSec
     external :: dgemv
 
     integer (kind = 4) :: pdim(3), ncell(3), icnt(6), icntG(6), nloc(3), profN(2)
@@ -582,8 +582,8 @@ subroutine solveTimeLoopPETScDD
     call KSPGetTolerances(ksp, kspRtol, kspAtol, kspDtol, kspMaxIts, perr)
     CHKERRA(perr)
     if (.not. (isPreonly .and. isCholesky)) then
-        if (me == 0) write(*,*) 'par.solver=3: only KSPPREONLY + PCCHOLESKY ', &
-            '(MUMPS) is verified for the distributed loop. Refusing.'
+        if (me == 0) write(*,'(A,I0,A)') 'par.solver=', sol_op, &
+            ': only KSPPREONLY + PCCHOLESKY (MUMPS) is verified for the distributed loop. Refusing.'
         flush(6)
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
@@ -1157,13 +1157,13 @@ contains
         integer (kind = 4) :: ibat, kk, gc, nbat, nn, ll, jj, nr
         PetscInt :: pk, pnb
         Vec :: vcol
-        real (kind = 8) :: t0
+        real (kind = dp) :: t0
         Mat :: Btm
         PetscInt :: rs, re, ri(1), ci(1), pz0 = 0, pone = 1
         PetscInt, allocatable :: dnzA(:), onzA(:)
         PetscScalar :: vv(1)
         integer (kind = 4), allocatable :: lrow(:), lcol(:), grow(:), gcol(:), rcnt(:), rdsp(:), tmpi(:)
-        real (kind = 8), allocatable :: lval(:), gval(:), tmpr(:)
+        real (kind = dp), allocatable :: lval(:), gval(:), tmpr(:)
         integer (kind = 4) :: nlz, cap, ntot, ie, r0
         t0 = MPI_Wtime()
         nbat = 0
@@ -1486,11 +1486,13 @@ contains
         endif
         if (amin > amax) then
             if (me == 0) write(*,*) 'EQ_S2T: no far-field constrained dof with a prescribed velocity'
+            flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
         if (amax - amin > 1.0d-12*max(abs(amin), abs(amax)) .or. zmax > 1.0d-12*scale) then
             if (me == 0) write(*,*) 'EQ_S2T: far-field part of the prescribed displacement is not ', &
                 'proportional to the velocity pattern: amin amax zmax', amin, amax, zmax
+            flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
         call ddFltPack(constmp)
@@ -1535,6 +1537,7 @@ contains
         PetscBool, intent(in) :: full
         integer (kind = 4) :: ll, ss, jj, kk, w, nn
         real (kind = dp) :: v(4), vg(4)
+        real (kind = dp), parameter :: s2tCheckRtol = 1.0d-8
         real (kind = dp), allocatable :: fop(:,:)
         if (full) then
             allocate(fop(ndof,numnp))
@@ -1564,6 +1567,20 @@ contains
             endif
             call MPI_Allreduce(v, vg, 4, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
             if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
+            ! The operator is a different arithmetic from the solve, so the two agree to
+            ! round-off, not bit for bit. Measured on the e2e cases and bp5/bp1002: traction
+            ! difference at most 1e-1 against a largest 2e13 (5e-15 relative), displacement
+            ! difference at most 7e-17 against 5e-2 (1e-15 relative); the e2e bar is 1e-9.
+            ! A bound of 1e-8 of each field's largest value is 3 orders above the measured
+            ! round-off and still far below any wrong operator column. Every rank holds
+            ! the same vg, so every rank stops. .not. (<=) also stops on NaN.
+            if (.not. (vg(1) <= s2tCheckRtol*vg(2) .and. vg(3) <= s2tCheckRtol*vg(4))) then
+                if (me == 0) write(*,'(A,I8,4ES14.6)') &
+                    'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
+                    'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
         endif
         if (s2tNst > 0) then
             do ss = 1, n4out

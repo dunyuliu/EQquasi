@@ -53,12 +53,17 @@ codes. The launcher normally passes the code through as the exit status.
   (MUMPS) or the conda build.
 * `par.solver must be 1, 2, 3 or 4`: `solver` holds another value.
 * `par.solver=3: only KSPPREONLY + PCCHOLESKY (MUMPS) is verified ...
-  Refusing.` (also for `solver = 4`): a PETSc option changed the Krylov or
+  Refusing.` (the message names the `solver` of the run, 3 or 4): a PETSc option changed the Krylov or
   preconditioner type. Slip to traction (`solver = 4`) builds its operator on
   the MUMPS factor, so it has no other option set; remove the option.
 * `EQ_S2T: ...` (`solver = 4`): the far-field displacement of the case is not
   proportional to one velocity pattern, or there is no fault pair, so the
   operator cannot stand for the solve. Use `solver = 3`.
+* `EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum`
+  (`solver = 4`): on a step that also solves in full, the operator's fault
+  traction or station displacement differs from the solve's by more than 1e-8
+  of that field's largest value (measured round-off is about 1e-14). The
+  operator is wrong for this case; report it, and run with `solver = 3`.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.
 * `par.solver=3: fault N is not one rectangle of nodes on a single interior

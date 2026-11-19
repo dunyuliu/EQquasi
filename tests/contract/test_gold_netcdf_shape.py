@@ -84,6 +84,7 @@ REGENERATED_8BYTE = (
     "test.bp7.qdc.a.10/cycle0",
     "bp5.qdc.kink.2000/cycle0",
     "test.bp8.qdc.gs.10",
+    "test.bp5.qdc.2000/cycle0",
 )
 REGENERATED_FILES = sorted(p for s in REGENERATED_8BYTE
                            for p in glob.glob(str(ROOT / "data" / s / "*.nc")))

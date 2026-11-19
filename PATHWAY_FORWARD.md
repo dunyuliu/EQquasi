@@ -391,6 +391,26 @@ build, run and traps are in `CLAUDE.md`.
    text bar for that set) and item 5 that depends on it; item 9
    (ICNTL(14) for native solver 1); step 2 of the operator-build plan (a
    new option name); any default change.
+   Owner, 2026-11-19 17:20 CST, after being shown that the v1.24.7 and
+   v1.24.8 liu2020 runs overlay at plot scale and differ only during the
+   rupture (at most 3.6e-7 of a column's maximum), asked "so 1e-9 rel is
+   not a good metrics?", and given the recommendation: "Keep 1e-9 / 1e-10
+   for short regression cases. For full-cycle cases, compare event time,
+   peak slip rate and event slip and moment at a stated tolerance. If you
+   agree, the conductor would propose the metrics and tolerances on the
+   board, measured on the existing full-cycle pairs, before any
+   comparator change." The owner answered: "yes" (verbatim.) Read as (a
+   reading): the 1e-9 / 1e-10 relative value bars stay for short
+   regression cases; for full earthquake-cycle comparisons the metrics
+   become physical ones (event times, peak slip rate, coseismic slip and
+   moment per event); the conductor first proposes the exact metrics,
+   their definitions (for example the slip-rate threshold that defines an
+   event) and tolerances on this row, measured on the full-cycle pairs
+   already run (liu2020 v1.24.7 against v1.24.8; the bp5, bp7 and bp1002
+   full cycles of solver 4 against solver 3), and no comparator or test
+   changes before the owner sees that proposal. NOT decided: the metric
+   set, the definitions and tolerances, which cases they apply to, and
+   item 11 (liu2020), which this proposal informs.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

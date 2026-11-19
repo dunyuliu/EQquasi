@@ -84,6 +84,9 @@ subroutine solveTimeLoopPETScDD
     PetscInt                   :: itsAtLastProgress, solvesAtLastProgress, kspMaxIts
     PetscBool                  :: isPreonly, isCholesky
     PetscBool                  :: icntl14Set
+    PetscBool                  :: s2tPlantSet
+    PetscInt                   :: s2tPlantRow
+    integer (kind = 4)         :: s2tPlantLoc
     KSPConvergedReason         :: kspReason
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     character (len = 16)       :: kspTypeStr, pcTypeStr
@@ -601,6 +604,29 @@ subroutine solveTimeLoopPETScDD
         call PCFactorGetMatrix(pc, Fmm, perr)
         CHKERRA(perr)
         call ddS2tBuild
+        ! Test hook (tests/e2e/test_benchmarks.py): -eq_s2t_plant_row <global row>
+        ! doubles that row of the operator [S c] after the build, so the operator
+        ! check of the next full-solve step (ddS2tStations) must stop the run.
+        ! Without the option nothing below changes the operator.
+        call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_plant_row', &
+            s2tPlantRow, s2tPlantSet, perr)
+        CHKERRA(perr)
+        if (s2tPlantSet) then
+            if (s2tPlantRow < 0 .or. s2tPlantRow >= s2tNcol) then
+                if (me == 0) write(*,'(A,I0,A,I0,A)') 'EQ_S2T: -eq_s2t_plant_row ', s2tPlantRow, &
+                    ' is outside the operator rows [0, ', s2tNcol, ')'
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            s2tPlantLoc = int(s2tPlantRow, 4) - s2tDspB(me)
+            if (s2tPlantLoc >= 0 .and. s2tPlantLoc < s2tNrB) then
+                s2tS(s2tPlantLoc+1, :) = 2.0d0*s2tS(s2tPlantLoc+1, :)
+                s2tC(s2tPlantLoc+1) = 2.0d0*s2tC(s2tPlantLoc+1)
+            endif
+            if (me == 0) write(*,'(A,I0,A)') 'EQ_S2T: -eq_s2t_plant_row ', s2tPlantRow, &
+                ': that operator row is doubled (test hook)'
+            flush(6)
+        endif
     endif
 
     stoptag = 0
@@ -1584,7 +1610,7 @@ contains
         ! Station cons from the operator (last apply of the step). On a step
         ! with the full solve, operator vs solve: traction at the owned fault
         ! pairs against ddBoundFtKu, station displacement against uloc.
-        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_is_finite
         PetscBool, intent(in) :: full
         integer (kind = 4) :: ll, ss, jj, kk, w, nn
         real (kind = dp) :: v(7), vg(7), bt, bu
@@ -1640,8 +1666,9 @@ contains
             ! A field that is zero by physics (bp7 step 1: traction 8e-15, pure round-off)
             ! has no scale to be relative to: the bound is floored at 1e-14 of the
             ! operator's largest entry, the response to 1 m of slip.
-            ! The test (tests/e2e/test_benchmarks.py, _s2t_bounds) holds this same bound.
-            ! PROPOSAL, owner decision pending: the 1e-14 floor (commit 570977e).
+            ! The test (tests/e2e/test_benchmarks.py, _s2t_violations) holds this same bound;
+            ! the 1e-14 floor is the owner's (2026-11-19). -eq_s2t_plant_row proves a wrong
+            ! operator row still stops the run (test_slip_to_traction_planted_operator_row_aborts).
             bt = max(s2tCheckRtol*vg(2), 1.0d-14*vg(5))
             bu = max(s2tCheckRtol*vg(4), 1.0d-14*vg(6))
             wt = 'relative'
@@ -1651,11 +1678,22 @@ contains
             if (vg(7) > 0.0d0 .or. .not. (vg(1) <= bt .and. vg(3) <= bu)) then
                 if (me == 0) then
                     write(*,'(A,A,I8,4ES14.6)') &
-                        'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
+                        'EQ_S2T: operator disagrees with the solve beyond max(1e-8 of the field maximum, ' // &
+                        '1e-14 of the operator maximum): ', &
                         'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
                     write(*,'(A,ES14.6,A,A,A,ES14.6,A,A,A,F4.1)') 'EQ_S2T: bound traction ', bt, ' (', trim(wt), &
                         '), displacement ', bu, ' (', trim(wu), '); NaN flag ', vg(7)
                 endif
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+        endif
+        ! A step without the full solve has no solve to check the station
+        ! displacement against: a non-finite value stops the run on the rank that
+        ! holds it (MPI_ABORT ends every rank, no collective needed).
+        if (.not. full .and. s2tNst > 0) then
+            if (any(.not. ieee_is_finite(s2tU(1:s2tNst)))) then
+                write(*,'(A,I0,A,I8)') 'EQ_S2T: NaN or Inf in the operator station displacement, rank ', me, ', step', it
                 flush(6)
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif

@@ -800,8 +800,7 @@ S2T_NSTEP = 31
 # ddS2tStations prints it on every full-solve step). The bound is the solver's own:
 # 1e-8 of each field's largest value, floored at 1e-14 of the operator's largest
 # entry (maxabs_S for the traction, maxabs_Su for the displacement, both printed
-# on the check line). PROPOSAL, owner decision pending: the floor is commit
-# 570977e, a numerics choice not yet agreed; it must not merge before the answer.
+# on the check line). The floor is the owner's (2026-11-19, "go").
 S2T_CHECK_RTOL = 1e-8
 S2T_CHECK_FLOOR = 1e-14
 S2T_CHECK_RE = (r"EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u maxabs_S maxabs_Su\s+"
@@ -812,8 +811,7 @@ def _s2t_violations(rows):
     """The check rows (step, then six floats) that exceed the solver's bound.
     This is a Python copy of the bound the solver applies (src/solveTimeLoopPETScDD.f90,
     max(S2T_CHECK_RTOL*field_max, S2T_CHECK_FLOOR*operator_max)). The Fortran
-    abort on a wrong operator has NO run-level test until the planted-operator
-    hook is agreed (proposed name -eq_s2t_plant_row <global row>, owner's decision)."""
+    abort on a wrong operator is tested by test_slip_to_traction_planted_operator_row_aborts."""
     bad = []
     for r in rows:
         dt_, at_, du, au, st, su = (float(v) for v in r[1:])
@@ -846,9 +844,8 @@ def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
 @pytest.mark.e2e_fast
 def test_s2t_check_assert_catches_a_planted_wrong_operator():
     """Checks the Python copy of the bound (_s2t_violations), not the Fortran
-    abort, which has NO run-level test until the planted-operator hook is agreed.
-    The assert of _assert_s2t_ran on planted check rows (no run: planting an
-    operator in a run needs a hook in the solver, a new name, rule 1, not agreed).
+    abort (that is test_slip_to_traction_planted_operator_row_aborts).
+    The assert of _assert_s2t_ran on planted check rows, no run.
     Largest traction 1e6, largest S entry 1e3: relative bound 1e-8 * 1e6 = 1e-2,
     floor 1e-14 * 1e3 = 1e-11. A traction difference of 1e-5 relative (10) must
     fail, 1e-9 relative (1e-3, below the bound) must pass; with a traction zero
@@ -860,6 +857,47 @@ def test_s2t_check_assert_catches_a_planted_wrong_operator():
     assert not _s2t_violations([("1",) + f(1e-12, 0.0, 0.0, 1.0, 1e3, 1.0)]), "floor not applied"
     assert _s2t_violations([("1",) + f(1e-9, 0.0, 0.0, 1.0, 1e3, 1.0)]), "above the floor not caught"
     assert _s2t_violations([("1",) + f(0.0, 1.0, 1.0e-5, 1.0, 1e3, 1.0)]), "displacement 1e-5 not caught"
+
+
+# The solver's own abort on a wrong operator (src/solveTimeLoopPETScDD.f90,
+# ddS2tStations), and its refusal of a row outside the operator.
+S2T_PLANT_ABORT = ("EQ_S2T: operator disagrees with the solve beyond max(1e-8 of the field maximum, "
+                   "1e-14 of the operator maximum)")
+S2T_PLANTS = {
+    # row 0 doubled after the build: step 1 solves in full and must stop the run.
+    "row0": (0, S2T_PLANT_ABORT),
+    "out_of_range": (1000000000, "EQ_S2T: -eq_s2t_plant_row 1000000000 is outside the operator rows [0, "),
+}
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(S2T_PLANTS))
+def test_slip_to_traction_planted_operator_row_aborts(case):
+    """par.solver = 4 with PETSC_OPTIONS -eq_s2t_plant_row <row>: the solver
+    doubles that global row of the operator after the build, and the operator
+    check of the first full-solve step (step 1) stops the run with a nonzero
+    exit and the check's abort message; a row outside [0, n) stops it with the
+    hook's own message before any step. 31 steps, 4 ranks, test.bp5.qdc.2000."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
+    row, message = S2T_PLANTS[case]
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_plant_s4." + case)
+    e = C.env()
+    e["PETSC_OPTIONS"] = f"-eq_s2t_plant_row {row}"
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(f"par.solver = 4\npar.nstep = {S2T_NSTEP}\npar.HPC_ncpu = 4\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=900)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    out = r.stdout + r.stderr + (open(log_path).read() if os.path.exists(log_path) else "")
+    assert r.returncode != 0, f"{case}: run.sh exit 0 with a planted operator row\n{out[-3000:]}"
+    assert "EQ_S2T built sec" in out, f"{case}: the operator was not built\n{out[-3000:]}"
+    assert message in out, f"{case}: exit {r.returncode} without '{message}'\n{out[-3000:]}"
+    if case == "row0":
+        assert "EQ_S2T: -eq_s2t_plant_row 0: that operator row is doubled" in out, out[-3000:]
 
 
 @pytest.mark.e2e_fast

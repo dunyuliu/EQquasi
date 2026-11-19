@@ -128,7 +128,7 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
 * **`solver`** -- default `1`
 
-  solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; runs bp 8 as well).
+  solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; runs bp 8 as well). Slip to traction (4, experimental): solver 3 with the slip-to-traction operator of the fault, built once from the MUMPS factor (32 columns per batch; a build of minutes to hours, run by progress lines EQ_S2T_PROG) and then one matrix-vector product per solve; it reproduces solver 3 to round-off and pays back over thousands of steps. Needs the PETSc build and the default KSPPREONLY + PCCHOLESKY options; anything else stops the run.
 
 * **`nstep`** -- default `10000`
 

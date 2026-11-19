@@ -158,7 +158,7 @@ class parameters:
     # (ycoor = 0) that case.setup has always emitted; set this to a list of
     # len(ntotft) tuples to place faults at different y (e.g. a step-over).
     faultgeom   = None
-    solver      = 1 # solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; runs bp 8 as well).
+    solver      = 1 # solver option. MUMPS(1, recommended). PETSc(2). PETSc with each rank owning a block of the mesh (3, experimental; runs bp 8 as well). Slip to traction (4, experimental): solver 3 with the slip-to-traction operator of the fault, built once from the MUMPS factor (32 columns per batch; a build of minutes to hours, run by progress lines EQ_S2T_PROG) and then one matrix-vector product per solve; it reproduces solver 3 to round-off and pays back over thousands of steps. Needs the PETSc build and the default KSPPREONLY + PCCHOLESKY options; anything else stops the run.
     nstep       = 10000 # total num of time steps for exiting, if not exit via sliprate threshold. In fdc's quasi-static phase (eqquasi_mode 2) the run continues until rupture, and nstep is a safety cap of at least 30000.
     nt_out      = 100 # Every nt_out time steps, disp of the whole model and on-fault variables will be written out in netCDF format.
     bp          = 5 

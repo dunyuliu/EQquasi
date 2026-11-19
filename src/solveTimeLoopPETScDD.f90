@@ -1536,7 +1536,7 @@ contains
         ! pairs against ddBoundFtKu, station displacement against uloc.
         PetscBool, intent(in) :: full
         integer (kind = 4) :: ll, ss, jj, kk, w, nn
-        real (kind = dp) :: v(4), vg(4)
+        real (kind = dp) :: v(6), vg(6)
         real (kind = dp), parameter :: s2tCheckRtol = 1.0d-8
         real (kind = dp), allocatable :: fop(:,:)
         if (full) then
@@ -1544,6 +1544,8 @@ contains
             fop = consf
             call ddBoundFtKu
             v = 0.0d0
+            if (s2tNrB > 0) v(5) = maxval(abs(s2tS))
+            if (s2tNst > 0) v(6) = maxval(abs(s2tSu))
             do ll = 1, nOwnF
                 do w = 1, 2
                     nn = nsmp(w,locFlt(1,ll),locFlt(2,ll))
@@ -1565,7 +1567,7 @@ contains
                     endif
                 enddo
             endif
-            call MPI_Allreduce(v, vg, 4, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            call MPI_Allreduce(v, vg, 6, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
             if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
             ! The operator is a different arithmetic from the solve, so the two agree to
             ! round-off, not bit for bit. Measured on the e2e cases and bp5/bp1002: traction
@@ -1574,7 +1576,11 @@ contains
             ! A bound of 1e-8 of each field's largest value is 3 orders above the measured
             ! round-off and still far below any wrong operator column. Every rank holds
             ! the same vg, so every rank stops. .not. (<=) also stops on NaN.
-            if (.not. (vg(1) <= s2tCheckRtol*vg(2) .and. vg(3) <= s2tCheckRtol*vg(4))) then
+            ! A field that is zero by physics (bp7 step 1: traction 8e-15, pure round-off)
+            ! has no scale to be relative to: the bound is floored at 1e-14 of the
+            ! operator's largest entry, the response to 1 m of slip.
+            if (.not. (vg(1) <= max(s2tCheckRtol*vg(2), 1.0d-14*vg(5)) .and. &
+                       vg(3) <= max(s2tCheckRtol*vg(4), 1.0d-14*vg(6)))) then
                 if (me == 0) write(*,'(A,A,I8,4ES14.6)') &
                     'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
                     'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg

@@ -651,26 +651,36 @@ def test_distributed_loop_matches_petsc_loop(compset):
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)
 
 
-def _dd_run_pair(compset, tag, s2, s3):
+def _dd_run_one(name, tag, extra):
+    """One workflow run of `tag` = (compset, tag) with the parameter lines
+    `extra` appended, in scratch/e2e.dd_<name>.<tag>; returns its cycle
+    directory and stdout."""
+    compset, tag = tag
+    workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{tag}")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(extra)
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
+                   capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
+                       capture_output=True, text=True)
+    assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+    return os.path.join(workdir, "result", "cycle0"), r.stdout
+
+
+def _dd_run_pair(compset, tag, s2, other, second="s3"):
     """Run `compset` twice through the workflow, with the parameter lines `s2`
-    and `s3` appended, in scratch/e2e.dd_s2.<tag> and scratch/e2e.dd_s3.<tag>.
-    Returns the two cycle directories and the s3 run's stdout."""
+    and `other` appended, in scratch/e2e.dd_s2.<tag> and
+    scratch/e2e.dd_<second>.<tag> (second = "s3" for solver 3, "s4" for solver 4).
+    Returns the two cycle directories, keyed "s2" and `second`, and the second
+    run's stdout."""
     cyc, out = {}, {}
-    for name, extra in {"s2": s2, "s3": s3}.items():
-        workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{tag}")
-        e = C.env()
-        shutil.rmtree(workdir, ignore_errors=True)
-        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
-                       cwd=str(ROOT), env=e, check=True, capture_output=True)
-        with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
-            f.write(extra)
-        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
-                       capture_output=True)
-        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
-                           capture_output=True, text=True)
-        assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
-        cyc[name], out[name] = os.path.join(workdir, "result", "cycle0"), r.stdout
-    return cyc, out["s3"]
+    for name, extra in {"s2": s2, second: other}.items():
+        cyc[name], out[name] = _dd_run_one(name, (compset, tag), extra)
+    return cyc, out[second]
 
 
 # Layouts the 4-rank test above does not reach (its blocks are (2, 2, 1)):
@@ -792,7 +802,7 @@ S2T_NSTEP = 31
 S2T_CHECK_RTOL = 1e-9
 
 
-def _assert_s2t_ran(cyc, nstep):
+def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
     """The run of `cyc` (a cycle directory) built the operator, and its
     full-solve steps hold the first and the last step, each with the operator's
     traction and station displacement within S2T_CHECK_RTOL of the solve's.
@@ -822,10 +832,10 @@ def test_slip_to_traction_matches_petsc_loop(compset):
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 2, 4 unavailable)")
     cyc, out = _dd_run_pair(compset, "s4." + compset, "par.solver = 2\npar.nstep = 31\n",
-                            "par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = 4\n")
+                            "par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = 4\n", second="s4")
     _assert_distributed_mesh(out, nranks=4)
-    _assert_s2t_ran(cyc["s3"], S2T_NSTEP)
-    bad = _dd_differences(cyc["s2"], cyc["s3"], DD_EXPECTED_KINDS[compset])
+    _assert_s2t_ran(cyc["s4"], S2T_NSTEP)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
     assert not bad, "solver 4 differs from solver 2:\n" + "\n".join(bad)
 
 
@@ -840,12 +850,47 @@ def test_slip_to_traction_matches_petsc_loop_z_and_corner_blocks(case):
     compset, nranks, extra = DD_LAYOUT_CASES[case]
     cyc, out = _dd_run_pair(compset, "s4." + case,
                             "par.solver = 2\npar.nstep = 31\npar.HPC_ncpu = 4\n" + extra,
-                            f"par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = {nranks}\n" + extra)
+                            f"par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = {nranks}\n" + extra,
+                            second="s4")
     blocks = _assert_distributed_mesh(out, nranks=nranks)
     assert blocks[2] > 1 and blocks[0] > 1, f"blocks {blocks}: no z halo exchange or no in-plane block corner"
-    _assert_s2t_ran(cyc["s3"], S2T_NSTEP)
-    bad = _dd_differences(cyc["s2"], cyc["s3"], DD_EXPECTED_KINDS[compset])
+    _assert_s2t_ran(cyc["s4"], S2T_NSTEP)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
     assert not bad, "solver 4 differs from solver 2:\n" + "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_slip_to_traction_stop_on_a_step_that_is_not_an_output_step():
+    """A run that ends on par.fluid_tend (bp 8) stops on a step that is neither
+    the last of par.nstep nor one of the nt_out output steps, so only the
+    `stoptag == 1` term of the full-solve condition (src/solveTimeLoopPETScDD.f90,
+    s2tFull) makes the stop step solve in full. Without it the stop step's disp
+    snapshot would hold the previous solve's displacement.
+
+    The stop time is the midpoint of two step times of a solver 2 probe run;
+    solver 2 and solver 4 then stop on the same step, the solver 4 log holds a
+    full-solve line for it, and every file, the disp snapshot of the stop step
+    included, agrees at DD_RTOL (_dd_differences)."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 4 unavailable)")
+    compset = "test.bp8.qdc.gs.10"
+    probe, _ = _dd_run_one("s2", (compset, "s4stop.probe"), "par.solver = 2\npar.nstep = 31\n")
+    times = C.read_any(os.path.join(probe, "global.dat"))[:, 0]
+    tend = 0.5 * (times[13] + times[14])
+    extra = f"par.nstep = 31\npar.fluid_tend = {tend!r}\n"
+    cyc, out = _dd_run_pair(compset, "s4stop", "par.solver = 2\n" + extra,
+                            "par.solver = 4\npar.HPC_ncpu = 4\n" + extra, second="s4")
+    snaps = sorted(int(m.group(1)) for n_ in os.listdir(cyc["s2"])
+                   if (m := re.fullmatch(r"disp\.(\d{5})\.nc", n_)))
+    stop = snaps[-1]
+    nt_out = 100
+    assert 1 < stop < 31 and stop % nt_out != 1, \
+        f"solver 2 stopped on step {stop}: want one that is neither the last (31) nor an output step"
+    assert os.path.exists(os.path.join(cyc["s4"], f"disp.{stop:05d}.nc")), \
+        f"solver 4 wrote no disp snapshot for the stop step {stop}"
+    _assert_s2t_ran(cyc["s4"], stop)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
+    assert not bad, "solver 4 differs from solver 2 at the stop step:\n" + "\n".join(bad)
 
 
 @pytest.mark.e2e_fast
@@ -883,8 +928,14 @@ def test_slip_to_traction_abort_on_one_rank_stops_every_rank():
 
 # Unsupported combinations stop the run with a message; none falls back to another solver.
 S2T_REFUSALS = {
-    "solver5": ("par.solver = 5\n", None, "par.solver must be 1, 2, 3 or 4"),
-    "krylov": ("par.solver = 4\n", "-ksp_type cg -pc_type jacobi", "only KSPPREONLY + PCCHOLESKY"),
+    # (parameter lines, PETSC_OPTIONS, message, needs PETSc). The solver 5 guard
+    # (src/eqquasi.f90) runs before any PETSc branch, so it is tested on every build.
+    "solver5": ("par.solver = 5\n", None, "par.solver must be 1, 2, 3 or 4; got", False),
+    # The message names the run's own solver (F5): a wrong value fails both.
+    "krylov4": ("par.solver = 4\n", "-ksp_type cg -pc_type jacobi",
+                "par.solver=4: only KSPPREONLY + PCCHOLESKY", True),
+    "krylov3": ("par.solver = 3\n", "-ksp_type cg -pc_type jacobi",
+                "par.solver=3: only KSPPREONLY + PCCHOLESKY", True),
 }
 
 
@@ -894,9 +945,9 @@ def test_slip_to_traction_unsupported_combination_fails_loudly(case):
     """par.solver = 5, and par.solver = 4 with PETSc options that replace the
     MUMPS Cholesky factor the operator is built on, end with a nonzero exit and
     the refusal's message, and write no cycle result."""
-    if not _binary_has_petsc():
-        pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
-    extra, petsc_options, message = S2T_REFUSALS[case]
+    extra, petsc_options, message, needs_petsc = S2T_REFUSALS[case]
+    if needs_petsc and not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 3, 4 unavailable)")
     workdir = os.path.join(WORK_ROOT, "e2e.dd_refuse." + case)
     e = C.env()
     if petsc_options:

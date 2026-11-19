@@ -75,6 +75,7 @@ def test_gold_snapshot_variables_are_three_dimensional(path):
 # ---------------------------------------------------------------------------
 
 REGENERATED_8BYTE = (
+    "bp1002.qdc.2500/cycle0",
     "test.bp5.qdc.2000/cycle0-step101-fast",
     "test.bp5.qdc.dip90.2000/cycle0",
     "test.stepover.qdc.1000/cycle0",

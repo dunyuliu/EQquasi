@@ -62,8 +62,10 @@ codes. The launcher normally passes the code through as the exit status.
 * `EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum`
   (`solver = 4`): on a step that also solves in full, the operator's fault
   traction or station displacement differs from the solve's by more than 1e-8
-  of that field's largest value (or 1e-14 of the operator's largest entry, for a field
-  that is zero by physics; measured round-off is about 1e-14). The
+  of that field's largest value, or by more than 1e-14 of the operator's largest
+  entry if that is larger (the bound is the larger of the two, so the floor binds for
+  any field below about 1e-6 of the operator's largest entry; measured round-off is
+  about 1e-14). The
   operator is wrong for this case; report it, and run with `solver = 3`.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.

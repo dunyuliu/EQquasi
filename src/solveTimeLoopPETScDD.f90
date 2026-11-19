@@ -1165,6 +1165,17 @@ contains
         integer (kind = 4), allocatable :: lrow(:), lcol(:), grow(:), gcol(:), rcnt(:), rdsp(:), tmpi(:)
         real (kind = dp), allocatable :: lval(:), gval(:), tmpr(:)
         integer (kind = 4) :: nlz, cap, ntot, ie, r0
+        ! The operator is built on the MUMPS factor: any other factor solver
+        ! stops the run on every rank. pcTypeStr (set to 'cholesky' after the
+        ! loop's KSP check) is the scratch for the factor type name here.
+        call PCFactorGetMatSolverType(pc, pcTypeStr, perr)
+        CHKERRA(perr)
+        if (trim(pcTypeStr) /= MATSOLVERMUMPS) then
+            if (me == 0) write(*,'(A,A,A)') "EQ_S2T: the factor solver type is '", trim(pcTypeStr), "', not mumps"
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
+        pcTypeStr = 'cholesky'
         t0 = MPI_Wtime()
         nbat = 0
         allocate(s2tCnt(0:nprocs-1), s2tDsp(0:nprocs-1))
@@ -1462,7 +1473,7 @@ contains
     subroutine ddS2tApply
         ! consf at the owned fault pairs = S g + alpha c, g the constmp
         ! of the fault pairs, alpha the far-field amplitude (checked).
-        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_is_finite
         integer (kind = 4) :: nn, jj, nr
         real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi, nanf
         nr = 6*nOwnF
@@ -1532,6 +1543,14 @@ contains
         CHKERRA(perr)
         call MPI_Allgatherv(s2tOwn, nr, MPI_DOUBLE_PRECISION, s2tGall, s2tCnt, s2tDsp, &
             MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        ! s2tGall (the pair displacement g, every pair, every step) is the same
+        ! on every rank after the gather, so every rank reaches the same decision
+        ! and none skips a collective.
+        if (any(.not. ieee_is_finite(s2tGall(1:s2tNcol)))) then
+            if (me == 0) write(*,*) 'EQ_S2T: NaN or Inf in the fault-pair displacement fed to the operator, step', it
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
         consf = 0.0d0
         if (s2tNrB > 0) then
             call dgemv('N', s2tNrB, s2tNcol, 1.0d0, s2tS, s2tNrB, s2tGall, 1, 0.0d0, s2tY, 1)
@@ -1539,6 +1558,12 @@ contains
         endif
         call MPI_Allgatherv(s2tY, s2tNrB, MPI_DOUBLE_PRECISION, s2tYall, s2tCntB, s2tDspB, &
             MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, IERR)
+        ! s2tYall = S g + alpha c, gathered: identical on every rank.
+        if (any(.not. ieee_is_finite(s2tYall(1:sum(s2tCntB))))) then
+            if (me == 0) write(*,*) 'EQ_S2T: NaN or Inf in the operator product S g, step', it
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
         call VecGhostGetLocalForm(fvec, floc, perr)
         CHKERRA(perr)
         call VecGetArray(floc, parr, perr)

@@ -809,7 +809,11 @@ S2T_CHECK_RE = (r"EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u m
 
 
 def _s2t_violations(rows):
-    """The check rows (step, then six floats) that exceed the solver's bound."""
+    """The check rows (step, then six floats) that exceed the solver's bound.
+    This is a Python copy of the bound the solver applies (src/solveTimeLoopPETScDD.f90,
+    max(S2T_CHECK_RTOL*field_max, S2T_CHECK_FLOOR*operator_max)). The Fortran
+    abort on a wrong operator has NO run-level test until the planted-operator
+    hook is agreed (proposed name -eq_s2t_plant_row <global row>, owner's decision)."""
     bad = []
     for r in rows:
         dt_, at_, du, au, st, su = (float(v) for v in r[1:])
@@ -841,7 +845,9 @@ def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
 
 @pytest.mark.e2e_fast
 def test_s2t_check_assert_catches_a_planted_wrong_operator():
-    """The assert of _assert_s2t_ran on planted check rows (no run: planting an
+    """Checks the Python copy of the bound (_s2t_violations), not the Fortran
+    abort, which has NO run-level test until the planted-operator hook is agreed.
+    The assert of _assert_s2t_ran on planted check rows (no run: planting an
     operator in a run needs a hook in the solver, a new name, rule 1, not agreed).
     Largest traction 1e6, largest S entry 1e3: relative bound 1e-8 * 1e6 = 1e-2,
     floor 1e-14 * 1e3 = 1e-11. A traction difference of 1e-5 relative (10) must
@@ -972,7 +978,7 @@ S2T_REFUSALS = {
     # A direct factor from another package: the operator is built by
     # MatMatTransposeSolve on the MUMPS factor, so the run must stop, not go on.
     "nonmumps4": ("par.solver = 4\n", "-pc_factor_mat_solver_type petsc",
-                  None, True),
+                  "EQ_S2T: the factor solver type is 'petsc', not mumps", True),
 }
 
 

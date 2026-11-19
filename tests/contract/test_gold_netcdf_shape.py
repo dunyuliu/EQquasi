@@ -62,3 +62,87 @@ def test_gold_snapshot_variables_are_three_dimensional(path):
         "against a 3-D run under any comparator that reduces per fault, which is "
         "how this went unnoticed once already."
     )
+
+
+# ---------------------------------------------------------------------------
+# Storage width. The NetCDF writers store 8-byte reals since 1.24.8 (src/netcdf_io.f90
+# follows dp; owner decision, board row 1, 2026-11-18), and the tier bar for those
+# files is 1e-10. A 4-byte file under data/ in a regenerated set would make that bar
+# unreachable (float32 holds ~6e-8), and nothing else checked the width of the
+# reference files. A set joins REGENERATED_8BYTE in the commit that replaces its
+# files, never before: a set still holding 4-byte gold is the next regeneration's
+# job, not a failure of this one.
+# ---------------------------------------------------------------------------
+
+REGENERATED_8BYTE = (
+    "bp1002.qdc.2500/cycle0",
+    "test.bp5.qdc.2000/cycle0-step101-fast",
+    "test.bp5.qdc.dip90.2000/cycle0",
+    "test.stepover.qdc.1000/cycle0",
+    "test.stepover.qdc.con.1000/cycle0",
+    "test.bp7.qdc.a.10/cycle0-step101-fast",
+    "test.bp7.qdc.a.10/cycle0",
+    "bp5.qdc.kink.2000/cycle0",
+    "test.bp8.qdc.gs.10",
+    "test.bp5.qdc.2000/cycle0",
+)
+REGENERATED_FILES = sorted(p for s in REGENERATED_8BYTE
+                           for p in glob.glob(str(ROOT / "data" / s / "*.nc")))
+
+
+def assert_eight_byte_reals(path):
+    """Raise AssertionError naming every real variable of `path` not stored in 8 bytes.
+
+    A file with no real variable at all also raises: a width check that passes
+    because nothing was checked is the failure this guard exists to prevent.
+    """
+    nc = pytest.importorskip("netCDF4")
+    d = nc.Dataset(path)
+    real = {v: var.dtype.itemsize for v, var in d.variables.items() if var.dtype.kind == "f"}
+    d.close()
+    assert real, f"{path} holds no real variable; the width check checked nothing"
+    narrow = {v: w for v, w in real.items() if w != 8}
+    assert not narrow, (
+        f"{path}: {narrow} are stored as {sorted(set(narrow.values()))}-byte reals (4-byte means float32); "
+        "the regenerated sets hold 8-byte reals (1.24.8). Regenerate the file with the 1.24.8 binary, "
+        "or take the set out of REGENERATED_8BYTE in the commit that decides to keep it."
+    )
+
+
+@pytest.mark.parametrize("subdir", REGENERATED_8BYTE)
+def test_regenerated_set_is_present(subdir):
+    found = glob.glob(str(ROOT / "data" / subdir / "fault.*.nc"))
+    assert found, f"data/{subdir} has no fault.*.nc; REGENERATED_8BYTE names a set that is not there"
+
+
+@pytest.mark.parametrize("path", REGENERATED_FILES,
+                         ids=[os.path.relpath(p, str(ROOT)) for p in REGENERATED_FILES])
+def test_regenerated_gold_stores_8_byte_reals(path):
+    assert_eight_byte_reals(path)
+
+
+def test_width_check_fails_loudly_on_a_4_byte_file(tmp_path):
+    nc = pytest.importorskip("netCDF4")
+    for code, ok in (("f4", False), ("f8", True)):
+        p = str(tmp_path / f"w_{code}.nc")
+        d = nc.Dataset(p, "w")
+        d.createDimension("n", 3)
+        v = d.createVariable("slip", code, ("n",))
+        v[:] = [1.0, 2.0, 3.0]
+        d.close()
+        if ok:
+            assert_eight_byte_reals(p)
+        else:
+            with pytest.raises(AssertionError, match="4-byte"):
+                assert_eight_byte_reals(p)
+
+
+def test_width_check_fails_on_a_file_with_no_real_variable(tmp_path):
+    nc = pytest.importorskip("netCDF4")
+    p = str(tmp_path / "ints.nc")
+    d = nc.Dataset(p, "w")
+    d.createDimension("n", 3)
+    d.createVariable("nid", "i4", ("n",))[:] = [1, 2, 3]
+    d.close()
+    with pytest.raises(AssertionError, match="checked nothing"):
+        assert_eight_byte_reals(p)

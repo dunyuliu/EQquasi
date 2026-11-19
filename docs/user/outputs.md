@@ -100,7 +100,10 @@ by step number. `fault.NNNNN.nc` holds the fault-plane fields on a
 `effective_normal` (Pa), `slip_rate` (m/s), `state_variable`,
 `state_normal`, the nodal velocities `vxm vym vzm vxs vys vzs`, and
 accumulated slip `slips`, `slipd`, `slipn` (m). `disp.NNNNN.nc` holds the
-displacement of every node in the model. `plotOnFaultVars` maps every
+displacement of every node in the model. Every real variable in these files,
+in the restart files, in the roughness file and in `eqquasi.mesh.coor.nc` is
+stored as an 8-byte real (float64, the solver's `dp`) since 1.24.8; earlier
+files hold 4-byte reals. `plotOnFaultVars` maps every
 `fault.NNNNN.nc`.
 
 ## Restart files: `fault.r.nc` and `disp.r.nc`
@@ -111,6 +114,12 @@ formats. The next cycle starts from them; `plotAccumulated` reads slip from
 attribute (the writer's `dx`); a coupled restart whose dip-axis spacing
 doesn't match this run's `dx` stops loudly at read rather than silently
 misaligning the fault grid along dip.
+
+Since 1.24.8 the restart files hold the end state unrounded (8-byte reals), so
+cycle 2 and later start from the exact end state of the previous cycle. Under
+1.24.7 and earlier they started from the 4-byte rounded state, so a cycle after
+the first can differ from an older run at the level of that rounding; cycle 1 is
+unaffected. A 4-byte restart file written by an older version is still read.
 
 ## Mesh: `eqquasi.mesh.coor.nc`, `eqquasi.mesh.ien.nc`, `eqquasi.mesh.nsmp.nc`
 

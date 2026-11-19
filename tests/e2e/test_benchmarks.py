@@ -417,10 +417,10 @@ DD_EXPECTED_KINDS = {
 # The whole-mesh numbering solver 3 computes in closed form, each rank sending
 # its own part: integers and grid coordinates, so equal arrays and no tolerance.
 DD_MESH_FILES = ("eqquasi.mesh.coor.nc", "eqquasi.mesh.ien.nc", "eqquasi.mesh.nsmp.nc")
-# disp.*.nc and fault.*.nc are stored as float32 (eps 1.2e-7): a round-off
-# difference can move the last digit, a node written under another node's
-# number moves the field.
-DD_DISP_RTOL = 1e-6
+# disp.*.nc and fault.*.nc are stored as float64 (the solver's dp) since
+# 1.24.8 and are compared at DD_RTOL like the text columns (they were float32,
+# compared at 1e-6, before). A node written under another node's number moves
+# the field far past it.
 # The double-precision columns. Measured 2026-11-13 over 101 steps at 1, 4
 # and 8 ranks: worst 1.6e-13 of a column's scale. 1e-10 leaves room for a
 # different MUMPS ordering.
@@ -619,7 +619,7 @@ def _dd_differences(s2, s3, expected):
         for f in snaps:
             ab = pair(f)
             if ab:
-                ok, msg = C.compare_netcdf(*ab, rtol=DD_DISP_RTOL, floor_rtol=DD_DISP_RTOL)
+                ok, msg = C.compare_netcdf(*ab, rtol=DD_RTOL, floor_rtol=DD_RTOL)
                 if not ok:
                     bad.append(f"{f}: {msg}")
     return bad

@@ -977,8 +977,12 @@ S2T_REFUSALS = {
                 "par.solver=3: only KSPPREONLY + PCCHOLESKY", True),
     # A direct factor from another package: the operator is built by
     # MatMatTransposeSolve on the MUMPS factor, so the run must stop, not go on.
+    # PETSc itself refuses this one at KSPSetUp, before the solver's own check
+    # (ddS2tBuild: 'EQ_S2T: the factor solver type is ..., not mumps'); no other
+    # Cholesky factor of an mpiaij matrix is built into this PETSc, so that check
+    # has no run-level test here.
     "nonmumps4": ("par.solver = 4\n", "-pc_factor_mat_solver_type petsc",
-                  "EQ_S2T: the factor solver type is 'petsc', not mumps", True),
+                  "MatSolverType petsc does not support matrix type mpiaij", True),
 }
 
 

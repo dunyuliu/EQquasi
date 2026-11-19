@@ -1180,7 +1180,14 @@ contains
             flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
-        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)))
+        allocate(s2tS(max(1,nr), s2tNcol), s2tC(max(1,nr)), s2tGall(s2tNcol), s2tOwn(max(1,nr)), stat = ie)
+        if (ie /= 0) then
+            write(*,'(A,I0,A,I0,A,I0,A,F0.2,A)') 'EQ_S2T: rank ', me, ' cannot allocate its operator block: ', max(1,nr), &
+                ' rows x ', s2tNcol, ' columns = ', 8.0d0*dble(max(1,nr))*dble(s2tNcol)/1.0d9, &
+                ' GB (the whole operator is (6*Nf)^2*8 bytes); use fewer faults or more ranks, or par.solver = 3'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
         s2tS = 0.0d0
         s2tNst = 0
         if (allocated(stnNode)) s2tNst = ndof*n4out
@@ -1395,7 +1402,14 @@ contains
             hi = min(s2tDsp(r)+s2tCnt(r), s2tDspB(me)+s2tCntB(me))
             rc(r) = max(0, hi-lo)
         enddo
-        allocate(Sn(max(1,s2tNrB), s2tNcol), Cn(max(1,s2tNrB)))
+        allocate(Sn(max(1,s2tNrB), s2tNcol), Cn(max(1,s2tNrB)), stat = k)
+        if (k /= 0) then
+            write(*,'(A,I0,A,I0,A,I0,A,F0.2,A)') 'EQ_S2T: rank ', me, ' cannot allocate the redistributed operator block: ', &
+                max(1,s2tNrB), ' rows x ', s2tNcol, ' columns = ', 8.0d0*dble(max(1,s2tNrB))*dble(s2tNcol)/1.0d9, &
+                ' GB (the old and the new layout are held together while rows move)'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
         allocate(sb(max(1,sum(sc))*cb), rb(max(1,sum(rc))*cb))
         do c0 = 1, s2tNcol, cb
             nc = min(cb, s2tNcol-c0+1)

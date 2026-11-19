@@ -969,6 +969,10 @@ S2T_REFUSALS = {
                 "par.solver=4: only KSPPREONLY + PCCHOLESKY", True),
     "krylov3": ("par.solver = 3\n", "-ksp_type cg -pc_type jacobi",
                 "par.solver=3: only KSPPREONLY + PCCHOLESKY", True),
+    # A direct factor from another package: the operator is built by
+    # MatMatTransposeSolve on the MUMPS factor, so the run must stop, not go on.
+    "nonmumps4": ("par.solver = 4\n", "-pc_factor_mat_solver_type petsc",
+                  None, True),
 }
 
 
@@ -995,9 +999,53 @@ def test_slip_to_traction_unsupported_combination_fails_loudly(case):
     log_path = os.path.join(workdir, "log", "cycle0.log")
     log = open(log_path).read() if os.path.exists(log_path) else ""
     assert r.returncode != 0, f"{case}: run.sh exit 0, the combination was accepted"
-    assert message in r.stdout + r.stderr + log, \
-        f"{case}: exit {r.returncode} without '{message}'\n{(r.stdout + log)[-2000:]}"
+    if message is not None:
+        assert message in r.stdout + r.stderr + log, \
+            f"{case}: exit {r.returncode} without '{message}'\n{(r.stdout + log)[-2000:]}"
     assert "EQ_S2T built sec" not in log, f"{case}: the operator was built before the refusal"
+
+
+@pytest.mark.e2e_fast
+def test_slip_to_traction_refused_on_a_build_without_petsc():
+    """par.solver = 4 on a binary built without PETSc ends with a nonzero exit
+    and the refusal message (src/eqquasi.f90), never another solver's result.
+    The binary under test is the installed one when it lacks PETSc; otherwise a
+    copy of src/ is built here with the PETSc define and objects removed, which
+    is also the rule 17a link check (only conda-linux builds PETSc, so the
+    machine is known)."""
+    exe = C.installed_binary()
+    if _binary_has_petsc():
+        build = os.path.join(WORK_ROOT, "e2e.nopetsc_build")
+        shutil.rmtree(build, ignore_errors=True)
+        shutil.copytree(ROOT / "src", build)
+        e = C.env()
+        e["MACHINE"] = "conda-linux"
+        e["EQQUASIROOT"] = str(ROOT)
+        r = subprocess.run(["make", "PETSC_DEFINE=", "OBJ_PETSC=", "PETSC_LIB="], cwd=build, env=e,
+                           capture_output=True, text=True, timeout=1800)
+        assert r.returncode == 0, "the build without PETSc failed to link:\n" + (r.stdout + r.stderr)[-3000:]
+        exe = os.path.join(build, "eqquasi")
+        assert "libpetsc" not in subprocess.run(["ldd", exe], capture_output=True, text=True).stdout
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_refuse.nopetsc4")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write("par.solver = 4\npar.HPC_ncpu = 2\npar.nstep = 3\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    run_sh = os.path.join(workdir, "run.sh")
+    text = open(run_sh).read()
+    patched = re.sub(r"eqquasi-[0-9][0-9.]* 2>&1", str(exe) + " 2>&1", text)
+    assert patched != text, "run.sh names no eqquasi-<version> binary to replace"
+    open(run_sh, "w").write(patched)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=600)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    log = open(log_path).read() if os.path.exists(log_path) else ""
+    assert r.returncode != 0, "run.sh exit 0: par.solver = 4 ran on a build without PETSc"
+    assert "needs MACHINE=conda-linux" in r.stdout + r.stderr + log, \
+        f"exit {r.returncode} without the refusal message\n{(r.stdout + log)[-2000:]}"
+    assert "EQ_S2T built sec" not in log
 
 
 # --- the comparison's own contracts: milliseconds, no run, part of the sweep ---

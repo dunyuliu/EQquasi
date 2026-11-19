@@ -1448,9 +1448,11 @@ contains
     subroutine ddS2tApply
         ! consf at the owned fault pairs = S g + alpha c, g the constmp
         ! of the fault pairs, alpha the far-field amplitude (checked).
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
         integer (kind = 4) :: nn, jj, nr
-        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi
+        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi, nanf
         nr = 6*nOwnF
+        nanf = 0.0d0
         amin = huge(1.0d0)
         amax = -huge(1.0d0)
         zmax = 0.0d0
@@ -1460,6 +1462,7 @@ contains
             if (s2tPair(nn)) cycle
             do jj = 1, ndof
                 wv = ddS2tW(id(jj,nn))
+                if (ieee_is_nan(constmp(jj,nn)) .or. ieee_is_nan(wv)) nanf = 1.0d0
                 if (wv /= 0.0d0) then
                     a = constmp(jj,nn)/wv
                     amin = min(amin, a)
@@ -1478,6 +1481,14 @@ contains
         lo = zmax
         call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
         zmax = hi
+        lo = nanf
+        call MPI_Allreduce(lo, hi, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+        ! min/max and MPI_MAX may drop a NaN, so each value is tested where it is made.
+        if (hi > 0.0d0 .or. ieee_is_nan(wmx)) then
+            if (me == 0) write(*,*) 'EQ_S2T: NaN in the far-field prescribed displacement or load'
+            flush(6)
+            call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+        endif
         scale = max(abs(amin), abs(amax))*wmx
         if (amin > amax .and. wmx == 0.0d0) then
             ! no far-field load at all: alpha = 0, the amax*s2tC term vanishes
@@ -1534,9 +1545,11 @@ contains
         ! Station cons from the operator (last apply of the step). On a step
         ! with the full solve, operator vs solve: traction at the owned fault
         ! pairs against ddBoundFtKu, station displacement against uloc.
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
         PetscBool, intent(in) :: full
         integer (kind = 4) :: ll, ss, jj, kk, w, nn
-        real (kind = dp) :: v(6), vg(6)
+        real (kind = dp) :: v(7), vg(7), bt, bu
+        character (len = 8) :: wt, wu
         real (kind = dp), parameter :: s2tCheckRtol = 1.0d-8
         real (kind = dp), allocatable :: fop(:,:)
         if (full) then
@@ -1546,9 +1559,16 @@ contains
             v = 0.0d0
             if (s2tNrB > 0) v(5) = maxval(abs(s2tS))
             if (s2tNst > 0) v(6) = maxval(abs(s2tSu))
+            if (s2tNrB > 0) then
+                if (any(ieee_is_nan(s2tS))) v(7) = 1.0d0
+            endif
+            if (s2tNst > 0) then
+                if (any(ieee_is_nan(s2tSu))) v(7) = 1.0d0
+            endif
             do ll = 1, nOwnF
                 do w = 1, 2
                     nn = nsmp(w,locFlt(1,ll),locFlt(2,ll))
+                    if (any(ieee_is_nan(fop(:,nn))) .or. any(ieee_is_nan(consf(:,nn)))) v(7) = 1.0d0
                     v(1) = max(v(1), maxval(abs(fop(:,nn) - consf(:,nn))))
                     v(2) = max(v(2), maxval(abs(consf(:,nn))))
                 enddo
@@ -1560,6 +1580,7 @@ contains
                     if (jj > 0) then
                         if (id(1,jj) > 0) then
                             do kk = 1, ndof
+                                if (ieee_is_nan(s2tU(ndof*(ss-1)+kk)) .or. ieee_is_nan(uloc(lbase(jj)+kk))) v(7) = 1.0d0
                                 v(3) = max(v(3), abs(s2tU(ndof*(ss-1)+kk) - uloc(lbase(jj)+kk)))
                                 v(4) = max(v(4), abs(uloc(lbase(jj)+kk)))
                             enddo
@@ -1567,23 +1588,35 @@ contains
                     endif
                 enddo
             endif
-            call MPI_Allreduce(v, vg, 6, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
-            if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
+            call MPI_Allreduce(v, vg, 7, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            if (me == 0) write(*,'(A,I8,6ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u maxabs_S maxabs_Su ', it, vg(1:6)
             ! The operator is a different arithmetic from the solve, so the two agree to
             ! round-off, not bit for bit. Measured on the e2e cases and bp5/bp1002: traction
             ! difference at most 1e-1 against a largest 2e13 (5e-15 relative), displacement
             ! difference at most 7e-17 against 5e-2 (1e-15 relative); the e2e bar is 1e-9.
             ! A bound of 1e-8 of each field's largest value is 3 orders above the measured
             ! round-off and still far below any wrong operator column. Every rank holds
-            ! the same vg, so every rank stops. .not. (<=) also stops on NaN.
+            ! the same vg, so every rank stops. A NaN is flagged where it is made (v(7)): max, maxval and
+            ! MPI_MAX may drop it, so the comparison below alone would not stop on a partial NaN.
             ! A field that is zero by physics (bp7 step 1: traction 8e-15, pure round-off)
             ! has no scale to be relative to: the bound is floored at 1e-14 of the
             ! operator's largest entry, the response to 1 m of slip.
-            if (.not. (vg(1) <= max(s2tCheckRtol*vg(2), 1.0d-14*vg(5)) .and. &
-                       vg(3) <= max(s2tCheckRtol*vg(4), 1.0d-14*vg(6)))) then
-                if (me == 0) write(*,'(A,A,I8,4ES14.6)') &
-                    'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
-                    'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
+            ! The test (tests/e2e/test_benchmarks.py, _s2t_bounds) holds this same bound.
+            ! PROPOSAL, owner decision pending: the 1e-14 floor (commit 570977e).
+            bt = max(s2tCheckRtol*vg(2), 1.0d-14*vg(5))
+            bu = max(s2tCheckRtol*vg(4), 1.0d-14*vg(6))
+            wt = 'relative'
+            if (1.0d-14*vg(5) > s2tCheckRtol*vg(2)) wt = 'floor'
+            wu = 'relative'
+            if (1.0d-14*vg(6) > s2tCheckRtol*vg(4)) wu = 'floor'
+            if (vg(7) > 0.0d0 .or. .not. (vg(1) <= bt .and. vg(3) <= bu)) then
+                if (me == 0) then
+                    write(*,'(A,A,I8,4ES14.6)') &
+                        'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
+                        'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
+                    write(*,'(A,ES14.6,A,A,A,ES14.6,A,A,A,F4.1)') 'EQ_S2T: bound traction ', bt, ' (', trim(wt), &
+                        '), displacement ', bu, ' (', trim(wu), '); NaN flag ', vg(7)
+                endif
                 flush(6)
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif

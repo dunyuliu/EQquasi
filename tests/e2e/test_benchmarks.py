@@ -797,9 +797,28 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
 # step 1 (a disp snapshot) and step 31 (the stop step) also solve in full.
 S2T_NSTEP = 31
 # The operator against the solve inside the run (src/solveTimeLoopPETScDD.f90,
-# ddS2tStations prints it on every full-solve step): measured on the cases
-# below, about 1e-14 of the largest traction. 1e-9 is the campaign bar.
-S2T_CHECK_RTOL = 1e-9
+# ddS2tStations prints it on every full-solve step). The bound is the solver's own:
+# 1e-8 of each field's largest value, floored at 1e-14 of the operator's largest
+# entry (maxabs_S for the traction, maxabs_Su for the displacement, both printed
+# on the check line). PROPOSAL, owner decision pending: the floor is commit
+# 570977e, a numerics choice not yet agreed; it must not merge before the answer.
+S2T_CHECK_RTOL = 1e-8
+S2T_CHECK_FLOOR = 1e-14
+S2T_CHECK_RE = (r"EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u maxabs_S maxabs_Su\s+"
+                r"(\d+)" + r"\s+(\S+)" * 6)
+
+
+def _s2t_violations(rows):
+    """The check rows (step, then six floats) that exceed the solver's bound."""
+    bad = []
+    for r in rows:
+        dt_, at_, du, au, st, su = (float(v) for v in r[1:])
+        bt = max(S2T_CHECK_RTOL * at_, S2T_CHECK_FLOOR * st)
+        bu = max(S2T_CHECK_RTOL * au, S2T_CHECK_FLOOR * su)
+        if not (dt_ <= bt and du <= bu):
+            bad.append(f"step {r[0]}: operator vs solve, traction {dt_:g} (bound {bt:g}), "
+                       f"displacement {du:g} (bound {bu:g})")
+    return bad
 
 
 def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
@@ -812,15 +831,29 @@ def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
         log = f.read()
     assert re.search(r"EQ_S2T built sec ncol nbat\s+\S+\s+\d+\s+\d+", log), \
         f"solver 4 did not print its operator build line: the slip-to-traction path did not run\n{log[-2000:]}"
-    rows = re.findall(r"EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u\s+"
-                      r"(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)", log)
+    rows = re.findall(S2T_CHECK_RE, log)
     steps = [int(r[0]) for r in rows]
     assert 1 in steps and nstep in steps and len(steps) < nstep, \
         f"full-solve steps {steps}: want step 1 and step {nstep} and fewer than {nstep} of them (else the operator is never applied alone)"
-    for r in rows:
-        dt_, at_, du, au = (float(v) for v in r[1:])
-        assert dt_ <= S2T_CHECK_RTOL * at_ and du <= S2T_CHECK_RTOL * au, \
-            f"step {r[0]}: operator vs solve, traction {dt_:g} of {at_:g}, displacement {du:g} of {au:g}"
+    bad = _s2t_violations(rows)
+    assert not bad, "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_s2t_check_assert_catches_a_planted_wrong_operator():
+    """The assert of _assert_s2t_ran on planted check rows (no run: planting an
+    operator in a run needs a hook in the solver, a new name, rule 1, not agreed).
+    Largest traction 1e6, largest S entry 1e3: relative bound 1e-8 * 1e6 = 1e-2,
+    floor 1e-14 * 1e3 = 1e-11. A traction difference of 1e-5 relative (10) must
+    fail, 1e-9 relative (1e-3, below the bound) must pass; with a traction zero
+    by physics (largest 0) a difference of 1e-12 (below the floor) passes and 1e-9
+    (above it) fails; a displacement difference of 1e-5 against largest 1 fails."""
+    f = lambda *v: tuple(f"{x:e}" for x in v)
+    assert _s2t_violations([("1",) + f(1e6 * 1e-5, 1e6, 0.0, 1.0, 1e3, 1.0)]), "1e-5 relative not caught"
+    assert not _s2t_violations([("1",) + f(1e6 * 1e-9, 1e6, 0.0, 1.0, 1e3, 1.0)]), "1e-9 relative rejected"
+    assert not _s2t_violations([("1",) + f(1e-12, 0.0, 0.0, 1.0, 1e3, 1.0)]), "floor not applied"
+    assert _s2t_violations([("1",) + f(1e-9, 0.0, 0.0, 1.0, 1e3, 1.0)]), "above the floor not caught"
+    assert _s2t_violations([("1",) + f(0.0, 1.0, 1.0e-5, 1.0, 1e3, 1.0)]), "displacement 1e-5 not caught"
 
 
 @pytest.mark.e2e_fast

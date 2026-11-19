@@ -1568,7 +1568,7 @@ contains
                 enddo
             endif
             call MPI_Allreduce(v, vg, 6, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
-            if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
+            if (me == 0) write(*,'(A,I8,4ES14.6)') 'EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
             ! The operator is a different arithmetic from the solve, so the two agree to
             ! round-off, not bit for bit. Measured on the e2e cases and bp5/bp1002: traction
             ! difference at most 1e-1 against a largest 2e13 (5e-15 relative), displacement
@@ -1583,7 +1583,7 @@ contains
                        vg(3) <= max(s2tCheckRtol*vg(4), 1.0d-14*vg(6)))) then
                 if (me == 0) write(*,'(A,A,I8,4ES14.6)') &
                     'EQ_S2T: operator disagrees with the solve beyond 1e-8 of the field maximum: ', &
-                    'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg
+                    'step maxdiff_traction maxabs_traction maxdiff_u maxabs_u ', it, vg(1:4)
                 flush(6)
                 call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
             endif

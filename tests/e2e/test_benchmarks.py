@@ -429,9 +429,10 @@ DD_RTOL = 1e-10
 # row 1, 2026-11-18/19), in the un-logged units of each column: slip_3 in m,
 # slip_rate_3 in m/s (the file holds its log10), shear_stress_3 in MPa. An
 # entry whose two values differ by no more than the floor passes, and so does
-# a log10 entry whose un-logged values both sit under it. No srfst_ floor and
-# no full-cycle floor is decided. The constants live in cases.py, where
-# compare_series applies them to every fltst_ file.
+# a log10 entry whose un-logged values both sit under it. The floors apply to
+# every fltst_ comparison, the gold comparison included; no srfst_ floor, and
+# no other full-cycle comparison rule (srfst_, global.dat, tolerances) changed.
+# The constants live in cases.py, where compare_series applies them.
 DD_STATION_FLOORS = C.STATION_FLOORS
 # The largest rank's share of the whole mesh's nodes at 4 ranks. A block is a
 # quarter of the cells plus one ghost line per cut direction; a rank that
@@ -1251,6 +1252,13 @@ def test_compare_series_fltst_difference_under_floor_passes(tmp_path, col, name,
 def test_compare_series_fltst_difference_above_floor_fails(tmp_path, col, name, ref_v, below, above):
     ok, msg = _series_floor_case(tmp_path, col, ref_v, above)
     assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("ref_v,run_v", [(float("-inf"), -20.0), (float("nan"), -20.0), (-20.0, float("nan"))])
+def test_compare_series_fltst_non_finite_log10_slip_rate_is_never_floored(tmp_path, ref_v, run_v):
+    ok, msg = _series_floor_case(tmp_path, 4, ref_v, run_v)
+    assert not ok and "column 5" in msg, f"ref={ref_v}, run={run_v}: ok={ok}, msg={msg!r}"
 
 
 @pytest.mark.e2e_fast

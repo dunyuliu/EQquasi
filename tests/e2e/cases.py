@@ -669,8 +669,9 @@ STATION_FLOOR_COLUMNS = {
 def station_floor_exempt(gpath, g, r):
     """Boolean mask of the entries of two fltst_ tables that sit inside a
     round-off floor. Only a file named fltst_* in a 9- or 11-column layout is
-    touched (no srfst_ floor); every other file gets an all-False mask. A
-    non-finite difference is never exempt."""
+    touched (no srfst_ floor); every other file gets an all-False mask. An
+    entry is exempt only when both its reference and run raw values (the
+    log10 values, un-exponentiated) are finite; g and r must be raw."""
     import numpy as _np
     exempt = _np.zeros(g.shape, bool)
     cols = STATION_FLOOR_COLUMNS.get(g.shape[1])
@@ -679,7 +680,8 @@ def station_floor_exempt(gpath, g, r):
     for j, name, log10 in cols:
         lin = (lambda a: 10.0 ** a) if log10 else (lambda a: a)
         with _np.errstate(invalid="ignore", over="ignore"):
-            exempt[:, j] = _np.abs(lin(r[:, j]) - lin(g[:, j])) <= STATION_FLOORS[name]
+            exempt[:, j] = (_np.isfinite(g[:, j]) & _np.isfinite(r[:, j])
+                            & (_np.abs(lin(r[:, j]) - lin(g[:, j])) <= STATION_FLOORS[name]))
     return exempt
 
 
@@ -696,6 +698,7 @@ def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
         return False, f"shape {r.shape} vs reference {g.shape}"
     g, r = _np.atleast_2d(_np.array(g, float)), _np.atleast_2d(_np.array(r, float))
 
+    g_raw, r_raw = g.copy(), r.copy()
     header = _header_of(gpath, rpath, ncols=g.shape[1])
     if header:
         for j, name in enumerate(header):
@@ -718,7 +721,7 @@ def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
 
     # An entry inside a round-off floor is made equal to its reference, so
     # compare_arrays skips it; the scale was measured before this.
-    exempt = station_floor_exempt(gpath, g, r)
+    exempt = station_floor_exempt(gpath, g_raw, r_raw)
     r = _np.where(exempt, g, r)
 
     ok, nbad, idx, worst = compare_arrays(g, r, col_rtol, floor_rtol, scale=scale)

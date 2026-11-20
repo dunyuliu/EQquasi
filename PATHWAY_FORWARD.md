@@ -438,6 +438,18 @@ build, run and traps are in `CLAUDE.md`.
    message that answered the exemption question, not an explicit "2A";
    the invoking session states it to the owner when relaying. NOT
    decided: item 9; any further cap change; compression.
+   Owner, 2026-11-20 16:01 CST, after being told what ICNTL(14) is (the
+   extra MUMPS working memory, in percent, reserved beyond MUMPS's own
+   estimate; already 100 on the PETSc paths, solvers 2 to 4; native
+   solver 1 does not set it and no failure has been seen there; the
+   recommendation was to leave it): "just make them 100?" (verbatim.)
+   Read as (a reading): item 9 is decided as option B: native solver 1
+   also sets ICNTL(14) = 100, so all solvers reserve the same MUMPS
+   workspace; a gated `src/` change with a version bump that changes the
+   default solver's memory reservation only, shown by gold results
+   unchanged at the tier bar and peak memory per rank recorded before
+   and after on the same cases. The message ends in a question mark; the
+   invoking session tells the owner it is read as an instruction.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -67,6 +67,12 @@ codes. The launcher normally passes the code through as the exit status.
   any field below about 1e-6 of the operator's largest entry; measured round-off is
   about 1e-14). The
   operator is wrong for this case; report it, and run with `solver = 3`.
+* `EQ_S2T: -eq_s2t_plant_row <row>: that operator row is doubled (test hook)`
+  (`solver = 4`): the PETSc option `-eq_s2t_plant_row <global row>` is a test
+  hook, not a setting. It doubles that row of the operator after the build so
+  that the check above must stop the run; the test suite uses it to show that
+  a wrong operator aborts. Remove it from `PETSC_OPTIONS` for a production run;
+  a row outside the operator stops the run.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.
 * `par.solver=3: fault N is not one rectangle of nodes on a single interior

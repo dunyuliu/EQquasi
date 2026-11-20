@@ -411,6 +411,18 @@ build, run and traps are in `CLAUDE.md`.
    changes before the owner sees that proposal. NOT decided: the metric
    set, the definitions and tolerances, which cases they apply to, and
    item 11 (liu2020), which this proposal informs.
+   Owner, 2026-11-20 15:58 CST, replying to the daily brief, whose
+   question 1 was "Option name for a test that plants a NaN in slip to
+   traction: A) `-eq_s2t_plant_nan` (recommended), B) another name":
+   "1A." (verbatim; the same message asked why the liu2020 displacement
+   file would be exempted and what ICNTL(14) is for, and answered
+   nothing else.) Read as (a reading): the PETSc option
+   `-eq_s2t_plant_nan <global row>` is agreed (rule 1), as conductor 37
+   proposed it (m4, option A): it writes a NaN into that row of the
+   operator output so a run-level test shows the non-finite abort
+   fires; a gated `src/` change with a version bump and one e2e test.
+   NOT decided: item 11 and item 5 (liu2020), item 9 (ICNTL(14) for
+   native solver 1).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

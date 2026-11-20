@@ -411,6 +411,45 @@ build, run and traps are in `CLAUDE.md`.
    changes before the owner sees that proposal. NOT decided: the metric
    set, the definitions and tolerances, which cases they apply to, and
    item 11 (liu2020), which this proposal informs.
+   Owner, 2026-11-20 15:58 CST, replying to the daily brief, whose
+   question 1 was "Option name for a test that plants a NaN in slip to
+   traction: A) `-eq_s2t_plant_nan` (recommended), B) another name":
+   "1A." (verbatim; the same message asked why the liu2020 displacement
+   file would be exempted and what ICNTL(14) is for, and answered
+   nothing else.) Read as (a reading): the PETSc option
+   `-eq_s2t_plant_nan <global row>` is agreed (rule 1), as conductor 37
+   proposed it (m4, option A): it writes a NaN into that row of the
+   operator output so a run-level test shows the non-finite abort
+   fires; a gated `src/` change with a version bump and one e2e test.
+   NOT decided: item 11 and item 5 (liu2020), item 9 (ICNTL(14) for
+   native solver 1).
+   Owner, 2026-11-20 16:00 CST, after being told that rule 22 caps every
+   tracked file at 5 MB (enforced by `tests/contract/test_root_layout.py`,
+   `MAX_TRACKED_FILE_BYTES`) and that liu2020's last-step displacement
+   file is 6.3 MB, with options A) exempt that one file, B) commit
+   liu2020 without a displacement file (recommended at that point), C)
+   store displacement files compressed: "you can go above 5mb. use 10mb"
+   (verbatim.) Read as (a reading): the per-file cap of rule 22 becomes
+   10 MB, in the rule text and in the contract test, a rules-owner edit
+   made on the owner's word; with it, item 5 needs no exemption, and the
+   liu2020 regeneration of item 11 option A goes ahead from the v1.24.8
+   run with its last-step displacement file, its README's "deterministically
+   reproducible" claim corrected. The item 11 part is a reading of a
+   message that answered the exemption question, not an explicit "2A";
+   the invoking session states it to the owner when relaying. NOT
+   decided: item 9; any further cap change; compression.
+   Owner, 2026-11-20 16:01 CST, after being told what ICNTL(14) is (the
+   extra MUMPS working memory, in percent, reserved beyond MUMPS's own
+   estimate; already 100 on the PETSc paths, solvers 2 to 4; native
+   solver 1 does not set it and no failure has been seen there; the
+   recommendation was to leave it): "just make them 100?" (verbatim.)
+   Read as (a reading): item 9 is decided as option B: native solver 1
+   also sets ICNTL(14) = 100, so all solvers reserve the same MUMPS
+   workspace; a gated `src/` change with a version bump that changes the
+   default solver's memory reservation only, shown by gold results
+   unchanged at the tier bar and peak memory per rank recorded before
+   and after on the same cases. The message ends in a question mark; the
+   invoking session tells the owner it is read as an instruction.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

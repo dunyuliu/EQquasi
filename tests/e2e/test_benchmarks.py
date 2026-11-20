@@ -425,6 +425,15 @@ DD_MESH_FILES = ("eqquasi.mesh.coor.nc", "eqquasi.mesh.ien.nc", "eqquasi.mesh.ns
 # and 8 ranks: worst 1.6e-13 of a column's scale. 1e-10 leaves room for a
 # different MUMPS ordering.
 DD_RTOL = 1e-10
+# Round-off floors of the fltst_ out-of-plane columns (owner decision, board
+# row 1, 2026-11-18/19), in the un-logged units of each column: slip_3 in m,
+# slip_rate_3 in m/s (the file holds its log10), shear_stress_3 in MPa. An
+# entry whose two values differ by no more than the floor passes, and so does
+# a log10 entry whose un-logged values both sit under it. The floors apply to
+# every fltst_ comparison, the gold comparison included; no srfst_ floor, and
+# no other full-cycle comparison rule (srfst_, global.dat, tolerances) changed.
+# The constants live in cases.py, where compare_series applies them.
+DD_STATION_FLOORS = C.STATION_FLOORS
 # The largest rank's share of the whole mesh's nodes at 4 ranks. A block is a
 # quarter of the cells plus one ghost line per cut direction; a rank that
 # held the whole mesh would be 1.
@@ -507,10 +516,12 @@ def _dd_station_series(gpath, rpath):
     layouts = {
         # t, slip_2, slip_3, log10 slip_rate_2, log10 slip_rate_3,
         # shear_stress_2, shear_stress_3, pore pressure, Darcy 2, 3, log10 state
-        11: ((2, (1, 2), False), (4, (3, 4), True), (6, (5, 6), False)),
+        11: ((2, (1, 2), False, "slip_3"), (4, (3, 4), True, "slip_rate_3"),
+             (6, (5, 6), False, "shear_stress_3")),
         # t, slip_s, slip_d, slip rate magnitude, slip rate along dip, tstk,
         # tdip, effective normal stress, log10 state
-        9: ((2, (1, 2), False), (4, (3, 4), False), (6, (5, 6, 7), False)),
+        9: ((2, (1, 2), False, "slip_3"), (4, (3, 4), False, "slip_rate_3"),
+            (6, (5, 6, 7), False, "shear_stress_3")),
     }
     ncols = g.shape[1]
     if ncols not in layouts:
@@ -528,7 +539,7 @@ def _dd_station_series(gpath, rpath):
         diff = np.abs(r - g)
         own = C._scaled_tol(g, col_rtol, DD_RTOL, np.abs(g).max(axis=0))
         bad = ~(diff <= own)
-        for j, vec, log10 in layouts[ncols]:
+        for j, vec, log10, name in layouts[ncols]:
             lin = (lambda a: 10.0 ** a) if log10 else (lambda a: a)
             vscale = max(np.abs(lin(g[:, c])).max() for c in vec)
             # ATOL_MACHINE_NOISE (1e-18) is added here, in linear units, to the
@@ -538,8 +549,8 @@ def _dd_station_series(gpath, rpath):
             # The strike column never enters this `&=`; `own` judges it, in
             # log10 units, where 1e-18 is inert (test_dd_station_series_noise_
             # floor_applies_to_dip_rate_column_only).
-            bad[:, j] &= ~(np.abs(lin(r[:, j]) - lin(g[:, j]))
-                           <= DD_RTOL * vscale + C.ATOL_MACHINE_NOISE)
+            tol = max(DD_RTOL * vscale + C.ATOL_MACHINE_NOISE, DD_STATION_FLOORS[name])
+            bad[:, j] &= ~(np.abs(lin(r[:, j]) - lin(g[:, j])) <= tol)
         ratio = np.where(bad, diff / np.maximum(own, 1e-300), 0.0)
     if bad.any():
         i, j = np.unravel_index(int(np.argmax(np.nan_to_num(ratio, nan=np.inf))), g.shape)
@@ -1161,11 +1172,121 @@ def test_dd_station_series_noise_floor_applies_to_dip_rate_column_only(tmp_path)
 
 @pytest.mark.e2e_fast
 def test_dd_station_series_dip_rate_above_noise_floor_fails(tmp_path):
-    """The floor is 1e-18 m/s and no more: -16 against -15.9 is 2.6e-17 m/s."""
-    ref = [_station_row(1.0, -20.0, -16.0), _station_row(2.0, -20.0, -16.0)]
-    run = [_station_row(1.0, -20.0, -16.0), _station_row(2.0, -20.0, -15.9)]
+    """The floor is 1e-12 m/s and no more: -10 against -9.9 is 2.6e-11 m/s."""
+    ref = [_station_row(1.0, -20.0, -10.0), _station_row(2.0, -20.0, -10.0)]
+    run = [_station_row(1.0, -20.0, -10.0), _station_row(2.0, -20.0, -9.9)]
     ok, msg = _dd_station_series(*_station_pair(tmp_path, ref, run))
     assert not ok and "columns [5]" in msg, f"ok={ok}, msg={msg!r}"
+
+
+def _floor_case(tmp_path, col, ref_v, run_v, ncols=11):
+    """Reference and run rows equal except column `col` (0-based) at row 1.
+    The strike column of the same vector is zeroed (log10 rate: left at -9)
+    so the vector's scale does not dwarf the floor under test."""
+    def row(t, v):
+        r = _station_row(t, -9.0, -9.0)
+        if col in (2, 6):
+            r[col - 1] = 0.0
+        r[col] = v
+        return r
+    ref = [row(1.0, ref_v), row(2.0, ref_v)]
+    run = [row(1.0, ref_v), row(2.0, run_v)]
+    return _dd_station_series(*_station_pair(tmp_path, ref, run))
+
+
+# (column, name, reference value, run value under the floor, run value above it)
+_FLOOR_CASES = [
+    (2, "slip_3", 0.0, 5e-16, 3e-15),
+    (4, "slip_rate_3", -20.0, -13.0, -11.0),        # log10: 1e-13 and 1e-11 m/s
+    (6, "shear_stress_3", 0.0, 5e-10, 3e-9),
+]
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_dd_station_series_difference_under_floor_passes(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _floor_case(tmp_path, col, ref_v, below)
+    assert ok, f"{name}: a difference under its floor must pass: {msg}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_dd_station_series_difference_above_floor_fails(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _floor_case(tmp_path, col, ref_v, above)
+    assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_dd_station_series_floors_do_not_reach_in_plane_columns(tmp_path):
+    """Shear_stress_2 (column 6) is in-plane: 1e6 vs 1e6+100 MPa is 1e-4
+    relative, above the 2e-6 of a 7-digit column, and no floor applies."""
+    ok, msg = _floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
+    assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
+
+
+def _series_floor_case(tmp_path, col, ref_v, run_v, fname="fltst_a.txt"):
+    """compare_series (the onfault comparison) on an 11-column pair equal
+    except column `col` (0-based) at row 1, built as _floor_case builds it."""
+    def row(t, v):
+        r = _station_row(t, -9.0, -9.0)
+        if col in (2, 6):
+            r[col - 1] = 0.0
+        r[col] = v
+        return r
+    g, r = str(tmp_path / "ref" / fname), str(tmp_path / "run" / fname)
+    for p, rows in ((g, [row(1.0, ref_v), row(2.0, ref_v)]), (r, [row(1.0, ref_v), row(2.0, run_v)])):
+        os.makedirs(os.path.dirname(p))
+        _write_station_file(p, rows)
+    return C.compare_series(g, r)
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_fltst_difference_under_floor_passes(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, below)
+    assert ok, f"{name}: a difference under its floor must pass: {msg}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_fltst_difference_above_floor_fails(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, above)
+    assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("ref_v,run_v", [(float("-inf"), -20.0), (float("nan"), -20.0), (-20.0, float("nan"))])
+def test_compare_series_fltst_non_finite_log10_slip_rate_is_never_floored(tmp_path, ref_v, run_v):
+    ok, msg = _series_floor_case(tmp_path, 4, ref_v, run_v)
+    assert not ok and "column 5" in msg, f"ref={ref_v}, run={run_v}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_srfst_file_gets_no_floor(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, below, fname="srfst_a.txt")
+    assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_compare_series_fltst_floors_do_not_reach_in_plane_columns(tmp_path):
+    ok, msg = _series_floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
+    assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_compare_series_fltst_nine_column_layout_gets_the_floors(tmp_path):
+    """9 columns (BP5/BP7): slip_3 is column 3, slip rate along dip (not
+    logged) column 5, tstk/tdip columns 6 and 7; shear_stress_3 is column 7."""
+    def write(p, v):
+        os.makedirs(os.path.dirname(p))
+        with open(p, "w") as f:
+            for t in (1.0, 2.0):
+                row = [t, 1.0, 0.0, 1.0, 0.0, 1.0e6, v if t == 2.0 else 0.0, 1.0, -5.0]
+                f.write("".join(f"{x:21.13E}" if k == 0 else f"{x:15.6E}" for k, x in enumerate(row)) + "\n")
+    g, r, a = (str(tmp_path / d / "fltst_n.txt") for d in ("ref", "run", "far"))
+    write(g, 0.0), write(r, 5e-10), write(a, 3e-9)
+    assert C.compare_series(g, r)[0] and not C.compare_series(g, a)[0]
 
 
 @pytest.mark.e2e_fast

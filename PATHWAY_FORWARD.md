@@ -423,6 +423,21 @@ build, run and traps are in `CLAUDE.md`.
    fires; a gated `src/` change with a version bump and one e2e test.
    NOT decided: item 11 and item 5 (liu2020), item 9 (ICNTL(14) for
    native solver 1).
+   Owner, 2026-11-20 16:00 CST, after being told that rule 22 caps every
+   tracked file at 5 MB (enforced by `tests/contract/test_root_layout.py`,
+   `MAX_TRACKED_FILE_BYTES`) and that liu2020's last-step displacement
+   file is 6.3 MB, with options A) exempt that one file, B) commit
+   liu2020 without a displacement file (recommended at that point), C)
+   store displacement files compressed: "you can go above 5mb. use 10mb"
+   (verbatim.) Read as (a reading): the per-file cap of rule 22 becomes
+   10 MB, in the rule text and in the contract test, a rules-owner edit
+   made on the owner's word; with it, item 5 needs no exemption, and the
+   liu2020 regeneration of item 11 option A goes ahead from the v1.24.8
+   run with its last-step displacement file, its README's "deterministically
+   reproducible" claim corrected. The item 11 part is a reading of a
+   message that answered the exemption question, not an explicit "2A";
+   the invoking session states it to the owner when relaying. NOT
+   decided: item 9; any further cap change; compression.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

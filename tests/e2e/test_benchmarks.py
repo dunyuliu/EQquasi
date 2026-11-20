@@ -651,26 +651,36 @@ def test_distributed_loop_matches_petsc_loop(compset):
     assert not bad, "solver 3 differs from solver 2:\n" + "\n".join(bad)
 
 
-def _dd_run_pair(compset, tag, s2, s3):
+def _dd_run_one(name, tag, extra):
+    """One workflow run of `tag` = (compset, tag) with the parameter lines
+    `extra` appended, in scratch/e2e.dd_<name>.<tag>; returns its cycle
+    directory and stdout."""
+    compset, tag = tag
+    workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{tag}")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(extra)
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
+                   capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
+                       capture_output=True, text=True)
+    assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+    return os.path.join(workdir, "result", "cycle0"), r.stdout
+
+
+def _dd_run_pair(compset, tag, s2, other, second="s3"):
     """Run `compset` twice through the workflow, with the parameter lines `s2`
-    and `s3` appended, in scratch/e2e.dd_s2.<tag> and scratch/e2e.dd_s3.<tag>.
-    Returns the two cycle directories and the s3 run's stdout."""
+    and `other` appended, in scratch/e2e.dd_s2.<tag> and
+    scratch/e2e.dd_<second>.<tag> (second = "s3" for solver 3, "s4" for solver 4).
+    Returns the two cycle directories, keyed "s2" and `second`, and the second
+    run's stdout."""
     cyc, out = {}, {}
-    for name, extra in {"s2": s2, "s3": s3}.items():
-        workdir = os.path.join(WORK_ROOT, f"e2e.dd_{name}.{tag}")
-        e = C.env()
-        shutil.rmtree(workdir, ignore_errors=True)
-        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
-                       cwd=str(ROOT), env=e, check=True, capture_output=True)
-        with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
-            f.write(extra)
-        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True,
-                       capture_output=True)
-        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e,
-                           capture_output=True, text=True)
-        assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
-        cyc[name], out[name] = os.path.join(workdir, "result", "cycle0"), r.stdout
-    return cyc, out["s3"]
+    for name, extra in {"s2": s2, second: other}.items():
+        cyc[name], out[name] = _dd_run_one(name, (compset, tag), extra)
+    return cyc, out[second]
 
 
 # Layouts the 4-rank test above does not reach (its blocks are (2, 2, 1)):
@@ -780,6 +790,312 @@ def test_distributed_abort_on_one_rank_stops_every_rank():
     assert p.returncode != 0, "the run printed the abort message and still exited 0"
     assert "MPI_ABORT" in out and re.search(r"[Ee]rrorcode:?\s*508\b", out), \
         f"no MPI_ABORT with error code 508 in the output (exit {p.returncode}):\n{out[-3000:]}"
+
+
+# --- par.solver = 4, slip to traction: each solver-3 case above, forced to 4 ---
+# Steps 2..30 of the 31-step runs are the operator's matrix-vector product alone;
+# step 1 (a disp snapshot) and step 31 (the stop step) also solve in full.
+S2T_NSTEP = 31
+# The operator against the solve inside the run (src/solveTimeLoopPETScDD.f90,
+# ddS2tStations prints it on every full-solve step). The bound is the solver's own:
+# 1e-8 of each field's largest value, floored at 1e-14 of the operator's largest
+# entry (maxabs_S for the traction, maxabs_Su for the displacement, both printed
+# on the check line). The floor is the owner's (2026-11-19, "go").
+S2T_CHECK_RTOL = 1e-8
+S2T_CHECK_FLOOR = 1e-14
+S2T_CHECK_RE = (r"EQ_S2T check step maxdiff_traction maxabs_traction maxdiff_u maxabs_u maxabs_S maxabs_Su\s+"
+                r"(\d+)" + r"\s+(\S+)" * 6)
+
+
+def _s2t_violations(rows):
+    """The check rows (step, then six floats) that exceed the solver's bound.
+    This is a Python copy of the bound the solver applies (src/solveTimeLoopPETScDD.f90,
+    max(S2T_CHECK_RTOL*field_max, S2T_CHECK_FLOOR*operator_max)). The Fortran
+    abort on a wrong operator is tested by test_slip_to_traction_planted_operator_row_aborts."""
+    bad = []
+    for r in rows:
+        dt_, at_, du, au, st, su = (float(v) for v in r[1:])
+        bt = max(S2T_CHECK_RTOL * at_, S2T_CHECK_FLOOR * st)
+        bu = max(S2T_CHECK_RTOL * au, S2T_CHECK_FLOOR * su)
+        if not (dt_ <= bt and du <= bu):
+            bad.append(f"step {r[0]}: operator vs solve, traction {dt_:g} (bound {bt:g}), "
+                       f"displacement {du:g} (bound {bu:g})")
+    return bad
+
+
+def _assert_s2t_ran(cyc, nstep):  # nstep: the run's last step
+    """The run of `cyc` (a cycle directory) built the operator, and its
+    full-solve steps hold the first and the last step, each with the operator's
+    traction and station displacement within S2T_CHECK_RTOL of the solve's.
+    A run that stayed on the solve (no EQ_S2T lines) fails (rule 2)."""
+    log_path = os.path.join(os.path.dirname(os.path.dirname(cyc)), "log", "cycle0.log")
+    with open(log_path) as f:
+        log = f.read()
+    assert re.search(r"EQ_S2T built sec ncol nbat\s+\S+\s+\d+\s+\d+", log), \
+        f"solver 4 did not print its operator build line: the slip-to-traction path did not run\n{log[-2000:]}"
+    rows = re.findall(S2T_CHECK_RE, log)
+    steps = [int(r[0]) for r in rows]
+    assert 1 in steps and nstep in steps and len(steps) < nstep, \
+        f"full-solve steps {steps}: want step 1 and step {nstep} and fewer than {nstep} of them (else the operator is never applied alone)"
+    bad = _s2t_violations(rows)
+    assert not bad, "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_s2t_check_assert_catches_a_planted_wrong_operator():
+    """Checks the Python copy of the bound (_s2t_violations), not the Fortran
+    abort (that is test_slip_to_traction_planted_operator_row_aborts).
+    The assert of _assert_s2t_ran on planted check rows, no run.
+    Largest traction 1e6, largest S entry 1e3: relative bound 1e-8 * 1e6 = 1e-2,
+    floor 1e-14 * 1e3 = 1e-11. A traction difference of 1e-5 relative (10) must
+    fail, 1e-9 relative (1e-3, below the bound) must pass; with a traction zero
+    by physics (largest 0) a difference of 1e-12 (below the floor) passes and 1e-9
+    (above it) fails; a displacement difference of 1e-5 against largest 1 fails."""
+    f = lambda *v: tuple(f"{x:e}" for x in v)
+    assert _s2t_violations([("1",) + f(1e6 * 1e-5, 1e6, 0.0, 1.0, 1e3, 1.0)]), "1e-5 relative not caught"
+    assert not _s2t_violations([("1",) + f(1e6 * 1e-9, 1e6, 0.0, 1.0, 1e3, 1.0)]), "1e-9 relative rejected"
+    assert not _s2t_violations([("1",) + f(1e-12, 0.0, 0.0, 1.0, 1e3, 1.0)]), "floor not applied"
+    assert _s2t_violations([("1",) + f(1e-9, 0.0, 0.0, 1.0, 1e3, 1.0)]), "above the floor not caught"
+    assert _s2t_violations([("1",) + f(0.0, 1.0, 1.0e-5, 1.0, 1e3, 1.0)]), "displacement 1e-5 not caught"
+
+
+# The solver's own abort on a wrong operator (src/solveTimeLoopPETScDD.f90,
+# ddS2tStations), and its refusal of a row outside the operator.
+S2T_PLANT_ABORT = ("EQ_S2T: operator disagrees with the solve beyond max(1e-8 of the field maximum, "
+                   "1e-14 of the operator maximum)")
+S2T_PLANTS = {
+    # row 0 doubled after the build: step 1 solves in full and must stop the run.
+    "row0": (0, S2T_PLANT_ABORT),
+    "out_of_range": (1000000000, "EQ_S2T: -eq_s2t_plant_row 1000000000 is outside the operator rows [0, "),
+}
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(S2T_PLANTS))
+def test_slip_to_traction_planted_operator_row_aborts(case):
+    """par.solver = 4 with PETSC_OPTIONS -eq_s2t_plant_row <row>: the solver
+    doubles that global row of the operator after the build, and the operator
+    check of the first full-solve step (step 1) stops the run with a nonzero
+    exit and the check's abort message; a row outside [0, n) stops it with the
+    hook's own message before any step. 31 steps, 4 ranks, test.bp5.qdc.2000."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
+    row, message = S2T_PLANTS[case]
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_plant_s4." + case)
+    e = C.env()
+    e["PETSC_OPTIONS"] = f"-eq_s2t_plant_row {row}"
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(f"par.solver = 4\npar.nstep = {S2T_NSTEP}\npar.HPC_ncpu = 4\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=900)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    out = r.stdout + r.stderr + (open(log_path).read() if os.path.exists(log_path) else "")
+    assert r.returncode != 0, f"{case}: run.sh exit 0 with a planted operator row\n{out[-3000:]}"
+    assert "EQ_S2T built sec" in out, f"{case}: the operator was not built\n{out[-3000:]}"
+    assert message in out, f"{case}: exit {r.returncode} without '{message}'\n{out[-3000:]}"
+    if case == "row0":
+        assert "EQ_S2T: -eq_s2t_plant_row 0: that operator row is doubled" in out, out[-3000:]
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("compset", sorted(DD_EXPECTED_KINDS))
+def test_slip_to_traction_matches_petsc_loop(compset):
+    """test_distributed_loop_matches_petsc_loop with par.solver = 4: same
+    compsets, 4 ranks, 31 steps, same comparison at the same DD_RTOL against
+    solver 2, and the operator's own check lines (_assert_s2t_ran)."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 4 unavailable)")
+    cyc, out = _dd_run_pair(compset, "s4." + compset, "par.solver = 2\npar.nstep = 31\n",
+                            "par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = 4\n", second="s4")
+    _assert_distributed_mesh(out, nranks=4)
+    _assert_s2t_ran(cyc["s4"], S2T_NSTEP)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
+    assert not bad, "solver 4 differs from solver 2:\n" + "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(DD_LAYOUT_CASES))
+def test_slip_to_traction_matches_petsc_loop_z_and_corner_blocks(case):
+    """test_distributed_loop_matches_petsc_loop_z_and_corner_blocks with
+    par.solver = 4: the same layouts (more than one block along z and along x,
+    the bp 8 well), the same comparison."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 4 unavailable)")
+    compset, nranks, extra = DD_LAYOUT_CASES[case]
+    cyc, out = _dd_run_pair(compset, "s4." + case,
+                            "par.solver = 2\npar.nstep = 31\npar.HPC_ncpu = 4\n" + extra,
+                            f"par.solver = 4\npar.nstep = 31\npar.HPC_ncpu = {nranks}\n" + extra,
+                            second="s4")
+    blocks = _assert_distributed_mesh(out, nranks=nranks)
+    assert blocks[2] > 1 and blocks[0] > 1, f"blocks {blocks}: no z halo exchange or no in-plane block corner"
+    _assert_s2t_ran(cyc["s4"], S2T_NSTEP)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
+    assert not bad, "solver 4 differs from solver 2:\n" + "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_slip_to_traction_stop_on_a_step_that_is_not_an_output_step():
+    """A run that ends on par.fluid_tend (bp 8) stops on a step that is neither
+    the last of par.nstep nor one of the nt_out output steps, so only the
+    `stoptag == 1` term of the full-solve condition (src/solveTimeLoopPETScDD.f90,
+    s2tFull) makes the stop step solve in full. Without it the stop step's disp
+    snapshot would hold the previous solve's displacement.
+
+    The stop time is the midpoint of two step times of a solver 2 probe run;
+    solver 2 and solver 4 then stop on the same step, the solver 4 log holds a
+    full-solve line for it, and every file, the disp snapshot of the stop step
+    included, agrees at DD_RTOL (_dd_differences)."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 2, 4 unavailable)")
+    compset = "test.bp8.qdc.gs.10"
+    probe, _ = _dd_run_one("s2", (compset, "s4stop.probe"), "par.solver = 2\npar.nstep = 31\n")
+    times = C.read_any(os.path.join(probe, "global.dat"))[:, 0]
+    tend = 0.5 * (times[13] + times[14])
+    extra = f"par.nstep = 31\npar.fluid_tend = {tend!r}\n"
+    cyc, out = _dd_run_pair(compset, "s4stop", "par.solver = 2\n" + extra,
+                            "par.solver = 4\npar.HPC_ncpu = 4\n" + extra, second="s4")
+    snaps = sorted(int(m.group(1)) for n_ in os.listdir(cyc["s2"])
+                   if (m := re.fullmatch(r"disp\.(\d{5})\.nc", n_)))
+    stop = snaps[-1]
+    nt_out = 100
+    assert 1 < stop < 31 and stop % nt_out != 1, \
+        f"solver 2 stopped on step {stop}: want one that is neither the last (31) nor an output step"
+    assert os.path.exists(os.path.join(cyc["s4"], f"disp.{stop:05d}.nc")), \
+        f"solver 4 wrote no disp snapshot for the stop step {stop}"
+    _assert_s2t_ran(cyc["s4"], stop)
+    bad = _dd_differences(cyc["s2"], cyc["s4"], DD_EXPECTED_KINDS[compset])
+    assert not bad, "solver 4 differs from solver 2 at the stop step:\n" + "\n".join(bad)
+
+
+@pytest.mark.e2e_fast
+def test_slip_to_traction_abort_on_one_rank_stops_every_rank():
+    """test_distributed_abort_on_one_rank_stops_every_rank with par.solver = 4:
+    the unclamped fault node's rank aborts inside the apply loop (the operator
+    is built first), and every rank must stop with error code 508."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
+    compset, nranks = "test.bp8.qdc.gs.10", 8
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_abort_s4")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(f"par.solver = 4\npar.HPC_ncpu = {nranks}\npar.fluid_q0 = 1.0\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    p = subprocess.Popen(["bash", "run.sh"], cwd=workdir, env=e, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        out, _ = p.communicate(timeout=600)
+    except subprocess.TimeoutExpired:
+        out = _kill_group_and_collect(p, DD_KILL_GRACE)
+        pytest.fail(f"par.solver = 4 did not stop within 600 s: a rank-local abort hangs the job\n{out[-3000:]}")
+    with open(os.path.join(workdir, "log", "cycle0.log")) as f:
+        out += f.read()
+    assert "EQ_S2T built sec" in out, f"the operator was not built before the abort:\n{out[-3000:]}"
+    assert "EFFECTIVE NORMAL STRESS IS NO LONGER COMPRESSIVE" in out, \
+        f"check_effective_normal was not reached (exit {p.returncode}):\n{out[-3000:]}"
+    assert p.returncode != 0, "the run printed the abort message and still exited 0"
+    assert "MPI_ABORT" in out and re.search(r"[Ee]rrorcode:?\s*508\b", out), \
+        f"no MPI_ABORT with error code 508 in the output (exit {p.returncode}):\n{out[-3000:]}"
+
+
+# Unsupported combinations stop the run with a message; none falls back to another solver.
+S2T_REFUSALS = {
+    # (parameter lines, PETSC_OPTIONS, message, needs PETSc). The solver 5 guard
+    # (src/eqquasi.f90) runs before any PETSc branch, so it is tested on every build.
+    "solver5": ("par.solver = 5\n", None, "par.solver must be 1, 2, 3 or 4; got", False),
+    # The message names the run's own solver (F5): a wrong value fails both.
+    "krylov4": ("par.solver = 4\n", "-ksp_type cg -pc_type jacobi",
+                "par.solver=4: only KSPPREONLY + PCCHOLESKY", True),
+    "krylov3": ("par.solver = 3\n", "-ksp_type cg -pc_type jacobi",
+                "par.solver=3: only KSPPREONLY + PCCHOLESKY", True),
+    # A direct factor from another package: the operator is built by
+    # MatMatTransposeSolve on the MUMPS factor, so the run must stop, not go on.
+    # nonmumps4: PETSc itself refuses at KSPSetUp, before the solver's own check.
+    # superlu4 (Cholesky kept, factor package replaced) is accepted by KSPSetUp and
+    # reaches the check in ddS2tBuild, which names the type found. With
+    # -pc_type lu the earlier PC-type guard stops the run instead.
+    "nonmumps4": ("par.solver = 4\n", "-pc_factor_mat_solver_type petsc",
+                  "MatSolverType petsc does not support matrix type mpiaij", True),
+    "superlu4": ("par.solver = 4\n", "-pc_factor_mat_solver_type superlu_dist",
+                 "EQ_S2T: the factor solver type is 'superlu_dist', not mumps", True),
+}
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(S2T_REFUSALS))
+def test_slip_to_traction_unsupported_combination_fails_loudly(case):
+    """par.solver = 5, and par.solver = 4 with PETSc options that replace the
+    MUMPS Cholesky factor the operator is built on, end with a nonzero exit and
+    the refusal's message, and write no cycle result."""
+    extra, petsc_options, message, needs_petsc = S2T_REFUSALS[case]
+    if needs_petsc and not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 3, 4 unavailable)")
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_refuse." + case)
+    e = C.env()
+    if petsc_options:
+        e["PETSC_OPTIONS"] = petsc_options
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(extra + "par.HPC_ncpu = 2\npar.nstep = 3\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=600)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    log = open(log_path).read() if os.path.exists(log_path) else ""
+    assert r.returncode != 0, f"{case}: run.sh exit 0, the combination was accepted"
+    if message is not None:
+        assert message in r.stdout + r.stderr + log, \
+            f"{case}: exit {r.returncode} without '{message}'\n{(r.stdout + log)[-2000:]}"
+    assert "EQ_S2T built sec" not in log, f"{case}: the operator was built before the refusal"
+
+
+@pytest.mark.e2e_fast
+def test_slip_to_traction_refused_on_a_build_without_petsc():
+    """par.solver = 4 on a binary built without PETSc ends with a nonzero exit
+    and the refusal message (src/eqquasi.f90), never another solver's result.
+    The binary under test is the installed one when it lacks PETSc; otherwise a
+    copy of src/ is built here with the PETSc define and objects removed, which
+    is also the rule 17a link check (only conda-linux builds PETSc, so the
+    machine is known)."""
+    exe = C.installed_binary()
+    if _binary_has_petsc():
+        build = os.path.join(WORK_ROOT, "e2e.nopetsc_build")
+        shutil.rmtree(build, ignore_errors=True)
+        shutil.copytree(ROOT / "src", build)
+        e = C.env()
+        e["MACHINE"] = "conda-linux"
+        e["EQQUASIROOT"] = str(ROOT)
+        r = subprocess.run(["make", "PETSC_DEFINE=", "OBJ_PETSC=", "PETSC_LIB="], cwd=build, env=e,
+                           capture_output=True, text=True, timeout=1800)
+        assert r.returncode == 0, "the build without PETSc failed to link:\n" + (r.stdout + r.stderr)[-3000:]
+        exe = os.path.join(build, "eqquasi")
+        assert "libpetsc" not in subprocess.run(["ldd", exe], capture_output=True, text=True).stdout
+    workdir = os.path.join(WORK_ROOT, "e2e.dd_refuse.nopetsc4")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write("par.solver = 4\npar.HPC_ncpu = 2\npar.nstep = 3\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    run_sh = os.path.join(workdir, "run.sh")
+    text = open(run_sh).read()
+    patched = re.sub(r"eqquasi-[0-9][0-9.]* 2>&1", str(exe) + " 2>&1", text)
+    assert patched != text, "run.sh names no eqquasi-<version> binary to replace"
+    open(run_sh, "w").write(patched)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=600)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    log = open(log_path).read() if os.path.exists(log_path) else ""
+    assert r.returncode != 0, "run.sh exit 0: par.solver = 4 ran on a build without PETSc"
+    assert "needs MACHINE=conda-linux" in r.stdout + r.stderr + log, \
+        f"exit {r.returncode} without the refusal message\n{(r.stdout + log)[-2000:]}"
+    assert "EQ_S2T built sec" not in log
 
 
 # --- the comparison's own contracts: milliseconds, no run, part of the sweep ---

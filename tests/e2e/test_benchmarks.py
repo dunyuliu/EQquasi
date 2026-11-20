@@ -430,8 +430,9 @@ DD_RTOL = 1e-10
 # slip_rate_3 in m/s (the file holds its log10), shear_stress_3 in MPa. An
 # entry whose two values differ by no more than the floor passes, and so does
 # a log10 entry whose un-logged values both sit under it. No srfst_ floor and
-# no full-cycle floor is decided.
-DD_STATION_FLOORS = {"slip_3": 1e-15, "slip_rate_3": 1e-12, "shear_stress_3": 1e-9}
+# no full-cycle floor is decided. The constants live in cases.py, where
+# compare_series applies them to every fltst_ file.
+DD_STATION_FLOORS = C.STATION_FLOORS
 # The largest rank's share of the whole mesh's nodes at 4 ranks. A block is a
 # quarter of the cells plus one ghost line per cut direction; a rank that
 # held the whole mesh would be 1.
@@ -1220,6 +1221,64 @@ def test_dd_station_series_floors_do_not_reach_in_plane_columns(tmp_path):
     relative, above the 2e-6 of a 7-digit column, and no floor applies."""
     ok, msg = _floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
     assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
+
+
+def _series_floor_case(tmp_path, col, ref_v, run_v, fname="fltst_a.txt"):
+    """compare_series (the onfault comparison) on an 11-column pair equal
+    except column `col` (0-based) at row 1, built as _floor_case builds it."""
+    def row(t, v):
+        r = _station_row(t, -9.0, -9.0)
+        if col in (2, 6):
+            r[col - 1] = 0.0
+        r[col] = v
+        return r
+    g, r = str(tmp_path / "ref" / fname), str(tmp_path / "run" / fname)
+    for p, rows in ((g, [row(1.0, ref_v), row(2.0, ref_v)]), (r, [row(1.0, ref_v), row(2.0, run_v)])):
+        os.makedirs(os.path.dirname(p))
+        _write_station_file(p, rows)
+    return C.compare_series(g, r)
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_fltst_difference_under_floor_passes(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, below)
+    assert ok, f"{name}: a difference under its floor must pass: {msg}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_fltst_difference_above_floor_fails(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, above)
+    assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("col,name,ref_v,below,above", _FLOOR_CASES)
+def test_compare_series_srfst_file_gets_no_floor(tmp_path, col, name, ref_v, below, above):
+    ok, msg = _series_floor_case(tmp_path, col, ref_v, below, fname="srfst_a.txt")
+    assert not ok and f"column {col+1}" in msg, f"{name}: ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_compare_series_fltst_floors_do_not_reach_in_plane_columns(tmp_path):
+    ok, msg = _series_floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
+    assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_compare_series_fltst_nine_column_layout_gets_the_floors(tmp_path):
+    """9 columns (BP5/BP7): slip_3 is column 3, slip rate along dip (not
+    logged) column 5, tstk/tdip columns 6 and 7; shear_stress_3 is column 7."""
+    def write(p, v):
+        os.makedirs(os.path.dirname(p))
+        with open(p, "w") as f:
+            for t in (1.0, 2.0):
+                row = [t, 1.0, 0.0, 1.0, 0.0, 1.0e6, v if t == 2.0 else 0.0, 1.0, -5.0]
+                f.write("".join(f"{x:21.13E}" if k == 0 else f"{x:15.6E}" for k, x in enumerate(row)) + "\n")
+    g, r, a = (str(tmp_path / d / "fltst_n.txt") for d in ("ref", "run", "far"))
+    write(g, 0.0), write(r, 5e-10), write(a, 3e-9)
+    assert C.compare_series(g, r)[0] and not C.compare_series(g, a)[0]
 
 
 @pytest.mark.e2e_fast

@@ -652,6 +652,37 @@ def column_printed_rtol(path, ncols, rtol):
     return out
 
 
+# Round-off floors of the fltst_ out-of-plane columns (owner decision, board
+# row 1, 2026-11-18/19), in the un-logged units of each column: slip_3 in m,
+# slip_rate_3 in m/s (the 11-column file holds its log10), shear_stress_3 in
+# MPa. An entry whose un-logged values differ by no more than the floor is
+# skipped; so is a log10 entry whose un-logged values both sit under it.
+STATION_FLOORS = {"slip_3": 1e-15, "slip_rate_3": 1e-12, "shear_stress_3": 1e-9}
+# (0-based column, floor name, holds log10) by fltst_ column count
+# (src/library_output.f90): 9 for BP5/BP7, 11 for BP8.
+STATION_FLOOR_COLUMNS = {
+    11: ((2, "slip_3", False), (4, "slip_rate_3", True), (6, "shear_stress_3", False)),
+    9: ((2, "slip_3", False), (4, "slip_rate_3", False), (6, "shear_stress_3", False)),
+}
+
+
+def station_floor_exempt(gpath, g, r):
+    """Boolean mask of the entries of two fltst_ tables that sit inside a
+    round-off floor. Only a file named fltst_* in a 9- or 11-column layout is
+    touched (no srfst_ floor); every other file gets an all-False mask. A
+    non-finite difference is never exempt."""
+    import numpy as _np
+    exempt = _np.zeros(g.shape, bool)
+    cols = STATION_FLOOR_COLUMNS.get(g.shape[1])
+    if cols is None or not os.path.basename(gpath).startswith("fltst_"):
+        return exempt
+    for j, name, log10 in cols:
+        lin = (lambda a: 10.0 ** a) if log10 else (lambda a: a)
+        with _np.errstate(invalid="ignore", over="ignore"):
+            exempt[:, j] = _np.abs(lin(r[:, j]) - lin(g[:, j])) <= STATION_FLOORS[name]
+    return exempt
+
+
 def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
     """(ok, message) for two numeric tables. Full array, not sampled.
 
@@ -684,6 +715,11 @@ def compare_series(gpath, rpath, rtol=1e-9, floor_rtol=1e-9):
         for j, name in enumerate(header):
             if name in LOG10_COLUMNS:
                 col_rtol[j] = rtol
+
+    # An entry inside a round-off floor is made equal to its reference, so
+    # compare_arrays skips it; the scale was measured before this.
+    exempt = station_floor_exempt(gpath, g, r)
+    r = _np.where(exempt, g, r)
 
     ok, nbad, idx, worst = compare_arrays(g, r, col_rtol, floor_rtol, scale=scale)
     if not ok:

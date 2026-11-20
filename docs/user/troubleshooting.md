@@ -60,7 +60,8 @@ codes. The launcher normally passes the code through as the exit status.
   proportional to one velocity pattern, or there is no fault pair, so the
   operator cannot stand for the solve. Use `solver = 3`.
 * `EQ_S2T: operator disagrees with the solve beyond max(1e-8 of the field
-  maximum, 1e-14 of the operator maximum)` (`solver = 4`): on a step that also solves in full, the operator's fault
+  maximum, 1e-14 of the operator maximum)` (`solver = 4`): on a step that also solves in full,
+  the operator's fault
   traction or station displacement differs from the solve's by more than 1e-8
   of that field's largest value, or by more than 1e-14 of the operator's largest
   entry if that is larger (the bound is the larger of the two, so the floor binds for

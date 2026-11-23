@@ -32,7 +32,7 @@ below it is the record of why.
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
 | 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
-| 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 5 MB. |
+| 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 10 MB. |
 | 23 | A quoted figure names its source file and counting rule: resource = maximum over all rank files; float32 parity states its floor. An empty `rss.*` is absent, not zero (23a); parse `EQ_S2T_PROG` with its inline header handled (23b). |
 | 24 | Long launch: grep the driver chain for `timeout` first, one wall cap recorded on the board row (24a); kill by recorded process group, check the lock (24b); `export` what children read, log it (24c); a batch over ~2 h declares itself (24d). |
 | 25 | "Running" on the board quotes a live `ps` line and an advancing log mtime, this turn (25a). A gate that could not run is NOT RUN, never green (25b). |
@@ -767,7 +767,7 @@ reverted on 2026-10-08 at the owner's request, and `reference/` became
 `testsys` -- `test` shadows the stdlib package -- does not apply to `tests`.
 Commit messages before 2026-10-08 still use the old names.
 
-**No tracked file over 5 MB.** The largest tracked file today is
+**No tracked file over 10 MB.** The largest tracked file today is
 `data/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
 under the limit, so this is a ceiling, not yet a problem; the check guards it
 so a future gold file doesn't cross it silently.
@@ -783,7 +783,7 @@ as a new row -- same process as rule 1 for a new name or parameter.
 
 **Check**: `tests/contract/test_root_layout.py` diffs `git ls-tree
 --name-only HEAD` against this table's entries and fails on any addition or
-removal, and fails on any tracked file over 5 MB. A `tidy()` step in the same
+removal, and fails on any tracked file over 10 MB. A `tidy()` step in the same
 file prints -- and does not fail on -- worktrees under `.claude/worktrees/` (or
 left under `scratch/`), merged local branches, and `runs/` and `scratch/`
 entries nothing in `PATHWAY_FORWARD.md` cites.

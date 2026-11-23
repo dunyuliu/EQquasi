@@ -563,6 +563,26 @@ build, run and traps are in `CLAUDE.md`.
    designed for EQquasi on its own and does not wait on, or imply, the
    FEniCSx backend, and a backend comparison should hold the time
    stepping fixed.
+   Owner, 2026-11-23 12:03 to 12:04 CST, answering three numbered
+   questions on the RK45 option: "1A, and 1 is Lapusta 2000?" then "2A.
+   3A" (verbatim.) The options as put were: 1, the parameter that
+   selects it, "A) a new `par.time_integrator` (1 = existing loop, 2 =
+   RK45) (recommended); B) another name"; 2, scope of the first
+   version, "A) `par.solver = 4` only, where it is cheap (recommended);
+   B) all solvers"; 3, who builds it, "A) the research-grade
+   implementer, which needs your OK per dispatch, after the v1.24.10
+   items land (recommended); B) wait for the design before deciding".
+   Read as (a reading): the new parameter `par.time_integrator` is
+   agreed (rule 1), value 1 the existing time loop (the default) and
+   value 2 RK45; the first version supports `par.solver = 4` only and
+   refuses other solvers with a message; the owner's word for one
+   dispatch of the research-grade implementer on this job is given, to
+   be used after the v1.24.10 items land, with the design on the board
+   first. The owner's question whether value 1 is the scheme of Lapusta
+   et al. (2000) is answered by the invoking session from the source,
+   and the documentation of value 1 says what the code does. NOT
+   decided: any further new name or file the implementation needs; the
+   RK45 tolerance default; a default change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

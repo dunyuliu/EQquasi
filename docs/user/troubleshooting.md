@@ -74,6 +74,12 @@ codes. The launcher normally passes the code through as the exit status.
   that the check above must stop the run; the test suite uses it to show that
   a wrong operator aborts. Remove it from `PETSC_OPTIONS` for a production run;
   a row outside the operator stops the run.
+* `EQ_S2T: -eq_s2t_plant_nan <row>: that operator row is set to NaN (test hook)`
+  (`solver = 4`): the PETSc option `-eq_s2t_plant_nan <global row>` is a test
+  hook, not a setting. It sets that row of the operator to NaN after the build
+  so that the NaN flag of the check above must stop the run; the test suite
+  uses it to show that a NaN in the operator aborts. Remove it from
+  `PETSC_OPTIONS` for a production run; a row outside the operator stops the run.
 * `par.solver=3: more blocks than cells in a direction`: too many MPI ranks
   for the mesh. Lower `HPC_ncpu`.
 * `par.solver=3: fault N is not one rectangle of nodes on a single interior

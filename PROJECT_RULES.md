@@ -767,9 +767,10 @@ reverted on 2026-10-08 at the owner's request, and `reference/` became
 `testsys` -- `test` shadows the stdlib package -- does not apply to `tests`.
 Commit messages before 2026-10-08 still use the old names.
 
-**No tracked file over 10 MB.** The largest tracked file today is
-`data/liu2020.qdc.kink.600/cycle0/fltst_strk000dp009.txt` at ~2.89 MB --
-under the limit, so this is a ceiling, not yet a problem; the check guards it
+**No tracked file over 10 MB.** The unit is MiB (10485760 bytes, the guard in
+`tests/contract/test_root_layout.py`). The largest tracked file today is
+`data/liu2020.qdc.kink.600/cycle0/disp.10000.nc` at 6,346,312 bytes
+(`git ls-tree -r -l master`, 2026-11-23) -- under the limit, so this is a ceiling, not yet a problem; the check guards it
 so a future gold file doesn't cross it silently.
 
 *Rationale.* An uncurated root is how a second status board, a second rule

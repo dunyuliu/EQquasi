@@ -504,6 +504,22 @@ build, run and traps are in `CLAUDE.md`.
    NOT decided: whether any compset keeps a constant xi explicitly (for
    example a SEAS benchmark whose submitted results used xi 0.2); the
    value of `xi_gamma` other than pi/4.
+   Owner, 2026-11-23 12:00 CST, on question 1 of the follow-up list,
+   which read "Benchmark compsets under the new default (follows from
+   1B): the SEAS cases (BP5, BP7, BP8, BP1002) were submitted with
+   constant `xi`. A) Pin those compsets to their submitted constant
+   `xi`, so the repo still reproduces the uploads; the new default
+   applies to everything else (recommended). B) Switch them too and
+   accept that the repo no longer reproduces the submissions.": "1:
+   keep old xi for now" (verbatim.) Read as (a reading, the narrow
+   one): the SEAS benchmark compsets keep their constant `xi`
+   (`par.xi_gamma = 0` set explicitly in them) and their gold is not
+   regenerated for this change. The words could also mean that the
+   old constant `xi` stays the default everywhere for now, which would
+   suspend the 11:58 "1B"; the invoking session asks the owner which,
+   and until the answer NO default is changed and NO gold is
+   regenerated for row 6. Either reading keeps the benchmark compsets
+   on constant `xi`.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

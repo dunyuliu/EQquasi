@@ -1,4 +1,10 @@
 #! /usr/bin/env python3
+# compset: liu2020.qdc.kink.600
+# gate   : reference frozen (utilities-read); no e2e row -- a cycle is ~5 h
+# changed: 2026-08-15
+# note   : Paper params at dx=600 (Lambda0/dx=0.94, marginal). Coherent cycles; nstep=10000 truncates long ones.
+# Status is mirrored in compset/README.md, which a contract test checks.
+# ----------------------------------------------------------------------
 """Liu, Duan & Luo (2020, GJI 220, 598-609): strike-slip fault with a kink.
 
 Quasi-dynamic (EQquasi alone). The paper's model is fully dynamic, EQquasi
@@ -78,7 +84,7 @@ par.fzmin, par.fzmax = -30.0e3, 0.0e3
 # below, as liu2020.fdc.planar had it.
 par.xminc, par.xmaxc, par.zminc = -25.0e3, 25.0e3, -25.0e3
 
-par.dx = 600.0e0       # 300 m (paper) needs 64-bit MUMPS; Lambda0/dx = 1.26 here vs the 2.3 the paper requires
+par.dx = 600.0e0       # 300 m (paper) runs (MUMPS blocker dead 2026-08-15); Lambda0/dx = 1.26 here vs the 2.3 the paper requires
 par.dy = par.dx
 par.dz = par.dx
 par.nuni_y_plus, par.nuni_y_minus = 10, 10
@@ -100,7 +106,7 @@ par.nt_out      = 1000
 par.bp          = 1000  # liu2020, for description only
 
 # The paper's epsilon, section 2.2 step (2): the time step is set from
-# eps*L/max(sliprate), "we use eps = 0.2". The liu2020.fdc.* compsets in the
+# eps*L/max(sliprate), "we use eps = 0.2". The liu2020.fdc.* compset in the
 # repo carry 0.02, a factor of ten smaller; the paper's value is used here.
 par.xi = 0.2
 par.minDc = 11e-3
@@ -178,7 +184,7 @@ par.dx_trans = 50
 
 par.casename = "liu2020-kink-qd-300"
 par.HPC_nnode = 1
-par.HPC_ncpu = 24
+par.HPC_ncpu = 3
 par.HPC_queue = "normal"
 par.HPC_time = "04:00:00"
 par.HPC_account = "EAR22013"
@@ -197,3 +203,14 @@ par.az_tol = 1.0e-7
 
 # Liu, Duan & Luo (2020) section 3.5: normal stress caps of -100 to -10 MPa.
 par.max_norm = -100.0e6
+
+# Cap on the adaptive time step (PATHWAY_FORWARD row 12). The creep step
+# xi*Dc/V_pl is 25.5 d; reference cycle0 never stepped past 25.14 d and 14
+# cycles of scratch/kink600.sci never past 25.1 d, so 30 d leaves the reference
+# untouched and guards Vmax < V_pl. The criterion taudot*dtmax <= xi*a*sigma_min
+# (taudot = mu*V_pl/W_vw = 0.14 MPa/yr, sigma_min = the 10 MPa cap) allows
+# 37 d; 30 d sits at 0.82 of it. case.setup prints the numbers.
+par.dtmax = 2.6e6
+
+# Caps were historically implied by rough_fault; the switch is explicit now.
+par.C_normal_stress_caps = 1

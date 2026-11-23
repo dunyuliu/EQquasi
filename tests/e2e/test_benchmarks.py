@@ -550,7 +550,10 @@ def _dd_station_series(gpath, rpath):
             # log10 units, where 1e-18 is inert (test_dd_station_series_noise_
             # floor_applies_to_dip_rate_column_only).
             tol = max(DD_RTOL * vscale + C.ATOL_MACHINE_NOISE, DD_STATION_FLOORS[name])
-            bad[:, j] &= ~(np.abs(lin(r[:, j]) - lin(g[:, j])) <= tol)
+            # No floor on a non-finite raw entry (cases.station_floor_exempt):
+            # 10**-inf is 0, which would read a -inf rate as a zero rate.
+            finite = np.isfinite(g[:, j]) & np.isfinite(r[:, j])
+            bad[:, j] &= ~(finite & (np.abs(lin(r[:, j]) - lin(g[:, j])) <= tol))
         ratio = np.where(bad, diff / np.maximum(own, 1e-300), 0.0)
     if bad.any():
         i, j = np.unravel_index(int(np.argmax(np.nan_to_num(ratio, nan=np.inf))), g.shape)
@@ -919,6 +922,10 @@ def test_slip_to_traction_planted_operator_row_aborts(case):
         assert "EQ_S2T: -eq_s2t_plant_row 0: that operator row is doubled" in out, out[-3000:]
     if case == "nan_row0":
         assert "EQ_S2T: -eq_s2t_plant_nan 0: that operator row is set to NaN" in out, out[-3000:]
+        # The abort prints `it` list-directed (gfortran pads the integer), so
+        # match "step" then whitespace then exactly 1.
+        assert re.search(r"operator product S g, step\s+1\s*$", out, re.M), \
+            f"the NaN abort did not name step 1\n{out[-3000:]}"
 
 
 @pytest.mark.e2e_fast
@@ -1168,7 +1175,7 @@ def test_dd_station_series_equal_finite_files_pass(tmp_path):
 @pytest.mark.e2e_fast
 def test_dd_station_series_noise_floor_applies_to_dip_rate_column_only(tmp_path):
     """Both runs hold a rate of 1e-20 m/s (log10 -20 against -19.9: 2.6e-21 m/s
-    apart, under the 1e-18 m/s machine-noise floor). In the dip column (5) that
+    apart, under the 1e-12 m/s slip_rate_3 floor). In the dip column (5) that
     is noise and passes; the same pair in the strike column (4) is a 0.1 shift
     of a log10 value, the floor does not reach it, and it fails."""
     ref = [_station_row(1.0, -20.0, -20.0), _station_row(2.0, -20.0, -20.0)]
@@ -1228,10 +1235,36 @@ def test_dd_station_series_difference_above_floor_fails(tmp_path, col, name, ref
 
 @pytest.mark.e2e_fast
 def test_dd_station_series_floors_do_not_reach_in_plane_columns(tmp_path):
-    """Shear_stress_2 (column 6) is in-plane: 1e6 vs 1e6+100 MPa is 1e-4
-    relative, above the 2e-6 of a 7-digit column, and no floor applies."""
-    ok, msg = _floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
+    """Shear_stress_2 (column 6) is in-plane. Reference 0 and run 5e-10 with
+    its sibling shear_stress_3 also 0 is a difference under the 1e-9
+    shear_stress_3 floor and above every other tolerance (scale 0): it must
+    fail. A floor wrongly applied to column 6 would pass it."""
+    ok, msg = _in_plane_below_floor_case(tmp_path)
     assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("ref_v,run_v", [(-20.0, float("-inf")), (float("-inf"), -20.0)])
+def test_dd_station_series_non_finite_log10_slip_rate_is_never_floored(tmp_path, ref_v, run_v):
+    """10**-inf is 0: a -inf log10 rate in the run (or reference) against a
+    -20 one is 1e-20 m/s apart in linear units, under the 1e-12 floor, and
+    must still fail (cases.station_floor_exempt: no floor on a non-finite
+    raw entry)."""
+    ok, msg = _floor_case(tmp_path, 4, ref_v, run_v)
+    assert not ok and "column 5" in msg, f"ref={ref_v}, run={run_v}: ok={ok}, msg={msg!r}"
+
+
+def _in_plane_below_floor_case(tmp_path, comparator=None):
+    """Columns 6 and 7 (shear_stress_2 and _3) zero in the reference; the run
+    holds 5e-10 in column 6 at row 1. `comparator` is the (gpath, rpath)
+    comparison, default the DD station series."""
+    def row(t, v):
+        r = _station_row(t, -9.0, -9.0)
+        r[5], r[6] = v, 0.0
+        return r
+    ref = [row(1.0, 0.0), row(2.0, 0.0)]
+    run = [row(1.0, 0.0), row(2.0, 5e-10)]
+    return (comparator or _dd_station_series)(*_station_pair(tmp_path, ref, run))
 
 
 def _series_floor_case(tmp_path, col, ref_v, run_v, fname="fltst_a.txt"):
@@ -1280,7 +1313,9 @@ def test_compare_series_srfst_file_gets_no_floor(tmp_path, col, name, ref_v, bel
 
 @pytest.mark.e2e_fast
 def test_compare_series_fltst_floors_do_not_reach_in_plane_columns(tmp_path):
-    ok, msg = _series_floor_case(tmp_path, 5, 1.0e6, 1.0e6 + 100.0)
+    """As the DD test of the same name: 0 against 5e-10 in column 6, under the
+    shear_stress_3 floor, must fail."""
+    ok, msg = _in_plane_below_floor_case(tmp_path, C.compare_series)
     assert not ok and "column 6" in msg, f"ok={ok}, msg={msg!r}"
 
 

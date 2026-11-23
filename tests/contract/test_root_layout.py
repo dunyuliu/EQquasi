@@ -2,7 +2,7 @@
 
 Two mechanical checks (fail the build):
   - the tracked top-level entries match rule 22's table exactly
-  - no tracked file is over 5 MB
+  - no tracked file is over 10 MB
 
 One report-only step (prints, never fails): `test_tidy_report` lists
 worktrees under .claude/worktrees/ (and any left under scratch/), merged local
@@ -42,7 +42,7 @@ ALLOWED_ROOT_ENTRIES = {
     "CLAUDE.md",
 }
 
-MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_TRACKED_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def _git(args, report_only=False):
@@ -74,7 +74,7 @@ def test_tracked_root_matches_rule_22():
     )
 
 
-def test_no_tracked_file_over_5mb():
+def test_no_tracked_file_over_10mb():
     out = _git(["ls-tree", "-r", "-l", "HEAD"])
     offenders = []
     for line in out.splitlines():

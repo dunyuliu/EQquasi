@@ -520,6 +520,23 @@ build, run and traps are in `CLAUDE.md`.
    and until the answer NO default is changed and NO gold is
    regenerated for row 6. Either reading keeps the benchmark compsets
    on constant `xi`.
+   Owner, 2026-11-23 12:01 CST, two messages clarifying the 12:00
+   answer: "but also build the new xi gamma as refs as wel" and "then
+   we can phase out" (verbatim.) Read as (a reading), replacing the two
+   readings of the 12:00 paragraph: a transition in three steps. (1)
+   Now: the constant `xi` stays the default and the existing reference
+   sets stay as they are; nothing is regenerated in place. (2) Also
+   now: a second set of references is built with the per-node factor
+   (`par.xi_gamma = pi/4`, `par.xi` 0.2 as the cap) for the same cases,
+   kept beside the existing ones, each recording step count, run time,
+   event times and peak slip rates against its constant-`xi`
+   counterpart. (3) Later, on the owner's word: the constant-`xi`
+   references and default are phased out and the 11:58 "1B" default
+   change takes effect. NOT decided: where the second set lives and
+   what it is called (new names under `data/`, rule 1: proposed on this
+   row first); which cases it covers (all nine sets, or the test-tier
+   ones only: the liu2020 cycle costs about 5 h); whether the test tier
+   runs the second set; when step 3 happens.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

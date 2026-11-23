@@ -632,8 +632,9 @@ subroutine solveTimeLoopPETScDD
             flush(6)
         endif
         ! Test hook (tests/e2e/test_benchmarks.py): -eq_s2t_plant_nan <global row> sets
-        ! that row of the operator S to NaN after the build, so the NaN flag of the
-        ! operator check of the next full-solve step (ddS2tStations, v(7)) must stop the run.
+        ! that row of the operator S to NaN after the build, so the finite check of the
+        ! operator product S g of step 1 must stop the run (it runs before the NaN flag
+        ! of the operator check, ddS2tStations v(7), which a row plant never reaches).
         call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_plant_nan', &
             s2tNanRow, s2tNanSet, perr)
         CHKERRA(perr)

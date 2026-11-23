@@ -879,8 +879,9 @@ S2T_PLANTS = {
     "row0": ("-eq_s2t_plant_row", 0, S2T_PLANT_ABORT),
     "out_of_range": ("-eq_s2t_plant_row", 1000000000,
                      "EQ_S2T: -eq_s2t_plant_row 1000000000 is outside the operator rows [0, "),
-    # row 0 set to NaN after the build: the NaN flag of step 1 must stop the run.
-    "nan_row0": ("-eq_s2t_plant_nan", 0, S2T_PLANT_ABORT),
+    # row 0 set to NaN after the build: the finite check of the operator product
+    # S g of step 1 (which runs before the operator check's NaN flag) must stop the run.
+    "nan_row0": ("-eq_s2t_plant_nan", 0, "EQ_S2T: NaN or Inf in the operator product S g, step"),
     "nan_out_of_range": ("-eq_s2t_plant_nan", 1000000000,
                          "EQ_S2T: -eq_s2t_plant_nan 1000000000 is outside the operator rows [0, "),
 }
@@ -916,7 +917,6 @@ def test_slip_to_traction_planted_operator_row_aborts(case):
         assert "EQ_S2T: -eq_s2t_plant_row 0: that operator row is doubled" in out, out[-3000:]
     if case == "nan_row0":
         assert "EQ_S2T: -eq_s2t_plant_nan 0: that operator row is set to NaN" in out, out[-3000:]
-        assert re.search(r"NaN flag\s+1\.0", out), "the NaN flag did not stop the run\n" + out[-3000:]
 
 
 @pytest.mark.e2e_fast

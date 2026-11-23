@@ -23,8 +23,17 @@ Requires a Fortran compiler, MPI, netCDF (with Fortran bindings), and
 Python 3 with numpy 1.26 (or older) and netCDF4 (`scripts/case.setup`
 imports it to write `on_fault_vars_input.nc`).
 
-On any Linux host, with no admin rights, everything (compilers and MPI
-included) comes from conda-forge:
+Clone the repository and make the scripts executable:
+
+```
+git clone https://github.com/dunyuliu/EQquasi.git
+cd EQquasi
+bash make.scripts.executable.sh
+```
+
+On any Linux host, with no admin rights, everything (compilers, MPI, netCDF
+and PETSc) comes from conda-forge, via the conda environment `eqquasi-petsc`
+that `environment.yml` in the repository root defines:
 
 ```
 conda env create -f environment.yml
@@ -41,6 +50,19 @@ workstations). Details and troubleshooting for each are in
 Each new shell needs `EQQUASIROOT` and `bin/`/`scripts/` on its `PATH`:
 `source install.eqquasi.sh`, or add the equivalent `export` lines to your
 shell startup file.
+
+## Test the install
+
+With the binary built and `EQQUASIROOT` set (see above), run the fast test
+tier from the checkout:
+
+```
+EQQUASIROOT=$PWD python3 -m pytest -q -m "not e2e" tests
+```
+
+It needs the built `bin/eqquasi-<version>`: a test fails if the binary is
+missing or older than `src/`. Expect all tests to pass with no skips; the
+counts change as tests are added.
 
 ## Run an example
 

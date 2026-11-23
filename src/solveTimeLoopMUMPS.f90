@@ -18,6 +18,8 @@ subroutine solveTimeLoopMUMPS
     mumps_par%SYM = 1! 0: unsymmetric; 1: Positive definite symmetric ; 2: general symmetric
     mumps_par%PAR = 1
     call DMUMPS(mumps_par)
+    ! Owner decision: workspace percentage 100, as the PETSc paths set.
+    mumps_par%ICNTL(14) = 100
  
     call getScalarOnFaultQuant
 

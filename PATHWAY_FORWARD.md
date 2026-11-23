@@ -485,6 +485,25 @@ build, run and traps are in `CLAUDE.md`.
    closed or rewritten (opening, closing and re-scoping rows stays with
    the rules owner, on the owner's word), and whether the uploaded BP8
    entries need a note.
+   Owner, 2026-11-23 11:58 CST, on row 6 (time-step factor xi), after
+   being offered "A) keep `par.xi_gamma` opt-in, add a warning when a
+   constant `par.xi` exceeds the limit, and document it, with no default
+   change (recommended); B) make per-node xi the default, which changes
+   results for every case and needs new gold; C) leave as is": "1B"
+   (verbatim.) Read as (a reading): the per-node time-step factor of
+   Lapusta et al. (2000) becomes the default (`par.xi_gamma` default
+   pi/4 in `scripts/defaultParameters.py`, today 0.0, with `par.xi` 0.2
+   kept as the cap); this is an intended change of results, so every
+   affected reference set under `data/` is regenerated and the tier
+   passes against the new gold; each regenerated set records step
+   count, run time and the event times and peak slip rates against the
+   old gold, so the owner sees what moved. The owner's 2026-11-18
+   "physics shouldn't change" was about 8-byte storage and does not
+   apply. A changed default is a behaviour change: the version bump is
+   at least minor (never major unattended), with a release-notes entry.
+   NOT decided: whether any compset keeps a constant xi explicitly (for
+   example a SEAS benchmark whose submitted results used xi 0.2); the
+   value of `xi_gamma` other than pi/4.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

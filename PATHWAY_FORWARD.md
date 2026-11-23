@@ -537,6 +537,24 @@ build, run and traps are in `CLAUDE.md`.
    row first); which cases it covers (all nine sets, or the test-tier
    ones only: the liu2020 cycle costs about 5 h); whether the test tier
    runs the second set; when step 3 happens.
+   Owner, 2026-11-23 12:02 CST, after being told that the FEniCSx BP8
+   prototype differs from EQquasi mainly in its time integration
+   (adaptive RK45 at tolerance 1e-6 against EQquasi's time loop with the
+   `xi` step control) and in precomputing a slip-to-traction matrix:
+   "eqquasi can have rk45" (verbatim.) Read as (a reading): the owner
+   agrees to adding an adaptive Runge-Kutta 4(5) time integrator to
+   EQquasi as an option beside the existing time loop, not as a default
+   change. It is new work with no row yet: the rules owner opens a row
+   on this word, and a design goes on the board before any code: how
+   the integrator calls the elastic solve (several evaluations per step,
+   cheap as operator products under `par.solver = 4`, a full solve each
+   under the other solvers), the state it integrates, the error norm
+   and tolerance, restart and output cadence, and the test (BP8 against
+   the reference and against the prototype; a short case against the
+   existing loop). NOT decided: the parameter name and values that
+   select it (rule 1); whether it is limited to `par.solver = 4`; its
+   priority against the rows already open; who implements it (a
+   research-grade implementation needs the owner's word per dispatch).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

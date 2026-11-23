@@ -450,6 +450,139 @@ build, run and traps are in `CLAUDE.md`.
    unchanged at the tier bar and peak memory per rank recorded before
    and after on the same cases. The message ends in a question mark; the
    invoking session tells the owner it is read as an instruction.
+   Owner, 2026-11-23 11:39 CST, replying to a brief whose questions were:
+   "1. Unmerged worktrees and branches: A) delete those already on
+   master or marked superseded, copying cited runs out first
+   (recommended); B) keep. 2. 27 uncited run folders and 39 scratch
+   entries (about 7.7 GB): A) delete after a final citation check
+   (recommended); B) keep. 3. Restart the unattended run in a fresh
+   session (this one is past its context limit), with the week's budget
+   ending 2026-11-25 16:38: A) yes, from `scratch/_logs/BRIEF_20261119.md`
+   (recommended); B) wait." Answer: "1A. 2A, 3A" (verbatim.) Read as
+   (a reading): (1) delete the worktrees and branches whose content is on
+   master or that this board marks superseded, after copying any cited
+   run output into `runs/`; anything neither on master nor marked
+   superseded stays and is listed again; (2) delete the uncited `runs/`
+   folders and `scratch/` entries listed by the 2026-11-20 cleanup report
+   after a final grep of this board, `docs/dev/board_history.md` and
+   `docs/` shows no citation; (3) the unattended run restarts from a fresh
+   session seeded by that brief file, under the existing budget.
+   Owner, 2026-11-23 11:42 CST, after "go" (11:41) on the restart: "no
+   budget. keep working. /autopilot" (verbatim.) Read as (a reading):
+   the run has no end date: the 2026-11-25 16:38 CST end is removed and
+   the run continues until the board's rows are done or blocked on the
+   owner ("until the board is green"); every other limit stands (Vista
+   ceiling 150 SU, no major version bump unattended, rule 1, owner-held
+   items).
+   Owner, 2026-11-23 11:56 CST, on row 3 (BP8 discrepancy), after being
+   offered A) compare EQquasi's slip-to-traction operator with the
+   FEniCSx prototype's on BP8, B) audit the `src/qdct*.f90` force
+   assembly, C) leave it parked: "bp8 hunt: it is OK. bc are different.
+   pause it" (verbatim.) Read as (a reading): row 3 is paused, no work
+   on it; the owner's view is that the difference from the reference
+   comes from different boundary conditions, not a code bug. Row 4,
+   which waits on row 3, stays waiting. NOT decided: whether row 3 is
+   closed or rewritten (opening, closing and re-scoping rows stays with
+   the rules owner, on the owner's word), and whether the uploaded BP8
+   entries need a note.
+   Owner, 2026-11-23 11:58 CST, on row 6 (time-step factor xi), after
+   being offered "A) keep `par.xi_gamma` opt-in, add a warning when a
+   constant `par.xi` exceeds the limit, and document it, with no default
+   change (recommended); B) make per-node xi the default, which changes
+   results for every case and needs new gold; C) leave as is": "1B"
+   (verbatim.) Read as (a reading): the per-node time-step factor of
+   Lapusta et al. (2000) becomes the default (`par.xi_gamma` default
+   pi/4 in `scripts/defaultParameters.py`, today 0.0, with `par.xi` 0.2
+   kept as the cap); this is an intended change of results, so every
+   affected reference set under `data/` is regenerated and the tier
+   passes against the new gold; each regenerated set records step
+   count, run time and the event times and peak slip rates against the
+   old gold, so the owner sees what moved. The owner's 2026-11-18
+   "physics shouldn't change" was about 8-byte storage and does not
+   apply. A changed default is a behaviour change: the version bump is
+   at least minor (never major unattended), with a release-notes entry.
+   NOT decided: whether any compset keeps a constant xi explicitly (for
+   example a SEAS benchmark whose submitted results used xi 0.2); the
+   value of `xi_gamma` other than pi/4.
+   Owner, 2026-11-23 12:00 CST, on question 1 of the follow-up list,
+   which read "Benchmark compsets under the new default (follows from
+   1B): the SEAS cases (BP5, BP7, BP8, BP1002) were submitted with
+   constant `xi`. A) Pin those compsets to their submitted constant
+   `xi`, so the repo still reproduces the uploads; the new default
+   applies to everything else (recommended). B) Switch them too and
+   accept that the repo no longer reproduces the submissions.": "1:
+   keep old xi for now" (verbatim.) Read as (a reading, the narrow
+   one): the SEAS benchmark compsets keep their constant `xi`
+   (`par.xi_gamma = 0` set explicitly in them) and their gold is not
+   regenerated for this change. The words could also mean that the
+   old constant `xi` stays the default everywhere for now, which would
+   suspend the 11:58 "1B"; the invoking session asks the owner which,
+   and until the answer NO default is changed and NO gold is
+   regenerated for row 6. Either reading keeps the benchmark compsets
+   on constant `xi`.
+   Owner, 2026-11-23 12:01 CST, two messages clarifying the 12:00
+   answer: "but also build the new xi gamma as refs as wel" and "then
+   we can phase out" (verbatim.) Read as (a reading), replacing the two
+   readings of the 12:00 paragraph: a transition in three steps. (1)
+   Now: the constant `xi` stays the default and the existing reference
+   sets stay as they are; nothing is regenerated in place. (2) Also
+   now: a second set of references is built with the per-node factor
+   (`par.xi_gamma = pi/4`, `par.xi` 0.2 as the cap) for the same cases,
+   kept beside the existing ones, each recording step count, run time,
+   event times and peak slip rates against its constant-`xi`
+   counterpart. (3) Later, on the owner's word: the constant-`xi`
+   references and default are phased out and the 11:58 "1B" default
+   change takes effect. NOT decided: where the second set lives and
+   what it is called (new names under `data/`, rule 1: proposed on this
+   row first); which cases it covers (all nine sets, or the test-tier
+   ones only: the liu2020 cycle costs about 5 h); whether the test tier
+   runs the second set; when step 3 happens.
+   Owner, 2026-11-23 12:02 CST, after being told that the FEniCSx BP8
+   prototype differs from EQquasi mainly in its time integration
+   (adaptive RK45 at tolerance 1e-6 against EQquasi's time loop with the
+   `xi` step control) and in precomputing a slip-to-traction matrix:
+   "eqquasi can have rk45" (verbatim.) Read as (a reading): the owner
+   agrees to adding an adaptive Runge-Kutta 4(5) time integrator to
+   EQquasi as an option beside the existing time loop, not as a default
+   change. It is new work with no row yet: the rules owner opens a row
+   on this word, and a design goes on the board before any code: how
+   the integrator calls the elastic solve (several evaluations per step,
+   cheap as operator products under `par.solver = 4`, a full solve each
+   under the other solvers), the state it integrates, the error norm
+   and tolerance, restart and output cadence, and the test (BP8 against
+   the reference and against the prototype; a short case against the
+   existing loop). NOT decided: the parameter name and values that
+   select it (rule 1); whether it is limited to `par.solver = 4`; its
+   priority against the rows already open; who implements it (a
+   research-grade implementation needs the owner's word per dispatch).
+   Owner, 2026-11-23 12:03 CST, next message: "those are indpeendent:
+   fenicsx/eqqusi or time steping" (verbatim.) Read as (a reading): the
+   choice of backend (FEniCSx or the Fortran EQquasi, row 4) and the
+   choice of time-stepping scheme (the existing `xi`-controlled loop,
+   per-node `xi_gamma`, RK45) are two separate axes; the RK45 option is
+   designed for EQquasi on its own and does not wait on, or imply, the
+   FEniCSx backend, and a backend comparison should hold the time
+   stepping fixed.
+   Owner, 2026-11-23 12:03 to 12:04 CST, answering three numbered
+   questions on the RK45 option: "1A, and 1 is Lapusta 2000?" then "2A.
+   3A" (verbatim.) The options as put were: 1, the parameter that
+   selects it, "A) a new `par.time_integrator` (1 = existing loop, 2 =
+   RK45) (recommended); B) another name"; 2, scope of the first
+   version, "A) `par.solver = 4` only, where it is cheap (recommended);
+   B) all solvers"; 3, who builds it, "A) the research-grade
+   implementer, which needs your OK per dispatch, after the v1.24.10
+   items land (recommended); B) wait for the design before deciding".
+   Read as (a reading): the new parameter `par.time_integrator` is
+   agreed (rule 1), value 1 the existing time loop (the default) and
+   value 2 RK45; the first version supports `par.solver = 4` only and
+   refuses other solvers with a message; the owner's word for one
+   dispatch of the research-grade implementer on this job is given, to
+   be used after the v1.24.10 items land, with the design on the board
+   first. The owner's question whether value 1 is the scheme of Lapusta
+   et al. (2000) is answered by the invoking session from the source,
+   and the documentation of value 1 says what the code does. NOT
+   decided: any further new name or file the implementation needs; the
+   RK45 tolerance default; a default change.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

@@ -894,7 +894,9 @@ def test_slip_to_traction_planted_operator_row_aborts(case):
     doubles that global row of the operator after the build, and the operator
     check of the first full-solve step (step 1) stops the run with a nonzero
     exit and the check's abort message; a row outside [0, n) stops it with the
-    hook's own message before any step. 31 steps, 4 ranks, test.bp5.qdc.2000."""
+    hook's own message before any step. -eq_s2t_plant_nan <row> sets that row to
+    NaN instead: the finite check of the operator product S g stops the run at step 1.
+    31 steps, 4 ranks, test.bp5.qdc.2000."""
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
     option, row, message = S2T_PLANTS[case]

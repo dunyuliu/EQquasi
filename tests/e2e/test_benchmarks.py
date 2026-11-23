@@ -876,8 +876,14 @@ S2T_PLANT_ABORT = ("EQ_S2T: operator disagrees with the solve beyond max(1e-8 of
                    "1e-14 of the operator maximum)")
 S2T_PLANTS = {
     # row 0 doubled after the build: step 1 solves in full and must stop the run.
-    "row0": (0, S2T_PLANT_ABORT),
-    "out_of_range": (1000000000, "EQ_S2T: -eq_s2t_plant_row 1000000000 is outside the operator rows [0, "),
+    "row0": ("-eq_s2t_plant_row", 0, S2T_PLANT_ABORT),
+    "out_of_range": ("-eq_s2t_plant_row", 1000000000,
+                     "EQ_S2T: -eq_s2t_plant_row 1000000000 is outside the operator rows [0, "),
+    # row 0 set to NaN after the build: the finite check of the operator product
+    # S g of step 1 (which runs before the operator check's NaN flag) must stop the run.
+    "nan_row0": ("-eq_s2t_plant_nan", 0, "EQ_S2T: NaN or Inf in the operator product S g, step"),
+    "nan_out_of_range": ("-eq_s2t_plant_nan", 1000000000,
+                         "EQ_S2T: -eq_s2t_plant_nan 1000000000 is outside the operator rows [0, "),
 }
 
 
@@ -888,13 +894,15 @@ def test_slip_to_traction_planted_operator_row_aborts(case):
     doubles that global row of the operator after the build, and the operator
     check of the first full-solve step (step 1) stops the run with a nonzero
     exit and the check's abort message; a row outside [0, n) stops it with the
-    hook's own message before any step. 31 steps, 4 ranks, test.bp5.qdc.2000."""
+    hook's own message before any step. -eq_s2t_plant_nan <row> sets that row to
+    NaN instead: the finite check of the operator product S g stops the run at step 1.
+    31 steps, 4 ranks, test.bp5.qdc.2000."""
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
-    row, message = S2T_PLANTS[case]
+    option, row, message = S2T_PLANTS[case]
     workdir = os.path.join(WORK_ROOT, "e2e.dd_plant_s4." + case)
     e = C.env()
-    e["PETSC_OPTIONS"] = f"-eq_s2t_plant_row {row}"
+    e["PETSC_OPTIONS"] = f"{option} {row}"
     shutil.rmtree(workdir, ignore_errors=True)
     subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, "test.bp5.qdc.2000"],
                    cwd=str(ROOT), env=e, check=True, capture_output=True)
@@ -909,6 +917,8 @@ def test_slip_to_traction_planted_operator_row_aborts(case):
     assert message in out, f"{case}: exit {r.returncode} without '{message}'\n{out[-3000:]}"
     if case == "row0":
         assert "EQ_S2T: -eq_s2t_plant_row 0: that operator row is doubled" in out, out[-3000:]
+    if case == "nan_row0":
+        assert "EQ_S2T: -eq_s2t_plant_nan 0: that operator row is set to NaN" in out, out[-3000:]
 
 
 @pytest.mark.e2e_fast

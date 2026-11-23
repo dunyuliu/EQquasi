@@ -67,6 +67,7 @@ subroutine solveTimeLoopPETScDD
     use petscksp
     use globalvar, gv_mat => mat
     use onFaultHelpers
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none
 
     Mat                        :: Amat
@@ -87,6 +88,9 @@ subroutine solveTimeLoopPETScDD
     PetscBool                  :: s2tPlantSet
     PetscInt                   :: s2tPlantRow
     integer (kind = 4)         :: s2tPlantLoc
+    PetscBool                  :: s2tNanSet
+    PetscInt                   :: s2tNanRow
+    integer (kind = 4)         :: s2tNanLoc
     KSPConvergedReason         :: kspReason
     PetscReal                  :: kspRtol, kspAtol, kspDtol
     character (len = 16)       :: kspTypeStr, pcTypeStr
@@ -625,6 +629,28 @@ subroutine solveTimeLoopPETScDD
             endif
             if (me == 0) write(*,'(A,I0,A)') 'EQ_S2T: -eq_s2t_plant_row ', s2tPlantRow, &
                 ': that operator row is doubled (test hook)'
+            flush(6)
+        endif
+        ! Test hook (tests/e2e/test_benchmarks.py): -eq_s2t_plant_nan <global row> sets
+        ! that row of the operator S to NaN after the build, so the finite check of the
+        ! operator product S g of step 1 must stop the run (it runs before the NaN flag
+        ! of the operator check, ddS2tStations v(7), which a row plant never reaches).
+        call PetscOptionsGetInt(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-eq_s2t_plant_nan', &
+            s2tNanRow, s2tNanSet, perr)
+        CHKERRA(perr)
+        if (s2tNanSet) then
+            if (s2tNanRow < 0 .or. s2tNanRow >= s2tNcol) then
+                if (me == 0) write(*,'(A,I0,A,I0,A)') 'EQ_S2T: -eq_s2t_plant_nan ', s2tNanRow, &
+                    ' is outside the operator rows [0, ', s2tNcol, ')'
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            s2tNanLoc = int(s2tNanRow, 4) - s2tDspB(me)
+            if (s2tNanLoc >= 0 .and. s2tNanLoc < s2tNrB) then
+                s2tS(s2tNanLoc+1, :) = ieee_value(0.0d0, ieee_quiet_nan)
+            endif
+            if (me == 0) write(*,'(A,I0,A)') 'EQ_S2T: -eq_s2t_plant_nan ', s2tNanRow, &
+                ': that operator row is set to NaN (test hook)'
             flush(6)
         endif
     endif

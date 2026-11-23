@@ -555,6 +555,14 @@ build, run and traps are in `CLAUDE.md`.
    select it (rule 1); whether it is limited to `par.solver = 4`; its
    priority against the rows already open; who implements it (a
    research-grade implementation needs the owner's word per dispatch).
+   Owner, 2026-11-23 12:03 CST, next message: "those are indpeendent:
+   fenicsx/eqqusi or time steping" (verbatim.) Read as (a reading): the
+   choice of backend (FEniCSx or the Fortran EQquasi, row 4) and the
+   choice of time-stepping scheme (the existing `xi`-controlled loop,
+   per-node `xi_gamma`, RK45) are two separate axes; the RK45 option is
+   designed for EQquasi on its own and does not wait on, or imply, the
+   FEniCSx backend, and a backend comparison should hold the time
+   stepping fixed.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

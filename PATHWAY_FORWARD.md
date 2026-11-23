@@ -450,6 +450,23 @@ build, run and traps are in `CLAUDE.md`.
    unchanged at the tier bar and peak memory per rank recorded before
    and after on the same cases. The message ends in a question mark; the
    invoking session tells the owner it is read as an instruction.
+   Owner, 2026-11-23 11:39 CST, replying to a brief whose questions were:
+   "1. Unmerged worktrees and branches: A) delete those already on
+   master or marked superseded, copying cited runs out first
+   (recommended); B) keep. 2. 27 uncited run folders and 39 scratch
+   entries (about 7.7 GB): A) delete after a final citation check
+   (recommended); B) keep. 3. Restart the unattended run in a fresh
+   session (this one is past its context limit), with the week's budget
+   ending 2026-11-25 16:38: A) yes, from `scratch/_logs/BRIEF_20261119.md`
+   (recommended); B) wait." Answer: "1A. 2A, 3A" (verbatim.) Read as
+   (a reading): (1) delete the worktrees and branches whose content is on
+   master or that this board marks superseded, after copying any cited
+   run output into `runs/`; anything neither on master nor marked
+   superseded stays and is listed again; (2) delete the uncited `runs/`
+   folders and `scratch/` entries listed by the 2026-11-20 cleanup report
+   after a final grep of this board, `docs/dev/board_history.md` and
+   `docs/` shows no citation; (3) the unattended run restarts from a fresh
+   session seeded by that brief file, under the existing budget.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

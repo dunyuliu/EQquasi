@@ -467,6 +467,13 @@ build, run and traps are in `CLAUDE.md`.
    after a final grep of this board, `docs/dev/board_history.md` and
    `docs/` shows no citation; (3) the unattended run restarts from a fresh
    session seeded by that brief file, under the existing budget.
+   Owner, 2026-11-23 11:42 CST, after "go" (11:41) on the restart: "no
+   budget. keep working. /autopilot" (verbatim.) Read as (a reading):
+   the run has no end date: the 2026-11-25 16:38 CST end is removed and
+   the run continues until the board's rows are done or blocked on the
+   owner ("until the board is green"); every other limit stands (Vista
+   ceiling 150 SU, no major version bump unattended, rule 1, owner-held
+   items).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

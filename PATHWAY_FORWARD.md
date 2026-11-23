@@ -474,6 +474,17 @@ build, run and traps are in `CLAUDE.md`.
    owner ("until the board is green"); every other limit stands (Vista
    ceiling 150 SU, no major version bump unattended, rule 1, owner-held
    items).
+   Owner, 2026-11-23 11:56 CST, on row 3 (BP8 discrepancy), after being
+   offered A) compare EQquasi's slip-to-traction operator with the
+   FEniCSx prototype's on BP8, B) audit the `src/qdct*.f90` force
+   assembly, C) leave it parked: "bp8 hunt: it is OK. bc are different.
+   pause it" (verbatim.) Read as (a reading): row 3 is paused, no work
+   on it; the owner's view is that the difference from the reference
+   comes from different boundary conditions, not a code bug. Row 4,
+   which waits on row 3, stays waiting. NOT decided: whether row 3 is
+   closed or rewritten (opening, closing and re-scoping rows stays with
+   the rules owner, on the owner's word), and whether the uploaded BP8
+   entries need a note.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

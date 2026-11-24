@@ -287,6 +287,7 @@ subroutine allocAndInit
     resu     = 0.0d0 
     resu_1   = 0.0d0 
     cons     = 0.0d0 
+    s2t_far_nacc = 0
     constmp  = 0.0d0
     consv    = 0.0d0 
     consvtmp = 0.0d0 

@@ -780,6 +780,7 @@ subroutine solveTimeLoopPETScDD
                     endif
                 enddo
             else
+                s2t_far_nacc = s2t_far_nacc + 1
                 do n = 1, numnp
                     if (id(1,n) > 0) then
                         do j = 1, ndof
@@ -1527,7 +1528,7 @@ contains
         ! of the fault pairs, alpha the far-field amplitude (checked).
         use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_is_finite
         integer (kind = 4) :: nn, jj, nr
-        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi, nanf
+        real (kind = dp) :: amin, amax, zmax, wv, a, wmx, scale, lo, hi, nanf, tol
         nr = 6*nOwnF
         nanf = 0.0d0
         amin = huge(1.0d0)
@@ -1577,9 +1578,11 @@ contains
             flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif
-        if (amax - amin > 1.0d-12*max(abs(amin), abs(amax)) .or. zmax > 1.0d-12*scale) then
+        ! round-off in cons grows like n*eps (one accumulation per step), so the bound scales with it
+        tol = max(1.0d-12, 4.0d0*epsilon(1.0d0)*dble(s2t_far_nacc))
+        if (amax - amin > tol*max(abs(amin), abs(amax)) .or. zmax > tol*scale) then
             if (me == 0) write(*,*) 'EQ_S2T: far-field part of the prescribed displacement is not ', &
-                'proportional to the velocity pattern: amin amax zmax', amin, amax, zmax
+                'proportional to the velocity pattern: amin amax zmax tol steps', amin, amax, zmax, tol, s2t_far_nacc
             flush(6)
             call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
         endif

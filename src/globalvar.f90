@@ -7,7 +7,11 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.24.12'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.24.14'
+
+    ! Steps accumulated in cons since it was last zeroed (ddS2tApply far-field
+    ! proportionality tolerance scales with it: round-off grows like n*eps).
+    integer (kind = 8) :: s2t_far_nacc = 0
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver

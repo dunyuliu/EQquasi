@@ -1427,31 +1427,46 @@ def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_col
     assert not ok and "p1output.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"
 
 
-RK45_TMAX = 2.0   # s, inside the first rupture of test.bp5.qdc.2000
+RK45_TMAX = 5.0   # s, inside the first rupture of test.bp5.qdc.2000
+RK45_DX = 4000.0  # m; twice the compset's cell, so the operator build takes seconds
 
 
 @pytest.mark.e2e_fast
 def test_rk45_integrator_runs_to_tmax_beside_the_existing_loop():
     """par.time_integrator = 2 (adaptive RK45, src/solveTimeLoopPETScDD.f90 rkStep)
     runs test.bp5.qdc.2000 with par.solver = 4 to par.tmax, and par.time_integrator
-    absent (= 1) runs the same case to the same time with the existing loop.
+    absent (= 1) runs the same case to the same time with the existing loop. The
+    mesh is coarsened to dx = 4000 m (2 ranks): the test is about the time loop,
+    and the operator build then takes seconds instead of minutes.
 
     Both stop on par.tmax (not on par.nstep), at the same final time; the value 1
     run prints no RK45 line; the value 2 log holds one RK45 line per accepted step
     and a summary whose accepted count is the number of global.dat rows. The two
-    integrators' peak slip rates at the common final time agree to 0.03 in log10
-    (measured 2026-11-24: see the bound's comment)."""
+    integrators' peak slip rates at the common final time agree to 0.02 in log10:
+    measured 0.0071 on 2026-11-24 (value 1: 150 steps, 9.7337e-2 m/s; value 2: 12
+    steps, 9.8947e-2 m/s). They are different schemes: agreement, not parity."""
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
+    import math
     compset, nstep = "test.bp5.qdc.2000", 2000
-    base = f"par.solver = 4\npar.HPC_ncpu = 4\npar.nstep = {nstep}\npar.tmax = {RK45_TMAX!r}\n"
-    cyc, log, g = {}, {}, {}
+    base = f"par.solver = 4\npar.HPC_ncpu = 2\npar.nstep = {nstep}\npar.tmax = {RK45_TMAX!r}\n"
+    log, g = {}, {}
     for name, extra in (("ti1", base), ("ti2", base + "par.time_integrator = 2\n")):
-        cyc[name], _ = _dd_run_one(name, (compset, "rk45"), extra)
-        case_dir = os.path.dirname(os.path.dirname(cyc[name]))
-        with open(os.path.join(case_dir, "log", "cycle0.log")) as f:
+        workdir = os.path.join(WORK_ROOT, "e2e.rk45." + name)
+        e = C.env()
+        shutil.rmtree(workdir, ignore_errors=True)
+        subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                       cwd=str(ROOT), env=e, check=True, capture_output=True)
+        udp = os.path.join(workdir, "user_defined_params.py")
+        C.apply_overrides(udp, {"dx": RK45_DX})
+        with open(udp, "a") as f:
+            f.write(extra)
+        subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+        r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=900)
+        assert r.returncode == 0, f"{name}: run.sh exit {r.returncode}\n{r.stdout[-3000:]}"
+        with open(os.path.join(workdir, "log", "cycle0.log")) as f:
             log[name] = f.read()
-        g[name] = C.read_any(os.path.join(cyc[name], "global.dat"))
+        g[name] = C.read_any(os.path.join(workdir, "result", "cycle0", "global.dat"))
     assert "RK45" not in log["ti1"], "the default integrator printed an RK45 line"
     assert "the run stops at par.tmax" in log["ti1"] and "the run stops at par.tmax" in log["ti2"]
     m = re.search(r"RK45 summary accepted=(\d+) rejected=(\d+)", log["ti2"])
@@ -1463,11 +1478,9 @@ def test_rk45_integrator_runs_to_tmax_beside_the_existing_loop():
         assert len(g[name]) < nstep, f"{name}: stopped on par.nstep, not on par.tmax"
         assert abs(g[name][-1, 0] - RK45_TMAX) <= 1e-12 * RK45_TMAX, \
             f"{name}: final time {g[name][-1, 0]!r}, par.tmax {RK45_TMAX!r}"
-    import math
     d = abs(math.log10(g["ti2"][-1, 1] / g["ti1"][-1, 1]))
-    # The two integrators are different schemes: this is agreement, not parity.
-    assert d <= 0.03, (f"peak slip rate at t = {RK45_TMAX} s: value 1 {g['ti1'][-1, 1]!r}, "
-                       f"value 2 {g['ti2'][-1, 1]!r}, |log10 ratio| {d:.4f} > 0.03")
+    assert d <= 0.02, (f"peak slip rate at t = {RK45_TMAX} s: value 1 {g['ti1'][-1, 1]!r}, "
+                       f"value 2 {g['ti2'][-1, 1]!r}, |log10 ratio| {d:.4f} > 0.02")
 
 
 # Combinations par.time_integrator = 2 and par.tmax do not support: each stops

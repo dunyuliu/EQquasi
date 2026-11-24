@@ -1894,11 +1894,15 @@ contains
         if (.not. rkReady) then
             call rkRhs(t0, 0.0d0, rkY, rkK(:,:,1), .false.)
             rkReady = .true.
-            ! First step: the starting guess of Hairer, Norsett & Wanner (1993,
-            ! II.4), h = 0.01*|y0|/|f0| in the norm of the error test, 1e-6 s when
-            ! either is below 1e-5. Not xi*Dc/V: that limiter is not applied here,
-            ! and a first step far beyond the state's own time scale sends the
-            ! stages to slip rates that end in a non-finite product.
+            ! First step: the starting-step algorithm of Hairer, Norsett & Wanner
+            ! (1993, II.4), in the norm of the error test. h0 = 0.01*|y0|/|f0|
+            ! (1e-6 s when either is below 1e-5); one explicit Euler step of h0 and
+            ! a second evaluation there give d2 = |f1 - f0|/h0; then
+            ! h1 = (0.01/max(|f0|, d2))**(1/5) and h = min(100*h0, h1). Not
+            ! xi*Dc/V: that limiter is not applied here. The second evaluation is
+            ! what sees a load that switches on after t = 0 (bp 7 nucleation); a
+            ! first step far beyond the state's own time scale sends the stages to
+            ! slip rates that end in a non-finite product.
             lo = 0.0d0
             do ll = 1, nOwnF
                 do m = 1, 7
@@ -1911,10 +1915,41 @@ contains
             enddo
             call MPI_Allreduce(lo, hi, 2, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
             if (hi(1) < 1.0d-5 .or. hi(2) < 1.0d-5) then
-                rkH = 1.0d-6
+                h = 1.0d-6
             else
-                rkH = 0.01d0*hi(1)/hi(2)
+                h = 0.01d0*hi(1)/hi(2)
             endif
+            fac = hi(2)
+            do ll = 1, nOwnF
+                do m = 1, 7
+                    rkYs(m,ll) = rkY(m,ll) + h*rkK(m,ll,1)
+                enddo
+            enddo
+            call rkRhs(t0 + h, h, rkYs, rkK(:,:,2), .false.)
+            lo = 0.0d0
+            do ll = 1, nOwnF
+                do m = 1, 7
+                    sc = RK45_ATOL_SLIP
+                    if (m == 7) sc = RK45_ATOL_STATE
+                    sc = sc + RK45_RTOL*abs(rkY(m,ll))
+                    ev = abs(rkK(m,ll,2) - rkK(m,ll,1))/sc/h
+                    if (.not. ieee_is_finite(ev)) lo(2) = 1.0d0
+                    lo(1) = max(lo(1), ev)
+                enddo
+            enddo
+            call MPI_Allreduce(lo, hi, 2, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            if (hi(2) > 0.0d0) then
+                if (me == 0) write(*,'(A,ES15.7,A)') &
+                    'RK45: non-finite rate in the starting-step estimate, trial step ', h, ' s'
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 512, IERR)
+            endif
+            if (max(fac, hi(1)) <= 1.0d-15) then
+                rkH = max(1.0d-6, h*1.0d-3)
+            else
+                rkH = (0.01d0/max(fac, hi(1)))**0.2d0
+            endif
+            rkH = min(100.0d0*h, rkH)
             if (me == 0) write(*,'(A,ES12.5,A)') 'RK45 first step size ', rkH, ' s'
         endif
         rkRejStep = 0

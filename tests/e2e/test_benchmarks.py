@@ -1468,7 +1468,7 @@ def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_col
 
 @pytest.mark.e2e_fast
 def test_station_velocity_uses_the_step_taken():
-    """Regression (1.24.12): off-fault station velocity is displacement change
+    """Regression (1.24.13): off-fault station velocity is displacement change
     over the step actually taken.
 
     The solver loops reassigned dtev1 to the NEXT step's size before dividing

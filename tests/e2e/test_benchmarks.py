@@ -1390,7 +1390,9 @@ def test_station_velocity_uses_the_step_taken():
     own displacement is stored, so the displacement of row i is the state at
     the end of step i-1 (time t_{i-1}), and the velocity of row i must equal
     (d_i - d_{i-1}) / (t_{i-1} - t_{i-2}): the change over the step that made
-    it. The unfixed solver divides by t_i - t_{i-1}, the next step.
+    it. The unfixed solver divides by t_i - t_{i-1}, the next step. Row 1
+    divides by the first step, which is t_0 (the step starts at time 0).
+    Tolerance per entry: C.station_velocity_ratio (rounding-aware).
     """
     import numpy as np
     run_dir = C.run_case("test.bp5.qdc.2000",
@@ -1398,19 +1400,17 @@ def test_station_velocity_uses_the_step_taken():
                          os.path.join(WORK_ROOT, "e2e.station_velocity"))
     files = C.station_files(run_dir, "srfst_strk")
     assert files, "run wrote no off-fault station files"
-    worst = 0.0
+    info = json.load(open(os.path.join(run_dir, "runInfo.json")))
+    print(f"\nbinary version {info['version']} (run_dir {run_dir})")
+    worst, worst_norm, n_tight = 0.0, 0.0, 0
     for f in files:
-        a = np.loadtxt(os.path.join(run_dir, f))
-        t = a[:, 0]
-        dt = np.diff(t)
-        assert dt.max() > 1.5 * dt.min(), \
-            f"{f}: time step never varied (dt {dt.min():.4g}..{dt.max():.4g}); " \
-            f"the test cannot see the divisor"
-        for c in (1, 3, 5):                       # displacement columns
-            d, v = a[:, c], a[:, c + 1]
-            fd = np.diff(d)[1:] / dt[:-1]             # rows 2..n
-            keep = np.abs(fd) > 1e-1 * np.abs(fd).max()   # clear of 7-digit rounding
-            if keep.any():
-                worst = max(worst, np.max(np.abs(v[2:][keep] / fd[keep] - 1)))
-    print(f"\nstation velocity / finite-difference: max |ratio - 1| = {worst:.3e}")
-    assert worst < 1e-3, f"station velocity disagrees with d(disp)/dt by {worst:.3e}"
+        t = np.loadtxt(os.path.join(run_dir, f))[:, 0]
+        assert np.diff(t).max() > 1.5 * np.diff(t).min(), \
+            f"{f}: time step never varied; the test cannot see the divisor"
+        w, wn, nt = C.station_velocity_ratio(os.path.join(run_dir, f))
+        worst, worst_norm, n_tight = max(worst, w), max(worst_norm, wn), n_tight + nt
+    print(f"station velocity / finite-difference: max |ratio - 1| = {worst:.3e}, "
+          f"max |ratio - 1| / allowed = {worst_norm:.3e}, tight entries = {n_tight}")
+    assert n_tight > 0, "no entry is tight enough to discriminate the divisor"
+    assert worst_norm <= 1.0, \
+        f"station velocity disagrees with d(disp)/dt by {worst:.3e} ({worst_norm:.2f}x allowed)"

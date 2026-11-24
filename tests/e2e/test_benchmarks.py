@@ -317,6 +317,18 @@ def test_restart_rejects_mismatched_dip_spacing():
     assert "dip-axis node spacing" in log_bad and "does not match" in log_bad, (
         f"failed, but not with the expected message:\n{log_bad[-3000:]}")
 
+    # (c) a restart with no dip_node_spacing attribute, as written by an older
+    # EQquasi version: the message must name that cause and the remedy.
+    def strip(path):
+        with netCDF4.Dataset(path, "r+") as d:
+            d.delncattr("dip_node_spacing")
+
+    rc_none, log_none = seed_and_run("restart_guard_unstamped", strip)
+    assert rc_none != 0, "a restart without dip_node_spacing did not fail loudly"
+    for needle in ("carries no", "older EQquasi version", "setncattr", "single-precision"):
+        assert needle in log_none, (
+            f"missing-attribute message lacks {needle!r}:\n{log_none[-3000:]}")
+
 
 @pytest.mark.e2e_fast
 def test_mat_het_constant_field_equals_uniform_material():

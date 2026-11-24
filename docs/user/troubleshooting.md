@@ -63,6 +63,15 @@ codes. The launcher normally passes the code through as the exit status.
   tolerance is `max(1e-12, 4*eps*n)` for `n` accumulated steps (round-off in
   the far-field displacement grows with `n`), and the message prints that
   tolerance and `n`; a spread far above it is a real mismatch.
+* `netcdf_read_on_fault_restart: ... carries no "dip_node_spacing" global attribute`:
+  the restart file cannot be checked against this run's `dx`. Either it is a
+  coupled restart (for example `fault.dyna.r.nc` from EQdyna), which must stamp
+  the attribute with its own `dz`, or it was written by an older EQquasi
+  version that did not stamp it (1.19.1 did not). In the second case, if the
+  file was written with this run's `dx`, stamp it on a copy:
+  `d = netCDF4.Dataset('fault.r.nc', 'a'); d.setncattr('dip_node_spacing', dx); d.close()`.
+  Older versions also wrote single-precision files, so a run continued this
+  way agrees with an all-new run only to about 1e-7.
 * `EQ_S2T: operator disagrees with the solve beyond max(1e-8 of the field
   maximum, 1e-14 of the operator maximum)` (`solver = 4`): on a step that also solves in full,
   the operator's fault

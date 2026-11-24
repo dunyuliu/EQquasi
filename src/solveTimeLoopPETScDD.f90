@@ -842,8 +842,6 @@ subroutine solveTimeLoopPETScDD
         if (wantProf) call ddWriteProf
 
         status0 = status1
-        dtev1 = max(dt,int8(dtev/dt)*dt)
-
         do n = 1, numnp
             if (id(1,n) > 0) then
                 do j = 1, ndof
@@ -863,6 +861,10 @@ subroutine solveTimeLoopPETScDD
                 endif
             enddo
         endif
+        ! consv above divides by the step just taken (dtev1 as set at the top of the step);
+        ! the next step size is chosen only now.
+        dtev1 = max(dt,int8(dtev/dt)*dt)
+
         globaldat(1,it) = time
         globaldat(2,it) = maxSlipRate
         globaldat(3,it) = totMomRate

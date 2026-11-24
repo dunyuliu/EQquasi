@@ -198,8 +198,6 @@ subroutine solveTimeLoopMUMPS
             if (bp == 8) call bp8_profile_record
 
             status0 = status1
-            dtev1 = max(dt,int8(dtev/dt)*dt)    
-
             do i=1,numnp
                 do j=1,ndof
                     if (id(j,i)>0) then 
@@ -207,6 +205,10 @@ subroutine solveTimeLoopMUMPS
                     endif
                 enddo 
             enddo                        
+            ! consv above divides by the step just taken (dtev1 as set at the top of the step);
+            ! the next step size is chosen only now.
+            dtev1 = max(dt,int8(dtev/dt)*dt)    
+
             globaldat(1,it) = time
             globaldat(2,it) = maxSlipRate
             globaldat(3,it) = totMomRate    

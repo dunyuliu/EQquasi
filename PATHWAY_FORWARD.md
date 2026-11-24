@@ -615,6 +615,26 @@ build, run and traps are in `CLAUDE.md`.
    reference file that the divisor fix changes (the difference is shown
    on this row first); the value of the cap for per-node stepping; any
    further new name the RK45 work needs (`par.rk_rtol` and the like).
+   Owner, 2026-11-24 16:21 CST, on GitHub issues 270 to 273 of this
+   repository (filed 2026-11-24 16:14 CST: 270, `par.solver = 4` aborts
+   long multi-cycle runs when the far-field proportionality check at
+   1e-12 trips on round-off; 271, `scripts/generateFaultInterface`
+   builds a planar fault steeper than `par.dip`, 57.3 degrees for 50;
+   272, request for a mid-cycle checkpoint; 273, the restart message for
+   a file from an older version names neither cause nor remedy), after
+   being offered "A) take #270 and #271 into the queue now, ahead of
+   RK45 (recommended); B) all four now; C) leave them": "eval and fix"
+   (verbatim.) Read as (a reading): each issue's claim is first checked
+   against the source and by a reproducing run or test (the issues are
+   reports, unverified), then fixed where confirmed, as gated PRs that
+   close the issue: 270 and 271 first, ahead of the RK45 landing, 273
+   as a small follow-up. NOT decided: for 272 the checkpoint needs a
+   new parameter and a design, proposed on this row first (rule 1); for
+   271 a corrected dip changes the mesh of every dipping planar-fault
+   case, so any committed reference it changes is shown on this row
+   before it is replaced, and whether to keep the old behaviour behind
+   an option is the owner's call; the tolerance or form of the check in
+   270 is proposed with its measurement, not loosened silently.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

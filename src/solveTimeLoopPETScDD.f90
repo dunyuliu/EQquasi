@@ -130,6 +130,16 @@ subroutine solveTimeLoopPETScDD
         timeUsedInComputing, progressStartTime
     character (len = 50) :: netcdf_outfile, output_type
     logical :: wantProf
+    ! par.time_integrator = 2 (RK45, rkStep/rkRhs/rkFinish below). State per owned
+    ! fault pair: rkY(1:3) slave and rkY(4:6) master displacement (m), rkY(7) the
+    ! state, ln(V0*theta/Dc) for friclaw 3 and psi for friclaw 4. rkK(:,:,1:7) the
+    ! seven stage derivatives; stage 1 of a step is stage 7 of the last accepted one.
+    real (kind = dp), allocatable :: rkY(:,:), rkYs(:,:), rkK(:,:,:), rkSave(:), &
+        rkFnft(:,:), rkSlp(:,:), rkVpk(:,:)
+    logical, allocatable :: rkFr(:)
+    logical :: rkReady = .false.
+    real (kind = dp) :: rkH = 0.0d0, rkErr = 0.0d0, rkHmin = huge(1.0d0), rkHmax = 0.0d0
+    integer (kind = 4) :: rkAcc = 0, rkRej = 0, rkProd = 0, rkBelowDt = 0, rkRejStep = 0
 
     call PetscInitialize(PETSC_NULL_CHARACTER, perr)
     CHKERRA(perr)
@@ -671,13 +681,26 @@ subroutine solveTimeLoopPETScDD
         uprev = uloc
         if (s2tNst > 0) s2tUprev = s2tU
 
+        if (time_integrator == 2) then
+            ! RK45: one accepted step; sets time, dtev1 (the step taken), cons at
+            ! the constrained nodes and the state; stoptag at par.tmax.
+            call rkStep
+        else
         if (bp == 7 .and. icstart == 1) then
             if (it < (nuct/dt)) then
                 dtev1 = dt
             endif
         endif
         if (dtmax > 0.0d0) dtev1 = min(dtev1, dtmax)
+        ! par.tmax: the last step is cut to end there, and is the stop step.
+        if (tmax > 0.0d0) then
+            if (time + dtev1 >= tmax) then
+                dtev1 = tmax - time
+                stoptag = 1
+            endif
+        endif
         time = time + dtev1
+        endif
 
         ! bp8: every rank advances the pore pressure of its own fault nodes
         ! to t+dtev1 before faulting consumes it through fric(FR_PORE_DP,:,:).
@@ -719,6 +742,9 @@ subroutine solveTimeLoopPETScDD
             enddo
         endif
 
+        if (time_integrator == 2) then
+            call rkFinish
+        else
         do iiTag = 0, 1
             itag = iiTag
             call ddBoundLoad
@@ -833,6 +859,7 @@ subroutine solveTimeLoopPETScDD
                 totSlipRuptArea = rsumG(5)
             endif
         enddo
+        endif
 
         if (bp == 8) call bp8_profile_record
 
@@ -842,7 +869,8 @@ subroutine solveTimeLoopPETScDD
         if (wantProf) call ddWriteProf
 
         status0 = status1
-        dtev1 = max(dt,int8(dtev/dt)*dt)
+        ! RK45 keeps dtev1 = the step taken (its next step size is rkH).
+        if (time_integrator /= 2) dtev1 = max(dt,int8(dtev/dt)*dt)
 
         do n = 1, numnp
             if (id(1,n) > 0) then
@@ -938,6 +966,10 @@ subroutine solveTimeLoopPETScDD
             kspRtol, '='
         if (hwmG(1) > 0.0d0) write(*,'(X,A,2f12.1)') &
             '= Peak RSS at the end, MB: largest rank, sum       = ', hwmG(1), hwmG(2)
+        if (time_integrator == 2) write(*,'(A,I0,A,I0,A,F8.5,A,I0,A,I0,A,ES12.5,A,ES12.5,A,ES12.5)') &
+            'RK45 summary accepted=', rkAcc, ' rejected=', rkRej, ' rejected_fraction=', &
+            dble(rkRej)/dble(max(1, rkAcc + rkRej)), ' operator_products=', rkProd, &
+            ' accepted_below_dt=', rkBelowDt, ' dt=', dt, ' h_min=', rkHmin, ' h_max=', rkHmax
         write(*,*) '====================================================================='
         ! The run metadata reports the whole mesh, not rank 0's block.
         nloc = (/ numnp, numel, neq /)
@@ -1737,6 +1769,369 @@ contains
             enddo
         endif
     end subroutine ddS2tStations
+
+    subroutine rkRhs(tstage, dtfar, ys, k, wantU)
+        ! Stage derivative of par.time_integrator = 2 at time tstage and state ys:
+        ! k(1:6) the split-node velocities, k(7) the state rate. The far-field
+        ! prescribed displacement is that of the step start plus its velocity times
+        ! dtfar. One operator product (ddS2tApply), then the existing nodal solve
+        ! (faulting, first pass: it writes the velocities to consvtmp and the slip
+        ! rate to fric(FR_V_TRIAL) and does not advance the state). The caller
+        ! (rkStep) restores what that pass accumulates (fnft, slp4fri, FR_V_PEAK).
+        ! wantU: also the station displacement of this state (ddS2tApply, itag 1).
+        real (kind = dp), intent(in) :: tstage, dtfar, ys(:,:)
+        real (kind = dp), intent(out) :: k(:,:)
+        logical, intent(in) :: wantU
+        integer (kind = 4) :: ll, ii, jf, nn, jj
+        real (kind = dp) :: v, dc, v0, a, b, fss, psiss
+        do nn = 1, numnp
+            if (id(1,nn) > 0) cycle
+            if (s2tPair(nn)) cycle
+            do jj = 1, ndof
+                constmp(jj,nn) = cons(jj,nn) + ddS2tW(id(jj,nn))*dtfar
+            enddo
+        enddo
+        do ll = 1, nOwnF
+            ii = locFlt(1,ll)
+            jf = locFlt(2,ll)
+            constmp(1:3,nsmp(1,ii,jf)) = ys(1:3,ll)
+            constmp(1:3,nsmp(2,ii,jf)) = ys(4:6,ll)
+            if (rkFr(ll)) then
+                if (friclaw == 3) then
+                    fric(FR_STATE,ii,jf) = fric(FR_RSF_DC,ii,jf)/fric(FR_RSF_V0,ii,jf)*dexp(ys(7,ll))
+                else
+                    fric(FR_STATE,ii,jf) = ys(7,ll)
+                endif
+            endif
+        enddo
+        time = tstage
+        itag = 0
+        if (wantU) itag = 1
+        call ddS2tApply
+        itag = 0
+        call faulting
+        rkProd = rkProd + 1
+        do ll = 1, nOwnF
+            ii = locFlt(1,ll)
+            jf = locFlt(2,ll)
+            k(1:3,ll) = consvtmp(1:3,nsmp(1,ii,jf))
+            k(4:6,ll) = consvtmp(1:3,nsmp(2,ii,jf))
+            k(7,ll) = 0.0d0
+            if (rkFr(ll)) then
+                v = fric(FR_V_TRIAL,ii,jf)
+                dc = fric(FR_RSF_DC,ii,jf)
+                v0 = fric(FR_RSF_V0,ii,jf)
+                if (friclaw == 3) then
+                    ! aging law, d/dt ln(V0*theta/Dc) = V0/Dc*exp(-phi) - V/Dc
+                    k(7,ll) = v0/dc*dexp(-ys(7,ll)) - v/dc
+                else
+                    ! slip law, dpsi/dt = -V/Dc*(psi - psi_ss(V)), psi_ss as in fric.f90
+                    a = fric(FR_RSF_A,ii,jf)
+                    b = fric(FR_RSF_B,ii,jf)
+                    fss = fric(FR_RSF_F0,ii,jf) - (b - a)*dlog(v/v0)
+                    psiss = a*dlog(2.0d0*v0/v*dsinh(fss/a))
+                    k(7,ll) = -v/dc*(ys(7,ll) - psiss)
+                endif
+            endif
+        enddo
+    end subroutine rkRhs
+
+    subroutine rkStep
+        ! par.time_integrator = 2: one accepted step of the Dormand-Prince 5(4) pair
+        ! (Dormand & Prince 1980), first-same-as-last, 6 operator products per attempt.
+        ! Unknowns: displacement of the owned split-node pairs and the state; the slip
+        ! rate is algebraic (the nodal Newton solve of faulting at each stage). Error
+        ! norm and controller: the RK45_* constants of globalvar.f90 (placeholders).
+        ! The step-size limiter xi*Dc/V is NOT applied; par.dtmax caps h, par.tmax
+        ! cuts the last step. A rejected attempt leaves time, cons and the state as
+        ! they were. Stops the run (512) on a non-finite error estimate or when h
+        ! no longer advances the time.
+        use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+        real (kind = dp), parameter :: c(7) = (/ 0.0d0, 1.0d0/5.0d0, 3.0d0/10.0d0, 4.0d0/5.0d0, 8.0d0/9.0d0, 1.0d0, 1.0d0 /)
+        ! a(j,s): weight of stage j in the state of stage s
+        real (kind = dp), parameter :: a(6,7) = reshape((/ &
+            0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+            1.0d0/5.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+            3.0d0/40.0d0, 9.0d0/40.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+            44.0d0/45.0d0, -56.0d0/15.0d0, 32.0d0/9.0d0, 0.0d0, 0.0d0, 0.0d0, &
+            19372.0d0/6561.0d0, -25360.0d0/2187.0d0, 64448.0d0/6561.0d0, -212.0d0/729.0d0, 0.0d0, 0.0d0, &
+            9017.0d0/3168.0d0, -355.0d0/33.0d0, 46732.0d0/5247.0d0, 49.0d0/176.0d0, -5103.0d0/18656.0d0, 0.0d0, &
+            35.0d0/384.0d0, 0.0d0, 500.0d0/1113.0d0, 125.0d0/192.0d0, -2187.0d0/6784.0d0, 11.0d0/84.0d0 /), (/ 6, 7 /))
+        ! fifth-order minus fourth-order weights
+        real (kind = dp), parameter :: e(7) = (/ 71.0d0/57600.0d0, 0.0d0, -71.0d0/16695.0d0, 71.0d0/1920.0d0, &
+            -17253.0d0/339200.0d0, 22.0d0/525.0d0, -1.0d0/40.0d0 /)
+        integer (kind = 4) :: ll, ii, jf, nn, jj, s, j, m
+        real (kind = dp) :: t0, h, fac, ev, sc, lo(2), hi(2)
+        logical :: clip
+        if (.not. rkReady) then
+            allocate(rkY(7,max(1,nOwnF)), rkYs(7,max(1,nOwnF)), rkK(7,max(1,nOwnF),7), &
+                rkSave(max(1,nOwnF)), rkFr(max(1,nOwnF)))
+            rkY = 0.0d0
+            rkYs = 0.0d0
+            rkK = 0.0d0
+            rkFr = .false.
+            do ll = 1, nOwnF
+                ii = locFlt(1,ll)
+                jf = locFlt(2,ll)
+                nn = nsmp(1,ii,jf)
+                ! the rate-and-state box, the test of faulting
+                rkFr(ll) = (abs(x(3,nn)) <= abs(zminc) .and. x(1,nn) <= xmaxc .and. x(1,nn) >= xminc)
+                rkY(1:3,ll) = cons(1:3,nsmp(1,ii,jf))
+                rkY(4:6,ll) = cons(1:3,nsmp(2,ii,jf))
+                if (rkFr(ll)) then
+                    if (friclaw == 3) then
+                        rkY(7,ll) = dlog(fric(FR_RSF_V0,ii,jf)*fric(FR_STATE,ii,jf)/fric(FR_RSF_DC,ii,jf))
+                    else
+                        rkY(7,ll) = fric(FR_STATE,ii,jf)
+                    endif
+                endif
+            enddo
+        endif
+        rkFnft = fnft
+        rkSlp = slp4fri
+        rkVpk = fric(FR_V_PEAK,:,:)
+        t0 = time
+        if (.not. rkReady) then
+            call rkRhs(t0, 0.0d0, rkY, rkK(:,:,1), .false.)
+            rkReady = .true.
+            ! First step: the starting guess of Hairer, Norsett & Wanner (1993,
+            ! II.4), h = 0.01*|y0|/|f0| in the norm of the error test, 1e-6 s when
+            ! either is below 1e-5. Not xi*Dc/V: that limiter is not applied here,
+            ! and a first step far beyond the state's own time scale sends the
+            ! stages to slip rates that end in a non-finite product.
+            lo = 0.0d0
+            do ll = 1, nOwnF
+                do m = 1, 7
+                    sc = RK45_ATOL_SLIP
+                    if (m == 7) sc = RK45_ATOL_STATE
+                    sc = sc + RK45_RTOL*abs(rkY(m,ll))
+                    lo(1) = max(lo(1), abs(rkY(m,ll))/sc)
+                    lo(2) = max(lo(2), abs(rkK(m,ll,1))/sc)
+                enddo
+            enddo
+            call MPI_Allreduce(lo, hi, 2, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            if (hi(1) < 1.0d-5 .or. hi(2) < 1.0d-5) then
+                rkH = 1.0d-6
+            else
+                rkH = 0.01d0*hi(1)/hi(2)
+            endif
+            if (me == 0) write(*,'(A,ES12.5,A)') 'RK45 first step size ', rkH, ' s'
+        endif
+        rkRejStep = 0
+        do
+            h = rkH
+            if (dtmax > 0.0d0) h = min(h, dtmax)
+            clip = .false.
+            if (tmax > 0.0d0) then
+                if (t0 + h >= tmax) then
+                    h = tmax - t0
+                    clip = .true.
+                endif
+            endif
+            if (.not. clip .and. .not. (t0 + h > t0)) then
+                if (me == 0) write(*,'(A,ES15.7,A,ES15.7,A,I0,A,I0,A,ES12.5)') &
+                    'RK45: the step size h = ', h, ' s no longer advances the time t = ', t0, &
+                    ' s, step ', it, ', after ', rkRejStep, ' rejections; last error norm ', rkErr
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 512, IERR)
+            endif
+            dtev1 = h
+            do s = 2, 7
+                do ll = 1, nOwnF
+                    do m = 1, 7
+                        rkYs(m,ll) = rkY(m,ll)
+                        do j = 1, s - 1
+                            rkYs(m,ll) = rkYs(m,ll) + h*a(j,s)*rkK(m,ll,j)
+                        enddo
+                    enddo
+                enddo
+                call rkRhs(t0 + c(s)*h, c(s)*h, rkYs, rkK(:,:,s), s == 7)
+            enddo
+            ! rkYs is now the fifth-order solution at t0 + h (the state of stage 7).
+            lo = 0.0d0
+            do ll = 1, nOwnF
+                do m = 1, 7
+                    ev = 0.0d0
+                    do j = 1, 7
+                        ev = ev + h*e(j)*rkK(m,ll,j)
+                    enddo
+                    sc = RK45_ATOL_SLIP
+                    if (m == 7) sc = RK45_ATOL_STATE
+                    sc = sc + RK45_RTOL*max(abs(rkY(m,ll)), abs(rkYs(m,ll)))
+                    ! max() may drop a NaN: flag it where it is made
+                    if (.not. ieee_is_finite(ev) .or. .not. ieee_is_finite(rkYs(m,ll))) lo(2) = 1.0d0
+                    lo(1) = max(lo(1), abs(ev)/sc)
+                enddo
+            enddo
+            call MPI_Allreduce(lo, hi, 2, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+            rkErr = hi(1)
+            if (hi(2) > 0.0d0) then
+                if (me == 0) write(*,'(A,ES15.7,A,ES15.7,A,I0)') &
+                    'RK45: non-finite error estimate or stage state at t = ', t0, ' s, h = ', h, ' s, step ', it
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 512, IERR)
+            endif
+            if (rkErr > 0.0d0) then
+                fac = min(RK45_FAC_MAX, max(RK45_FAC_MIN, RK45_SAFETY*rkErr**(-0.2d0)))
+            else
+                fac = RK45_FAC_MAX
+            endif
+            if (rkErr <= 1.0d0) then
+                rkH = h*fac
+                exit
+            endif
+            rkRej = rkRej + 1
+            rkRejStep = rkRejStep + 1
+            rkH = h*min(fac, 1.0d0)
+        enddo
+        rkAcc = rkAcc + 1
+        if (h < dt) rkBelowDt = rkBelowDt + 1
+        rkHmin = min(rkHmin, h)
+        rkHmax = max(rkHmax, h)
+        ! Accepted: what the stage passes accumulated is put back (rkFinish makes the
+        ! step's own update), then time, displacement and state move to t0 + h.
+        fnft = rkFnft
+        slp4fri = rkSlp
+        fric(FR_V_PEAK,:,:) = rkVpk
+        rkY = rkYs
+        rkK(:,:,1) = rkK(:,:,7)
+        time = t0 + h
+        if (clip) stoptag = 1
+        do nn = 1, numnp
+            if (id(1,nn) > 0) cycle
+            if (s2tPair(nn)) cycle
+            do jj = 1, ndof
+                cons(jj,nn) = cons(jj,nn) + ddS2tW(id(jj,nn))*h
+            enddo
+        enddo
+        do ll = 1, nOwnF
+            ii = locFlt(1,ll)
+            jf = locFlt(2,ll)
+            cons(1:3,nsmp(1,ii,jf)) = rkY(1:3,ll)
+            cons(1:3,nsmp(2,ii,jf)) = rkY(4:6,ll)
+            if (rkFr(ll)) then
+                if (friclaw == 3) then
+                    fric(FR_STATE,ii,jf) = fric(FR_RSF_DC,ii,jf)/fric(FR_RSF_V0,ii,jf)*dexp(rkY(7,ll))
+                else
+                    fric(FR_STATE,ii,jf) = rkY(7,ll)
+                endif
+            endif
+        enddo
+    end subroutine rkStep
+
+    subroutine rkFinish
+        ! par.time_integrator = 2: what the second pass of the existing loop does
+        ! after its operator product, for the step rkStep accepted. consf and the
+        ! station displacement are those of the last stage (the accepted state), so
+        ! no further product is made. On a step whose displacement is read
+        ! (s2tFull) the free nodes are solved on the factor and the operator is
+        ! checked against the solve (ddS2tStations), as in the existing loop.
+        ! faulting (second pass) then records the step: slip rate, tractions,
+        ! stations, peak and moment rates, rupture time, dtev = min xi*Dc/V (logged,
+        ! not used). Its state update over dtev1 is undone: the state is rkStep's.
+        ! pma, the acceleration measure, is formed from two solves of the same
+        ! state here and is not meaningful under this integrator.
+        integer (kind = 4) :: ll, ii, jf, nn, jj
+        itag = 1
+        s2tFull = (mod(it,nt_output_stress) == 1 .or. it == nstep .or. stoptag == 1)
+        if (s2tFull) then
+            call ddFltForward(cons)
+            do nn = 1, numnp
+                if (id(1,nn) > 0) then
+                    constmp(:,nn) = 0.0d0
+                else
+                    constmp(:,nn) = cons(:,nn)
+                endif
+            enddo
+            call ddS2tRhs
+            call VecZeroEntries(bvec, perr)
+            CHKERRA(perr)
+            call VecSetValuesLocal(bvec, pnLoc, allLoc, rloc, ADD_VALUES, perr)
+            CHKERRA(perr)
+            call VecAssemblyBegin(bvec, perr)
+            CHKERRA(perr)
+            call VecAssemblyEnd(bvec, perr)
+            CHKERRA(perr)
+            call KSPSolve(ksp, bvec, xvec, perr)
+            CHKERRA(perr)
+            call KSPGetConvergedReason(ksp, kspReason, perr)
+            CHKERRA(perr)
+            if (kspReason%v < 0) then
+                if (me == 0) write(*,*) 'par.solver=4, RK45: KSPSolve did NOT converge ', &
+                    '(KSPConvergedReason =', kspReason%v, ') at step', it
+                flush(6)
+                call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
+            endif
+            call KSPGetIterationNumber(ksp, kspIts, perr)
+            CHKERRA(perr)
+            totalKSPIts = totalKSPIts + kspIts
+            nKSPSolves = nKSPSolves + 1
+            minKSPIts = min(minKSPIts, kspIts)
+            maxKSPIts = max(maxKSPIts, kspIts)
+            call VecGhostUpdateBegin(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+            CHKERRA(perr)
+            call VecGhostUpdateEnd(xvec, INSERT_VALUES, SCATTER_FORWARD, perr)
+            CHKERRA(perr)
+            call VecGhostGetLocalForm(xvec, xloc, perr)
+            CHKERRA(perr)
+            call VecGetArray(xloc, parr, perr)
+            CHKERRA(perr)
+            do ii = 1, nLocDof
+                uloc(ii) = parr(ii)
+            enddo
+            call VecRestoreArray(xloc, parr, perr)
+            CHKERRA(perr)
+            call VecGhostRestoreLocalForm(xvec, xloc, perr)
+            CHKERRA(perr)
+            do nn = 1, numnp
+                if (id(1,nn) > 0) then
+                    do jj = 1, ndof
+                        cons(jj,nn) = uloc(lbase(nn)+jj)
+                    enddo
+                endif
+            enddo
+        endif
+        call ddS2tStations(s2tFull)
+        do ll = 1, nOwnF
+            ii = locFlt(1,ll)
+            jf = locFlt(2,ll)
+            consvtmp(1:3,nsmp(1,ii,jf)) = rkK(1:3,ll,1)
+            consvtmp(1:3,nsmp(2,ii,jf)) = rkK(4:6,ll,1)
+            rkSave(ll) = fric(FR_STATE,ii,jf)
+        enddo
+        call faulting
+        do ll = 1, nOwnF
+            fric(FR_STATE,locFlt(1,ll),locFlt(2,ll)) = rkSave(ll)
+        enddo
+        do jj = 1, n4onf
+            ii = anonfs(1,jj)
+            jf = anonfs(3,jj)
+            if (jf < 1 .or. jf > ntotft) cycle
+            if (ii < 1 .or. ii > nftnd(jf)) cycle
+            if (fltMine(ii,jf)) fltsta(4,it,jj) = fric(FR_STATE,ii,jf)
+        enddo
+        call ddFltForward(consv)
+        call ddFltForward(consvtmp)
+        call MPI_Allreduce(dtev, dtevG, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, IERR)
+        dtev = dtevG
+        rmax(1) = pma
+        rmax(2) = maxSlipRate
+        rmax(3:2+ntotft) = peakSlipRatePerFault(1:ntotft,it)
+        call MPI_Allreduce(rmax, rmaxG, 2+ntotft, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, IERR)
+        pma = rmaxG(1)
+        maxSlipRate = rmaxG(2)
+        peakSlipRatePerFault(1:ntotft,it) = rmaxG(3:2+ntotft)
+        rsum = (/ totMomRate, totMomRateVW, totRuptArea, totTaoRuptArea, totSlipRuptArea /)
+        call MPI_Allreduce(rsum, rsumG, 5, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERR)
+        totMomRate = rsumG(1)
+        totMomRateVW = rsumG(2)
+        totRuptArea = rsumG(3)
+        totTaoRuptArea = rsumG(4)
+        totSlipRuptArea = rsumG(5)
+        if (me == 0) write(*,'(A,I8,A,ES22.15,A,ES12.5,A,ES12.5,A,ES10.3,A,ES12.5,A,I0,A,I0)') &
+            'RK45 step=', it, ' t=', time, ' h=', dtev1, ' dtev=', dtev, ' err=', rkErr, &
+            ' Vmax=', maxSlipRate, ' rej_step=', rkRejStep, ' rej_total=', rkRej
+    end subroutine rkFinish
 
     subroutine ddFltPack(a)
         real (kind = dp), intent(in) :: a(ndof,numnp)

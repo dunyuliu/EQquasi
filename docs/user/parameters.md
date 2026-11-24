@@ -254,6 +254,12 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
   cap on the adaptive time step, s. 0 means no cap.
 
+* **`time_integrator`** -- default `1`
+
+* **`tmax`** -- default `0.0`
+
+  final simulated time, s. 0 means off. > 0 : the run stops at this time (the last step is cut to end on it) unless nstep or the slip-rate exit comes first; honoured by both time integrators, solver = 3 and 4 only (solver 1 or 2 stops with code 511).
+
 * **`fric_pc_L`** -- default `0.0`
 
   Prakash-Clifton relaxation distance for the normal-stress state variable, m. 0.0 : default. No state; use the instantaneous effective normal stress. > 0  : relax the normal-stress state over this slip distance.

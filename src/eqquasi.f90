@@ -44,6 +44,28 @@ program eqquasi3d
         call MPI_ABORT(MPI_COMM_WORLD, 1, IERR)
     endif
 
+    ! par.time_integrator = 2 (RK45) and par.tmax: every unsupported combination
+    ! stops here with its reason; nothing falls back to integrator 1 (rule 2).
+    if (time_integrator == 2 .and. (sol_op /= 4 .or. (bp /= 5 .and. bp /= 7) .or. &
+        (friclaw /= 3 .and. friclaw /= 4) .or. fric_pc_L > 0.0d0 .or. icstart /= 1)) then
+        if (me == 0) then
+            if (sol_op /= 4) write(*,*) 'par.time_integrator = 2 (RK45) needs par.solver = 4; got par.solver = ', sol_op
+            if (bp /= 5 .and. bp /= 7) write(*,*) 'par.time_integrator = 2 (RK45) supports bp 5 and 7 only; got par.bp = ', bp
+            if (bp == 8) write(*,*) 'BP8 pore pressure is advanced once per step and cannot be evaluated at RK stage times.'
+            if (friclaw /= 3 .and. friclaw /= 4) write(*,*) 'par.time_integrator = 2 (RK45) needs par.friclaw = 3 or 4; got ', friclaw
+            if (fric_pc_L > 0.0d0) write(*,*) 'par.time_integrator = 2 (RK45) needs par.fric_pc_L = 0; got ', fric_pc_L
+            if (icstart /= 1) write(*,*) 'par.time_integrator = 2 (RK45) runs the first cycle only (not restartable); got cycle start ', icstart
+            write(*,*) 'Set par.time_integrator = 1, or change the case. Refusing.'
+        endif
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 511, IERR)
+    endif
+    if (tmax > 0.0d0 .and. sol_op < 3) then
+        if (me == 0) write(*,*) 'par.tmax is honoured by par.solver = 3 and 4 only; got par.solver = ', sol_op, '. Refusing.'
+        flush(6)
+        call MPI_ABORT(MPI_COMM_WORLD, 511, IERR)
+    endif
+
     allocate(an4nds(2,n4nds), xonfs(2,maxval(nonfs),ntotft), x4nds(3,n4nds))
     call readstations2
 

@@ -203,3 +203,47 @@ def test_fdc_quasi_static_phase_runs_until_rupture():
         body = body.split("end subroutine")[0]
         assert re.search(r"if \(eqquasi_mode == 2\) then\s*\n\s*write\(\*,\*\) 'WARNING",
                          body), f"{f}: mode 2 reaching nstep must warn"
+
+
+def test_time_integrator_one_is_the_default_and_the_only_value_a_compset_uses():
+    """par.time_integrator = 1, the loop every reference result was made with,
+    stays the default at each place a default lives (defaultParameters.py, the
+    Fortran module, and read_input.f90 for a model.txt without the line); no
+    compset selects another value; par.tmax defaults to off. Values other than
+    1 and 2 are refused by case.setup and by the solver, and value 2 refuses
+    every combination it does not support instead of falling back."""
+    from conftest import ROOT
+
+    py = read("scripts/defaultParameters.py")
+    assert re.search(r"^\s*time_integrator\s*=\s*1\s*(#|$)", py, re.M)
+    assert re.search(r"^\s*tmax\s*=\s*0\.0\s*(#|$)", py, re.M)
+    gv = strip_fortran_comments(read("src/globalvar.f90"))
+    assert "integer (kind=4) :: time_integrator = 1" in gv
+    assert "real (kind=dp) :: tmax = 0.0d0" in gv
+    ri = strip_fortran_comments(read("src/read_input.f90"))
+    body = ri.split("index(adjustl(capsLine), 'time_integrator') == 1")
+    assert len(body) == 2, "read_input.f90 no longer reads a 'time_integrator' keyword line"
+    assert \
+        "time_integrator = 1\n" in body[0][-200:], \
+        "the default before the optional model.txt line is no longer 1"
+    assert "(time_integrator /= 1 .and. time_integrator /= 2)" in body[1]
+    setup = strip_python_comments(read("scripts/case.setup"))
+    assert "if par.time_integrator not in (1, 2):" in setup
+    assert 'f.write("time_integrator  " + str(int(par.time_integrator))' in setup
+    assert 'f.write("tmax  " + repr(float(par.tmax))' in setup
+
+    users = [str(p.relative_to(ROOT)) for p in sorted((ROOT / "compset").rglob("*"))
+             if p.is_file() and p.suffix in (".py", ".txt", ".md", "")
+             and "time_integrator" in p.read_text(errors="replace")]
+    assert not users, f"a compset sets par.time_integrator (the default must stay the only value in use): {users}"
+
+    main = strip_fortran_comments(read("src/eqquasi.f90"))
+    guard = main.split("if (time_integrator == 2 .and. (")[1].split("call MPI_ABORT(MPI_COMM_WORLD, 511, IERR)")[0]
+    for cond in ("sol_op /= 4", "(bp /= 5 .and. bp /= 7)", "(friclaw /= 3 .and. friclaw /= 4)",
+                 "fric_pc_L > 0.0d0", "icstart /= 1"):
+        assert cond in guard, f"par.time_integrator = 2 no longer refuses {cond}"
+    loop = strip_fortran_comments(read("src/solveTimeLoopPETScDD.f90"))
+    assert loop.count("if (time_integrator == 2) then") == 2, \
+        "the RK45 branch must enter the time loop at exactly two places (the step and its record)"
+    for other in ("src/solveTimeLoopMUMPS.f90", "src/solveTimeLoopPETSc.f90", "src/faulting.f90", "src/fric.f90"):
+        assert "time_integrator" not in read(other), f"{other} must not depend on par.time_integrator"

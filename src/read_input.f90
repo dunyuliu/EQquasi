@@ -237,6 +237,39 @@ subroutine readmodel
                 backspace(1002)
             endif
         endif
+        ! Time integrator and final time. Two KEYWORD lines,
+        ! 'time_integrator <1|2>' and 'tmax <seconds>', after xi_gamma and
+        ! before faultgeom, read the same way: absent (an older model.txt) ->
+        ! put the line back; time_integrator stays 1 and tmax 0 = off.
+        time_integrator = 1
+        read(1002,'(A)',iostat=ios) capsLine
+        if (ios == 0) then
+            if (index(adjustl(capsLine), 'time_integrator') == 1) then
+                capsLine = adjustl(capsLine)
+                read(capsLine(16:),*,iostat=iosCaps) time_integrator
+                if (iosCaps /= 0 .or. (time_integrator /= 1 .and. time_integrator /= 2)) then
+                    write(*,*) 'model.txt: par.time_integrator must be 1 (existing loop) or 2 (RK45), got: ', trim(capsLine)
+                    stop 510
+                endif
+            else
+                backspace(1002)
+            endif
+        endif
+        tmax = 0.0d0
+        read(1002,'(A)',iostat=ios) capsLine
+        if (ios == 0) then
+            if (index(adjustl(capsLine), 'tmax') == 1) then
+                capsLine = adjustl(capsLine)
+                read(capsLine(5:),*,iostat=iosCaps) tmax
+                ! .not.(>= 0) also rejects NaN; huge() rejects Inf.
+                if (iosCaps /= 0 .or. .not. (tmax >= 0.0d0 .and. tmax < huge(1.0d0))) then
+                    write(*,*) 'model.txt: expected "tmax <finite seconds >= 0>" (0 = off), got: ', trim(capsLine)
+                    stop 510
+                endif
+            else
+                backspace(1002)
+            endif
+        endif
         ! Optional per-fault geometry block, one line per fault:
         !   xlo xhi ycoor zlo zhi   (meters)
         ! Appended after the bp8 block and read with iostat so a model.txt
@@ -260,6 +293,10 @@ subroutine readmodel
     capsActive = (C_normal_stress_caps == 1)
     if (me == 0 .and. xi_gamma > 0.0d0) write(*,'(X,A,F6.3,A,F6.3,A)') &
         '= time step: Lapusta et al. (2000) per-node xi, gamma = ', xi_gamma, ', cap ', ksi, ' ='
+    if (me == 0 .and. time_integrator == 2) write(*,'(X,A)') &
+        '= time integrator: 2, adaptive RK45 (Dormand-Prince 5(4)) ='
+    if (me == 0 .and. tmax > 0.0d0) write(*,'(X,A,ES15.7,A)') &
+        '= the run stops at par.tmax = ', tmax, ' s ='
     if (me == 0 .and. ratxz /= 1.0d0) write(*,'(X,A,F6.3,A)') &
         '= x/z cells grow by ', ratxz, ' per step outside the fault box ='
     ! Always state it: the only way to know caps are on is to be told.

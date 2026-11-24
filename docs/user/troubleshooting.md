@@ -38,6 +38,9 @@ codes. The launcher normally passes the code through as the exit status.
 | 501 | Zero mass at a fault node. The message prints the node's coordinates. | Check the fault geometry and mesh near that point. |
 | 502 | A negative time step was computed from a negative trial slip rate: the run has become unstable at that node. | The message prints the location and the slip rate; inspect the fault state there. |
 | 508 | The effective normal stress at a node is no longer compressive, so rate-and-state friction has no solution. The message prints the time, location, and stresses. | Common at the tips of step-overs, bends and rough faults. Normal-stress caps (`C_normal_stress_caps = 1`) are the regularization `case.setup` suggests. |
+| 510 | `model.txt` has a malformed `time_integrator` or `tmax` line: `time_integrator` is not 1 or 2, or `tmax` is not a finite number >= 0. | Fix the value in `user_defined_params.py` and rerun `case.setup`. |
+| 511 | `time_integrator = 2` with a case it does not support (it needs `solver = 4`, `bp = 5` or `7`, `friclaw = 3` or `4`, `fric_pc_L = 0`, and the first cycle), or `tmax > 0` with `solver = 1` or `2`. The message names which. | Set `time_integrator = 1`, or change the case; for `tmax`, use `solver = 3` or `4`. |
+| 512 | `time_integrator = 2`: the error estimate is not finite, or the step size has shrunk until it no longer advances the time. The message prints the time, the step size and the number of rejections. | Inspect the fault state at that time; rerun the case with `time_integrator = 1` to compare. |
 
 ### Other failures from the solver
 

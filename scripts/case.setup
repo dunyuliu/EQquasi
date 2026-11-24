@@ -93,6 +93,16 @@ def create_model_input_file():
         if not (math.isfinite(float(par.xi_gamma)) and float(par.xi_gamma) >= 0.0):
             raise SystemExit(f"case.setup: par.xi_gamma must be finite and >= 0 (0 = off), got {par.xi_gamma!r}")
         f.write("xi_gamma  " + str(par.xi_gamma) + "\n")
+        # Time integrator and final time: two keyword lines after xi_gamma and
+        # before faultgeom (read_input.f90 reads them the same way). The solver
+        # refuses unsupported combinations itself (codes 510, 511); here only
+        # values that cannot be written as a number are refused.
+        if par.time_integrator not in (1, 2):
+            raise SystemExit(f"case.setup: par.time_integrator must be 1 (existing loop) or 2 (RK45), got {par.time_integrator!r}")
+        if not (math.isfinite(float(par.tmax)) and float(par.tmax) >= 0.0):
+            raise SystemExit(f"case.setup: par.tmax must be finite and >= 0 (0 = off), got {par.tmax!r}")
+        f.write("time_integrator  " + str(int(par.time_integrator)) + "\n")
+        f.write("tmax  " + repr(float(par.tmax)) + "\n")
         # Optional per-fault geometry, one line per fault: xlo xhi ycoor zlo zhi (m).
         # read_input.f90 reads this block with iostat, so omitting it (the
         # attribute defaults to None) keeps every existing compset's

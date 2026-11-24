@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.24.11'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.24.12'
 
     ! Where the solver reads inputs from and writes outputs to, relative to
     ! its working directory. A case laid out by create.newcase runs the solver
@@ -177,6 +177,20 @@ MODULE globalvar
     real (kind=dp) :: fluid_WI        ! Peaceman well index, m^3/(Pa s).
     real (kind=dp) :: fluid_pwell = 0.0d0 ! well pressure, Pa.
     real (kind=dp) :: dtmax = 0.0d0   ! cap on the adaptive time step, s. 0 means no cap.
+    ! par.time_integrator: 1 = the existing two-pass loop (default); 2 = adaptive
+    ! Dormand-Prince RK5(4) (par.solver = 4, bp 5 and 7 only; rkStep in
+    ! solveTimeLoopPETScDD.f90). par.tmax: stop at this simulated time, s; 0 = off.
+    integer (kind=4) :: time_integrator = 1
+    real (kind=dp) :: tmax = 0.0d0
+    ! RK45 tolerances and controller constants. PLACEHOLDERS: not calibrated, not
+    ! user parameters (owner decision 2026-11-24, question 5) until a spring-slider
+    ! and a bp5 cycle fix them. Error norm: max over owned fault pairs and components
+    ! of |err| / (atol + RK45_RTOL*max(|y_n|,|y_n+1|)), atol by class.
+    real (kind=dp), parameter :: RK45_RTOL = 1.0d-6        ! PLACEHOLDER, relative
+    real (kind=dp), parameter :: RK45_ATOL_SLIP = 1.0d-9   ! PLACEHOLDER, m (split-node displacement)
+    real (kind=dp), parameter :: RK45_ATOL_STATE = 1.0d-6  ! PLACEHOLDER, ln(V0*theta/Dc) (aging) or psi (slip law)
+    real (kind=dp), parameter :: RK45_SAFETY = 0.9d0       ! PLACEHOLDER
+    real (kind=dp), parameter :: RK45_FAC_MIN = 0.2d0, RK45_FAC_MAX = 5.0d0 ! PLACEHOLDERS
     ! Optional heterogeneous shear modulus, read from input/mat_het.txt when
     ! that file exists (scripts/case.setup writes it iff par.mat_het is set).
     ! Inside the box |x| <= mat_het_box(1), |y| <= mat_het_box(2),

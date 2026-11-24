@@ -1425,3 +1425,92 @@ def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_col
         np.savetxt(p, np.array([[1.0, 0.1, 0.0, 5.0, 0.0], [2.0, 0.2, 0.0, 6.0, tdip]]))
     ok, msg = _dd_profile_series(g, r)
     assert not ok and "p1output.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"
+
+
+RK45_TMAX = 2.0   # s, inside the first rupture of test.bp5.qdc.2000
+
+
+@pytest.mark.e2e_fast
+def test_rk45_integrator_runs_to_tmax_beside_the_existing_loop():
+    """par.time_integrator = 2 (adaptive RK45, src/solveTimeLoopPETScDD.f90 rkStep)
+    runs test.bp5.qdc.2000 with par.solver = 4 to par.tmax, and par.time_integrator
+    absent (= 1) runs the same case to the same time with the existing loop.
+
+    Both stop on par.tmax (not on par.nstep), at the same final time; the value 1
+    run prints no RK45 line; the value 2 log holds one RK45 line per accepted step
+    and a summary whose accepted count is the number of global.dat rows. The two
+    integrators' peak slip rates at the common final time agree to 0.03 in log10
+    (measured 2026-11-24: see the bound's comment)."""
+    if not _binary_has_petsc():
+        pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")
+    compset, nstep = "test.bp5.qdc.2000", 2000
+    base = f"par.solver = 4\npar.HPC_ncpu = 4\npar.nstep = {nstep}\npar.tmax = {RK45_TMAX!r}\n"
+    cyc, log, g = {}, {}, {}
+    for name, extra in (("ti1", base), ("ti2", base + "par.time_integrator = 2\n")):
+        cyc[name], _ = _dd_run_one(name, (compset, "rk45"), extra)
+        case_dir = os.path.dirname(os.path.dirname(cyc[name]))
+        with open(os.path.join(case_dir, "log", "cycle0.log")) as f:
+            log[name] = f.read()
+        g[name] = C.read_any(os.path.join(cyc[name], "global.dat"))
+    assert "RK45" not in log["ti1"], "the default integrator printed an RK45 line"
+    assert "the run stops at par.tmax" in log["ti1"] and "the run stops at par.tmax" in log["ti2"]
+    m = re.search(r"RK45 summary accepted=(\d+) rejected=(\d+)", log["ti2"])
+    assert m, f"no RK45 summary in the value 2 log:\n{log['ti2'][-2000:]}"
+    assert int(m.group(1)) == len(g["ti2"]), \
+        f"RK45 accepted {m.group(1)} steps but global.dat holds {len(g['ti2'])} rows"
+    assert len(re.findall(r"^RK45 step=", log["ti2"], re.M)) == len(g["ti2"])
+    for name in ("ti1", "ti2"):
+        assert len(g[name]) < nstep, f"{name}: stopped on par.nstep, not on par.tmax"
+        assert abs(g[name][-1, 0] - RK45_TMAX) <= 1e-12 * RK45_TMAX, \
+            f"{name}: final time {g[name][-1, 0]!r}, par.tmax {RK45_TMAX!r}"
+    import math
+    d = abs(math.log10(g["ti2"][-1, 1] / g["ti1"][-1, 1]))
+    # The two integrators are different schemes: this is agreement, not parity.
+    assert d <= 0.03, (f"peak slip rate at t = {RK45_TMAX} s: value 1 {g['ti1'][-1, 1]!r}, "
+                       f"value 2 {g['ti2'][-1, 1]!r}, |log10 ratio| {d:.4f} > 0.03")
+
+
+# Combinations par.time_integrator = 2 and par.tmax do not support: each stops
+# with its message; none falls back to the default integrator.
+# id -> (compset, parameter lines, stage that must fail, message, MPI error code or None).
+RK45_REFUSALS = {
+    "bp8": ("test.bp8.qdc.gs.10", "par.solver = 4\npar.time_integrator = 2\n", "run",
+            "par.time_integrator = 2 (RK45) supports bp 5 and 7 only", 511),
+    "solver3": ("test.bp5.qdc.2000", "par.solver = 3\npar.time_integrator = 2\n", "run",
+                "par.time_integrator = 2 (RK45) needs par.solver = 4", 511),
+    "tmax_solver1": ("test.bp5.qdc.2000", "par.solver = 1\npar.tmax = 1.0\n", "run",
+                     "par.tmax is honoured by par.solver = 3 and 4 only", 511),
+    "value3": ("test.bp5.qdc.2000", "par.solver = 4\npar.time_integrator = 3\n", "setup",
+               "par.time_integrator must be 1 (existing loop) or 2 (RK45)", None),
+}
+
+
+@pytest.mark.e2e_fast
+@pytest.mark.parametrize("case", sorted(RK45_REFUSALS))
+def test_rk45_unsupported_combination_fails_loudly(case):
+    """BP8 with par.time_integrator = 2, value 2 with a solver other than 4, and
+    par.tmax with solver 1 end run.sh with a nonzero exit, the refusal's message
+    and MPI error code 511, before any operator is built; a value other than 1 or
+    2 is refused by case.setup. The solver's guard (src/eqquasi.f90) runs before
+    any PETSc branch, so these run on every build."""
+    compset, extra, stage, message, code = RK45_REFUSALS[case]
+    workdir = os.path.join(WORK_ROOT, "e2e.rk45_refuse." + case)
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(extra + "par.HPC_ncpu = 2\npar.nstep = 3\n")
+    s = subprocess.run(["./case.setup"], cwd=workdir, env=e, capture_output=True, text=True)
+    if stage == "setup":
+        assert s.returncode != 0, f"{case}: case.setup accepted the value"
+        assert message in s.stdout + s.stderr, f"{case}: case.setup failed without '{message}'\n{s.stderr[-2000:]}"
+        return
+    assert s.returncode == 0, f"{case}: case.setup failed\n{s.stderr[-2000:]}"
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True, text=True, timeout=600)
+    log_path = os.path.join(workdir, "log", "cycle0.log")
+    out = r.stdout + r.stderr + (open(log_path).read() if os.path.exists(log_path) else "")
+    assert r.returncode != 0, f"{case}: run.sh exit 0, the combination was accepted"
+    assert message in out, f"{case}: exit {r.returncode} without '{message}'\n{out[-2000:]}"
+    assert re.search(rf"[Ee]rrorcode:?\s*{code}\b", out), f"{case}: no MPI error code {code}\n{out[-2000:]}"
+    assert "EQ_S2T built sec" not in out, f"{case}: the operator was built before the refusal"

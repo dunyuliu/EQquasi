@@ -43,6 +43,48 @@ Edit `user_defined_params.py`. Every setting is an attribute of `par`; see
 * `nt_out` -- how often (in steps) fault and volume snapshots are written.
 * `dx` -- the on-fault element size, in metres.
 
+### Time integrator and final time
+
+`time_integrator` selects how a cycle is advanced in time.
+
+* `1` (the default) is the loop every reference result was made with. Each
+  step takes an explicit (Euler) predictor of the fault displacement, a
+  trapezoidal corrector, a Newton solve for the slip rate after each of the
+  two, and then one exponential update of the state at the corrected slip
+  rate. The step size is `xi*Dc/Vmax` (per node when `xi_gamma > 0`), rounded
+  down to a whole number of base steps `dt`, never below `dt`, and capped by
+  `dtmax`.
+* `2` is an adaptive Runge-Kutta integrator, the Dormand-Prince 5(4) pair
+  (Dormand and Prince, 1980), experimental. Its unknowns are the fault
+  displacement and the state (ln(V0*theta/Dc) for `friclaw = 3`, psi for
+  `friclaw = 4`); the slip rate comes from the same Newton solve at every
+  stage. An attempted step costs 6 slip-to-traction products (value 1: 2 per
+  step) and is accepted or repeated with a smaller size from its own error
+  estimate. `xi` and `xi_gamma` are not applied and the step may fall below
+  `dt`; `dtmax` still caps it. The first step size comes from the initial
+  rates (Hairer, Norsett and Wanner, 1993). The tolerances are fixed in the
+  source (relative 1e-6; absolute 1e-9 m on displacement and 1e-6 on the
+  state); they are not calibrated yet and are not parameters.
+
+Value 2 runs with `solver = 4`, `bp = 5` or `7`, `friclaw = 3` or `4` and
+`fric_pc_L = 0` only, and only the first cycle: it cannot continue from a
+previous cycle, and, as with value 1, a run that was killed starts again from
+step 0. Any other combination stops with code 511; nothing falls back to
+value 1. BP8 is refused because its pore pressure is advanced once per step.
+
+With value 2 the cycle log holds one line per accepted step,
+`RK45 step= ... t= ... h= ... dtev= ... err= ... Vmax= ... rej_step= ... rej_total= ...`
+(`h` the step taken, `dtev` the `xi*Dc/Vmax` value for comparison, `err` the
+error norm, at most 1), and one `RK45 summary` line with the accepted and
+rejected steps and the number of products. The `pma` value printed on screen
+is not meaningful with value 2.
+
+`tmax` (seconds, default 0 = off) stops a run at that simulated time; the last
+step is cut to end on it. `nstep` and the slip-rate exit still apply if they
+come first. It is honoured by both integrators with `solver = 3` or `4`
+(`solver = 1` or `2` stops with code 511), so two runs can be compared at one
+time instead of one step count.
+
 ## Set up
 
 ```

@@ -118,3 +118,22 @@ def test_a_missing_binary_fails_rather_than_skips():
         "silently empties the gate.")
     assert 'pytest.skip("bin/eqquasi not built")' not in src, \
         "cases.run_case still skips when the binary is missing"
+
+
+GATE_SCRIPT = os.path.join("tests", "release_gate.sh")
+
+
+def test_release_gate_script_is_checked_in_and_sets_machine():
+    """Rule 9a: the full-tier gate is tests/release_gate.sh, and it sets MACHINE.
+
+    A gate run from an untracked script is not a gate; a gate that builds with
+    the wrong machine proves nothing about the target host.
+    """
+    p = ROOT / GATE_SCRIPT
+    assert p.exists(), f"{GATE_SCRIPT} is missing; the full-tier gate must be checked in"
+    assert os.access(p, os.X_OK), f"{GATE_SCRIPT} is not executable"
+    src = read(GATE_SCRIPT)
+    assert "MACHINE=" in src, f"{GATE_SCRIPT} never sets MACHINE"
+    assert "-m ubuntu" not in src, f"{GATE_SCRIPT} builds with -m ubuntu"
+    r = subprocess.run(["bash", "-n", str(p)], capture_output=True, text=True)
+    assert r.returncode == 0, f"bash -n {GATE_SCRIPT} failed: {r.stderr}"

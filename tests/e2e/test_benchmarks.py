@@ -363,6 +363,41 @@ def test_mat_het_constant_field_equals_uniform_material():
 
 
 @pytest.mark.e2e_fast
+def test_newton_iteration_cap_aborts_with_node_residual_and_step():
+    """A Newton-Raphson solve that reaches its iteration cap (src/faulting.f90,
+    ivmax) stops the run (v1.24.12, MPI_Abort code 509) and names the node, the
+    residual and the time step. Before, it printed a WARNING and carried on
+    with the unconverged slip rate (owner decision, board row 1, D4 (i)).
+
+    Planted case: test.stepover.qdc.con.1000 with par.xi = 0.2 and
+    par.xi_gamma = pi/4, the 101-step stepover whose first step already drives
+    nodes to a slip rate of 1e-38 whose residual never meets the 1e-10 exit
+    test. The run must exit non-zero with the new message at step 1, must not
+    print the old warning, and must not reach step 2.
+    """
+    import math
+    compset = "test.stepover.qdc.con.1000"
+    workdir = os.path.join(WORK_ROOT, "e2e.newton_cap")
+    e = C.env()
+    shutil.rmtree(workdir, ignore_errors=True)
+    subprocess.run([str(ROOT / "scripts" / "create.newcase"), workdir, compset],
+                   cwd=str(ROOT), env=e, check=True, capture_output=True)
+    with open(os.path.join(workdir, "user_defined_params.py"), "a") as f:
+        f.write(f"par.xi = 0.2\npar.xi_gamma = {math.pi / 4!r}\n")
+    subprocess.run(["./case.setup"], cwd=workdir, env=e, check=True, capture_output=True)
+    r = subprocess.run(["bash", "run.sh"], cwd=workdir, env=e, capture_output=True,
+                       text=True, timeout=900)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, "a Newton solve at its iteration cap did not stop the run"
+    assert "NEWTON-RAPHSON DID NOT CONVERGE" in out, out[-3000:]
+    assert re.search(r"time step index\s*=\s*1\b", out), "message lacks the time step"
+    assert re.search(r"node \(x,z\) location\s*=\s*\S+\s+\S+", out), "message lacks the node"
+    assert re.search(r"residual \(MPa\)\s*=\s*\S+", out), "message lacks the residual"
+    assert "WARNING, Newton-Raphson reaches" not in out, "old warn-and-proceed text is back"
+    assert not re.search(r"time step =\s*=\s*\n\s*=\s*2\b", out), "the run went on to step 2"
+
+
+@pytest.mark.e2e_fast
 def test_xi_gamma_per_node_step_runs_and_matches_eq15():
     """par.xi_gamma (v1.23.0) runs the per-node time-step factor of Lapusta et
     al. (2000), eq. 15, in src/faulting.f90 -- the real Fortran path, not a

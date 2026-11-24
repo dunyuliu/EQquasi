@@ -38,6 +38,7 @@ codes. The launcher normally passes the code through as the exit status.
 | 501 | Zero mass at a fault node. The message prints the node's coordinates. | Check the fault geometry and mesh near that point. |
 | 502 | A negative time step was computed from a negative trial slip rate: the run has become unstable at that node. | The message prints the location and the slip rate; inspect the fault state there. |
 | 508 | The effective normal stress at a node is no longer compressive, so rate-and-state friction has no solution. The message prints the time, location, and stresses. | Common at the tips of step-overs, bends and rough faults. Normal-stress caps (`C_normal_stress_caps = 1`) are the regularization `case.setup` suggests. |
+| 509 | The Newton-Raphson solve for a fault node's slip rate reached its iteration cap (`ivmax`) without meeting its residual test. The message prints the time-step index, the node location, the last trial slip rate and the residual (MPa). | Usually an unstable step: reduce the time-step factor `par.xi`, or check the fault state at that node. |
 
 ### Other failures from the solver
 

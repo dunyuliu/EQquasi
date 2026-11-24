@@ -18,6 +18,7 @@ integer (kind=4) :: ierr_abort
 real (kind = dp) :: rr,R0,T,dtao0, dtao, mr!RSF
 real (kind = dp) :: statetmp, eta!RSF
 integer (kind=4) :: iv
+logical :: newton_converged
 real (kind = dp) :: tstk0, tdip0,ttao0 !RSF
 real (kind = dp) :: dxmudv, rsfeq, drsfeqdv, vtmp, theta_pc_dot, theta_pc_tmp
 real (kind = dp) :: v_trial,v_trial_new,sliprs_trial,sliprd_trial, tau_fric_trial,&
@@ -264,6 +265,7 @@ do ift = 1, ntotft
                 ! Here, residual f(v) = shear_traction - frictional_strength. eq(8), Jiang et al. (2022).
                 ! shear_traction = static_shear_traction - eta*v. 
                 ! Use theta_pc, the state variable that accounts for normal stress change for the effective normal stress.
+                newton_converged = .false.
                 do iv = 1,ivmax
                     fric(FR_STATE_TRIAL,i,ift) = statetmp 
                     ! update fric(22) and v_trial for the next time step.
@@ -299,7 +301,10 @@ do ift = 1, ntotft
                     
                     ! exiting critera for the Newton-Raphson solver.
                     ! residul stress is 1e-10 time of the new static traction.
-                    if (abs(rsfeq) < 1.0d-10 * ttao0) exit 
+                    if (abs(rsfeq) < 1.0d-10 * ttao0) then
+                        newton_converged = .true.
+                        exit
+                    endif
                     
                     vtmp = v_trial -  rsfeq / drsfeqdv ! v_n+1 = v_n - f(v_n)/f'(v_n+1)
                     
@@ -310,14 +315,18 @@ do ift = 1, ntotft
                     endif                
                 enddo ! end looping for the Newton-Raphson solver.    
                 
-                if (iv == ivmax) then 
-                    write(*,*) "WARNING, Newton-Raphson reaches the maximum iteration ... ..."
-                    write(*,*) "Node (x,y) location", x(1,isn), x(3,isn)
-                    write(*,*) "Slip rate solution is, ", v_trial 
-                    write(*,*) "Error of stress (in MPa) is ", rsfeq/1.0d6
-                    write(*,*) 'sliprate, norm(MPa), tstk, tdip, state2(MPa)'
-                    write(*,*) v_trial, tnrm0/1e6, tstk0/1e6, tdip0/1e6, theta_pc_tmp/1e6
-                endif 
+                ! Reaching the cap without meeting the exit test: stop. (iv == ivmax
+                ! is also true when the last allowed iteration converges, so the
+                ! flag, not iv, decides.)
+                if (.not. newton_converged) then
+                    write(*,*) 'NEWTON-RAPHSON DID NOT CONVERGE: iteration cap reached, ivmax = ', ivmax
+                    write(*,*) 'time step index = ', it
+                    write(*,*) 'node (x,z) location = ', x(1,isn), x(3,isn)
+                    write(*,*) 'v_trial = ', v_trial
+                    write(*,*) 'residual (MPa) = ', rsfeq/1.0d6
+                    flush(6)
+                    call MPI_ABORT(MPI_COMM_WORLD, 509, IERR)
+                endif
                 
                 if (v_trial > 20.0d0) then 
                     write(*,*) 'WARNING: node (x,y) yields faulty slip rate', x(1,isn), x(3,isn)

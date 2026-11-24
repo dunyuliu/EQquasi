@@ -807,3 +807,45 @@ def compare_netcdf(gpath, rpath, rtol=1e-10, floor_rtol=1e-10):
 
 
 COMPARATORS = {"series": compare_series, "netcdf": compare_netcdf}
+
+
+def station_velocity_ratio(path, digits=7, floor=1e-3):
+    """Compare an off-fault station file's velocity with d(disp)/dt over the
+    step just taken. Returns (worst |ratio-1|, worst |ratio-1| / allowed,
+    number of entries with allowed error <= 5 * floor, i.e. tight enough to
+    tell the old and new divisors apart).
+
+    Row i velocity = (d_i - d_{i-1}) / (t_{i-1} - t_{i-2}); for i = 1 the
+    divisor is t_0 (the first step starts at time 0, not a file row).
+    Printed values carry `digits` significant digits (relative rounding up to
+    r = 5 * 10^(1-digits) at a mantissa near 0.1), so the fd quotient has
+    relative error up to r * (|d_i| + |d_{i-1}|) / |d_i - d_{i-1}| plus r on v.
+    Allowed |ratio-1| per entry = max(floor, 3 * that bound).
+    Entries with zero displacement change are skipped (no information).
+    """
+    import numpy as np
+    a = np.loadtxt(path)
+    if not np.isfinite(a).all():
+        raise AssertionError(f"{path}: non-finite value in station file")
+    t = a[:, 0]
+    step = np.diff(np.concatenate([[0.0], t]))        # step[k] ends at t[k]
+    r = 5.0 * 10.0 ** (1 - digits)
+    worst = worst_norm = 0.0
+    tight = 0
+    for c in (1, 3, 5):                               # displacement columns
+        d, v = a[:, c], a[:, c + 1]
+        dd = np.diff(d)                               # dd[k] = d[k+1] - d[k]
+        use = dd != 0.0
+        if not use.any():
+            continue
+        fd = dd[use] / step[:-1][use]                 # rows 1..n-1
+        vv = v[1:][use]
+        scale = np.abs(d[1:][use]) + np.abs(d[:-1][use])
+        allowed = np.maximum(floor, 3.0 * (r * scale / np.abs(dd[use]) + r))
+        err = np.abs(vv / fd - 1.0)
+        worst = max(worst, float(err.max()))
+        worst_norm = max(worst_norm, float((err / allowed).max()))
+        tight += int((allowed <= 5 * floor).sum())
+    if not (np.isfinite(worst) and np.isfinite(worst_norm)):
+        raise AssertionError(f"{path}: non-finite ratio")
+    return worst, worst_norm, tight

@@ -1464,3 +1464,43 @@ def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_col
         np.savetxt(p, np.array([[1.0, 0.1, 0.0, 5.0, 0.0], [2.0, 0.2, 0.0, 6.0, tdip]]))
     ok, msg = _dd_profile_series(g, r)
     assert not ok and "p1output.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_station_velocity_uses_the_step_taken():
+    """Regression (1.24.13): off-fault station velocity is displacement change
+    over the step actually taken.
+
+    The solver loops reassigned dtev1 to the NEXT step's size before dividing
+    the nodal displacement change by it, so with a variable step every
+    free-node velocity was off by (next dt)/(this dt). A constant-dt case such
+    as test.bp5.qdc.2000 at its default xi hides it, so xi is raised until the
+    step grows. SEAS station files interleave displacement and velocity per
+    component after the time column. The history is recorded before the step's
+    own displacement is stored, so the displacement of row i is the state at
+    the end of step i-1 (time t_{i-1}), and the velocity of row i must equal
+    (d_i - d_{i-1}) / (t_{i-1} - t_{i-2}): the change over the step that made
+    it. The unfixed solver divides by t_i - t_{i-1}, the next step. Row 1
+    divides by the first step, which is t_0 (the step starts at time 0).
+    Tolerance per entry: C.station_velocity_ratio (rounding-aware).
+    """
+    import numpy as np
+    run_dir = C.run_case("test.bp5.qdc.2000",
+                         {"xi": 0.5, "nstep": 101, "nt_out": 101, "HPC_ncpu": 2},
+                         os.path.join(WORK_ROOT, "e2e.station_velocity"))
+    files = C.station_files(run_dir, "srfst_strk")
+    assert files, "run wrote no off-fault station files"
+    info = json.load(open(os.path.join(run_dir, "runInfo.json")))
+    print(f"\nbinary version {info['version']} (run_dir {run_dir})")
+    worst, worst_norm, n_tight = 0.0, 0.0, 0
+    for f in files:
+        t = np.loadtxt(os.path.join(run_dir, f))[:, 0]
+        assert np.diff(t).max() > 1.5 * np.diff(t).min(), \
+            f"{f}: time step never varied; the test cannot see the divisor"
+        w, wn, nt = C.station_velocity_ratio(os.path.join(run_dir, f))
+        worst, worst_norm, n_tight = max(worst, w), max(worst_norm, wn), n_tight + nt
+    print(f"station velocity / finite-difference: max |ratio - 1| = {worst:.3e}, "
+          f"max |ratio - 1| / allowed = {worst_norm:.3e}, tight entries = {n_tight}")
+    assert n_tight > 0, "no entry is tight enough to discriminate the divisor"
+    assert worst_norm <= 1.0, \
+        f"station velocity disagrees with d(disp)/dt by {worst:.3e} ({worst_norm:.2f}x allowed)"

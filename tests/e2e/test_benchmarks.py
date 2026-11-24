@@ -366,14 +366,14 @@ def test_mat_het_constant_field_equals_uniform_material():
 def test_newton_iteration_cap_aborts_with_node_residual_and_step():
     """A Newton-Raphson solve that reaches its iteration cap (src/faulting.f90,
     ivmax) stops the run (v1.24.12, MPI_Abort code 509) and names the node, the
-    residual and the time step. Before, it printed a WARNING and carried on
+    residual, the time step, the predictor/corrector pass and the fault index. Before, it printed a WARNING and carried on
     with the unconverged slip rate (owner decision, board row 1, D4 (i)).
 
     Planted case: test.stepover.qdc.con.1000 with par.xi = 0.2 and
     par.xi_gamma = pi/4, the 101-step stepover whose first step already drives
     nodes to a slip rate of 1e-38 whose residual never meets the 1e-10 exit
-    test. The run must exit non-zero with the new message at step 1, must not
-    print the old warning, and must not reach step 2.
+    test. The run must exit with status 253 (code 509 mod 256) and the new message at step 1 and must
+    not print the old warning.
     """
     import math
     compset = "test.stepover.qdc.con.1000"
@@ -389,12 +389,16 @@ def test_newton_iteration_cap_aborts_with_node_residual_and_step():
                        text=True, timeout=900)
     out = r.stdout + r.stderr
     assert r.returncode != 0, "a Newton solve at its iteration cap did not stop the run"
+    # MPI_Abort(509): the OS keeps 8 bits of an exit status, so run.sh
+    # (exit $status) and the launcher hand the harness 509 % 256 = 253.
+    assert r.returncode == 509 % 256, f"expected exit 253 (MPI_Abort 509 mod 256), got {r.returncode}"
     assert "NEWTON-RAPHSON DID NOT CONVERGE" in out, out[-3000:]
     assert re.search(r"time step index\s*=\s*1\b", out), "message lacks the time step"
+    assert re.search(r"itag\s*=\s*[01]\b", out), "message lacks the predictor/corrector pass"
+    assert re.search(r"fault index ift\s*=\s*\d+", out), "message lacks the fault index"
     assert re.search(r"node \(x,z\) location\s*=\s*\S+\s+\S+", out), "message lacks the node"
     assert re.search(r"residual \(MPa\)\s*=\s*\S+", out), "message lacks the residual"
     assert "WARNING, Newton-Raphson reaches" not in out, "old warn-and-proceed text is back"
-    assert not re.search(r"time step =\s*=\s*\n\s*=\s*2\b", out), "the run went on to step 2"
 
 
 @pytest.mark.e2e_fast

@@ -321,6 +321,8 @@ do ift = 1, ntotft
                 if (.not. newton_converged) then
                     write(*,*) 'NEWTON-RAPHSON DID NOT CONVERGE: iteration cap reached, ivmax = ', ivmax
                     write(*,*) 'time step index = ', it
+                    write(*,*) 'predictor(0)/corrector(1) pass itag = ', itag
+                    write(*,*) 'fault index ift = ', ift
                     write(*,*) 'node (x,z) location = ', x(1,isn), x(3,isn)
                     write(*,*) 'v_trial = ', v_trial
                     write(*,*) 'residual (MPa) = ', rsfeq/1.0d6

@@ -583,6 +583,38 @@ build, run and traps are in `CLAUDE.md`.
    and the documentation of value 1 says what the code does. NOT
    decided: any further new name or file the implementation needs; the
    RK45 tolerance default; a default change.
+   Owner, 2026-11-24 10:54 CST, replying to the daily brief built from
+   the "Owner decision brief for the 2026-11-24 09:37 CST daily brief"
+   on this board (items D1 to D6): "1A. 2A. 3A" (verbatim.) The
+   questions as put were: "1. Tests and rules: A) take the conductor's
+   recommendations (recommended); B) go through them one by one. The
+   recommendations: narrow the skipping tests to cases that have
+   references; make an unconverged Newton solve abort instead of warn;
+   fix a station-velocity divisor that may use the wrong time step;
+   accept six rule amendments. 2. Time stepping: A) (recommended) hold
+   the per-node references until the 0.2 cap is settled, since the cap
+   changes bp1002; start RK45 on the design's defaults (BP5 and BP7
+   first, BP8 refused, existing loop unchanged, new `par.tmax`); B)
+   build the per-node references now. 3. Full-cycle metrics (event
+   times, peak slip rate, moment, station slip): A) adopt the proposed
+   definitions and tolerances after a check on the identical-run pair
+   (recommended); B) adopt now." Read as (a reading): D1, the
+   recommended option B for the category, summary and section 4.3
+   skips; D4, the recommended option for both defects (the Newton
+   solve that reaches its cap aborts; the free-node velocity divisor is
+   fixed); D5, rule amendments R-A to R-F accepted as written, R-E
+   after the Newton fix, edited into `PROJECT_RULES.md` by the rules
+   owner; D2, option C (measurements stay on the board, no per-node
+   reference under `data/` until the 0.2 cap is decided); D3, the
+   recommended answer to each of the seven RK45 questions, which
+   includes the new parameter name `par.tmax` (rule 1), and the one
+   approved dispatch of the research-grade implementer may now be used;
+   D6, option A. NOT decided, because the brief as put to the owner did
+   not name them: the single bp1002 zone case behind 11 skipped tests
+   (generate its reference or drop the case); replacing any committed
+   reference file that the divisor fix changes (the difference is shown
+   on this row first); the value of the cap for per-node stepping; any
+   further new name the RK45 work needs (`par.rk_rtol` and the like).
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

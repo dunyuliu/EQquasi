@@ -1443,7 +1443,7 @@ def test_rk45_integrator_runs_to_tmax_beside_the_existing_loop():
     run prints no RK45 line; the value 2 log holds one RK45 line per accepted step
     and a summary whose accepted count is the number of global.dat rows. The two
     integrators' peak slip rates at the common final time agree to 0.02 in log10:
-    measured 0.0071 on 2026-11-24 (value 1: 150 steps, 9.7337e-2 m/s; value 2: 12
+    measured 0.0071 on 2026-11-24 (value 1: 150 steps, 9.7337e-2 m/s; value 2: 13
     steps, 9.8947e-2 m/s). They are different schemes: agreement, not parity."""
     if not _binary_has_petsc():
         pytest.skip("this binary was built without PETSc (par.solver = 4 unavailable)")

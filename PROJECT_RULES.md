@@ -13,25 +13,25 @@ below it is the record of why.
 |---|---|
 | 1 | New file, name, or parameter? Say so and get agreement **first**. |
 | 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. |
-| 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. A skip in the gate is a failure (3a); the audit runs before the PR lands (3b). |
+| 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. A skip in the gate is a failure, and a reference-file skip must match the board's recorded reason and count (3a); the audit runs before the PR lands (3b). |
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
 | 6 | New benchmark = new `if (bp == N)` block. Never edit an existing one. |
 | 7 | New compset: `compset/<bench>.<mode>[.<var>].<dx>[.<desc>]/` (test twin: `test.` prefix only) + a row in `compset/README.md`. |
-| 8 | `data/<compset name>/` is read-only and only grows. Every gold file needs a reader. |
-| 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. |
+| 8 | `data/<compset name>/` is read-only and only grows. Every gold file needs a reader. A replacement needs a written owner approval and a provenance README (8b). |
+| 9 | Build claims are hypotheses until run **on the target host**. `MACHINE` is required. The full-tier gate is `tests/release_gate.sh` (9a). |
 | 10 | Docs move with the code, in the same commit. |
 | 11 | Comparing two runs? Check both `runInfo.json` versions first. Rows agreeing to 3+ digits while a controlled variable changed: investigate, not a result (11a). Relaxed comparator column: audit the others (11b). Audit every noise or comparator claim before the owner relies on it (11c). |
 | 12 | The gate must keep an `ntotft > 1` case. |
 | 13 | No `if (ntotft == 1)` branching. `nint` is shadowed. Watch implicit interfaces. |
-| 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). |
+| 14 | Work only inside this folder: worktrees in `.claude/worktrees/<topic>`, runs in `runs/<YYYYMMDD>_<slug>/`, temp in `scratch/`; move run data out before removing a worktree. Stage explicit paths — **never** `git add -A`. A dispatch brief states its file scope; diff a returning branch against it before merge (14a). Evidence files go to `runs/` of the main checkout, never only inside an agent worktree (14b). |
 | 15 | Shared 64-core box: check `uptime`, ≤2 runs, wait above load 56. `flock <lock> timeout N cmd`, never `timeout` around `flock`; shared-lock holders are bounded (15a); lock waiters are not FIFO (15b); `< /dev/null` on launching loops, `tail --pid` to wait (15c). |
 | 16 | A subagent's or audit's finding is a hypothesis. Check the source. Before escalating: re-derive against file:line, a dimensional check, and against already-passing gates (16a). |
 | 17 | CI is the clean-machine gate (fast suite + build + the two `e2e_fast` smokes); full `-m e2e` is periodic, not CI's job. A `src/` change must also link without PETSc (17a); workflows pin `python-version` (17b); land with `gh api` + `gh run watch`, not `gh pr edit` or auto-merge (17c). |
 | 18 | Every compset must create, run, **and** post-process. |
 | 19 | Change params → `case.setup` → `run.sh`. Never call the binary directly. |
 | 20 | "Plot" = five figures, fixed order. Per fault, or say which fault. |
-| 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. |
+| 21 | Release = green CI on the exact master SHA → victor-reyes audit of `last-tag..commit` quoted in the release note (or "audit waived by owner") → stranger-clone gate → annotated tag → push → `gh release create --verify-tag --latest`, one action. Patch/minor unattended; major is the owner's. A release covering several untagged versions names each (21c). |
 | 22 | Root is a whitelist (rule 22): only the listed top-level entries, no tracked file over 10 MB. |
 | 23 | A quoted figure names its source file and counting rule: resource = maximum over all rank files; float32 parity states its floor. An empty `rss.*` is absent, not zero (23a); parse `EQ_S2T_PROG` with its inline header handled (23b). |
 | 24 | Long launch: grep the driver chain for `timeout` first, one wall cap recorded on the board row (24a); kill by recorded process group, check the lock (24b); `export` what children read, log it (24c); a batch over ~2 h declares itself (24d). |
@@ -160,10 +160,16 @@ the gate-runner's job, not an excuse: build the binary in the gate worktree
 (rule 9) before the run, then read the summary's skip count and the reason of
 every skip. Evidence posted to a PR lists each skip reason; a skip whose reason
 is "no binary" or any missing tool of the runner's own makes the run void, not
-green. Skips caused by absent reference files (data absence, named in the
-reason) are reported as such and are not covered by this sub-rule. Check:
+green. A skip caused by an absent reference file is accepted only when the
+evidence lists, per reason text, the reference path or category and the count,
+and the count equals the number recorded on the board row for that tier; a new
+reason text, a new category or a larger count is a failure. Check:
 `python3 -m pytest -q -rs -m "not e2e" tests | grep -ci 'binary'` reads 0.
-Tier: judgment on the reasons; the grep is the mechanical proxy.
+Tier: judgment on the reasons; the grep is the mechanical proxy. The
+reference-skip clause is mechanical by design (the skip-gate test compares
+reason and count against a recorded list), but `tests/contract/test_skip_gate.py`
+still allowlists by reason substring only, so it is a norm until that test
+compares category and count.
 
 **3b. The audit runs before a board PR lands, not after.** Board rows quoting
 figures (row 1, 2026-11-14) were merged and then audited; the audits found
@@ -273,6 +279,16 @@ unverified and must say so.
 asserts on is dead weight masquerading as a safety net.
 `tests/contract/test_reference_gold_is_referenced.py` enforces this.
 
+**8b. An owner-approved regeneration is the only permitted replacement.** A
+reference file may be replaced rather than added only when the owner has
+approved it in writing on a board row; the commit message carries the row
+number, a provenance README beside the file names the source run directory,
+version, md5 of source and of the copy, and the replaced file's previous md5.
+Check: every path the PR diff lists as modified under `data/` appears in a
+provenance README in the same diff. Tier: mechanical once a test reads the
+diff; norm until then. (Origin: the liu2020 regeneration, PR 245, which rule 8's
+"re-blessing is additive" had no clause for.)
+
 ---
 
 ## 9. Build/environment claims must be verified on the target host
@@ -288,6 +304,16 @@ asserts on is dead weight masquerading as a safety net.
 - **Never rebuild while a multi-cycle run is in flight.** `run.sh` invokes the
   versioned binary afresh each cycle, so a mid-run rebuild splits the dataset
   across two builds under one version number. Cost a restart on 2026-08-14.
+
+**9a. The gate script is checked in and exports `MACHINE`.** The full-tier gate
+runs from `tests/release_gate.sh`, which sets `MACHINE` explicitly, builds the
+binary in the gate clone before pytest (rule 3a), and writes `status.txt` with
+each stage's exit code. A gate run from any other script is not a gate.
+Incident: the gates on `65a8435` (2026-11-19) and `71f6c8d` (2026-11-23) left
+`MACHINE` unset, so `install.eqquasi.sh` defaulted to `-m ubuntu` and the
+install test failed at `dmumps_struc.h`; a re-run with `MACHINE=conda-linux`
+was green. Check: `tests/contract/test_release_gate.py` asserts the script
+exists and contains `MACHINE=`. Tier: mechanical.
 
 ---
 
@@ -441,6 +467,15 @@ cleanup.
 
 **Tier**: mechanical — `git diff --stat <base>..<branch>` against the stated
 scope is a yes/no check a human or future tool can run.
+
+**14b. Evidence files have a destination outside any agent worktree.** A brief
+that asks for evidence files names a destination under
+`runs/<YYYYMMDD>_<slug>/` of the main checkout (or a committed path); the agent
+writes there directly, and the conductor lists the destination before accepting
+the report. Evidence that exists only inside an agent worktree is treated as not
+kept. Incident (conductor 37, 2026-11-23, 19:40): an agent worktree was removed
+and took its gitignored metrics CSVs and scripts with it. Check: the conductor
+runs `ls -l --time-style=full-iso` on the destination. Tier: norm.
 
 ---
 
@@ -728,6 +763,15 @@ outside the project hit it.
 **How to apply**: budget the clone-and-follow pass as part of the release,
 not as optional polish; a stranger-clone failure restarts the sequence at
 step 2, after the fix lands through its own gated PR.
+
+**21c. A release that covers several unreleased versions** quotes one audit of
+`last-tag..commit` and names every version it covers in the note; no `src/`
+version in that range stays untagged. Incident: v1.24.10 and v1.24.11 were never
+tagged separately, one release covered both; rule 21a already requires the
+audit of `last-tag..commit`. Check:
+`git log <last-tag>..<sha> -S'EQQUASI_VERSION' -- src/globalvar.f90` lists each
+bump, and each version appears in the note. Tier: mechanical per release, by
+reading the two lists.
 
 ## 22. The root is a whitelist, not a preference
 

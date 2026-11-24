@@ -60,6 +60,8 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 
 * **`dip`** -- default `90.0`
 
+  Fault dip in degrees (0 < dip <= 90). generateFaultInterface offsets the fault surface by dx/tan(dip) per row from 1.24.12 on; versions up to 1.24.11 used dx*cos(dip), which built a steeper plane, atan(1/cos(dip)) (50 became 57.3 degrees; 90 was unaffected). A planar or rough run with dip other than 90 from an earlier version is not comparable with one now.
+
 * **`fxmin`**, **`fxmax`** -- defaults `-60000.0`, `60000.0`
 
   model_domain (in meters)
@@ -107,14 +109,6 @@ Every entry below is an attribute of the `parameters` class in `scripts/defaultP
 * **`insertFaultType`** -- default `0`
 
   Controlling switches for EQquasi system 0: no fault, 1: planar 2: rough.
-
-  Dip: `generateFaultInterface` offsets the fault surface by `dx/tan(par.dip)`
-  per row (1.24.12 and later). Versions up to 1.24.11 offset it by
-  `dx*cos(par.dip)`, which built a plane dipping `atan(1/cos(dip))` (50 became
-  57.3 degrees; 90 was unaffected). A planar or rough run with `par.dip` other
-  than 90 from an earlier version used the steeper plane, so its fault area,
-  down-dip width and depth range along dip differ from a run now; the two are
-  not comparable. `par.dip = 0` is refused.
 
 * **`rough_fault`** -- default `insertFaultType`
 

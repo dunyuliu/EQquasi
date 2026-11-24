@@ -12,7 +12,7 @@ below it is the record of why.
 | | |
 |---|---|
 | 1 | New file, name, or parameter? Say so and get agreement **first**. |
-| 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. |
+| 2 | Missing input fails loudly. No default, no skip, no warn-and-proceed. A solve that reaches its iteration cap aborts (2b). |
 | 3 | Per-PR gate: CI green + victor-reyes audit + LOCAL `-m e2e_fast`, evidence posted. Full `-m e2e` runs weekly (owner may relax to monthly), not per-PR. A skip in the gate is a failure, and a reference-file skip must match the board's recorded reason and count (3a); the audit runs before the PR lands (3b). |
 | 4 | `model.txt` / `stations.txt` / `fric.txt`: **append** a field, never insert. |
 | 5 | New `fric()` slot: constant in globalvar.f90 AND defaultParameters.py + table row. |
@@ -116,6 +116,21 @@ run produces numbers.
 a workflow line that discarded `pytest -m e2e`'s exit code both made a broken
 branch look green. Both fixed; `tests/contract/test_release_gate.py` now
 guards the exit-code path.
+
+**2b. A numerical solve that reaches its iteration cap stops the run.** An
+iterative solve inside the time loop (the nodal Newton solve at
+`src/faulting.f90`) that reaches its cap aborts with the node, the residual and
+the step; it never prints a warning and continues.
+
+*Check.* `grep -n 'WARNING' src/faulting.f90` finds no `write` inside the
+cap-reached block (that block tests `.not. newton_converged`, not `iv`, and
+calls `MPI_ABORT` code 509);
+`tests/e2e/test_benchmarks.py::test_newton_iteration_cap_aborts_with_node_residual_and_step`
+plants a case that hits the cap and asserts exit status 253 (509 mod 256) and
+the message.
+
+*Incident.* The Newton cap abort landed in v1.24.12 (c392cc4); before it the
+cap was not a stop condition.
 
 ---
 

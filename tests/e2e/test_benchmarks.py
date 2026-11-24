@@ -64,6 +64,45 @@ def _marks(c):
 ALL = [pytest.param(c, marks=_marks(c)) for c in C.CASES]
 IDS = [C.case_id(c) for c in C.CASES]
 
+# The one case with no reference directory yet. Its tests keep skipping at run
+# time ("no reference at ..."); whether to freeze a reference or drop the case
+# is an owner decision pending on PATHWAY_FORWARD.md row 1 (brief item D1).
+# Any other case without a reference directory is an error at collection.
+PENDING_REFERENCE = {"test.bp1002.qdc.zone.2500"}
+
+
+def holding(cases, holds):
+    """Cases whose reference holds what a check reads, chosen at collection.
+
+    A case whose reference lacks it is deselected, not skipped, so a skip in
+    these tests means a defect. A missing reference directory raises, except
+    for PENDING_REFERENCE cases, which stay selected and skip in _run.
+    """
+    out = []
+    for c in cases:
+        ref_dir = C.reference_dir(c[0], c[3])
+        if not os.path.isdir(ref_dir):
+            if c[0] in PENDING_REFERENCE:
+                out.append(c)
+                continue
+            raise RuntimeError(f"case {C.case_id(c)} has no reference at "
+                               f"{ref_dir}")
+        if holds(ref_dir):
+            out.append(c)
+    return out
+
+
+def category_params(categories, cases=None):
+    return [pytest.param(c, cat, marks=_marks(c), id=f"{cat}-{C.case_id(c)}")
+            for cat in categories
+            for c in holding(C.CASES if cases is None else cases,
+                             lambda d, cat=cat: bool(C.category_files(d, cat)))]
+
+
+def file_params(holds, cases=None):
+    return [pytest.param(c, marks=_marks(c), id=C.case_id(c))
+            for c in holding(C.CASES if cases is None else cases, holds)]
+
 
 @pytest.fixture(scope="session")
 def runs():
@@ -77,14 +116,16 @@ def _run(runs, case):
         name, compset, over, ref, _ = case
         ref_dir = C.reference_dir(name, ref)
         if not os.path.isdir(ref_dir):
+            if name not in PENDING_REFERENCE:
+                pytest.fail(f"case {cid} has no reference at {ref_dir}")
             pytest.skip(f"no reference at {ref_dir}")
         runs[cid] = (C.run_case(compset, over,
                                 os.path.join(WORK_ROOT, f"e2e.{cid}")), ref_dir)
     return runs[cid]
 
 
-@pytest.mark.parametrize("case", ALL, ids=IDS)
-@pytest.mark.parametrize("category", [c for c in C.CATEGORIES if c != "scalars"])
+@pytest.mark.parametrize("case,category", category_params(
+    [c for c in C.CATEGORIES if c != "scalars"]))
 def test_category_matches_reference(runs, case, category):
     """Compare every reference file in one category, and report each by name.
 
@@ -93,8 +134,7 @@ def test_category_matches_reference(runs, case, category):
     """
     run_dir, ref_dir = _run(runs, case)
     files = C.category_files(ref_dir, category)
-    if not files:
-        pytest.skip(f"this reference holds no {category} files")
+    assert files, f"{C.case_id(case)}: reference holds no {category} files"
 
     compare = C.COMPARATORS[C.CATEGORIES[category][1]]
     lines, failed = [], False
@@ -117,13 +157,24 @@ def test_category_matches_reference(runs, case, category):
     assert not failed, f"\n{C.case_id(case)} / {category}\n{report}"
 
 
-@pytest.mark.parametrize("case", ALL, ids=IDS)
+def _summary_has_checks(ref_dir):
+    """Whether summary.json names a value test_summary_scalars_match reads."""
+    s = C.load_summary(ref_dir)
+    if not s:
+        return False
+    return (("run" in s and "steps" in s["run"])
+            or ("event" in s and "peak_Vmax_m_s" in s["event"])
+            or any(st.startswith(("+", "-")) and isinstance(v, dict)
+                   and ("slip_mm" in v or "p_late_MPa" in v)
+                   for st, v in s.items()))
+
+
+@pytest.mark.parametrize("case", file_params(_summary_has_checks))
 def test_summary_scalars_match(runs, case):
     """summary.json is where a reference states what it considers important."""
     run_dir, ref_dir = _run(runs, case)
     s = C.load_summary(ref_dir)
-    if not s:
-        pytest.skip("this reference has no summary.json")
+    assert s, f"{C.case_id(case)}: reference has no summary.json"
 
     lines, failed = [], False
 
@@ -158,22 +209,22 @@ def test_summary_scalars_match(runs, case):
         if "p_late_MPa" in vals and a.shape[1] > 7:
             check(f"{st} late p (MPa)", a[-1, 7], vals["p_late_MPa"])
 
-    if not lines:
-        pytest.skip("summary.json holds nothing this checks")
+    assert lines, f"{C.case_id(case)}: summary.json holds nothing this checks"
     report = "\n".join(lines)
     print(f"\n{C.case_id(case)} / scalars\n{report}")
     assert not failed, f"\n{C.case_id(case)} / scalars\n{report}"
 
 
-@pytest.mark.parametrize("case", ALL, ids=IDS)
+@pytest.mark.parametrize("case", file_params(
+    lambda d: bool(C.category_files(d, "profile"))))
 def test_output_is_uploadable(runs, case):
     """A result must also pass the submission validator, not merely match.
 
     Only meaningful where the section 4.3 profiles exist, which is BP8.
     """
     run_dir, ref_dir = _run(runs, case)
-    if not C.category_files(ref_dir, "profile"):
-        pytest.skip("no section 4.3 profiles in this reference")
+    assert C.category_files(ref_dir, "profile"), (
+        f"{C.case_id(case)}: reference holds no section 4.3 profiles")
 
     out = os.path.join(WORK_ROOT, f"e2e.sub.{C.case_id(case)}")
     subprocess.run(["python3", os.path.join(str(ROOT), "scripts",

@@ -1374,3 +1374,43 @@ def test_dd_profile_series_non_finite_reference_is_a_failure_naming_file_and_col
         np.savetxt(p, np.array([[1.0, 0.1, 0.0, 5.0, 0.0], [2.0, 0.2, 0.0, 6.0, tdip]]))
     ok, msg = _dd_profile_series(g, r)
     assert not ok and "p1output.txt" in msg and "column 5" in msg, f"ok={ok}, msg={msg!r}"
+
+
+@pytest.mark.e2e_fast
+def test_station_velocity_uses_the_step_taken():
+    """Regression (1.24.12): off-fault station velocity is displacement change
+    over the step actually taken.
+
+    The solver loops reassigned dtev1 to the NEXT step's size before dividing
+    the nodal displacement change by it, so with a variable step every
+    free-node velocity was off by (next dt)/(this dt). A constant-dt case such
+    as test.bp5.qdc.2000 at its default xi hides it, so xi is raised until the
+    step grows. SEAS station files interleave displacement and velocity per
+    component after the time column. The history is recorded before the step's
+    own displacement is stored, so the displacement of row i is the state at
+    the end of step i-1 (time t_{i-1}), and the velocity of row i must equal
+    (d_i - d_{i-1}) / (t_{i-1} - t_{i-2}): the change over the step that made
+    it. The unfixed solver divides by t_i - t_{i-1}, the next step.
+    """
+    import numpy as np
+    run_dir = C.run_case("test.bp5.qdc.2000",
+                         {"xi": 0.5, "nstep": 101, "nt_out": 101, "HPC_ncpu": 2},
+                         os.path.join(WORK_ROOT, "e2e.station_velocity"))
+    files = C.station_files(run_dir, "srfst_strk")
+    assert files, "run wrote no off-fault station files"
+    worst = 0.0
+    for f in files:
+        a = np.loadtxt(os.path.join(run_dir, f))
+        t = a[:, 0]
+        dt = np.diff(t)
+        assert dt.max() > 1.5 * dt.min(), \
+            f"{f}: time step never varied (dt {dt.min():.4g}..{dt.max():.4g}); " \
+            f"the test cannot see the divisor"
+        for c in (1, 3, 5):                       # displacement columns
+            d, v = a[:, c], a[:, c + 1]
+            fd = np.diff(d)[1:] / dt[:-1]             # rows 2..n
+            keep = np.abs(fd) > 1e-1 * np.abs(fd).max()   # clear of 7-digit rounding
+            if keep.any():
+                worst = max(worst, np.max(np.abs(v[2:][keep] / fd[keep] - 1)))
+    print(f"\nstation velocity / finite-difference: max |ratio - 1| = {worst:.3e}")
+    assert worst < 1e-3, f"station velocity disagrees with d(disp)/dt by {worst:.3e}"

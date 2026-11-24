@@ -29,6 +29,8 @@ mkdir -p "$OUT/home" || die "cannot create $OUT"
 OUT=$(cd "$OUT" && pwd) || die "cannot resolve $OUT"
 W=$OUT/clone
 STATUS=$OUT/status.txt
+# The e2e stage runs `run` inside `flock ... bash -c`: that child sees only exported variables.
+export OUT W CONDA_BASE
 echo "start $(date +%T) load $(cut -d' ' -f1-3 /proc/loadavg) machine=$MACHINE url=$URL" > "$STATUS"
 
 FAILED=""

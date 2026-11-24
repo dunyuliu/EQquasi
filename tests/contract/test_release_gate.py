@@ -137,3 +137,17 @@ def test_release_gate_script_is_checked_in_and_sets_machine():
     assert "-m ubuntu" not in src, f"{GATE_SCRIPT} builds with -m ubuntu"
     r = subprocess.run(["bash", "-n", str(p)], capture_output=True, text=True)
     assert r.returncode == 0, f"bash -n {GATE_SCRIPT} failed: {r.stderr}"
+
+
+def test_release_gate_exports_what_the_flocked_stage_needs():
+    """The e2e stage runs `run` in a `flock ... bash -c` child, which sees only
+    exported variables. The first real run (12:04, 2026-11-24) found the child
+    with an empty clone path: pytest rc 4, `file or directory not found: tests`.
+    """
+    src = read(GATE_SCRIPT)
+    exported = set()
+    for line in src.splitlines():
+        if line.startswith("export "):
+            exported.update(line.split()[1:])
+    for name in ("OUT", "W", "CONDA_BASE", "MACHINE"):
+        assert name in exported, f"{GATE_SCRIPT} does not export {name}; the flocked e2e stage would lose it"

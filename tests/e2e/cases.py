@@ -25,7 +25,10 @@ ruptured. So the comparisons are driven by what the reference directory
 contains, exactly as `scripts/plotStations.py` decides its layout.
 """
 
+import bisect
+import glob
 import json
+import math
 import os
 import re
 import shutil
@@ -807,3 +810,139 @@ def compare_netcdf(gpath, rpath, rtol=1e-10, floor_rtol=1e-10):
 
 
 COMPARATORS = {"series": compare_series, "netcdf": compare_netcdf}
+
+
+# ---------------------------------------------------------------------------
+# Full-cycle physical metrics (board PATHWAY_FORWARD.md, D6, owner option A,
+# 2026-11-24). Definitions and tolerances are the board's; do not loosen.
+#
+# Event: contiguous samples of global.dat column 2 (peak slip rate) at or above
+# EVENT_THRESHOLD. Onset and end: log-linear threshold crossing. Moment:
+# trapezoid integral of column 3 over the event window. Coseismic slip: the
+# fltst station with the largest slip, hypot(columns 2, 3) at end minus onset.
+# A window touching the first or last sample is truncated: its onset or end is
+# NaN and is never compared (D6 windows).
+EVENT_THRESHOLD = 1e-3  # m/s
+D6_TOLERANCES = {   # bp5 / bp7, solver 4 against solver 3 (round-off class)
+    "onset_s": 4e-15,   # absolute, seconds
+    "end_s": 1e-10,     # absolute, seconds
+    "peak": 6e-14,      # relative
+    "moment": 2e-14,    # relative
+    "slip": 2e-14,      # relative
+}
+
+
+def load_columns(path):
+    """Whitespace-separated float table; empty or ragged files raise."""
+    rows = [[float(x) for x in ln.split()] for ln in open(path) if ln.split()]
+    if not rows:
+        raise ValueError(f"empty table {path}")
+    if len({len(r) for r in rows}) != 1:
+        raise ValueError(f"ragged table {path}")
+    return rows
+
+
+def log_crossing(t0, v0, t1, v1, thr):
+    """Time at which log(v) (linear in t between the samples) equals log(thr)."""
+    if v0 <= 0 or v1 <= 0:
+        raise ValueError(f"non-positive slip rate at a crossing: {v0}, {v1}")
+    return t0 + (math.log(thr) - math.log(v0)) / (math.log(v1) - math.log(v0)) * (t1 - t0)
+
+
+def _lin(t, ts, ys, i):
+    return ys[i] + (t - ts[i]) / (ts[i + 1] - ts[i]) * (ys[i + 1] - ys[i])
+
+
+def find_events(g, thr=EVENT_THRESHOLD):
+    """Events of a global.dat table (rows: time, peak slip rate, moment, ...).
+
+    Returns dicts with onset, end (NaN when truncated), t0, t1 (the window used),
+    peak and moment.
+    """
+    t = [r[0] for r in g]
+    v = [r[1] for r in g]
+    m = [r[2] for r in g]
+    n = len(t)
+    out = []
+    i = 0
+    while i < n:
+        if v[i] >= thr:
+            a = i
+            while i + 1 < n and v[i + 1] >= thr:
+                i += 1
+            b = i
+            ts, vs = a == 0, b == n - 1
+            on = math.nan if ts else log_crossing(t[a - 1], v[a - 1], t[a], v[a], thr)
+            en = math.nan if vs else log_crossing(t[b], v[b], t[b + 1], v[b + 1], thr)
+            tw = ([] if ts else [on]) + t[a:b + 1] + ([] if vs else [en])
+            mw = (([] if ts else [_lin(on, t, m, a - 1)]) + m[a:b + 1]
+                  + ([] if vs else [_lin(en, t, m, b)]))
+            mom = sum(0.5 * (mw[k] + mw[k + 1]) * (tw[k + 1] - tw[k]) for k in range(len(tw) - 1))
+            out.append(dict(onset=on, end=en, t0=tw[0], t1=tw[-1],
+                            peak=max(v[a:b + 1]), moment=mom))
+        i += 1
+    return out
+
+
+def station_slip_over(fltst_path, t0, t1):
+    """hypot(fltst cols 2, 3) at t1 minus t0, interpolated; NaN if outside the series."""
+    f = load_columns(fltst_path)
+    ts = [r[0] for r in f]
+    s = [math.hypot(r[1], r[2]) for r in f]
+    if t0 < ts[0] or t1 > ts[-1]:
+        return math.nan
+
+    def at(t):
+        return _lin(t, ts, s, min(max(bisect.bisect_right(ts, t) - 1, 0), len(ts) - 2))
+    return at(t1) - at(t0)
+
+
+def full_cycle_metrics(result_dir, thr=EVENT_THRESHOLD):
+    """Per-event metrics of a result/cycle0 directory (global.dat + fltst_*.txt).
+
+    Each event also carries `station` (largest coseismic slip in THIS run) and
+    `slip`. NaN-slip stations (truncated windows) never win.
+    """
+    result_dir = str(result_dir)
+    events = find_events(load_columns(os.path.join(result_dir, "global.dat")), thr)
+    stations = sorted(glob.glob(os.path.join(result_dir, "fltst_*.txt")))
+    if not stations:
+        raise FileNotFoundError(f"no fltst_*.txt in {result_dir}")
+    for ev in events:
+        slips = {p: station_slip_over(p, ev["t0"], ev["t1"]) for p in stations}
+        ok = {p: x for p, x in slips.items() if not math.isnan(x)}
+        best = max(ok, key=ok.get) if ok else None
+        ev["station"] = os.path.basename(best) if best else None
+        ev["slip"] = ok[best] if best else math.nan
+    return events
+
+
+def _rel(a, b):
+    return 0.0 if a == b else abs(b - a) / max(abs(a), abs(b))
+
+
+def compare_full_cycle_metrics(ref, run, tol=D6_TOLERANCES):
+    """(ok, message) comparing two `full_cycle_metrics` lists at the D6 tolerances.
+
+    NaN-safe: a failure is `not (err <= bound)`. Both-NaN (truncated) onset, end
+    or slip is skipped; NaN on one side only fails.
+    """
+    if len(ref) != len(run):
+        return False, f"event count {len(run)} != reference {len(ref)}"
+    bad = []
+    for k, (a, b) in enumerate(zip(ref, run)):
+        pairs = (("onset_s", abs(b["onset"] - a["onset"]), a["onset"], b["onset"]),
+                 ("end_s", abs(b["end"] - a["end"]), a["end"], b["end"]),
+                 ("peak", _rel(a["peak"], b["peak"]), a["peak"], b["peak"]),
+                 ("moment", _rel(a["moment"], b["moment"]), a["moment"], b["moment"]),
+                 ("slip", _rel(a["slip"], b["slip"]), a["slip"], b["slip"]))
+        for key, err, x, y in pairs:
+            if math.isnan(x) and math.isnan(y):
+                continue
+            if not (err <= tol[key]):
+                bad.append(f"event {k} {key}: {err:.3e} > {tol[key]:g}")
+        if a["station"] != b["station"]:
+            bad.append(f"event {k} station {b['station']} != reference {a['station']}")
+    if bad:
+        return False, "; ".join(bad)
+    return True, f"{len(ref)} event(s) within D6 tolerances"

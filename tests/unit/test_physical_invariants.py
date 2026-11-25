@@ -229,3 +229,97 @@ def test_multifault_reference_seeds_exactly_one_fault():
     assert not np.array_equal(v[0], v[1]), (
         "both faults have identical slip-rate slabs at step 1, which is what "
         "a fault-aliased read of on_fault_vars_input.nc produces")
+
+
+# --- full-cycle metric functions (tests/e2e/cases.py, board D6) -------------
+# Synthetic series with hand-computable answers. The rate is log-linear between
+# samples, so a crossing of 1e-3 between 1e-4 and 1e-2 is at the midpoint.
+
+def _cases():
+    import sys
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    import cases
+    return cases
+
+
+def _series(onset_shift=0.0):
+    """Rate 1e-5, 1e-5, 1e-4, 1e-2, 1e-1, 1e-2, 1e-4, 1e-5, 1e-5 at t = 0..8 s
+    (sample 2 moved by onset_shift); moment column 2.0 inside the event."""
+    t = [0.0, 1.0, 2.0 + onset_shift, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    v = [1e-5, 1e-5, 1e-4, 1e-2, 1e-1, 1e-2, 1e-4, 1e-5, 1e-5]
+    return [[ti, vi, 2.0 if vi >= 1e-3 else 0.0, 0.0] for ti, vi in zip(t, v)]
+
+
+def _tagged(events):
+    for e in events:
+        e.update(station="s", slip=1.0)
+    return events
+
+
+def test_find_events_log_linear_crossings_are_exact():
+    ev = _cases().find_events(_series())
+    assert [(len(ev)), ev[0]["onset"], ev[0]["end"]] == [1, pytest.approx(2.5, abs=1e-14),
+                                                          pytest.approx(5.5, abs=1e-14)]
+
+
+def test_find_events_moment_is_trapezoid_over_the_crossing_window():
+    # window t = 2.5, 3, 4, 5, 5.5; column 3 interpolated to 1, then 2, 2, 2, then 1:
+    # 0.75 + 2 + 2 + 0.75 = 5.5
+    assert _cases().find_events(_series())[0]["moment"] == pytest.approx(5.5, abs=1e-14)
+
+
+def test_find_events_peak_is_window_maximum():
+    assert _cases().find_events(_series())[0]["peak"] == 1e-1
+
+
+def test_find_events_two_separate_events_are_two():
+    g = _series() + [[9.0 + k, v, 0.0, 0.0] for k, v in enumerate([1e-5, 1e-2, 1e-1, 1e-5])]
+    assert len(_cases().find_events(g)) == 2
+
+
+def test_find_events_a_lone_sample_exactly_at_threshold_is_an_event():
+    # "at or above": a single sample at 1e-3 is one event (a strict > finds none).
+    g = [[0.0, 1e-5, 0, 0], [1.0, 1e-3, 0, 0], [2.0, 1e-5, 0, 0]]
+    assert len(_cases().find_events(g)) == 1
+
+
+def test_find_events_window_touching_first_sample_has_nan_onset_and_finite_end():
+    g = [[0.0, 1e-1, 0, 0], [1.0, 1e-1, 0, 0], [2.0, 1e-5, 0, 0]]
+    ev = _cases().find_events(g)[0]
+    assert (ev["onset"] != ev["onset"]) and ev["end"] == ev["end"]
+
+
+def test_log_crossing_nonpositive_rate_raises():
+    with pytest.raises(ValueError):
+        _cases().log_crossing(0.0, 0.0, 1.0, 1e-2, 1e-3)
+
+
+def test_station_slip_over_interpolates_hypot_difference(tmp_path):
+    p = tmp_path / "fltst_x.txt"
+    p.write_text("0 0 0\n1 3 4\n2 6 8\n")
+    assert _cases().station_slip_over(str(p), 0.5, 1.5) == pytest.approx(5.0, abs=1e-14)
+
+
+def test_compare_full_cycle_metrics_identical_passes():
+    c = _cases()
+    ev = _tagged(c.find_events(_series()))
+    assert c.compare_full_cycle_metrics(ev, [dict(e) for e in ev])[0]
+
+
+def test_compare_full_cycle_metrics_shifted_onset_is_caught():
+    c = _cases()
+    ok, msg = c.compare_full_cycle_metrics(_tagged(c.find_events(_series())),
+                                           _tagged(c.find_events(_series(onset_shift=1e-6))))
+    assert not ok and "onset_s" in msg
+
+
+def test_compare_full_cycle_metrics_nan_peak_fails():
+    c = _cases()
+    ref = _tagged(c.find_events(_series()))
+    assert not c.compare_full_cycle_metrics(ref, [dict(e, peak=float("nan")) for e in ref])[0]
+
+
+def test_compare_full_cycle_metrics_event_count_mismatch_fails():
+    c = _cases()
+    ref = _tagged(c.find_events(_series()))
+    assert not c.compare_full_cycle_metrics(ref, ref + ref)[0]

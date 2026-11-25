@@ -98,6 +98,13 @@ def generateFaultInterface(par, case_dir, nx, nz, dx, dz, isRoughFault, dipAngle
         pu.die(f'generateFaultInterface: par.insertFaultType={isRoughFault} '
                'inserts no fault (1: planar, 2: rough); nothing to generate.')
     
+    # Rows of the file are dx apart in depth (src/func_lib.f90 maps mesh z to
+    # row j at z = fz1 + (j-1)*dx), so a plane dipping dipAngle moves dx/tan(dip)
+    # in y per row. Only 0 < dip <= 90 names such a plane: stop rather than build another.
+    if not 0. < dipAngle <= 90.:
+        pu.die(f'generateFaultInterface: par.dip={dipAngle} is not a dipping '
+               'fault (the per-row offset dx/tan(dip) needs 0 < dip <= 90); use 0 < dip <= 90.')
+
     # The fault interface is discretized to dx by dx squares.   
     # Rotate y coordinates to y+ by the (90-dip) angle.
     # 1. shorten z coordinate by depth z/tan(dip)
@@ -112,10 +119,6 @@ def generateFaultInterface(par, case_dir, nx, nz, dx, dz, isRoughFault, dipAngle
     # Rows of the file are dx apart in depth (src/func_lib.f90 maps mesh z to
     # row j at z = fz1 + (j-1)*dx), so a plane dipping dipAngle moves dx/tan(dip)
     # in y per row. dip 0 has no such plane: stop rather than build one.
-    if dipAngle % 180. == 0.:
-        pu.die(f'generateFaultInterface: par.dip={dipAngle} is not a dipping '
-               'fault (the per-row offset dx/tan(dip) is undefined); use 0 < dip <= 90.')
-
     dSurface_dx = np.gradient(subSurface/dx, axis=1) 
     dSurface_dz = np.gradient(subSurface/dz, axis=0) 
     

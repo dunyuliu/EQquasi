@@ -635,6 +635,23 @@ build, run and traps are in `CLAUDE.md`.
    before it is replaced, and whether to keep the old behaviour behind
    an option is the owner's call; the tolerance or form of the check in
    270 is proposed with its measurement, not loosened silently.
+   Owner, 2026-11-25 08:35 to 08:37 CST: "/autopilot" (typed with no
+   argument) and then "self develop" (both verbatim), after the
+   invoking session reported a message relayed by another session
+   asking for "/autopilot achieve the grand goals, self-paced" and asked
+   the owner to confirm it and say what the grand goals are. Read as (a
+   reading): the unattended run resumes under the budget already on
+   this row (2026-11-23 11:42 CST: no end date), self-paced, and it
+   develops on its own initiative: beyond the open rows it proposes its
+   next work on this board (each proposal with its falsifier and cost,
+   as in the 2026-11-16 "keep proposing, keep exploring" run) and
+   carries out what needs no owner decision. Unchanged: rule 1 (a new
+   file, name, parameter or compset needs the owner's word), no default
+   change, no reference replaced, no major version bump, the Vista
+   ceiling, every paused or owner-held row stays blocked on the owner,
+   and questions go to the daily brief. The phrase "the grand goals" is
+   NOT adopted as scope: this repository's board, rule book and docs
+   define no such goals and the owner has not said here what they are.
    (h) end state, owner 2026-11-13: "in the end, mumps is a choice o petcs".
    One PETSc time loop; MUMPS, BDDC and AMG are solver choices inside it and
    `solveTimeLoopMUMPS.f90` retires. Before it retires: PETSc-with-MUMPS

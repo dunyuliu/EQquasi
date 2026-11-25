@@ -49,7 +49,21 @@ def test_built_dip_equals_par_dip(gen, tmp_path, dip):
         f"par.dip={dip} built a plane that dips something else")
 
 
-def test_dip_zero_is_refused(gen, tmp_path):
+@pytest.mark.parametrize("dip", [-50.0, 0.0, 90.0001, 180.0])
+def test_dip_outside_range_is_refused(gen, tmp_path, dip):
     with pytest.raises(SystemExit):
         gen.generateFaultInterface(SimpleNamespace(fxmin=0.0, fzmin=0.0),
-                                   str(tmp_path), NX, NZ, DX, DX, 1, 0.0, seedId=1)
+                                   str(tmp_path), NX, NZ, DX, DX, 1, dip, seedId=1)
+    assert not (tmp_path / "bFault_Rough_Geometry.txt").exists()
+
+
+def test_deleted_category_is_visible_at_collection(monkeypatch):
+    """A category no reference holds must collect as a failing param, not vanish."""
+    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    import test_benchmarks as tb
+    monkeypatch.setattr(tb.C, "category_files", lambda d, cat: [])
+    monkeypatch.setattr(tb, "holding", lambda cases, holds: [])
+    params = tb.category_params(["profile"])
+    assert len(params) == 1 and params[0].values[0] is None
+    with pytest.raises(AssertionError, match="no reference holds any profile"):
+        tb.test_category_matches_reference({}, None, "profile")

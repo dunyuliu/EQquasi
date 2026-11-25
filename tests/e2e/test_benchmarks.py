@@ -93,10 +93,16 @@ def holding(cases, holds):
 
 
 def category_params(categories, cases=None):
-    return [pytest.param(c, cat, marks=_marks(c), id=f"{cat}-{C.case_id(c)}")
-            for cat in categories
-            for c in holding(C.CASES if cases is None else cases,
-                             lambda d, cat=cat: bool(C.category_files(d, cat)))]
+    """One param per (case, category) the reference holds. A category that no
+    case holds is not dropped: it becomes one param that fails by name, so a
+    deleted category cannot make its test vanish at collection."""
+    out = []
+    for cat in categories:
+        held = [pytest.param(c, cat, marks=_marks(c), id=f"{cat}-{C.case_id(c)}")
+                for c in holding(C.CASES if cases is None else cases,
+                                 lambda d, cat=cat: bool(C.category_files(d, cat)))]
+        out += held or [pytest.param(None, cat, id=f"{cat}-no-reference-holds-it")]
+    return out
 
 
 def file_params(holds, cases=None):
@@ -132,6 +138,7 @@ def test_category_matches_reference(runs, case, category):
     Reported per file rather than as a single verdict: "bp5 failed" sends you
     looking, "fltst_strk000dp010.txt: max|diff| = 3.1e-04 at column 6" does not.
     """
+    assert case is not None, f"no reference holds any {category} files"
     run_dir, ref_dir = _run(runs, case)
     files = C.category_files(ref_dir, category)
     assert files, f"{C.case_id(case)}: reference holds no {category} files"

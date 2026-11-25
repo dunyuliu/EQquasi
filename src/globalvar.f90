@@ -7,7 +7,7 @@ MODULE globalvar
     ! benchmark output header and into runInfo.json, so it is the provenance
     ! for any published comparison -- it must match a tag that exists.
     ! bp8 is unreleased: the -dev suffix says so truthfully in submission files.
-    character (len = *), parameter :: EQQUASI_VERSION = '1.24.14'
+    character (len = *), parameter :: EQQUASI_VERSION = '1.24.15'
 
     ! Steps accumulated in cons since it was last zeroed (ddS2tApply far-field
     ! proportionality tolerance scales with it: round-off grows like n*eps).

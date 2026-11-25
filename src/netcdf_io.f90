@@ -776,7 +776,8 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
         print *, 'Two causes. (1) A coupled restart (e.g. fault.dyna.r.nc from EQdyna) must', &
             ' stamp this attribute with its own dz before EQquasi can read it.'
         print *, '(2) A restart written by an older EQquasi version that did not stamp it', &
-            ' (1.19.1 did not). If EQquasi wrote the file with this run''s dx, stamp it on a copy:'
+            ' (1.19.1 did not). If EQquasi wrote the file with this run''s dx, copy it, then stamp the original:'
+        print *, '  cp fault.r.nc fault.r.nc.bak'
         print *, '  python3 -c "import netCDF4; d = netCDF4.Dataset(''fault.r.nc'', ''a''); ', &
             'd.setncattr(''dip_node_spacing'', DX); d.close()"   (DX = this run''s dx)'
         print *, 'Older versions wrote single-precision files, so a run continued this way', &

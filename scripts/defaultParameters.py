@@ -116,6 +116,11 @@ class parameters:
     # mode of the code - quasi-dynamic (1) or fully-dynamic (2). 
     mode = 1
 
+    # Fault dip in degrees (0 < dip <= 90). generateFaultInterface offsets the
+    # fault surface by dx/tan(dip) per row from 1.24.12 on; versions up to
+    # 1.24.11 used dx*cos(dip), which built a steeper plane, atan(1/cos(dip))
+    # (50 became 57.3 degrees; 90 was unaffected). A planar or rough run with
+    # dip other than 90 from an earlier version is not comparable with one now.
     dip = 90.
 
     # model_domain (in meters)

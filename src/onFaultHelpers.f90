@@ -233,6 +233,7 @@ subroutine initOnFaultKinematics
     dtev       = ksi*minDc/maxSlipRate
     dtev1      = ksi*minDc/maxSlipRate!Initial dtev1>dt to enter static state.
     cons       = 0.0d0
+    s2t_far_nacc = 0
     constmp    = 0.0d0
     consvtmp   = 0.0d0
     consv      = 0.0d0

@@ -773,8 +773,14 @@ subroutine netcdf_read_on_fault_restart(infile1, infile2)
         print *, 'netcdf_read_on_fault_restart: ', trim(infile2), &
             ' carries no "dip_node_spacing" global attribute, so its dip-axis', &
             ' node spacing cannot be verified against this run''s dx = ', dx, '.'
-        print *, 'A coupled restart (e.g. fault.dyna.r.nc from EQdyna) must', &
+        print *, 'Two causes. (1) A coupled restart (e.g. fault.dyna.r.nc from EQdyna) must', &
             ' stamp this attribute with its own dz before EQquasi can read it.'
+        print *, '(2) A restart written by an older EQquasi version that did not stamp it', &
+            ' (1.19.1 did not). If EQquasi wrote the file with this run''s dx, stamp it on a copy:'
+        print *, '  python3 -c "import netCDF4; d = netCDF4.Dataset(''fault.r.nc'', ''a''); ', &
+            'd.setncattr(''dip_node_spacing'', DX); d.close()"   (DX = this run''s dx)'
+        print *, 'Older versions wrote single-precision files, so a run continued this way', &
+            ' agrees with an all-new run only to about 1e-7.'
         stop 'Stopped'
     endif
     if (abs(file_dip_spacing - dx) > 1.0d-6 * dx) then

@@ -133,7 +133,11 @@ def test_release_gate_script_is_checked_in_and_sets_machine():
     assert p.exists(), f"{GATE_SCRIPT} is missing; the full-tier gate must be checked in"
     assert os.access(p, os.X_OK), f"{GATE_SCRIPT} is not executable"
     src = read(GATE_SCRIPT)
-    assert "MACHINE=" in src, f"{GATE_SCRIPT} never sets MACHINE"
+    code = [l for l in src.splitlines() if not l.lstrip().startswith("#")]
+    assert any(l.startswith("export MACHINE") for l in code), (
+        f"{GATE_SCRIPT} has no non-comment 'export MACHINE' line")
+    assert any('[ -n "${MACHINE:-}" ]' in l and "die" in l for l in code), (
+        f"{GATE_SCRIPT} does not refuse an unset MACHINE")
     assert "-m ubuntu" not in src, f"{GATE_SCRIPT} builds with -m ubuntu"
     r = subprocess.run(["bash", "-n", str(p)], capture_output=True, text=True)
     assert r.returncode == 0, f"bash -n {GATE_SCRIPT} failed: {r.stderr}"

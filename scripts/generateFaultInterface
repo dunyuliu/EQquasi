@@ -116,9 +116,6 @@ def generateFaultInterface(par, case_dir, nx, nz, dx, dz, isRoughFault, dipAngle
 
     # compute gradients for y=y(x,z), dy/dx, dy/dz
     # axis=(1,0), 1 along columns, 0 along rows.
-    # Rows of the file are dx apart in depth (src/func_lib.f90 maps mesh z to
-    # row j at z = fz1 + (j-1)*dx), so a plane dipping dipAngle moves dx/tan(dip)
-    # in y per row. dip 0 has no such plane: stop rather than build one.
     dSurface_dx = np.gradient(subSurface/dx, axis=1) 
     dSurface_dz = np.gradient(subSurface/dz, axis=0) 
     

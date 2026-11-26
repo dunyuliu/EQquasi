@@ -24,7 +24,12 @@ DX = 100.0
 @pytest.fixture(scope="module")
 def gen():
     os.environ.setdefault("MPLBACKEND", "Agg")
-    sys.path.insert(0, str(ROOT / "scripts"))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.syspath_prepend(str(ROOT / "scripts"))
+        yield _load_gen()
+
+
+def _load_gen():
     path = str(ROOT / "scripts" / "generateFaultInterface")
     loader = importlib.machinery.SourceFileLoader("generateFaultInterface", path)
     spec = importlib.util.spec_from_loader("generateFaultInterface", loader)
@@ -59,11 +64,12 @@ def test_dip_outside_range_is_refused(gen, tmp_path, dip):
 
 def test_deleted_category_is_visible_at_collection(monkeypatch):
     """A category no reference holds must collect as a failing param, not vanish."""
-    sys.path.insert(0, str(ROOT / "tests" / "e2e"))
+    monkeypatch.syspath_prepend(str(ROOT / "tests" / "e2e"))
     import test_benchmarks as tb
     monkeypatch.setattr(tb.C, "category_files", lambda d, cat: [])
     monkeypatch.setattr(tb, "holding", lambda cases, holds: [])
     params = tb.category_params(["profile"])
     assert len(params) == 1 and params[0].values[0] is None
+    assert {m.name for m in params[0].marks} == {"e2e_fast", "e2e_ci"}  # runs in the tiers CI and the sweep select
     with pytest.raises(AssertionError, match="no reference holds any profile"):
         tb.test_category_matches_reference({}, None, "profile")

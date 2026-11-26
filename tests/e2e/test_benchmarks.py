@@ -101,7 +101,8 @@ def category_params(categories, cases=None):
         held = [pytest.param(c, cat, marks=_marks(c), id=f"{cat}-{C.case_id(c)}")
                 for c in holding(C.CASES if cases is None else cases,
                                  lambda d, cat=cat: bool(C.category_files(d, cat)))]
-        out += held or [pytest.param(None, cat, id=f"{cat}-no-reference-holds-it")]
+        out += held or [pytest.param(None, cat, id=f"{cat}-no-reference-holds-it",
+                                      marks=[pytest.mark.e2e_fast, pytest.mark.e2e_ci])]
     return out
 
 
